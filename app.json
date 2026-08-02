@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "Forge OS",
+    "slug": "forge-os",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#E65C00"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.forgeos",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Forge OS needs your location for attendance check-in.",
+        "NSCameraUsageDescription": "Forge OS needs camera access for 5S photo submissions.",
+        "NSPhotoLibraryUsageDescription": "Forge OS needs photo library access for 5S submissions."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#E65C00"
+      },
+      "package": "com.yourcompany.forgeos",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "RECEIVE_BOOT_COMPLETED",
+        "SCHEDULE_EXACT_ALARM"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      ["expo-location", {
+        "locationAlwaysAndWhenInUsePermission": "Forge OS needs your location for attendance check-in."
+      }],
+      ["expo-camera", {
+        "cameraPermission": "Forge OS needs camera access for 5S photo submissions."
+      }],
+      ["expo-notifications", {
+        "icon": "./assets/notification-icon.png",
+        "color": "#E65C00"
+      }]
+    ],
+    "extra": {
+      "router": { "origin": false }
+    }
+  }
+}
