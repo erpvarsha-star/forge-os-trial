@@ -1,0 +1,376 @@
+{
+  "common": {
+    "appName": "फोर्ज ओएस",
+    "companyName": "वर्षा फोर्जिंग्स प्राइवेट लिमिटेड",
+    "welcome": "स्वागत है",
+    "save": "सहेजें",
+    "cancel": "रद्द करें",
+    "submit": "जमा करें",
+    "approve": "स्वीकृत करें",
+    "reject": "अस्वीकार करें",
+    "edit": "संपादित करें",
+    "delete": "हटाएं",
+    "confirm": "पुष्टि करें",
+    "back": "वापस",
+    "next": "आगे",
+    "loading": "लोड हो रहा है...",
+    "success": "सफल",
+    "error": "त्रुटि",
+    "retry": "पुनः प्रयास करें",
+    "logout": "लॉग आउट",
+    "search": "खोजें",
+    "filter": "फ़िल्टर",
+    "viewAll": "सभी देखें",
+    "today": "आज",
+    "yesterday": "कल",
+    "thisMonth": "इस महीने",
+    "points": "अंक",
+    "rank": "रैंक",
+    "department": "विभाग",
+    "shift": "शिफ्ट",
+    "date": "तारीख़",
+    "reason": "कारण",
+    "status": "स्थिति",
+    "notifications": "सूचनाएं",
+    "noData": "कोई डेटा उपलब्ध नहीं",
+    "saveSuccess": "सफलतापूर्वक सहेजा गया",
+    "saveFailed": "कुछ गड़बड़ हुई। कृपया पुनः प्रयास करें।",
+    "requiredField": "यह फ़ील्ड आवश्यक है"
+  },
+
+  "auth": {
+    "loginTitle": "फोर्ज ओएस में लॉग इन करें",
+    "phoneNumber": "फ़ोन नंबर",
+    "sendOtp": "ओटीपी भेजें",
+    "enterOtp": "ओटीपी दर्ज करें",
+    "verifyOtp": "सत्यापित करें और आगे बढ़ें",
+    "otpSentTo": "{{phone}} पर ओटीपी भेजा गया",
+    "resendOtp": "ओटीपी पुनः भेजें",
+    "invalidOtp": "अमान्य ओटीपी। कृपया पुनः प्रयास करें।",
+    "selectLanguage": "भाषा चुनें",
+    "sessionExpired": "आपका सत्र समाप्त हो गया है। कृपया पुनः लॉग इन करें।"
+  },
+
+  "roles": {
+    "owner": "मालिक",
+    "plant_head": "प्लांट हेड",
+    "manager": "मैनेजर",
+    "supervisor": "सुपरवाइज़र",
+    "member": "सदस्य",
+    "hr_admin": "एचआर एडमिन",
+    "security_guard": "सुरक्षा गार्ड",
+    "ai_agent": "वर्षा एआई"
+  },
+
+  "attendance": {
+    "checkIn": "चेक-इन करें",
+    "checkInSuccess": "चेक-इन सफल हुआ",
+    "scanQr": "गेट क्यूआर कोड स्कैन करें",
+    "gpsVerifying": "स्थान सत्यापित हो रहा है...",
+    "outsideGeofence": "आप प्लांट से {{distance}} मीटर दूर हैं। चेक-इन करने के लिए पास आएं।",
+    "invalidQr": "अमान्य क्यूआर कोड। कृपया पुनः प्रयास करें।",
+    "lateReasonPrompt": "आप देर से आए हैं। कृपया एक कारण चुनें।",
+    "lateReasons": {
+      "traffic": "ट्रैफ़िक",
+      "health": "स्वास्थ्य",
+      "family": "पारिवारिक",
+      "vehicle": "वाहन",
+      "other": "अन्य"
+    },
+    "status": {
+      "P": "उपस्थित",
+      "LC": "देर से आना",
+      "EC": "जल्दी आना",
+      "OT": "ओवरटाइम",
+      "A": "अनुपस्थित",
+      "H": "छुट्टी का दिन",
+      "L": "अवकाश",
+      "WO": "साप्ताहिक अवकाश"
+    },
+    "checkpoint1": "स्व चेक-इन",
+    "checkpoint2": "सुरक्षा पुष्टि",
+    "checkpoint3": "सुपरवाइज़र पुष्टि",
+    "regularise": "सुधार करें",
+    "regulariseRequestSubmitted": "सुधार अनुरोध जमा किया गया",
+    "warning1": "बार-बार देर से आने पर चेतावनी 1 जारी की गई",
+    "finalWarning": "अंतिम चेतावनी जारी — मालिक की स्वीकृति आवश्यक",
+    "attendanceCalendar": "उपस्थिति कैलेंडर",
+    "lateBy": "{{minutes}} मिनट देर से"
+  },
+
+  "leave": {
+    "applyLeave": "अवकाश हेतु आवेदन करें",
+    "leaveType": "अवकाश प्रकार",
+    "leaveTypes": {
+      "EL": "अर्जित अवकाश",
+      "CL": "आकस्मिक अवकाश",
+      "SL": "बीमारी अवकाश",
+      "CO": "प्रतिपूरक अवकाश",
+      "ML": "मातृत्व अवकाश"
+    },
+    "startDate": "आरंभ तिथि",
+    "endDate": "समाप्ति तिथि",
+    "balance": "अवकाश शेष",
+    "coverageWarning": "इसे स्वीकृत करने से विभाग की उपलब्धता {{pct}}% से कम हो जाएगी।",
+    "ownerConfirmRequired": "उपलब्धता {{pct}}% से कम — स्वीकृति से पहले मालिक की पुष्टि आवश्यक।",
+    "pendingApproval": "स्वीकृति लंबित",
+    "approvedBy": "{{name}} द्वारा स्वीकृत",
+    "rejectedReason": "अस्वीकृत: {{reason}}",
+    "escalatedToPlantHead": "प्लांट हेड को अग्रेषित — मैनेजर ने 48 घंटे में जवाब नहीं दिया",
+    "finalApproverNote": "सभी अवकाश के लिए अंतिम स्वीकृति प्लांट हेड की होती है",
+    "compOffExpiry": "{{date}} को समाप्त होगा",
+    "maternityWeeks": "26 सप्ताह का मातृत्व अवकाश"
+  },
+
+  "advance": {
+    "applyAdvance": "वेतन अग्रिम हेतु आवेदन करें",
+    "amount": "राशि",
+    "repaymentMonths": "पुनर्भुगतान अवधि (महीने)",
+    "outstandingAdvance": "बकाया अग्रिम",
+    "warningOver30": "यह अग्रिम आपके सकल वेतन के 30% से अधिक है।",
+    "autoRejectOver50": "सकल वेतन के 50% से अधिक अग्रिम स्वतः अस्वीकृत हो जाते हैं।",
+    "monthlyDeduction": "मासिक कटौती",
+    "projectedTotal": "अनुमानित कुल बकाया",
+    "ownerApprovalRequired": "₹10,000 से अधिक की अग्रिम राशि के लिए मालिक की स्वीकृति आवश्यक"
+  },
+
+  "production": {
+    "hourlyEntry": "प्रति घंटा उत्पादन प्रविष्टि",
+    "machine": "मशीन",
+    "partNumber": "पार्ट नंबर",
+    "partsMade": "बने पार्ट्स",
+    "efficiency": "दक्षता",
+    "targetParts": "लक्ष्य पार्ट्स",
+    "validate": "प्रविष्टि सत्यापित करें",
+    "flagEntry": "प्रविष्टि फ़्लैग करें",
+    "incentiveFlag": "प्रोत्साहन फ़्लैग",
+    "lowEfficiencyAlert": "दक्षता 80% से कम — ध्यान देने की आवश्यकता",
+    "electricityReading": "बिजली रीडिंग",
+    "electricityStart": "आरंभिक रीडिंग",
+    "electricityEnd": "अंतिम रीडिंग",
+    "oilConsumption": "तेल खपत",
+    "oilType": "तेल का प्रकार",
+    "oilQty": "मात्रा",
+    "casualCount": "अस्थायी श्रमिक संख्या",
+    "unskilled": "अकुशल",
+    "skilled": "कुशल",
+    "operator": "ऑपरेटर",
+    "shiftReport": "शिफ्ट रिपोर्ट",
+    "submitShiftReport": "शिफ्ट रिपोर्ट जमा करें",
+    "noEntryWarning": "इस घंटे के लिए कोई प्रविष्टि नहीं — शून्य अंक, सुपरवाइज़र को सूचित किया गया",
+    "twoHourlyNote": "2-घंटे की प्रविष्टि पर पूर्ण उत्पादन अंकों का 80% मिलता है"
+  },
+
+  "payroll": {
+    "payslip": "वेतन पर्ची",
+    "downloadPayslip": "वेतन पर्ची डाउनलोड करें",
+    "grossEarnings": "सकल आय",
+    "totalDeductions": "कुल कटौती",
+    "netPay": "शुद्ध वेतन",
+    "earnings": {
+      "basic": "मूल वेतन",
+      "hra": "मकान किराया भत्ता",
+      "conveyance": "यात्रा भत्ता",
+      "washing": "धुलाई भत्ता",
+      "education": "शिक्षा भत्ता",
+      "vda": "परिवर्तनशील महंगाई भत्ता",
+      "heat": "ताप भत्ता",
+      "ot": "ओवरटाइम",
+      "dispatchIncentive": "डिस्पैच प्रोत्साहन",
+      "productionAllowance": "उत्पादन भत्ता"
+    },
+    "deductions": {
+      "pf": "पीएफ (12%)",
+      "esic": "ईएसआईसी (0.75%)",
+      "pt": "व्यवसाय कर",
+      "mlwf": "महाराष्ट्र श्रम कल्याण निधि",
+      "advanceRecovery": "अग्रिम वसूली"
+    },
+    "pfChallan": "पीएफ चालान",
+    "esicChallan": "ईएसआईसी चालान",
+    "minimumWagesCheck": "न्यूनतम मजदूरी अनुपालन",
+    "leaveEncashment": "अवकाश नकदीकरण",
+    "exportToZoho": "ज़ोहो बुक्स में निर्यात करें",
+    "exportToSheets": "शीट्स में निर्यात करें"
+  },
+
+  "tasks": {
+    "myTasks": "मेरे कार्य",
+    "assignTask": "कार्य सौंपें",
+    "taskTitle": "कार्य शीर्षक",
+    "dueDate": "नियत तारीख",
+    "priority": {
+      "low": "कम",
+      "normal": "सामान्य",
+      "high": "उच्च"
+    },
+    "taskType": {
+      "daily": "दैनिक",
+      "weekly": "साप्ताहिक",
+      "assigned": "सौंपा गया"
+    },
+    "overdue": "समय सीमा पार",
+    "markDone": "पूर्ण के रूप में चिह्नित करें",
+    "escalatedTask": "प्लांट हेड और मालिक को अग्रेषित",
+    "weeklyDueThursday": "साप्ताहिक कार्य गुरुवार शाम 6 बजे तक देने होते हैं"
+  },
+
+  "mrm": {
+    "monthlyReview": "मासिक समीक्षा (एमआरएम)",
+    "kpiAchievements": "केपीआई उपलब्धियां",
+    "highlights": "मुख्य बातें",
+    "challenges": "चुनौतियां",
+    "actionItems": "कार्य बिंदु",
+    "manpowerStatus": "जनशक्ति स्थिति",
+    "mrmDueReminder": "एमआरएम 10 तारीख शाम 5 बजे तक देना अनिवार्य है",
+    "mrmOverdue": "एमआरएम समय पर जमा नहीं हुई",
+    "status": {
+      "pending": "लंबित",
+      "submitted": "जमा किया गया",
+      "reviewed": "समीक्षा की गई",
+      "noted": "संज्ञान लिया गया"
+    },
+    "departments": {
+      "production": "उत्पादन",
+      "quality": "गुणवत्ता",
+      "maintenance": "रखरखाव",
+      "purchaseStores": "क्रय एवं भंडार",
+      "design": "डिज़ाइन",
+      "salesLogistics": "बिक्री एवं रसद",
+      "accountsFinance": "लेखा एवं वित्त",
+      "hr": "एचआर",
+      "administration": "प्रशासन"
+    }
+  },
+
+  "procurement": {
+    "purchaseRequisition": "क्रय अनुरोध",
+    "purchaseOrder": "क्रय आदेश",
+    "vehicleLog": "वाहन लॉग",
+    "vehicleNumber": "वाहन नंबर",
+    "driverName": "ड्राइवर का नाम",
+    "vendorName": "विक्रेता का नाम",
+    "material": "सामग्री",
+    "direction": {
+      "inward": "अंदर",
+      "outward": "बाहर"
+    },
+    "grn": "माल प्राप्ति नोट (जीआरएन)",
+    "challanNumber": "चालान नंबर",
+    "qcStatus": "क्यूसी स्थिति",
+    "threeWayMatch": "त्रिपक्षीय मिलान",
+    "matchComplete": "मिलान पूर्ण",
+    "exception": "अपवाद",
+    "releasePayment": "भुगतान जारी करें",
+    "eodLock": "ईओडी लॉक — आवक वाहन के लिए जीआरएन लंबित",
+    "escalate": "अग्रेषित करें"
+  },
+
+  "security": {
+    "gateLog": "गेट लॉग",
+    "confirmSeen": "देखा हुआ पुष्टि करें",
+    "eodConfirmation": "दिन के अंत की पुष्टि",
+    "mismatchReasonRequired": "वाहन गिनती जीआरएन गिनती से मेल नहीं खाती। कारण आवश्यक है।",
+    "checkpoint2Window": "शिफ्ट शुरू होने के 90 मिनट बाद पुष्टि बंद हो जाती है"
+  },
+
+  "scoring": {
+    "myScore": "मेरा स्कोर",
+    "leaderboard": "लीडरबोर्ड",
+    "employeeOfMonth": "माह का सर्वश्रेष्ठ कर्मचारी",
+    "categories": {
+      "best_member": "सर्वश्रेष्ठ सदस्य",
+      "best_operator": "सर्वश्रेष्ठ ऑपरेटर",
+      "best_supervisor": "सर्वश्रेष्ठ सुपरवाइज़र",
+      "best_manager": "सर्वश्रेष्ठ मैनेजर"
+    },
+    "badges": {
+      "bronze": "कांस्य",
+      "silver": "रजत",
+      "gold": "स्वर्ण",
+      "eotm_winner": "माह का सर्वश्रेष्ठ कर्मचारी"
+    },
+    "aiSuggestion": "एआई सुझाव",
+    "gapToLeader": "लीडर से {{points}} अंक पीछे",
+    "components": {
+      "attendance": "उपस्थिति",
+      "ontime": "समय पर उपस्थिति",
+      "task": "कार्य",
+      "kpi": "केपीआई",
+      "production": "उत्पादन",
+      "teamControl": "टीम नियंत्रण",
+      "brownie": "अतिरिक्त अंक"
+    }
+  },
+
+  "fraud": {
+    "fraudAlert": "धोखाधड़ी चेतावनी",
+    "mockLocationBlocked": "नकली स्थान का पता चला। चेक-इन अवरुद्ध।",
+    "bulkConfirmationFlag": "{{name}} ने {{seconds}} सेकंड में {{count}} कर्मचारियों की पुष्टि की",
+    "reviewRequired": "समीक्षा आवश्यक"
+  },
+
+  "home": {
+    "owner": {
+      "title": "मालिक डैशबोर्ड",
+      "plantWideAttendance": "प्लांट-व्यापी उपस्थिति %",
+      "manpowerCost": "जनशक्ति लागत बनाम बजट",
+      "deptPerformance": "विभाग प्रदर्शन",
+      "mrmStatus": "एमआरएम स्थिति — सभी विभाग",
+      "unreadEmails": "अपठित ईमेल",
+      "escalatedTasks": "अग्रेषित कार्य",
+      "fraudFlags": "धोखाधड़ी फ़्लैग",
+      "eotmSummary": "माह का सर्वश्रेष्ठ कर्मचारी सारांश"
+    },
+    "plant_head": {
+      "title": "प्लांट हेड डैशबोर्ड",
+      "deptRanking": "स्कोर अनुसार विभाग रैंकिंग",
+      "pendingApprovals": "लंबित स्वीकृतियां",
+      "escalationAlerts": "अग्रेषण चेतावनियां",
+      "mrmReviews": "एमआरएम समीक्षाएं",
+      "emailTasks": "प्लांट भर के ईमेल कार्य",
+      "threeWayMatchStatus": "त्रिपक्षीय मिलान स्थिति"
+    },
+    "manager": {
+      "title": "मैनेजर डैशबोर्ड",
+      "deptAttendance": "विभाग उपस्थिति",
+      "absentToday": "आज अनुपस्थित / देरी से",
+      "teamScoreBreakdown": "टीम स्कोर विवरण",
+      "kpiSnapshot": "केपीआई स्नैपशॉट",
+      "createTask": "कार्य बनाएं और सौंपें",
+      "validateProduction": "उत्पादन डेटा सत्यापित करें",
+      "submitMrm": "10 तारीख तक एमआरएम जमा करें"
+    },
+    "supervisor": {
+      "title": "सुपरवाइज़र डैशबोर्ड",
+      "teamTab": "टीम",
+      "confirmAttendance": "उपस्थिति पुष्टि करें",
+      "productionEfficiency": "उत्पादन दक्षता",
+      "casualCountTab": "अस्थायी संख्या",
+      "shiftReportTab": "शिफ्ट रिपोर्ट"
+    },
+    "member": {
+      "title": "मेरा फोर्ज ओएस",
+      "myScoreBreakdown": "मेरा स्कोर विवरण",
+      "eotmRank": "मेरी माह का सर्वश्रेष्ठ कर्मचारी रैंक",
+      "myBadges": "मेरे बैज",
+      "hourlyEntryTab": "प्रति घंटा प्रविष्टि",
+      "maintenanceTab": "बिजली और तेल"
+    },
+    "hr_admin": {
+      "title": "एचआर एडमिन डैशबोर्ड",
+      "employeeRecords": "कर्मचारी रिकॉर्ड",
+      "shiftPlanning": "शिफ्ट योजना",
+      "generateQr": "दैनिक क्यूआर जनरेट करें",
+      "complianceChecks": "अनुपालन जांच",
+      "probationTracking": "परिवीक्षा ट्रैकिंग",
+      "holidayMaster": "अवकाश सूची"
+    },
+    "security_guard": {
+      "title": "सुरक्षा डैशबोर्ड",
+      "vehicleLogTab": "वाहन लॉग",
+      "contractLabourCount": "ठेका श्रमिक संख्या",
+      "eodConfirmTab": "ईओडी पुष्टि"
+    }
+  }
+}

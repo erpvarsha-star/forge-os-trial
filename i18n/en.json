@@ -1,0 +1,376 @@
+{
+  "common": {
+    "appName": "Forge OS",
+    "companyName": "Varsha Forgings Pvt Ltd",
+    "welcome": "Welcome",
+    "save": "Save",
+    "cancel": "Cancel",
+    "submit": "Submit",
+    "approve": "Approve",
+    "reject": "Reject",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "loading": "Loading...",
+    "success": "Success",
+    "error": "Error",
+    "retry": "Retry",
+    "logout": "Log Out",
+    "search": "Search",
+    "filter": "Filter",
+    "viewAll": "View All",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "thisMonth": "This Month",
+    "points": "Points",
+    "rank": "Rank",
+    "department": "Department",
+    "shift": "Shift",
+    "date": "Date",
+    "reason": "Reason",
+    "status": "Status",
+    "notifications": "Notifications",
+    "noData": "No data available",
+    "saveSuccess": "Saved successfully",
+    "saveFailed": "Something went wrong. Please try again.",
+    "requiredField": "This field is required"
+  },
+
+  "auth": {
+    "loginTitle": "Log In to Forge OS",
+    "phoneNumber": "Phone Number",
+    "sendOtp": "Send OTP",
+    "enterOtp": "Enter OTP",
+    "verifyOtp": "Verify & Continue",
+    "otpSentTo": "OTP sent to {{phone}}",
+    "resendOtp": "Resend OTP",
+    "invalidOtp": "Invalid OTP. Please try again.",
+    "selectLanguage": "Select Language",
+    "sessionExpired": "Your session has expired. Please log in again."
+  },
+
+  "roles": {
+    "owner": "Owner",
+    "plant_head": "Plant Head",
+    "manager": "Manager",
+    "supervisor": "Supervisor",
+    "member": "Member",
+    "hr_admin": "HR Admin",
+    "security_guard": "Security Guard",
+    "ai_agent": "Varsha AI"
+  },
+
+  "attendance": {
+    "checkIn": "Check In",
+    "checkInSuccess": "Check-in successful",
+    "scanQr": "Scan Gate QR Code",
+    "gpsVerifying": "Verifying location...",
+    "outsideGeofence": "You are {{distance}}m from the plant. Move closer to check in.",
+    "invalidQr": "Invalid QR code. Please try again.",
+    "lateReasonPrompt": "You are late. Please select a reason.",
+    "lateReasons": {
+      "traffic": "Traffic",
+      "health": "Health",
+      "family": "Family",
+      "vehicle": "Vehicle",
+      "other": "Other"
+    },
+    "status": {
+      "P": "Present",
+      "LC": "Late Coming",
+      "EC": "Early Coming",
+      "OT": "Overtime",
+      "A": "Absent",
+      "H": "Holiday",
+      "L": "Leave",
+      "WO": "Weekly Off"
+    },
+    "checkpoint1": "Self Check-In",
+    "checkpoint2": "Security Confirmation",
+    "checkpoint3": "Supervisor Confirmation",
+    "regularise": "Regularise",
+    "regulariseRequestSubmitted": "Regularisation request submitted",
+    "warning1": "Warning 1 issued for repeated late arrivals",
+    "finalWarning": "Final Warning issued — Owner approval required",
+    "attendanceCalendar": "Attendance Calendar",
+    "lateBy": "Late by {{minutes}} min"
+  },
+
+  "leave": {
+    "applyLeave": "Apply for Leave",
+    "leaveType": "Leave Type",
+    "leaveTypes": {
+      "EL": "Earned Leave",
+      "CL": "Casual Leave",
+      "SL": "Sick Leave",
+      "CO": "Comp-Off",
+      "ML": "Maternity Leave"
+    },
+    "startDate": "Start Date",
+    "endDate": "End Date",
+    "balance": "Leave Balance",
+    "coverageWarning": "Approving this will drop department coverage below {{pct}}%.",
+    "ownerConfirmRequired": "Coverage below {{pct}}% — Owner confirmation required before approval.",
+    "pendingApproval": "Pending Approval",
+    "approvedBy": "Approved by {{name}}",
+    "rejectedReason": "Rejected: {{reason}}",
+    "escalatedToPlantHead": "Escalated to Plant Head — manager did not respond in 48 hours",
+    "finalApproverNote": "Plant Head is the final approver for all leave",
+    "compOffExpiry": "Expires on {{date}}",
+    "maternityWeeks": "26-week maternity leave"
+  },
+
+  "advance": {
+    "applyAdvance": "Apply for Salary Advance",
+    "amount": "Amount",
+    "repaymentMonths": "Repayment Period (months)",
+    "outstandingAdvance": "Outstanding Advance",
+    "warningOver30": "This advance is over 30% of your gross salary.",
+    "autoRejectOver50": "Advances above 50% of gross salary are auto-rejected.",
+    "monthlyDeduction": "Monthly Deduction",
+    "projectedTotal": "Projected Total Outstanding",
+    "ownerApprovalRequired": "Owner approval required for advances above ₹10,000"
+  },
+
+  "production": {
+    "hourlyEntry": "Hourly Production Entry",
+    "machine": "Machine",
+    "partNumber": "Part Number",
+    "partsMade": "Parts Made",
+    "efficiency": "Efficiency",
+    "targetParts": "Target Parts",
+    "validate": "Validate Entry",
+    "flagEntry": "Flag Entry",
+    "incentiveFlag": "Incentive Flag",
+    "lowEfficiencyAlert": "Efficiency below 80% — needs attention",
+    "electricityReading": "Electricity Reading",
+    "electricityStart": "Start Reading",
+    "electricityEnd": "End Reading",
+    "oilConsumption": "Oil Consumption",
+    "oilType": "Oil Type",
+    "oilQty": "Quantity",
+    "casualCount": "Casual Worker Count",
+    "unskilled": "Unskilled",
+    "skilled": "Skilled",
+    "operator": "Operator",
+    "shiftReport": "Shift Report",
+    "submitShiftReport": "Submit Shift Report",
+    "noEntryWarning": "No entry submitted for this hour — zero points, supervisor notified",
+    "twoHourlyNote": "2-hourly entry earns 80% of full production points"
+  },
+
+  "payroll": {
+    "payslip": "Payslip",
+    "downloadPayslip": "Download Payslip",
+    "grossEarnings": "Gross Earnings",
+    "totalDeductions": "Total Deductions",
+    "netPay": "Net Pay",
+    "earnings": {
+      "basic": "Basic",
+      "hra": "HRA",
+      "conveyance": "Conveyance",
+      "washing": "Washing Allowance",
+      "education": "Education Allowance",
+      "vda": "VDA",
+      "heat": "Heat Allowance",
+      "ot": "Overtime (OT)",
+      "dispatchIncentive": "Dispatch Incentive",
+      "productionAllowance": "Production Allowance"
+    },
+    "deductions": {
+      "pf": "PF (12%)",
+      "esic": "ESIC (0.75%)",
+      "pt": "Professional Tax",
+      "mlwf": "MLWF",
+      "advanceRecovery": "Advance Recovery"
+    },
+    "pfChallan": "PF Challan",
+    "esicChallan": "ESIC Challan",
+    "minimumWagesCheck": "Minimum Wages Compliance",
+    "leaveEncashment": "Leave Encashment",
+    "exportToZoho": "Export to Zoho Books",
+    "exportToSheets": "Export to Sheets"
+  },
+
+  "tasks": {
+    "myTasks": "My Tasks",
+    "assignTask": "Assign Task",
+    "taskTitle": "Task Title",
+    "dueDate": "Due Date",
+    "priority": {
+      "low": "Low",
+      "normal": "Normal",
+      "high": "High"
+    },
+    "taskType": {
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "assigned": "Assigned"
+    },
+    "overdue": "Overdue",
+    "markDone": "Mark as Done",
+    "escalatedTask": "Escalated to Plant Head and Owner",
+    "weeklyDueThursday": "Weekly tasks are due Thursday 18:00"
+  },
+
+  "mrm": {
+    "monthlyReview": "Monthly Review (MRM)",
+    "kpiAchievements": "KPI Achievements",
+    "highlights": "Highlights",
+    "challenges": "Challenges",
+    "actionItems": "Action Items",
+    "manpowerStatus": "Manpower Status",
+    "mrmDueReminder": "MRM due by the 10th at 17:00",
+    "mrmOverdue": "MRM Overdue",
+    "status": {
+      "pending": "Pending",
+      "submitted": "Submitted",
+      "reviewed": "Reviewed",
+      "noted": "Noted"
+    },
+    "departments": {
+      "production": "Production",
+      "quality": "Quality",
+      "maintenance": "Maintenance",
+      "purchaseStores": "Purchase & Stores",
+      "design": "Design",
+      "salesLogistics": "Sales & Logistics",
+      "accountsFinance": "Accounts & Finance",
+      "hr": "HR",
+      "administration": "Administration"
+    }
+  },
+
+  "procurement": {
+    "purchaseRequisition": "Purchase Requisition",
+    "purchaseOrder": "Purchase Order",
+    "vehicleLog": "Vehicle Log",
+    "vehicleNumber": "Vehicle Number",
+    "driverName": "Driver Name",
+    "vendorName": "Vendor Name",
+    "material": "Material",
+    "direction": {
+      "inward": "Inward",
+      "outward": "Outward"
+    },
+    "grn": "Goods Receipt Note (GRN)",
+    "challanNumber": "Challan Number",
+    "qcStatus": "QC Status",
+    "threeWayMatch": "Three-Way Match",
+    "matchComplete": "Match Complete",
+    "exception": "Exception",
+    "releasePayment": "Release Payment",
+    "eodLock": "EOD locked — GRN pending for an inward vehicle",
+    "escalate": "Escalate"
+  },
+
+  "security": {
+    "gateLog": "Gate Log",
+    "confirmSeen": "Confirm Seen",
+    "eodConfirmation": "End of Day Confirmation",
+    "mismatchReasonRequired": "Vehicle count does not match GRN count. Reason required.",
+    "checkpoint2Window": "Confirmations close 90 minutes after shift start"
+  },
+
+  "scoring": {
+    "myScore": "My Score",
+    "leaderboard": "Leaderboard",
+    "employeeOfMonth": "Employee of the Month",
+    "categories": {
+      "best_member": "Best Member",
+      "best_operator": "Best Operator",
+      "best_supervisor": "Best Supervisor",
+      "best_manager": "Best Manager"
+    },
+    "badges": {
+      "bronze": "Bronze",
+      "silver": "Silver",
+      "gold": "Gold",
+      "eotm_winner": "Employee of the Month"
+    },
+    "aiSuggestion": "AI Suggestion",
+    "gapToLeader": "{{points}} points behind leader",
+    "components": {
+      "attendance": "Attendance",
+      "ontime": "On-Time",
+      "task": "Task",
+      "kpi": "KPI",
+      "production": "Production",
+      "teamControl": "Team Control",
+      "brownie": "Brownie Points"
+    }
+  },
+
+  "fraud": {
+    "fraudAlert": "Fraud Alert",
+    "mockLocationBlocked": "Mock location detected. Check-in blocked.",
+    "bulkConfirmationFlag": "{{name}} confirmed {{count}} workers in {{seconds}} seconds",
+    "reviewRequired": "Review required"
+  },
+
+  "home": {
+    "owner": {
+      "title": "Owner Dashboard",
+      "plantWideAttendance": "Plant-wide Attendance %",
+      "manpowerCost": "Manpower Cost vs Budget",
+      "deptPerformance": "Department Performance",
+      "mrmStatus": "MRM Status — All Departments",
+      "unreadEmails": "Unread Emails",
+      "escalatedTasks": "Escalated Tasks",
+      "fraudFlags": "Fraud Flags",
+      "eotmSummary": "Employee of the Month Summary"
+    },
+    "plant_head": {
+      "title": "Plant Head Dashboard",
+      "deptRanking": "Departments Ranked by Score",
+      "pendingApprovals": "Pending Approvals",
+      "escalationAlerts": "Escalation Alerts",
+      "mrmReviews": "MRM Reviews",
+      "emailTasks": "Email Tasks Across Plant",
+      "threeWayMatchStatus": "Three-Way Match Status"
+    },
+    "manager": {
+      "title": "Manager Dashboard",
+      "deptAttendance": "Department Attendance",
+      "absentToday": "Absent / Late Today",
+      "teamScoreBreakdown": "Team Score Breakdown",
+      "kpiSnapshot": "KPI Snapshot",
+      "createTask": "Create & Assign Task",
+      "validateProduction": "Validate Production Data",
+      "submitMrm": "Submit MRM by 10th"
+    },
+    "supervisor": {
+      "title": "Supervisor Dashboard",
+      "teamTab": "Team",
+      "confirmAttendance": "Confirm Attendance",
+      "productionEfficiency": "Production Efficiency",
+      "casualCountTab": "Casual Count",
+      "shiftReportTab": "Shift Report"
+    },
+    "member": {
+      "title": "My Forge OS",
+      "myScoreBreakdown": "My Score Breakdown",
+      "eotmRank": "My EoTM Rank",
+      "myBadges": "My Badges",
+      "hourlyEntryTab": "Hourly Entry",
+      "maintenanceTab": "Electricity & Oil"
+    },
+    "hr_admin": {
+      "title": "HR Admin Dashboard",
+      "employeeRecords": "Employee Records",
+      "shiftPlanning": "Shift Planning",
+      "generateQr": "Generate Daily QR",
+      "complianceChecks": "Compliance Checks",
+      "probationTracking": "Probation Tracking",
+      "holidayMaster": "Holiday Master"
+    },
+    "security_guard": {
+      "title": "Security Dashboard",
+      "vehicleLogTab": "Vehicle Log",
+      "contractLabourCount": "Contract Labour Count",
+      "eodConfirmTab": "EOD Confirmation"
+    }
+  }
+}

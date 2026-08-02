@@ -46,7 +46,7 @@ async function weeklyShiftNotify(db: ReturnType<typeof supabaseAdmin>) {
     .gte('shift_date', start)
     .lte('shift_date', end);
 
-  const employeesWithShift = new Set((shifts ?? []).map((s: { employee_id: string }) => s.employee_id));
+  const employeesWithShift = new Set<string>((shifts ?? []).map((s: { employee_id: string }) => s.employee_id));
 
   if (employeesWithShift.size > 0) {
     await notifyEmployees(db, {
@@ -115,7 +115,7 @@ async function dailyCheckinReminder(db: ReturnType<typeof supabaseAdmin>) {
     .eq('shift_date', today)
     .in('shift_type', dueShiftTypes);
 
-  const employeeIds = Array.from(new Set((shifts ?? []).map((s: { employee_id: string }) => s.employee_id)));
+  const employeeIds = Array.from(new Set<string>((shifts ?? []).map((s: { employee_id: string }) => s.employee_id)));
 
   if (employeeIds.length > 0) {
     await notifyEmployees(db, {
