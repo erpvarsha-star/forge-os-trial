@@ -116,6 +116,13 @@ export const PRODUCTION = {
   machines: ['CNC', 'VMC', 'Hobbing', 'Forge Hammer', 'Press', 'Heat Treatment'] as const,
 };
 
+export const SHIFT_TIMES: Record<ShiftType, string> = {
+  morning: '06:00',
+  evening: '14:00',
+  night: '22:00',
+  general: '09:00',
+};
+
 export const PAYROLL = {
   pfRatePct: 12,
   esicRatePct: 0.75,

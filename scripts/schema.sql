@@ -171,6 +171,7 @@ insert into plant_config (config_key, config_value, description) values
   ('pt_amount', '200', 'Professional Tax flat monthly amount'),
   ('mlwf_amount', '25', 'Maharashtra Labour Welfare Fund flat amount'),
   ('nightly_scoring_time_ist', '"22:00"', 'Time the nightly-scoring edge function runs'),
+  ('shift_start_times', '{"morning": "06:00", "evening": "14:00", "night": "22:00", "general": "09:00"}', 'Shift start times (IST, 24h) used by shift-reminder'),
   ('score_weights', '{
     "member": {"attendance": 30, "ontime": 10, "task": 20, "kpi": 20, "production": 20, "team_control": 0},
     "operator": {"attendance": 20, "ontime": 10, "task": 10, "kpi": 20, "production": 30, "team_control": 10},
