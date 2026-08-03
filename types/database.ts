@@ -1,5 +1,5 @@
 /**
- * Forge OS — TypeScript types mirroring scripts/schema.sql.
+ * Forge OS — TypeScript types mirroring supabase/migrations/20260803090000_initial_schema.sql.
  *
  * Hand-written to match the schema (not `supabase gen types`, since this repo
  * doesn't have a live project ref to generate against yet). Once the project
@@ -9,7 +9,7 @@
  */
 
 // ---------------------------------------------------------------------------
-// Enums (must match `create type ... as enum (...)` in scripts/schema.sql)
+// Enums (must match `create type ... as enum (...)` in supabase/migrations/20260803090000_initial_schema.sql)
 // ---------------------------------------------------------------------------
 
 export type RoleEnum =

@@ -1,14 +1,15 @@
 -- ============================================================================
 -- FORGE OS — frontend-aligned schema patch
 --
--- Context: scripts/schema.sql was written before the actual React Native
--- (Expo) codebase existed, from the Master System Definition doc alone. Now
--- that the real frontend (forgeoscomplete.zip) is in this repo, several of
--- its Supabase queries use different table/column names than schema.sql
--- guessed (e.g. `attendance_records` not `attendance`, `employees.emp_code`
--- not `employee_code`, `department` as a plain string, etc). Reconciling
--- every table is a larger follow-up; this file defines ONLY the tables
--- needed to ship the 5 fixes requested for the frontend:
+-- Context: 20260803090000_initial_schema.sql was written before the actual
+-- React Native (Expo) codebase existed, from the Master System Definition
+-- doc alone. Now that the real frontend (forgeoscomplete.zip) is in this
+-- repo, several of its Supabase queries use different table/column names
+-- than that migration guessed (e.g. `attendance_records` not `attendance`,
+-- `employees.emp_code` not `employee_code`, `department` as a plain string,
+-- etc). Reconciling every table is a larger follow-up; this migration
+-- defines ONLY the tables needed to ship the 5 fixes requested for the
+-- frontend:
 --
 --   1. Role-based routing            — no schema change
 --   2. Security Guard role           — vehicle_log, eod_confirmations,
@@ -17,9 +18,10 @@
 --   4. Fraud detection in team.tsx   — fraud_alerts
 --   5. plant_config key-value fix    — plant_config (key-value, seeded)
 --
--- Run this after scripts/schema.sql (or standalone against a fresh project
--- if you're only running the frontend for now — every statement here is
--- self-contained and only depends on `employees` from schema.sql).
+-- Run this after 20260803090000_initial_schema.sql (or standalone against a
+-- fresh project if you're only running the frontend for now — every
+-- statement here is self-contained and only depends on `employees` from
+-- that migration).
 -- ============================================================================
 
 create extension if not exists "pgcrypto";

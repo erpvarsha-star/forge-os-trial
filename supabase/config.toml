@@ -1,0 +1,17 @@
+# Supabase CLI / GitHub integration project link.
+# project_id is the project ref — not a secret, safe to commit (it's already
+# visible in the project URL: https://odfwtdpvpfzdrznvurru.supabase.co).
+# Actual credentials (anon key, service role key, DB password) are never
+# stored here — they belong in .env (gitignored) locally and in
+# Project Settings -> Edge Functions -> Secrets / GitHub Actions secrets
+# for CI and deployed environments.
+project_id = "odfwtdpvpfzdrznvurru"
+
+[api]
+enabled = true
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
