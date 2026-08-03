@@ -41,12 +41,12 @@ export async function notifyEmployees(db: ReturnType<typeof supabaseAdmin>, inpu
 
   const { data: tokens } = await db
     .from('push_tokens')
-    .select('expo_push_token')
-    .in('employee_id', employeeIds);
+    .select('token')
+    .in('user_id', employeeIds);
 
   const pushed = await sendExpoPush(
-    (tokens ?? []).map((t: { expo_push_token: string }) => ({
-      to: t.expo_push_token,
+    (tokens ?? []).map((t: { token: string }) => ({
+      to: t.token,
       sound: 'default',
       title,
       body,

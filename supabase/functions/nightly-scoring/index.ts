@@ -49,13 +49,13 @@ function monthRange(year: number, month: number) {
 
 async function scoreCategoryFor(
   db: ReturnType<typeof supabaseAdmin>,
-  employee: { role: string; department_id: string | null }
+  employee: { role: string; department: string | null }
 ): Promise<ScoreCategory | null> {
   if (employee.role === 'supervisor') return 'supervisor';
   if (employee.role === 'manager') return 'manager';
   if (employee.role === 'member') {
-    if (!employee.department_id) return 'member';
-    const { data: dept } = await db.from('departments').select('is_production').eq('id', employee.department_id).single();
+    if (!employee.department) return 'member';
+    const { data: dept } = await db.from('departments').select('is_production').eq('name', employee.department).single();
     return dept?.is_production ? 'operator' : 'member';
   }
   return null;
@@ -135,7 +135,7 @@ async function computeProductionScore(db: ReturnType<typeof supabaseAdmin>, empl
 async function computeTeamControlScore(
   db: ReturnType<typeof supabaseAdmin>,
   employeeId: string,
-  departmentId: string | null,
+  department: string | null,
   start: string,
   end: string,
   workingDays: number
@@ -240,7 +240,7 @@ Deno.serve(async (req: Request) => {
   try {
     const { data: employees, error } = await db
       .from('employees')
-      .select('id, role, department_id, full_name')
+      .select('id, role, department, name')
       .eq('is_active', true)
       .in('role', ['member', 'supervisor', 'manager']);
 
@@ -258,7 +258,7 @@ Deno.serve(async (req: Request) => {
       const { ratio: productionRatio, avgEfficiency, incentiveFlag } = await computeProductionScore(db, employee.id, start, end);
       const teamControlRatio =
         weights.teamControl > 0
-          ? await computeTeamControlScore(db, employee.id, employee.department_id, start, end, presentDays || daysInMonth)
+          ? await computeTeamControlScore(db, employee.id, employee.department, start, end, presentDays || daysInMonth)
           : 0;
 
       // Interim KPI proxy — see module docstring.
@@ -277,7 +277,7 @@ Deno.serve(async (req: Request) => {
       const { badge, streak } = await computeAttendanceStreakBadge(db, employee.id, end);
 
       const aiSuggestion = await generateAiSuggestion({
-        employee: employee.full_name,
+        employee: employee.name,
         category,
         attendanceScore: Math.round(attendanceScore),
         ontimeScore: Math.round(ontimeScore),

@@ -41,9 +41,9 @@ async function getManagementIds(db: ReturnType<typeof supabaseAdmin>, roles: str
 }
 
 async function handleGpsCheck(db: ReturnType<typeof supabaseAdmin>, body: GpsCheckBody) {
-  const plantLat = await getPlantConfig(db, 'gps_lat', 19.8383935925407);
-  const plantLng = await getPlantConfig(db, 'gps_lng', 75.23638998304483);
-  const geofenceMeters = await getPlantConfig(db, 'geofence_meters', 100);
+  const plantLat = await getPlantConfig(db, 'plant_lat', 19.8383935925407);
+  const plantLng = await getPlantConfig(db, 'plant_lng', 75.23638998304483);
+  const geofenceMeters = await getPlantConfig(db, 'geofence_radius_meters', 100);
 
   const distance = distanceMeters(body.lat, body.lng, plantLat, plantLng);
   const outsideGeofence = distance > geofenceMeters;
