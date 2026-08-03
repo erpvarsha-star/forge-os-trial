@@ -191,45 +191,38 @@ async function computeAttendanceStreakBadge(db: ReturnType<typeof supabaseAdmin>
 }
 
 async function generateAiSuggestion(scoreSummary: Record<string, unknown>): Promise<string | null> {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  const apiKey = Deno.env.get('GEMINI_API_KEY');
   if (!apiKey) return null;
 
-  const model = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-sonnet-5';
+  const prompt =
+    'You are writing a short, encouraging, specific improvement tip for a factory worker in India, ' +
+    'based on this month\'s performance score data. Keep it to 1-2 short sentences, plain language, ' +
+    'no jargon, second person ("you"). Score data (0-100 scale unless noted):\n' +
+    JSON.stringify(scoreSummary);
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 120,
-        messages: [
-          {
-            role: 'user',
-            content:
-              'You are writing a short, encouraging, specific improvement tip for a factory worker in India, ' +
-              'based on this month\'s performance score data. Keep it to 1-2 short sentences, plain language, ' +
-              'no jargon, second person ("you"). Score data (0-100 scale unless noted):\n' +
-              JSON.stringify(scoreSummary),
-          },
-        ],
-      }),
-    });
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 120 },
+        }),
+      }
+    );
 
     if (!res.ok) {
-      console.error('Claude API error', await res.text());
+      console.error('Gemini API error', await res.text());
       return null;
     }
 
     const data = await res.json();
-    const text = data?.content?.[0]?.text;
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     return typeof text === 'string' ? text.trim() : null;
   } catch (err) {
-    console.error('Claude API call failed', err);
+    console.error('Gemini API call failed', err);
     return null;
   }
 }
