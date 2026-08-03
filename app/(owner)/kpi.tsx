@@ -29,6 +29,7 @@ export default function OwnerKPI() {
             width={Dimensions.get('window').width - 48}
             height={220}
             yAxisLabel="%"
+            yAxisSuffix=""
             chartConfig={{
               backgroundColor: '#fff',
               backgroundGradientFrom: '#fff',

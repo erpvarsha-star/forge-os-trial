@@ -22,7 +22,7 @@ export function useAuth() {
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
+      if (session?.user.phone) {
         await loadEmployee(session.user.phone)
       } else {
         setState(s => ({ ...s, isLoading: false }))
@@ -32,7 +32,7 @@ export function useAuth() {
     init()
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
+      if (session?.user.phone) {
         loadEmployee(session.user.phone)
       } else {
         setState({ session: null, employee: null, isLoading: false, isAuthenticated: false })

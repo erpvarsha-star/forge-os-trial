@@ -145,7 +145,7 @@ export default function LoginScreen() {
                 placeholder={t('auth.otpHint')}
                 value={otp}
                 onChangeText={setOtp}
-                keyboardType="number-pad"
+                keyboardType="numeric"
                 maxLength={6}
                 error={error}
                 className="w-full"
@@ -160,7 +160,7 @@ export default function LoginScreen() {
               />
               <Button
                 title={countdown > 0 ? `auth.resendIn` : 'auth.resendOtp'}
-                onPress={countdown > 0 ? undefined : handleSendOtp}
+                onPress={handleSendOtp}
                 variant="ghost"
                 disabled={countdown > 0}
                 className="w-full"

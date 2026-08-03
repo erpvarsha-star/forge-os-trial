@@ -12,6 +12,7 @@ export interface Employee {
   supervisor_id?: string
   manager_id?: string
   plant_head_id?: string
+  salary?: number
   is_active: boolean
   created_at: string
   updated_at: string
@@ -128,6 +129,7 @@ export interface FiveSSubmission {
   verified_by?: string
   verified_at?: string
   created_at: string
+  employee?: { name: string; emp_code: string }
 }
 
 export interface FiveSChallenge {
