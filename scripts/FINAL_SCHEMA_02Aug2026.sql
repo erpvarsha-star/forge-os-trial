@@ -459,7 +459,7 @@ as $$
   select id from employees where auth_user_id = auth.uid();
 $$;
 
-create or replace function current_role()
+create or replace function get_current_employee_role()
 returns text
 language sql stable
 as $$
@@ -470,7 +470,7 @@ create or replace function is_management()
 returns boolean
 language sql stable
 as $$
-  select current_role() in ('manager', 'plant_head', 'hr_admin', 'owner');
+  select get_current_employee_role() in ('manager', 'plant_head', 'hr_admin', 'owner');
 $$;
 
 alter table employees enable row level security;
@@ -530,8 +530,8 @@ create policy "attendance_records_select" on attendance_records for select
     or employee_id in (select id from employees where supervisor_id = current_employee_id())
   );
 create policy "attendance_records_write" on attendance_records for all
-  using (employee_id = current_employee_id() or is_management() or current_role() in ('supervisor', 'security_guard'))
-  with check (employee_id = current_employee_id() or is_management() or current_role() in ('supervisor', 'security_guard'));
+  using (employee_id = current_employee_id() or is_management() or get_current_employee_role() in ('supervisor', 'security_guard'))
+  with check (employee_id = current_employee_id() or is_management() or get_current_employee_role() in ('supervisor', 'security_guard'));
 
 create policy "shifts_select" on shifts for select using (auth.uid() is not null);
 create policy "shifts_write" on shifts for all using (is_management()) with check (is_management());
@@ -552,8 +552,8 @@ create policy "leave_requests_select" on leave_requests for select
 create policy "leave_requests_insert" on leave_requests for insert
   with check (employee_id = current_employee_id());
 create policy "leave_requests_update" on leave_requests for update
-  using (is_management() or current_role() = 'supervisor')
-  with check (is_management() or current_role() = 'supervisor');
+  using (is_management() or get_current_employee_role() = 'supervisor')
+  with check (is_management() or get_current_employee_role() = 'supervisor');
 
 create policy "advance_requests_select" on advance_requests for select
   using (
@@ -564,30 +564,30 @@ create policy "advance_requests_select" on advance_requests for select
 create policy "advance_requests_insert" on advance_requests for insert
   with check (employee_id = current_employee_id());
 create policy "advance_requests_update" on advance_requests for update
-  using (is_management() or current_role() = 'supervisor')
-  with check (is_management() or current_role() = 'supervisor');
+  using (is_management() or get_current_employee_role() = 'supervisor')
+  with check (is_management() or get_current_employee_role() = 'supervisor');
 
 create policy "payroll_records_select" on payroll_records for select
   using (employee_id = current_employee_id() or is_management());
 
 create policy "monthly_scores_select" on monthly_scores for select
-  using (employee_id = current_employee_id() or is_management() or current_role() = 'supervisor');
+  using (employee_id = current_employee_id() or is_management() or get_current_employee_role() = 'supervisor');
 
 create policy "maintenance_observations_select" on maintenance_observations for select using (auth.uid() is not null);
 create policy "maintenance_observations_insert" on maintenance_observations for insert with check (employee_id = current_employee_id());
 create policy "maintenance_observations_update" on maintenance_observations for update
-  using (is_management() or current_role() = 'supervisor')
-  with check (is_management() or current_role() = 'supervisor');
+  using (is_management() or get_current_employee_role() = 'supervisor')
+  with check (is_management() or get_current_employee_role() = 'supervisor');
 
 create policy "5s_challenges_select" on "5s_challenges" for select using (auth.uid() is not null);
 create policy "5s_challenges_write" on "5s_challenges" for all using (is_management()) with check (is_management());
 
 create policy "5s_submissions_select" on "5s_submissions" for select
-  using (employee_id = current_employee_id() or is_management() or current_role() = 'supervisor');
+  using (employee_id = current_employee_id() or is_management() or get_current_employee_role() = 'supervisor');
 create policy "5s_submissions_insert" on "5s_submissions" for insert with check (employee_id = current_employee_id());
 create policy "5s_submissions_update" on "5s_submissions" for update
-  using (is_management() or current_role() = 'supervisor')
-  with check (is_management() or current_role() = 'supervisor');
+  using (is_management() or get_current_employee_role() = 'supervisor')
+  with check (is_management() or get_current_employee_role() = 'supervisor');
 
 create policy "casual_workers_select" on casual_workers for select
   using (supervisor_id = current_employee_id() or is_management());
@@ -602,7 +602,7 @@ create policy "data_collection_submissions_insert" on data_collection_submission
 
 create policy "mrm_reviews_select" on mrm_reviews for select using (auth.uid() is not null);
 create policy "mrm_reviews_insert" on mrm_reviews for insert
-  with check (current_role() = 'manager' or is_management());
+  with check (get_current_employee_role() = 'manager' or is_management());
 
 create policy "fraud_alerts_select" on fraud_alerts for select using (is_management());
 create policy "fraud_alerts_insert" on fraud_alerts for insert with check (auth.uid() is not null);
@@ -611,7 +611,7 @@ create policy "fraud_flags_select" on fraud_flags for select using (is_managemen
 create policy "fraud_flags_insert" on fraud_flags for insert with check (auth.uid() is not null);
 
 create policy "vehicle_log_select" on vehicle_log for select using (auth.uid() is not null);
-create policy "vehicle_log_insert" on vehicle_log for insert with check (current_role() = 'security_guard' or is_management());
+create policy "vehicle_log_insert" on vehicle_log for insert with check (get_current_employee_role() = 'security_guard' or is_management());
 
 create policy "eod_confirmations_select" on eod_confirmations for select using (auth.uid() is not null);
 create policy "eod_confirmations_write" on eod_confirmations for all
