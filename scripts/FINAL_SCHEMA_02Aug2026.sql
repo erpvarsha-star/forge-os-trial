@@ -68,7 +68,7 @@ create table employees (
   auth_user_id uuid unique references auth.users(id),
   emp_code text unique not null,
   name text not null,
-  phone text unique not null,
+  phone text unique,
   role text not null check (role in ('member','supervisor','manager','plant_head','hr_admin','owner','security_guard')),
   department text,
   category text,
