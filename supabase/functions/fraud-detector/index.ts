@@ -77,7 +77,7 @@ async function handleBulkConfirmationCheck(db: ReturnType<typeof supabaseAdmin>,
   const windowStart = new Date(Date.now() - threshold.seconds * 1000).toISOString();
 
   const { data: recentConfirmations, error } = await db
-    .from('attendance')
+    .from('attendance_records')
     .select('id, checkpoint3_at')
     .eq('checkpoint3_confirmed_by', body.supervisorId)
     .eq('shift_date', body.shiftDate)

@@ -68,7 +68,7 @@ async function computeAttendanceAndOnTime(
   end: string
 ) {
   const { data: rows } = await db
-    .from('attendance')
+    .from('attendance_records')
     .select('status, late_minutes')
     .eq('employee_id', employeeId)
     .gte('shift_date', start)
@@ -170,7 +170,7 @@ function computeBrownie(input: { lcCount: number; onTimeAll: boolean; taskTotal:
 
 async function computeAttendanceStreakBadge(db: ReturnType<typeof supabaseAdmin>, employeeId: string, asOf: string) {
   const { data: rows } = await db
-    .from('attendance')
+    .from('attendance_records')
     .select('shift_date, status')
     .eq('employee_id', employeeId)
     .lte('shift_date', asOf)
