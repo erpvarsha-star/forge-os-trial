@@ -78,6 +78,19 @@ export function useAuth() {
       token,
       type: 'sms',
     })
+
+    if (!error && data.session) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (session) {
+        await supabase
+          .from('employees')
+          .update({ auth_user_id: session.user.id })
+          .eq('phone', `+91${phone}`)
+      }
+    }
+
     return { data, error }
   }
 
