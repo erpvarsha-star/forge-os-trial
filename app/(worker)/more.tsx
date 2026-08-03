@@ -1,78 +1,99 @@
-import { useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, Alert, Modal } from "react-native";
-import { useTranslation } from "react-i18next";
-import { router } from "expo-router";
-import { SafeView } from "@/components/SafeView";
-import { Header } from "@/components/Header";
-import { Card } from "@/components/Card";
-import { Button } from "@/components/Button";
-import { useAuthStore } from "@/hooks/useAuth";
-import { useLanguage } from "@/hooks/useLanguage";
-import { FileText, User, Bell, Globe, LogOut, ChevronRight } from "lucide-react-native";
+import React, { useState } from 'react'
+import { View, Text, ScrollView, Alert, Modal } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import { useAuth } from '@/hooks/useAuth'
+import { useLanguage } from '@/hooks/useLanguage'
+import { Header } from '@/components/Header'
+import { Card } from '@/components/Card'
+import { Button } from '@/components/Button'
+import { LoadingScreen } from '@/components/LoadingScreen'
+import { removePushToken } from '@/lib/notifications'
+import { router } from 'expo-router'
+import {
+  FileText, User, Bell, Globe, LogOut, ChevronRight, Wallet, QrCode
+} from 'lucide-react-native'
+import { TouchableOpacity } from 'react-native'
 
-export default function MoreScreen() {
-  const { t, i18n } = useTranslation();
-  const { employee, logout } = useAuthStore();
-  const { toggleLanguage, isHindi } = useLanguage();
-  const [showLangModal, setShowLangModal] = useState(false);
+export default function WorkerMore() {
+  const { t } = useTranslation()
+  const { employee, logout } = useAuth()
+  const { language, toggleLanguage } = useLanguage(employee)
+  const [showLangModal, setShowLangModal] = useState(false)
 
-  const handleLogout = () => {
-    Alert.alert(t("auth.logout"), t("auth.logoutConfirm"), [
-      { text: t("app.cancel"), style: "cancel" },
-      { text: t("app.confirm"), onPress: logout },
-    ]);
-  };
+  if (!employee) return <LoadingScreen />
+
+  const handleLogout = async () => {
+    if (employee) await removePushToken(employee.id)
+    await logout()
+  }
 
   const menuItems = [
-    { icon: FileText, label: t("more.payslip"), action: () => router.push("/(worker)/payslip") },
-    { icon: User, label: t("more.profile"), action: () => {} },
-    { icon: Bell, label: t("more.notifications"), action: () => {} },
-    { icon: Globe, label: `${t("more.language")}: ${isHindi ? t("more.hindi") : t("more.english")}`, action: () => setShowLangModal(true) },
-    { icon: LogOut, label: t("auth.logout"), action: handleLogout, danger: true },
-  ];
+    { icon: <FileText size={20} color="#E65C00" />, label: 'common.payslip', onPress: () => router.push('/(worker)/payslip') },
+    { icon: <User size={20} color="#E65C00" />, label: 'common.profile', onPress: () => router.push('/(worker)/profile') },
+    { icon: <Bell size={20} color="#E65C00" />, label: 'common.notifications', onPress: () => router.push('/(worker)/notifications') },
+    { icon: <Wallet size={20} color="#E65C00" />, label: 'common.advance', onPress: () => router.push('/(worker)/advance') },
+    { icon: <QrCode size={20} color="#E65C00" />, label: 'worker.qrCheckIn', onPress: () => router.push('/(worker)/qr') },
+    { icon: <Globe size={20} color="#E65C00" />, label: 'common.language', onPress: () => setShowLangModal(true), value: language === 'hi' ? 'हिंदी' : 'English' },
+  ]
 
   return (
-    <SafeView>
-      <Header />
+    <View className="flex-1 bg-gray-50">
+      <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
-        <Text className="text-2xl font-bold text-gray-800 mb-4">{t("more.title")}</Text>
-
-        {/* Profile Card */}
         <Card className="mb-4">
-          <View className="flex-row items-center">
-            <View className="w-16 h-16 bg-primary/10 rounded-full items-center justify-center mr-4">
-              <Text className="text-primary text-2xl font-bold">{employee?.name?.charAt(0)}</Text>
+          <View className="flex-row items-center gap-4">
+            <View className="w-16 h-16 bg-orange-100 rounded-full items-center justify-center">
+              <User size={28} color="#E65C00" />
             </View>
             <View>
-              <Text className="text-lg font-bold text-gray-800">{employee?.name}</Text>
-              <Text className="text-gray-500">{employee?.emp_code} • {employee?.department}</Text>
-              <Text className="text-gray-400 text-sm capitalize">{employee?.role}</Text>
+              <Text className="text-lg font-bold text-gray-900">{employee.name}</Text>
+              <Text className="text-sm text-gray-500">{employee.emp_code}</Text>
+              <Text className="text-sm text-orange-600 capitalize">{employee.role}</Text>
             </View>
           </View>
         </Card>
 
-        {/* Menu Items */}
-        {menuItems.map((item, idx) => (
-          <TouchableOpacity key={idx} onPress={item.action} className="bg-white rounded-xl p-4 mx-2 mb-2 flex-row items-center shadow-sm border border-gray-100">
-            <item.icon size={20} color={item.danger ? "#EF4444" : "#6B7280"} className="mr-3" />
-            <Text className={`flex-1 text-gray-800 font-medium ${item.danger ? "text-danger" : ""}`}>{item.label}</Text>
-            <ChevronRight size={18} color="#9CA3AF" />
+        {menuItems.map((item, index) => (
+          <TouchableOpacity
+            key={index}
+            onPress={item.onPress}
+            className="bg-white rounded-xl p-4 mb-2 flex-row items-center justify-between shadow-sm border border-gray-100"
+          >
+            <View className="flex-row items-center gap-3">
+              {item.icon}
+              <Text className="text-base text-gray-900">{t(item.label)}</Text>
+            </View>
+            <View className="flex-row items-center gap-2">
+              {item.value && <Text className="text-sm text-gray-500">{item.value}</Text>}
+              <ChevronRight size={18} color="#9CA3AF" />
+            </View>
           </TouchableOpacity>
         ))}
+
+        <Button
+          title="common.logout"
+          onPress={handleLogout}
+          variant="danger"
+          size="lg"
+          className="mt-4"
+          icon={<LogOut size={20} color="white" />}
+        />
       </ScrollView>
 
-      {/* Language Modal */}
-      <Modal visible={showLangModal} animationType="slide" transparent>
-        <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-white rounded-t-xl p-6">
-            <Text className="text-lg font-bold mb-4">{t("more.language")}</Text>
-            <TouchableOpacity onPress={() => { toggleLanguage(); setShowLangModal(false); }} className="py-3 border-b border-gray-100">
-              <Text className="text-gray-800">{isHindi ? "Switch to English" : "हिंदी में बदलें"}</Text>
+      <Modal visible={showLangModal} transparent animationType="fade">
+        <View className="flex-1 bg-black/50 justify-center items-center px-6">
+          <View className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <Text className="text-lg font-bold text-gray-900 mb-4">{t('common.language')}</Text>
+            <TouchableOpacity
+              onPress={() => { toggleLanguage(); setShowLangModal(false); }}
+              className="p-4 rounded-lg bg-gray-50 mb-2"
+            >
+              <Text className="text-base text-gray-900">{language === 'hi' ? 'Switch to English' : 'हिंदी में बदलें'}</Text>
             </TouchableOpacity>
-            <Button title={t("app.close")} onPress={() => setShowLangModal(false)} variant="outline" className="mt-4" />
+            <Button title="common.close" onPress={() => setShowLangModal(false)} variant="ghost" />
           </View>
         </View>
       </Modal>
-    </SafeView>
-  );
+    </View>
+  )
 }

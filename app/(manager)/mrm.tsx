@@ -1,61 +1,65 @@
-import { useState } from "react";
-import { View, Text, ScrollView, Alert } from "react-native";
-import { useTranslation } from "react-i18next";
-import { router } from "expo-router";
-import { SafeView } from "@/components/SafeView";
-import { Header } from "@/components/Header";
-import { Card } from "@/components/Card";
-import { Button } from "@/components/Button";
-import { Input } from "@/components/Input";
-import { useAuthStore } from "@/hooks/useAuth";
-import { supabase } from "@/lib/supabase";
+import React, { useState } from 'react'
+import { View, Text, ScrollView, Alert } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import { useAuth } from '@/hooks/useAuth'
+import { Header } from '@/components/Header'
+import { Card } from '@/components/Card'
+import { Button } from '@/components/Button'
+import { Input } from '@/components/Input'
+import { LoadingScreen } from '@/components/LoadingScreen'
+import { supabase } from '@/lib/supabase'
+import { Save } from 'lucide-react-native'
 
 export default function MRMScreen() {
-  const { t } = useTranslation();
-  const { employee } = useAuthStore();
-  const [actions, setActions] = useState([{ description: "", owner: "", target: "" }]);
+  const { t } = useTranslation()
+  const { employee } = useAuth()
+  const [safety, setSafety] = useState('')
+  const [quality, setQuality] = useState('')
+  const [delivery, setDelivery] = useState('')
+  const [cost, setCost] = useState('')
+  const [morale, setMorale] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const addAction = () => setActions([...actions, { description: "", owner: "", target: "" }]);
-  const updateAction = (idx: number, field: string, value: string) => {
-    const updated = [...actions];
-    updated[idx] = { ...updated[idx], [field]: value };
-    setActions(updated);
-  };
+  if (!employee) return <LoadingScreen />
 
-  const submit = async () => {
-    if (!employee) return;
-    const month = new Date().toLocaleString("en", { month: "long" });
-    const year = new Date().getFullYear();
-    const { data: mrm, error } = await supabase.from("mrm_reviews").insert({
-      department_id: employee.department_id, month, year, status: "submitted",
-      submitted_by: employee.id, submitted_on: new Date().toISOString(),
-    }).select().single();
+  const handleSubmit = async () => {
+    setIsSubmitting(true)
+    const now = new Date()
+    await supabase.from('mrm_reviews').insert({
+      department: employee.department,
+      month: String(now.getMonth() + 1).padStart(2, '0'),
+      year: now.getFullYear(),
+      safety_score: parseFloat(safety) || 0,
+      quality_score: parseFloat(quality) || 0,
+      delivery_score: parseFloat(delivery) || 0,
+      cost_score: parseFloat(cost) || 0,
+      morale_score: parseFloat(morale) || 0,
+      submitted_by: employee.id,
+      submitted_at: new Date().toISOString(),
+      status: 'submitted',
+    })
+    setIsSubmitting(false)
+    Alert.alert(t('common.success'), 'MRM review submitted')
+  }
 
-    if (!error && mrm) {
-      await supabase.from("mrm_actions").insert(actions.map(a => ({
-        mrm_id: mrm.id, description: a.description, owner: a.owner, target_date: a.target, status: "open",
-      })));
-      Alert.alert("Success", "MRM submitted");
-      router.back();
-    }
-  };
+  const isOverdue = new Date().getDate() > 10
 
   return (
-    <SafeView>
-      <Header />
+    <View className="flex-1 bg-gray-50">
+      <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
-        <Text className="text-2xl font-bold text-gray-800 mb-4">{t("manager.mrmReview")}</Text>
-        {actions.map((action, idx) => (
-          <Card key={idx} className="mb-2">
-            <Text className="font-bold text-gray-800 mb-2">Action {idx + 1}</Text>
-            <Input label="Description" value={action.description} onChangeText={(v) => updateAction(idx, "description", v)} />
-            <Input label="Owner" value={action.owner} onChangeText={(v) => updateAction(idx, "owner", v)} />
-            <Input label="Target Date" value={action.target} onChangeText={(v) => updateAction(idx, "target", v)} />
-          </Card>
-        ))}
-        <Button title="Add Action" onPress={addAction} variant="outline" className="mb-4" />
-        <Button title={t("app.submit")} onPress={submit} />
+        {isOverdue && <Card className="mb-4 bg-red-50 border-red-200"><Text className="text-sm text-red-600 font-bold">{t('manager.mrmOverdue')}</Text></Card>}
+        <Card>
+          <Text className="text-lg font-bold text-gray-900 mb-1">{t('manager.mrmForm')}</Text>
+          <Text className="text-xs text-gray-500 mb-4">{t('manager.mrmDeadline')}</Text>
+          <Input label="Safety Score (0-100)" value={safety} onChangeText={setSafety} keyboardType="numeric" maxLength={3} />
+          <Input label="Quality Score (0-100)" value={quality} onChangeText={setQuality} keyboardType="numeric" maxLength={3} />
+          <Input label="Delivery Score (0-100)" value={delivery} onChangeText={setDelivery} keyboardType="numeric" maxLength={3} />
+          <Input label="Cost Score (0-100)" value={cost} onChangeText={setCost} keyboardType="numeric" maxLength={3} />
+          <Input label="Morale Score (0-100)" value={morale} onChangeText={setMorale} keyboardType="numeric" maxLength={3} />
+          <Button title="common.submit" onPress={handleSubmit} loading={isSubmitting} icon={<Save size={18} color="white" />} />
+        </Card>
       </ScrollView>
-    </SafeView>
-  );
+    </View>
+  )
 }

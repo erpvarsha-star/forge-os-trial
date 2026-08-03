@@ -9,50 +9,52 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#E65C00"
+      "backgroundColor": "#ffffff"
     },
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourcompany.forgeos",
-      "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Forge OS needs your location for attendance check-in.",
-        "NSCameraUsageDescription": "Forge OS needs camera access for 5S photo submissions.",
-        "NSPhotoLibraryUsageDescription": "Forge OS needs photo library access for 5S submissions."
-      }
+      "bundleIdentifier": "com.yourcompany.forgeos"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#E65C00"
+        "backgroundColor": "#ffffff"
       },
       "package": "com.yourcompany.forgeos",
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "CAMERA",
-        "RECEIVE_BOOT_COMPLETED",
-        "SCHEDULE_EXACT_ALARM"
+        "RECEIVE_BOOT_COMPLETED"
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
     "plugins": [
       "expo-router",
-      ["expo-location", {
-        "locationAlwaysAndWhenInUsePermission": "Forge OS needs your location for attendance check-in."
-      }],
-      ["expo-camera", {
-        "cameraPermission": "Forge OS needs camera access for 5S photo submissions."
-      }],
-      ["expo-notifications", {
-        "icon": "./assets/notification-icon.png",
-        "color": "#E65C00"
-      }]
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Forge OS to use your location for attendance verification."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Forge OS to access your camera for 5S photo submissions and QR scanning."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#E65C00"
+        }
+      ]
     ],
-    "extra": {
-      "router": { "origin": false }
-    }
+    "scheme": "forgeos"
   }
 }

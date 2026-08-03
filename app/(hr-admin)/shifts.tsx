@@ -1,46 +1,102 @@
-import { useState, useEffect } from "react";
-import { View, Text, ScrollView } from "react-native";
-import { SafeView } from "@/components/SafeView";
-import { Header } from "@/components/Header";
-import { Card } from "@/components/Card";
-import { Button } from "@/components/Button";
-import { Input } from "@/components/Input";
-import { supabase } from "@/lib/supabase";
-import { Shift } from "@/types";
+import React, { useState, useEffect } from 'react'
+import { View, Text, ScrollView, Modal, Alert } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import { useAuth } from '@/hooks/useAuth'
+import { Header } from '@/components/Header'
+import { Card } from '@/components/Card'
+import { Button } from '@/components/Button'
+import { Input } from '@/components/Input'
+import { LoadingScreen } from '@/components/LoadingScreen'
+import { supabase } from '@/lib/supabase'
+import { Shift, Employee } from '@/types'
+import { Calendar, Plus, Clock } from 'lucide-react-native'
+import { TouchableOpacity } from 'react-native'
 
-export default function ShiftPlanningScreen() {
-  const [shifts, setShifts] = useState<Shift[]>([]);
-  const [newShift, setNewShift] = useState({ name: "", start: "", end: "", dept: "" });
+export default function ShiftsScreen() {
+  const { t } = useTranslation()
+  const { employee } = useAuth()
+  const [shifts, setShifts] = useState<Shift[]>([])
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [showModal, setShowModal] = useState(false)
+  const [selectedShift, setSelectedShift] = useState('')
+  const [selectedEmployee, setSelectedEmployee] = useState('')
+  const [selectedDate, setSelectedDate] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => { fetchShifts(); }, []);
+  useEffect(() => { fetchData() }, [employee])
 
-  const fetchShifts = async () => {
-    const { data } = await supabase.from("shifts").select("*");
-    if (data) setShifts(data as Shift[]);
-  };
+  const fetchData = async () => {
+    const [{ data: sData }, { data: eData }] = await Promise.all([
+      supabase.from('shifts').select('*'),
+      supabase.from('employees').select('id, name, emp_code').eq('is_active', true),
+    ])
+    if (sData) setShifts(sData as Shift[])
+    if (eData) setEmployees(eData as Employee[])
+    setIsLoading(false)
+  }
 
-  const addShift = async () => {
-    const { error } = await supabase.from("shifts").insert({
-      name: newShift.name, start_time: newShift.start, end_time: newShift.end, department_id: newShift.dept,
-    });
-    if (!error) { setNewShift({ name: "", start: "", end: "", dept: "" }); fetchShifts(); }
-  };
+  const assignShift = async () => {
+    if (!selectedShift || !selectedEmployee || !selectedDate) {
+      Alert.alert(t('common.error'), t('common.required'))
+      return
+    }
+    await supabase.from('employee_shifts').insert({
+      employee_id: selectedEmployee,
+      shift_id: selectedShift,
+      date: selectedDate,
+    })
+    setShowModal(false)
+    Alert.alert(t('common.success'), 'Shift assigned')
+  }
 
+  if (!employee) return <LoadingScreen />
   return (
-    <SafeView>
-      <Header />
+    <View className="flex-1 bg-gray-50">
+      <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
-        <Text className="text-2xl font-bold text-gray-800 mb-4">Shift Planning</Text>
-        <Card>
-          <Input label="Shift Name" value={newShift.name} onChangeText={(t) => setNewShift({ ...newShift, name: t })} />
-          <Input label="Start Time" value={newShift.start} onChangeText={(t) => setNewShift({ ...newShift, start: t })} placeholder="HH:MM" />
-          <Input label="End Time" value={newShift.end} onChangeText={(t) => setNewShift({ ...newShift, end: t })} placeholder="HH:MM" />
-          <Button title="Add Shift" onPress={addShift} />
-        </Card>
-        {shifts.map((s) => (
-          <Card key={s.id} className="mt-2"><Text className="font-bold">{s.name}</Text><Text className="text-gray-500">{s.start_time} - {s.end_time}</Text></Card>
+        <View className="flex-row justify-between items-center mb-4">
+          <Text className="text-xl font-bold text-gray-900">{t('hrAdmin.shiftPlanning')}</Text>
+          <Button title="" onPress={() => setShowModal(true)} icon={<Plus size={20} color="white" />} />
+        </View>
+        {shifts.map(shift => (
+          <Card key={shift.id} className="mb-2">
+            <View className="flex-row items-center gap-3">
+              <Clock size={18} className="text-orange-600" />
+              <View>
+                <Text className="text-sm font-bold text-gray-900">{shift.name}</Text>
+                <Text className="text-xs text-gray-500">{shift.start_time} - {shift.end_time}</Text>
+              </View>
+            </View>
+          </Card>
         ))}
       </ScrollView>
-    </SafeView>
-  );
+
+      <Modal visible={showModal} transparent animationType="slide">
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className="bg-white rounded-t-2xl p-6">
+            <Text className="text-lg font-bold text-gray-900 mb-4">{t('hrAdmin.assignShift')}</Text>
+            <Text className="text-sm font-medium text-gray-700 mb-2">Employee</Text>
+            <ScrollView horizontal className="mb-4" showsHorizontalScrollIndicator={false}>
+              {employees.map(emp => (
+                <TouchableOpacity key={emp.id} onPress={() => setSelectedEmployee(emp.id)} className={`mr-2 px-3 py-2 rounded-lg border ${selectedEmployee === emp.id ? 'bg-orange-600 border-orange-600' : 'border-gray-300'}`}>
+                  <Text className={`text-sm ${selectedEmployee === emp.id ? 'text-white' : 'text-gray-700'}`}>{emp.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <Text className="text-sm font-medium text-gray-700 mb-2">Shift</Text>
+            <ScrollView horizontal className="mb-4" showsHorizontalScrollIndicator={false}>
+              {shifts.map(shift => (
+                <TouchableOpacity key={shift.id} onPress={() => setSelectedShift(shift.id)} className={`mr-2 px-3 py-2 rounded-lg border ${selectedShift === shift.id ? 'bg-orange-600 border-orange-600' : 'border-gray-300'}`}>
+                  <Text className={`text-sm ${selectedShift === shift.id ? 'text-white' : 'text-gray-700'}`}>{shift.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <Input label={t('common.date')} value={selectedDate} onChangeText={setSelectedDate} placeholder="YYYY-MM-DD" />
+            <Button title="common.save" onPress={assignShift} className="mt-4" />
+            <Button title="common.cancel" onPress={() => setShowModal(false)} variant="ghost" />
+          </View>
+        </View>
+      </Modal>
+    </View>
+  )
 }

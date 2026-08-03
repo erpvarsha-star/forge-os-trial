@@ -1,42 +1,61 @@
-import { useState, useEffect } from "react";
-import { View, Text, ScrollView, Alert } from "react-native";
-import { SafeView } from "@/components/SafeView";
-import { Header } from "@/components/Header";
-import { Card } from "@/components/Card";
-import { Button } from "@/components/Button";
-import { useAuthStore } from "@/hooks/useAuth";
-import { supabase } from "@/lib/supabase";
+import React, { useState, useEffect } from 'react'
+import { View, Text, ScrollView } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import { useAuth } from '@/hooks/useAuth'
+import { Header } from '@/components/Header'
+import { Card } from '@/components/Card'
+import { Button } from '@/components/Button'
+import { LoadingScreen } from '@/components/LoadingScreen'
+import { supabase } from '@/lib/supabase'
+import { LeaveRequest, AdvanceRequest } from '@/types'
+import { CheckCircle, XCircle } from 'lucide-react-native'
 
-export default function OwnerApprovalsScreen() {
-  const { employee } = useAuthStore();
-  const [items, setItems] = useState<any[]>([]);
+export default function OwnerApprovals() {
+  const { t } = useTranslation()
+  const { employee } = useAuth()
+  const [items, setItems] = useState<(LeaveRequest | AdvanceRequest)[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => { fetchItems(); }, []);
+  useEffect(() => { fetchApprovals() }, [employee])
 
-  const fetchItems = async () => {
-    const { data: leaves } = await supabase.from("leave_requests").select("*, employees(name)").eq("status", "pending");
-    const { data: advances } = await supabase.from("salary_advances").select("*, employees(name)").eq("status", "pending");
-    setItems([...(leaves || []).map((l: any) => ({ ...l, type: "leave" })), ...(advances || []).map((a: any) => ({ ...a, type: "advance" }))]);
-  };
+  const fetchApprovals = async () => {
+    if (!employee) return
+    const [{ data: leaves }, { data: advances }] = await Promise.all([
+      supabase.from('leave_requests').select('*, employee:employees(*)').eq('status', 'pending'),
+      supabase.from('advance_requests').select('*, employee:employees(*)').eq('status', 'pending'),
+    ])
+    const all = [...(leaves || []), ...(advances || [])]
+    setItems(all as any)
+    setIsLoading(false)
+  }
 
-  const approve = async (id: string, table: string) => {
-    await supabase.from(table).update({ status: "approved", approved_by: employee!.id }).eq("id", id);
-    Alert.alert("Approved"); fetchItems();
-  };
+  const approve = async (table: string, id: string) => {
+    await supabase.from(table).update({ status: 'approved', approved_by: employee!.id, approved_at: new Date().toISOString() }).eq('id', id)
+    fetchApprovals()
+  }
 
+  const reject = async (table: string, id: string) => {
+    await supabase.from(table).update({ status: 'rejected', approved_by: employee!.id, approved_at: new Date().toISOString() }).eq('id', id)
+    fetchApprovals()
+  }
+
+  if (!employee) return <LoadingScreen />
   return (
-    <SafeView>
-      <Header />
+    <View className="flex-1 bg-gray-50">
+      <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
-        <Text className="text-2xl font-bold text-gray-800 mb-4">Final Approvals</Text>
-        {items.map((item) => (
-          <Card key={`${item.type}-${item.id}`} className="mb-2">
-            <Text className="font-bold">{item.employees?.name}</Text>
-            <Text className="text-gray-500 capitalize">{item.type}: {item.amount || item.leave_type}</Text>
-            <Button title="Approve" onPress={() => approve(item.id, item.type === "leave" ? "leave_requests" : "salary_advances")} size="sm" className="mt-2" />
+        <Text className="text-xl font-bold text-gray-900 mb-4">{t('owner.finalEscalation')}</Text>
+        {items.map((item: any) => (
+          <Card key={item.id} className="mb-2">
+            <Text className="text-sm font-bold text-gray-900">{item.employee?.name} ({item.employee?.department})</Text>
+            <Text className="text-xs text-gray-500">{item.type || `₹${item.amount}`}</Text>
+            <View className="flex-row gap-2 mt-2">
+              <Button title="supervisor.approve" onPress={() => approve(item.type ? 'leave_requests' : 'advance_requests', item.id)} size="sm" className="flex-1" icon={<CheckCircle size={14} color="white" />} />
+              <Button title="supervisor.reject" onPress={() => reject(item.type ? 'leave_requests' : 'advance_requests', item.id)} variant="danger" size="sm" className="flex-1" icon={<XCircle size={14} color="white" />} />
+            </View>
           </Card>
         ))}
       </ScrollView>
-    </SafeView>
-  );
+    </View>
+  )
 }

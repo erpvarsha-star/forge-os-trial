@@ -1,100 +1,174 @@
-import { useState } from "react";
-import { View, Text, Image, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
-import { useTranslation } from "react-i18next";
-import { router } from "expo-router";
-import { SafeView } from "@/components/SafeView";
-import { Input } from "@/components/Input";
-import { Button } from "@/components/Button";
-import { Loading } from "@/components/Loading";
-import { useAuth } from "@/hooks/useAuth";
-import { APP_CONFIG } from "@/lib/config";
+import React, { useState, useEffect } from 'react'
+import { View, Text, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import { useAuth } from '@/hooks/useAuth'
+import { Button } from '@/components/Button'
+import { Input } from '@/components/Input'
+import { LoadingScreen } from '@/components/LoadingScreen'
+import { APP_CONFIG } from '@/lib/config'
+import { supabase } from '@/lib/supabase'
+import { router } from 'expo-router'
+import { registerForPushNotificationsAsync } from '@/lib/notifications'
+import { Phone, Lock, Building2 } from 'lucide-react-native'
 
 export default function LoginScreen() {
-  const { t } = useTranslation();
-  const { loginWithPhone, verifyOtp, getRoleRoute } = useAuth();
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [step, setStep] = useState<"phone" | "otp">("phone");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [countdown, setCountdown] = useState(0);
+  const { t } = useTranslation()
+  const { isLoading, isAuthenticated, loadEmployee } = useAuth()
+  const [phone, setPhone] = useState('')
+  const [otp, setOtp] = useState('')
+  const [step, setStep] = useState<'phone' | 'otp'>('phone')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [countdown, setCountdown] = useState(0)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(c => c - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [countdown])
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace('/')
+    }
+  }, [isAuthenticated])
+
+  if (isLoading) return <LoadingScreen />
 
   const handleSendOtp = async () => {
-    if (phone.length !== 10) { setError("Enter 10 digit number"); return; }
-    setLoading(true); setError("");
-    const { error } = await loginWithPhone(phone);
-    setLoading(false);
-    if (error) setError(error.message);
-    else { setStep("otp"); startCountdown(); }
-  };
+    setError('')
+    if (phone.length !== 10 || !/^\d{10}$/.test(phone)) {
+      setError(t('auth.invalidPhone'))
+      return
+    }
+
+    setIsSubmitting(true)
+    const { error: sendError } = await supabase.auth.signInWithOtp({
+      phone: `+91${phone}`,
+    })
+
+    if (sendError) {
+      setError(sendError.message)
+      setIsSubmitting(false)
+      return
+    }
+
+    setStep('otp')
+    setCountdown(60)
+    setIsSubmitting(false)
+  }
 
   const handleVerifyOtp = async () => {
-    if (otp.length !== 6) { setError("Enter 6-digit OTP"); return; }
-    setLoading(true); setError("");
-    const { error, employee } = await verifyOtp(phone, otp);
-    setLoading(false);
-    if (error) {
-      if (error.message.includes("not registered")) setError(t("auth.notRegistered"));
-      else setError(t("auth.invalidOtp"));
-    } else if (employee) {
-      router.replace(getRoleRoute() as any);
+    setError('')
+    if (otp.length !== 6 || !/^\d{6}$/.test(otp)) {
+      setError(t('auth.invalidOtp'))
+      return
     }
-  };
 
-  const startCountdown = () => {
-    setCountdown(60);
-    const interval = setInterval(() => {
-      setCountdown((prev) => { if (prev <= 1) { clearInterval(interval); return 0; } return prev - 1; });
-    }, 1000);
-  };
+    setIsSubmitting(true)
+    const { data, error: verifyError } = await supabase.auth.verifyOtp({
+      phone: `+91${phone}`,
+      token: otp,
+      type: 'sms',
+    })
 
-  const handleResend = async () => { if (countdown > 0) return; await handleSendOtp(); };
+    if (verifyError || !data.session) {
+      setError(t('auth.invalidOtp'))
+      setIsSubmitting(false)
+      return
+    }
 
-  if (loading && step === "phone") return <Loading />;
+    const { data: empData, error: empError } = await supabase
+      .from('employees')
+      .select('*')
+      .eq('phone', `+91${phone}`)
+      .single()
+
+    if (empError || !empData) {
+      await supabase.auth.signOut()
+      setError(t('auth.notRegistered'))
+      setIsSubmitting(false)
+      return
+    }
+
+    await loadEmployee(`+91${phone}`)
+    await registerForPushNotificationsAsync(empData.id)
+    setIsSubmitting(false)
+    router.replace('/')
+  }
 
   return (
-    <SafeView className="bg-white">
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} className="flex-1">
-        <ScrollView className="flex-1 px-6 py-8" keyboardShouldPersistTaps="handled">
-          <View className="items-center mt-12 mb-8">
-            {APP_CONFIG.logoUrl ? (
-              <Image source={{ uri: APP_CONFIG.logoUrl }} className="w-24 h-24 mb-4" resizeMode="contain" />
-            ) : (
-              <View className="w-24 h-24 bg-primary/10 rounded-full items-center justify-center mb-4">
-                <Text className="text-primary text-3xl font-bold">F</Text>
-              </View>
-            )}
-            <Text className="text-2xl font-bold text-gray-900 text-center">{APP_CONFIG.appName}</Text>
-            <Text className="text-gray-500 text-center mt-1">{t("auth.welcome", { company: APP_CONFIG.companyName })}</Text>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      className="flex-1 bg-white"
+    >
+      <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+        <View className="flex-1 items-center justify-center px-6 py-12">
+          <View className="w-20 h-20 bg-orange-600 rounded-2xl items-center justify-center mb-6 shadow-lg">
+            <Building2 size={40} color="white" />
           </View>
 
-          {step === "phone" ? (
-            <View>
-              <Text className="text-lg font-semibold text-gray-800 mb-4">{t("auth.phoneLabel")}</Text>
-              <View className="flex-row items-center border border-gray-300 rounded-lg bg-white mb-4">
-                <View className="px-4 py-3 border-r border-gray-300"><Text className="text-gray-700 font-medium">+91</Text></View>
-                <Input placeholder={t("auth.phonePlaceholder")} value={phone}
-                  onChangeText={(t) => { setPhone(t.replace(/[^0-9]/g, "").slice(0, 10)); setError(""); }}
-                  keyboardType="phone-pad" maxLength={10} className="flex-1 mb-0 border-0" />
-              </View>
-              {error ? <Text className="text-danger mb-4">{error}</Text> : null}
-              <Button title={t("auth.sendOtp")} onPress={handleSendOtp} loading={loading} size="lg" />
+          <Text className="text-2xl font-bold text-gray-900 mb-1">{APP_CONFIG.appName}</Text>
+          <Text className="text-sm text-gray-500 mb-8">{APP_CONFIG.companyName}</Text>
+
+          <Text className="text-xl font-bold text-gray-900 mb-6">{t('auth.loginTitle')}</Text>
+
+          {step === 'phone' ? (
+            <View className="w-full gap-4">
+              <Input
+                label={t('auth.enterPhone')}
+                placeholder={t('auth.phoneHint')}
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+                maxLength={10}
+                error={error}
+                className="w-full"
+              />
+              <Button
+                title="auth.sendOtp"
+                onPress={handleSendOtp}
+                loading={isSubmitting}
+                size="lg"
+                className="w-full"
+                icon={<Phone size={20} color="white" />}
+              />
             </View>
           ) : (
-            <View>
-              <Text className="text-lg font-semibold text-gray-800 mb-2">{t("auth.otpLabel")}</Text>
-              <Text className="text-gray-500 mb-4">Sent to +91 {phone}</Text>
-              <Input placeholder={t("auth.otpPlaceholder")} value={otp}
-                onChangeText={(t) => { setOtp(t.replace(/[^0-9]/g, "").slice(0, 6)); setError(""); }}
-                keyboardType="number-pad" maxLength={6} className="mb-4" />
-              {error ? <Text className="text-danger mb-4">{error}</Text> : null}
-              <Button title={t("auth.verifyOtp")} onPress={handleVerifyOtp} loading={loading} size="lg" className="mb-4" />
-              <Button title={countdown > 0 ? `Resend in ${countdown}s` : t("auth.resendOtp")}
-                onPress={handleResend} variant="outline" disabled={countdown > 0} />
+            <View className="w-full gap-4">
+              <Text className="text-sm text-gray-600 text-center mb-2">
+                {t('auth.otpSent')}: +91 {phone}
+              </Text>
+              <Input
+                label={t('auth.enterOtp')}
+                placeholder={t('auth.otpHint')}
+                value={otp}
+                onChangeText={setOtp}
+                keyboardType="number-pad"
+                maxLength={6}
+                error={error}
+                className="w-full"
+              />
+              <Button
+                title="auth.verifyOtp"
+                onPress={handleVerifyOtp}
+                loading={isSubmitting}
+                size="lg"
+                className="w-full"
+                icon={<Lock size={20} color="white" />}
+              />
+              <Button
+                title={countdown > 0 ? `auth.resendIn` : 'auth.resendOtp'}
+                onPress={countdown > 0 ? undefined : handleSendOtp}
+                variant="ghost"
+                disabled={countdown > 0}
+                className="w-full"
+              />
             </View>
           )}
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeView>
-  );
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  )
 }

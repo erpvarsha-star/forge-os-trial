@@ -1,36 +1,49 @@
-import { useState, useEffect } from "react";
-import { View, Text, ScrollView } from "react-native";
-import { useTranslation } from "react-i18next";
-import { SafeView } from "@/components/SafeView";
-import { Header } from "@/components/Header";
-import { Card } from "@/components/Card";
-import { Badge } from "@/components/Badge";
-import { supabase } from "@/lib/supabase";
+import React, { useState, useEffect } from 'react'
+import { View, Text, ScrollView } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import { useAuth } from '@/hooks/useAuth'
+import { Header } from '@/components/Header'
+import { Card } from '@/components/Card'
+import { LoadingScreen } from '@/components/LoadingScreen'
+import { supabase } from '@/lib/supabase'
+import { MRMReview } from '@/types'
+import { CheckCircle, Clock } from 'lucide-react-native'
 
 export default function PlantHeadMRM() {
-  const { t } = useTranslation();
-  const [mrms, setMrms] = useState<any[]>([]);
+  const { t } = useTranslation()
+  const { employee } = useAuth()
+  const [reviews, setReviews] = useState<MRMReview[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => { fetchMrms(); }, []);
+  useEffect(() => {
+    const fetch = async () => {
+      if (!employee) return
+      const now = new Date()
+      const { data } = await supabase.from('mrm_reviews').select('*').eq('month', String(now.getMonth() + 1).padStart(2, '0')).eq('year', now.getFullYear())
+      if (data) setReviews(data as MRMReview[])
+      setIsLoading(false)
+    }
+    fetch()
+  }, [employee])
 
-  const fetchMrms = async () => {
-    const { data } = await supabase.from("mrm_reviews").select("*, departments(name)").eq("status", "submitted");
-    if (data) setMrms(data);
-  };
-
+  if (!employee) return <LoadingScreen />
   return (
-    <SafeView>
-      <Header />
+    <View className="flex-1 bg-gray-50">
+      <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
-        <Text className="text-2xl font-bold text-gray-800 mb-4">{t("plantHead.mrmStatus")}</Text>
-        {mrms.map((mrm) => (
-          <Card key={mrm.id} className="mb-2">
-            <Text className="font-bold text-gray-800">{mrm.departments?.name}</Text>
-            <Text className="text-gray-500">{mrm.month} {mrm.year}</Text>
-            <Badge text={mrm.status} variant="warning" className="mt-2" />
+        <Text className="text-xl font-bold text-gray-900 mb-4">{t('plantHead.mrmStatus')}</Text>
+        {reviews.map(review => (
+          <Card key={review.id} className="mb-2">
+            <View className="flex-row items-center justify-between">
+              <View>
+                <Text className="text-sm font-bold text-gray-900">{review.department}</Text>
+                <Text className="text-xs text-gray-500">Safety: {review.safety_score} | Quality: {review.quality_score}</Text>
+              </View>
+              {review.status === 'submitted' ? <CheckCircle size={20} className="text-green-600" /> : <Clock size={20} className="text-yellow-600" />}
+            </View>
           </Card>
         ))}
       </ScrollView>
-    </SafeView>
-  );
+    </View>
+  )
 }

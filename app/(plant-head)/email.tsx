@@ -1,34 +1,49 @@
-import { View, Text, ScrollView } from "react-native";
-import { useTranslation } from "react-i18next";
-import { SafeView } from "@/components/SafeView";
-import { Header } from "@/components/Header";
-import { Card } from "@/components/Card";
-import { Badge } from "@/components/Badge";
+import React, { useState, useEffect } from 'react'
+import { View, Text, ScrollView } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import { useAuth } from '@/hooks/useAuth'
+import { Header } from '@/components/Header'
+import { Card } from '@/components/Card'
+import { LoadingScreen } from '@/components/LoadingScreen'
+import { supabase } from '@/lib/supabase'
+import { EmailTask } from '@/types'
+import { Mail, Inbox } from 'lucide-react-native'
 
-export default function EmailDashboardScreen() {
-  const { t } = useTranslation();
-  const [inboxes] = useState([
-    { name: "HR", unread: 5, priority: "high" },
-    { name: "Production", unread: 2, priority: "medium" },
-    { name: "Maintenance", unread: 0, priority: "low" },
-    { name: "Safety", unread: 8, priority: "high" },
-    { name: "Finance", unread: 1, priority: "medium" },
-    { name: "IT", unread: 0, priority: "low" },
-  ]);
+export default function PlantHeadEmail() {
+  const { t } = useTranslation()
+  const { employee } = useAuth()
+  const [tasks, setTasks] = useState<EmailTask[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
+  useEffect(() => {
+    const fetch = async () => {
+      if (!employee) return
+      const { data } = await supabase.from('email_tasks').select('*').eq('status', 'unread').order('priority', { ascending: false }).limit(20)
+      if (data) setTasks(data as EmailTask[])
+      setIsLoading(false)
+    }
+    fetch()
+  }, [employee])
+
+  if (!employee) return <LoadingScreen />
   return (
-    <SafeView>
-      <Header />
+    <View className="flex-1 bg-gray-50">
+      <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
-        <Text className="text-2xl font-bold text-gray-800 mb-4">{t("plantHead.emailDashboard")}</Text>
-        <Text className="text-gray-500 mb-4">{t("plantHead.priorityInboxes")}</Text>
-        {inboxes.map((box) => (
-          <Card key={box.name} className="flex-row justify-between items-center mb-2">
-            <View><Text className="font-bold text-gray-800">{box.name}</Text><Text className="text-gray-500 text-sm">{box.unread} unread</Text></View>
-            <Badge text={box.priority} variant={box.priority === "high" ? "danger" : box.priority === "medium" ? "warning" : "info"} />
+        <Text className="text-xl font-bold text-gray-900 mb-4">{t('plantHead.emailDashboard')}</Text>
+        {tasks.map(task => (
+          <Card key={task.id} className="mb-2">
+            <View className="flex-row items-start gap-3">
+              <Mail size={18} className="text-orange-600 mt-0.5" />
+              <View className="flex-1">
+                <Text className="text-sm font-bold text-gray-900">{task.subject}</Text>
+                <Text className="text-xs text-gray-500">{task.sender} • {task.inbox}</Text>
+                <Text className="text-xs text-orange-600 mt-1">Priority: {task.priority}</Text>
+              </View>
+            </View>
           </Card>
         ))}
       </ScrollView>
-    </SafeView>
-  );
+    </View>
+  )
 }

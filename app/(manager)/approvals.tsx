@@ -1,65 +1,81 @@
-import { useState, useEffect } from "react";
-import { View, Text, ScrollView, Alert } from "react-native";
-import { useTranslation } from "react-i18next";
-import { SafeView } from "@/components/SafeView";
-import { Header } from "@/components/Header";
-import { Card } from "@/components/Card";
-import { Button } from "@/components/Button";
-import { useAuthStore } from "@/hooks/useAuth";
-import { supabase } from "@/lib/supabase";
-import { formatCurrency } from "@/lib/utils";
+import React, { useState, useEffect } from 'react'
+import { View, Text, ScrollView } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import { useAuth } from '@/hooks/useAuth'
+import { Header } from '@/components/Header'
+import { Card } from '@/components/Card'
+import { Button } from '@/components/Button'
+import { LoadingScreen } from '@/components/LoadingScreen'
+import { supabase } from '@/lib/supabase'
+import { LeaveRequest, AdvanceRequest } from '@/types'
+import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react-native'
 
-export default function ManagerApprovalsScreen() {
-  const { t } = useTranslation();
-  const { employee } = useAuthStore();
-  const [leaves, setLeaves] = useState<any[]>([]);
-  const [advances, setAdvances] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<"leaves" | "advances">("leaves");
+export default function ManagerApprovals() {
+  const { t } = useTranslation()
+  const { employee } = useAuth()
+  const [leaves, setLeaves] = useState<LeaveRequest[]>([])
+  const [advances, setAdvances] = useState<AdvanceRequest[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchApprovals() }, [employee])
 
-  const fetchData = async () => {
-    const { data: l } = await supabase.from("leave_requests").select("*, employees(name, emp_code)").eq("status", "pending");
-    const { data: a } = await supabase.from("salary_advances").select("*, employees(name, emp_code, department)").eq("status", "pending");
-    if (l) setLeaves(l);
-    if (a) setAdvances(a);
-  };
+  const fetchApprovals = async () => {
+    if (!employee) return
+    const { data: supervisors } = await supabase.from('employees').select('id').eq('manager_id', employee.id)
+    if (!supervisors) { setIsLoading(false); return }
+    const supIds = supervisors.map(s => s.id)
+    const { data: team } = await supabase.from('employees').select('id').in('supervisor_id', supIds)
+    if (!team) { setIsLoading(false); return }
+    const ids = team.map(t => t.id)
+    const [{ data: leaveData }, { data: advanceData }] = await Promise.all([
+      supabase.from('leave_requests').select('*, employee:employees(*)').in('employee_id', ids).eq('status', 'pending'),
+      supabase.from('advance_requests').select('*, employee:employees(*)').in('employee_id', ids).eq('status', 'pending'),
+    ])
+    if (leaveData) setLeaves(leaveData as LeaveRequest[])
+    if (advanceData) setAdvances(advanceData as AdvanceRequest[])
+    setIsLoading(false)
+  }
 
-  const approveLeave = async (id: string) => {
-    await supabase.from("leave_requests").update({ status: "approved", approved_by: employee!.id, approved_on: new Date().toISOString() }).eq("id", id);
-    Alert.alert("Approved"); fetchData();
-  };
+  const approve = async (table: string, id: string) => {
+    await supabase.from(table).update({ status: 'approved', approved_by: employee!.id, approved_at: new Date().toISOString() }).eq('id', id)
+    fetchApprovals()
+  }
 
-  const approveAdvance = async (id: string) => {
-    await supabase.from("salary_advances").update({ status: "approved", approved_by: employee!.id }).eq("id", id);
-    Alert.alert("Approved"); fetchData();
-  };
+  const reject = async (table: string, id: string) => {
+    await supabase.from(table).update({ status: 'rejected', approved_by: employee!.id, approved_at: new Date().toISOString() }).eq('id', id)
+    fetchApprovals()
+  }
 
+  if (!employee) return <LoadingScreen />
   return (
-    <SafeView>
-      <Header />
+    <View className="flex-1 bg-gray-50">
+      <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
-        <Text className="text-2xl font-bold text-gray-800 mb-4">Approvals</Text>
-        <View className="flex-row mb-4">
-          <Button title={`Leaves (${leaves.length})`} onPress={() => setActiveTab("leaves")} variant={activeTab === "leaves" ? "primary" : "outline"} className="flex-1 mr-2" />
-          <Button title={`Advances (${advances.length})`} onPress={() => setActiveTab("advances")} variant={activeTab === "advances" ? "primary" : "outline"} className="flex-1" />
-        </View>
-        {activeTab === "leaves" && leaves.map((req) => (
+        <Text className="text-lg font-bold text-gray-900 mb-2">{t('manager.escalatedApprovals')}</Text>
+        {leaves.map(req => (
           <Card key={req.id} className="mb-2">
-            <Text className="font-bold">{req.employees?.name}</Text>
-            <Text className="text-gray-500">{req.leave_type}: {req.start_date} to {req.end_date}</Text>
-            <Button title="Approve" onPress={() => approveLeave(req.id)} size="sm" className="mt-2" />
+            <Text className="text-sm font-bold text-gray-900">{req.employee?.name}</Text>
+            <Text className="text-xs text-gray-500">{req.type}: {req.start_date} to {req.end_date}</Text>
+            <View className="flex-row gap-2 mt-2">
+              <Button title="supervisor.approve" onPress={() => approve('leave_requests', req.id)} size="sm" className="flex-1" icon={<CheckCircle size={14} color="white" />} />
+              <Button title="supervisor.reject" onPress={() => reject('leave_requests', req.id)} variant="danger" size="sm" className="flex-1" icon={<XCircle size={14} color="white" />} />
+            </View>
           </Card>
         ))}
-        {activeTab === "advances" && advances.map((adv) => (
-          <Card key={adv.id} className="mb-2">
-            <Text className="font-bold">{adv.employees?.name}</Text>
-            <Text className="text-gray-500">{formatCurrency(adv.amount)} • {adv.repayment_months} months</Text>
-            <Text className="text-gray-500 text-sm">{adv.reason}</Text>
-            <Button title="Approve" onPress={() => approveAdvance(adv.id)} size="sm" className="mt-2" />
+        {advances.map(req => (
+          <Card key={req.id} className="mb-2">
+            <Text className="text-sm font-bold text-gray-900">{req.employee?.name}</Text>
+            <Text className="text-xs text-gray-500">₹{req.amount}</Text>
+            {req.amount > (req.employee?.salary || 0) * 0.3 && (
+              <View className="flex-row items-center gap-1 mt-1"><AlertTriangle size={14} className="text-red-600" /><Text className="text-xs text-red-600">{t('manager.advanceSafetyCheck')}</Text></View>
+            )}
+            <View className="flex-row gap-2 mt-2">
+              <Button title="supervisor.approve" onPress={() => approve('advance_requests', req.id)} size="sm" className="flex-1" />
+              <Button title="supervisor.reject" onPress={() => reject('advance_requests', req.id)} variant="danger" size="sm" className="flex-1" />
+            </View>
           </Card>
         ))}
       </ScrollView>
-    </SafeView>
-  );
+    </View>
+  )
 }
