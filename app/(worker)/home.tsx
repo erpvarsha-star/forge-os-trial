@@ -15,6 +15,8 @@ import { EmployeeShift } from '@/types'
 import { MAX_DAILY_OBSERVATIONS } from '@/constants'
 import { MapPin, Clock, CheckSquare, AlertCircle, Camera, QrCode } from 'lucide-react-native'
 import { router } from 'expo-router'
+import * as Location from 'expo-location'
+import Constants from 'expo-constants'
 
 export default function WorkerHome() {
   const { t } = useTranslation()
@@ -87,6 +89,28 @@ export default function WorkerHome() {
       return
     }
 
+    // Step 5 fraud detection: mock-location + same-device-different-employee ("buddy device")
+    const providerStatus = await Location.getProviderStatusAsync()
+    const mockDetected = !providerStatus.gpsAvailable
+    const deviceId = Constants.deviceId || Constants.sessionId
+
+    const todayStr = new Date().toISOString().split('T')[0]
+    const { data: buddyCheck } = await supabase
+      .from('attendance_records')
+      .select('employee_id')
+      .eq('device_id', deviceId)
+      .eq('date', todayStr)
+      .neq('employee_id', employee.id)
+      .single()
+
+    if (buddyCheck) {
+      await supabase.from('fraud_flags').insert({
+        employee_id: employee.id,
+        flag_type: 'BUDDY_DEVICE',
+        description: `Same device used by another employee today`,
+      })
+    }
+
     const now = new Date()
     const shiftStart = shift?.shift?.start_time
     let lateMinutes = 0
@@ -104,7 +128,7 @@ export default function WorkerHome() {
       return
     }
 
-    await checkIn(location.coords.latitude, location.coords.longitude, lateReason || undefined)
+    await checkIn(location.coords.latitude, location.coords.longitude, lateReason || undefined, mockDetected, deviceId)
     await refresh()
     setIsLoading(false)
   }

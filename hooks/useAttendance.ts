@@ -43,7 +43,7 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     fetchRecords()
   }, [fetchRecords])
 
-  const checkIn = async (lat: number, lng: number, lateReason?: string) => {
+  const checkIn = async (lat: number, lng: number, lateReason?: string, mockDetected?: boolean, deviceId?: string) => {
     const now = new Date()
     const date = now.toISOString().split('T')[0]
     const time = now.toISOString()
@@ -59,6 +59,8 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
         check_in_lng: lng,
         late_reason: lateReason || null,
         qr_verified: false,
+        mock_location_detected: mockDetected || false,
+        device_id: deviceId || null,
       })
       .select()
       .single()
