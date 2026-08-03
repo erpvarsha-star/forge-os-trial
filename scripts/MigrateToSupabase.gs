@@ -39,8 +39,8 @@ var SHEET_NAMES = {
 // Column headers expected in the Employee Master sheet (case-insensitive
 // match against row 1). Extra columns in the sheet are ignored.
 var EMPLOYEE_MASTER_COLUMNS = {
-  employee_code: 'Employee Code',
-  full_name: 'Full Name',
+  emp_code: 'Employee Code',
+  name: 'Full Name',
   phone: 'Phone',
   role: 'Role',
   department: 'Department',
@@ -108,7 +108,7 @@ function syncEmployeeMaster() {
 
   for (var r = 1; r < data.length; r++) {
     var row = data[r];
-    var employeeCode = getCell_(row, headerMap, EMPLOYEE_MASTER_COLUMNS.employee_code);
+    var employeeCode = getCell_(row, headerMap, EMPLOYEE_MASTER_COLUMNS.emp_code);
     if (!employeeCode) continue; // blank row
 
     var alreadySynced = row[syncedCol - 1];
@@ -121,7 +121,7 @@ function syncEmployeeMaster() {
     try {
       var existing = supabaseRequest_('GET', '/rest/v1/employees', null, {
         select: 'id,is_active',
-        employee_code: 'eq.' + employeeCode,
+        emp_code: 'eq.' + employeeCode,
       });
 
       if (!existing || existing.length === 0) {
@@ -136,7 +136,7 @@ function syncEmployeeMaster() {
         // Existing employee: sync editable master-data fields, but never
         // flip is_active from the sheet — that stays app-owned (Workflow 3).
         delete payload.is_active;
-        supabaseRequest_('PATCH', '/rest/v1/employees', payload, { employee_code: 'eq.' + employeeCode });
+        supabaseRequest_('PATCH', '/rest/v1/employees', payload, { emp_code: 'eq.' + employeeCode });
       }
 
       sheet.getRange(r + 1, syncedCol).setValue(new Date());
@@ -153,8 +153,8 @@ function syncEmployeeMaster() {
 function buildEmployeePayload_(row, headerMap) {
   var c = EMPLOYEE_MASTER_COLUMNS;
   var payload = {
-    employee_code: getCell_(row, headerMap, c.employee_code),
-    full_name: getCell_(row, headerMap, c.full_name),
+    emp_code: getCell_(row, headerMap, c.emp_code),
+    name: getCell_(row, headerMap, c.name),
     phone: normalizePhone_(getCell_(row, headerMap, c.phone)),
     role: normalizeRole_(getCell_(row, headerMap, c.role)),
     designation: getCell_(row, headerMap, c.designation) || null,
@@ -204,7 +204,7 @@ function notifyPlantHeadOfNewEmployee_(employeePayload) {
       employee_id: ph.id,
       type: 'new_employee_pending_approval',
       title: 'New employee pending approval',
-      body: (employeePayload.full_name || employeePayload.employee_code) + ' was added to the Employee Master sheet and needs your approval.',
+      body: (employeePayload.name || employeePayload.emp_code) + ' was added to the Employee Master sheet and needs your approval.',
     };
   });
   supabaseRequest_('POST', '/rest/v1/notifications', notifications);
@@ -221,7 +221,7 @@ function notifyPlantHeadOfNewEmployee_(employeePayload) {
  * differ from this shape.
  */
 var PRODUCTION_FORM_COLUMNS = {
-  employee_code: 'Employee Code',
+  emp_code: 'Employee Code',
   machine_id: 'Machine',
   part_number: 'Part Number',
   shift_date: 'Date',
@@ -253,15 +253,15 @@ function syncProductionSheet_(sheetName) {
     var row = data[r];
     if (row[syncedCol - 1]) continue; // already synced — form responses are append-only, never re-pushed
 
-    var employeeCode = getCell_(row, headerMap, PRODUCTION_FORM_COLUMNS.employee_code);
+    var employeeCode = getCell_(row, headerMap, PRODUCTION_FORM_COLUMNS.emp_code);
     if (!employeeCode) continue;
 
     var employees = supabaseRequest_('GET', '/rest/v1/employees', null, {
       select: 'id,department_id',
-      employee_code: 'eq.' + employeeCode,
+      emp_code: 'eq.' + employeeCode,
     });
     if (!employees || employees.length === 0) {
-      Logger.log('Unknown employee_code in ' + sheetName + ' row ' + (r + 1) + ': ' + employeeCode);
+      Logger.log('Unknown emp_code in ' + sheetName + ' row ' + (r + 1) + ': ' + employeeCode);
       continue;
     }
 
