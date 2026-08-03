@@ -56,6 +56,7 @@ drop table if exists shifts cascade;
 drop table if exists attendance_records cascade;
 drop table if exists attendance cascade;
 drop table if exists plant_config cascade;
+drop table if exists departments cascade;
 drop table if exists employees cascade;
 
 -- ============================================================================
@@ -86,7 +87,42 @@ create index idx_employees_manager on employees(manager_id);
 create index idx_employees_role on employees(role);
 
 -- ============================================================================
--- SECTION C — plant_config (key-value; lib/location.ts reads config_key/config_value rows, not a single flat row)
+-- SECTION C1 — departments
+-- Plain lookup table. employees.department is a text field (not FK) for
+-- flexibility; this table exists so edge functions (nightly-scoring,
+-- mrm-reminder) can look up is_production and iterate dept names.
+-- ============================================================================
+
+create table departments (
+  id uuid primary key default gen_random_uuid(),
+  name text unique not null,
+  is_production boolean default false,
+  created_at timestamptz default now()
+);
+
+insert into departments (name, is_production) values
+  ('Forge Shop',          true),
+  ('Press Shop',          true),
+  ('Heat Treatment',      true),
+  ('Machine Shop',        true),
+  ('VMC Shop',            true),
+  ('Die Shop',            true),
+  ('Cutting Shop',        true),
+  ('Final Shop',          true),
+  ('Maintenance',         false),
+  ('Quality',             false),
+  ('Design',              false),
+  ('Administration',      false),
+  ('Human Resource',      false),
+  ('Accounts',            false),
+  ('Purchase',            false),
+  ('Stores',              false),
+  ('Sales & Logistics',   false),
+  ('Production',          true)
+on conflict (name) do nothing;
+
+-- ============================================================================
+-- SECTION C2 — plant_config (key-value; lib/location.ts reads config_key/config_value rows, not a single flat row)
 -- ============================================================================
 
 create table plant_config (
