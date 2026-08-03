@@ -99,8 +99,8 @@ create table plant_config (
 insert into plant_config (config_key, config_value, description) values
   ('plant_code', '"VFL-AKT"', 'Plant identifier'),
   ('plant_name', '"Varsha Forgings"', 'Display name used by PlantConfig.plant_name'),
-  ('gps_lat', '19.8762', 'Plant latitude — read as PlantConfig.latitude'),
-  ('gps_lng', '75.3433', 'Plant longitude — read as PlantConfig.longitude'),
+  ('plant_lat', '19.8762', 'Plant latitude — read as PlantConfig.latitude'),
+  ('plant_lng', '75.3433', 'Plant longitude — read as PlantConfig.longitude'),
   ('geofence_radius_meters', '100', 'Check-in GPS geofence radius in metres'),
   ('qr_secret_salt', '"CHANGE_ME_ROTATE_IN_PRODUCTION"', 'Secret mixed into the daily gate QR hash')
 on conflict (config_key) do nothing;
