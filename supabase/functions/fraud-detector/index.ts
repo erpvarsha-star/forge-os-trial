@@ -54,13 +54,13 @@ async function handleGpsCheck(db: ReturnType<typeof supabaseAdmin>, body: GpsChe
     await db.from('fraud_flags').insert({
       flag_type: 'mock_location',
       employee_id: body.employeeId,
-      details: { lat: body.lat, lng: body.lng, distance_meters: distance },
+      description: JSON.stringify({ lat: body.lat, lng: body.lng, distance_meters: distance }),
     });
   } else if (outsideGeofence) {
     await db.from('fraud_flags').insert({
       flag_type: 'gps_outside_radius',
       employee_id: body.employeeId,
-      details: { lat: body.lat, lng: body.lng, distance_meters: distance, geofence_meters: geofenceMeters },
+      description: JSON.stringify({ lat: body.lat, lng: body.lng, distance_meters: distance, geofence_meters: geofenceMeters }),
     });
   }
 
@@ -80,7 +80,7 @@ async function handleBulkConfirmationCheck(db: ReturnType<typeof supabaseAdmin>,
     .from('attendance_records')
     .select('id, checkpoint3_at')
     .eq('checkpoint3_confirmed_by', body.supervisorId)
-    .eq('shift_date', body.shiftDate)
+    .eq('date', body.shiftDate)
     .gte('checkpoint3_at', windowStart);
 
   if (error) return jsonResponse({ error: error.message }, 500);
@@ -92,16 +92,13 @@ async function handleBulkConfirmationCheck(db: ReturnType<typeof supabaseAdmin>,
 
   await db.from('fraud_flags').insert({
     flag_type: 'bulk_confirmation',
-    supervisor_id: body.supervisorId,
-    employee_id: body.employeeId,
-    confirmations_count: count,
-    seconds_elapsed: threshold.seconds,
-    details: { shift_date: body.shiftDate },
+    employee_id: body.supervisorId,
+    description: JSON.stringify({ last_employee_id: body.employeeId, confirmations_count: count, seconds_elapsed: threshold.seconds, shift_date: body.shiftDate }),
   });
 
   const { data: supervisor } = await db
     .from('employees')
-    .select('full_name')
+    .select('name')
     .eq('id', body.supervisorId)
     .single();
 
@@ -110,7 +107,7 @@ async function handleBulkConfirmationCheck(db: ReturnType<typeof supabaseAdmin>,
     employeeIds: plantHeadIds,
     type: 'fraud_alert',
     title: 'Fraud alert',
-    body: `${supervisor?.full_name ?? 'A supervisor'} confirmed ${count} workers in ${threshold.seconds} seconds`,
+    body: `${supervisor?.name ?? 'A supervisor'} confirmed ${count} workers in ${threshold.seconds} seconds`,
     relatedEntityType: 'fraud_flags',
   });
 
@@ -120,7 +117,7 @@ async function handleBulkConfirmationCheck(db: ReturnType<typeof supabaseAdmin>,
   const { count: monthFlagCount } = await db
     .from('fraud_flags')
     .select('id', { count: 'exact', head: true })
-    .eq('supervisor_id', body.supervisorId)
+    .eq('employee_id', body.supervisorId)
     .gte('created_at', monthStart.toISOString());
 
   const flagsThisMonth = monthFlagCount ?? 0;
@@ -131,7 +128,7 @@ async function handleBulkConfirmationCheck(db: ReturnType<typeof supabaseAdmin>,
       employeeIds: hrAdminIds,
       type: 'fraud_alert_escalation',
       title: '2nd fraud flag this month',
-      body: `${supervisor?.full_name ?? 'A supervisor'} has 2 fraud flags this month — review recommended`,
+      body: `${supervisor?.name ?? 'A supervisor'} has 2 fraud flags this month — review recommended`,
       relatedEntityType: 'fraud_flags',
     });
   } else if (flagsThisMonth >= 3) {
@@ -140,7 +137,7 @@ async function handleBulkConfirmationCheck(db: ReturnType<typeof supabaseAdmin>,
       employeeIds: ownerAndPlantHeadIds,
       type: 'fraud_alert_red',
       title: 'Red alert — repeat fraud flags',
-      body: `${supervisor?.full_name ?? 'A supervisor'} has ${flagsThisMonth} fraud flags this month — HR Admin review mandatory`,
+      body: `${supervisor?.name ?? 'A supervisor'} has ${flagsThisMonth} fraud flags this month — HR Admin review mandatory`,
       relatedEntityType: 'fraud_flags',
     });
   }

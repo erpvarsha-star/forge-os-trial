@@ -161,6 +161,8 @@ create table attendance_records (
   qr_verified boolean default false,
   checkpoint2_confirmed_by uuid references employees(id),
   checkpoint2_at timestamptz,
+  checkpoint3_confirmed_by uuid references employees(id),
+  checkpoint3_at timestamptz,
   device_id text, -- Step 5: buddy-device fraud check
   mock_location_detected boolean default false, -- Step 5: mock-location fraud check
   created_at timestamptz default now(),

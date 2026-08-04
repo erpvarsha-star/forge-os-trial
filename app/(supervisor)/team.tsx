@@ -75,7 +75,7 @@ export default function SupervisorTeam() {
     const today = new Date().toISOString().split('T')[0]
 
     const { error } = await supabase.from('attendance_records').upsert(
-      { employee_id: member.id, date: today, status, qr_verified: false },
+      { employee_id: member.id, date: today, status, qr_verified: false, checkpoint3_confirmed_by: employee.id, checkpoint3_at: new Date().toISOString() },
       { onConflict: 'employee_id,date' }
     )
 
