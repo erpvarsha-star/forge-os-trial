@@ -19,6 +19,9 @@
 -- STEP 4: HR Admin role correction (VFL5440 Pallavi Vishnu Khade)
 \i PATCH_01_hrAdmin_03Aug2026.sql
 
+-- STEP 5: Plant Head + Owner phone (VFL1386 Fazal, VFL1001 Yash)
+\i PATCH_02_plantHead_phone_04Aug2026.sql
+
 -- =============================================================
 -- POST-RUN VERIFICATION
 -- =============================================================
