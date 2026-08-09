@@ -84,9 +84,9 @@
 - 81 staff employees (EMPLOYEE_SEED_03Aug2026.sql)
 - 39 worker employees (WORKER_SEED_04Aug2026.sql)
 - 120 total; ~95 have phone numbers after PATCH_03
-- **VFL1527** Sharwan Singh Jodha — phone TBD (conflict with VFL1520)
-- **VFL1528** Bhupendra Kashinath Bharude — phone TBD
-- **supervisor_id assignments**: NOT YET done — need org chart from Yash
+- **VFL1527** Sharwan Singh Jodha — phone intentionally left NULL (number given was duplicate of VFL1520)
+- **VFL1528** Bhupendra Kashinath Bharude — phone +918805698127 (fixed in PATCH_05)
+- **supervisor_id**: partial assignments done in PATCH_05 (Final/Die/Maintenance/Forge); rotating departments need weekly update or a supervisor_rotation table
 - Salary sheet (April 2026) uploaded — preserved for future payroll feature
 
 ---
@@ -94,7 +94,8 @@
 ## plant_config (key-value table)
 
 Keys: `plant_code`, `plant_name`, `plant_lat`, `plant_lng`, `geofence_radius_meters`, `qr_secret_salt`  
-**GPS not yet set to real plant coordinates** — update via SQL after getting exact coordinates from Yash.
+**GPS set to 19.836079, 75.236261 (confirmed by Yash, 09 Aug 2026). Geofence = 100 m.**  
+QR salt: PATCH_06 has a commented-out UPDATE — Yash must generate his own secret (`python3 -c "import secrets; print(secrets.token_hex(24))"`) and run it directly in Supabase SQL Editor. Never commit this value to git.
 
 ---
 
@@ -109,6 +110,8 @@ Keys: `plant_code`, `plant_name`, `plant_lat`, `plant_lng`, `geofence_radius_met
 | `PATCH_02_plantHead_phone_04Aug2026.sql` | Fazal plant_head + Yash phone | ✅ Applied |
 | `PATCH_03_phones_09Aug2026.sql` | 95 employee phones | ⏳ Run this |
 | `PATCH_04_schema_fixes_09Aug2026.sql` | Rename 5s_score → five_s_score, add indexes | ⏳ Run this |
+| `PATCH_05_supervisor_ids_09Aug2026.sql` | VFL1528 phone fix + supervisor/manager/plant_head IDs | ⏳ Run this |
+| `PATCH_06_plant_config_09Aug2026.sql` | Real GPS (19.836079, 75.236261) + QR secret salt | ⏳ Run this |
 
 ---
 
@@ -234,11 +237,9 @@ app/
 
 ## Pending from Yash (owner)
 
-1. **Org chart** — supervisor → member assignments (needed for PATCH_05 to set `supervisor_id`)
-2. **Plant GPS** — exact latitude/longitude of factory gate (for plant_config)
-3. **Geofence radius** — metres allowed from gate for GPS check-in
-4. **VFL1527 correct phone** — 8955273074 is already used by VFL1520 (conflict)
-5. **VFL1528 correct phone** — left blank
+1. **Org chart (paper)** — which workers go under which supervisor within Heat Treatment, Machine Shop, Cutting Shop; and Press Shop supervisors (Vaibhav Mali, Shakeel Sayyad, Shyambabu Yadav not in employee seed — may need to be added)
+2. **Rotating supervisor update** — Forge/Press/Machine/Electricity/Oil supervisors rotate weekly. `supervisor_id` is a fixed FK so it needs a weekly SQL update (or a new `supervisor_rotation` table). PATCH_05 sets Week 1 (Aug 4-10) for Forge Shop. Week 2/3 needs updating.
+3. **VFL1527 phone** — intentionally left NULL; correct number unknown
 
 ---
 
