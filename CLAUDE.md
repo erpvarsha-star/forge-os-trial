@@ -83,11 +83,19 @@
 
 - 81 staff employees (EMPLOYEE_SEED_03Aug2026.sql)
 - 39 worker employees (WORKER_SEED_04Aug2026.sql)
-- 120 total; ~95 have phone numbers after PATCH_03
+- 120 total; ~95 have phone numbers after PATCH_03; +6 new employees added in PATCH_08
 - **VFL1527** Sharwan Singh Jodha — phone intentionally left NULL (number given was duplicate of VFL1520)
 - **VFL1528** Bhupendra Kashinath Bharude — phone +918805698127 (fixed in PATCH_05)
+- **VFL5462** Bharat Salve — Manager, Accounts & Finance (emp code confirmed by Yash)
+- **VFL5463** Nagnath Kale — Manager (Consultant), Die Shop
+- **VFL5464** Sadashiv Soddy — Manager (Consultant), Quality/QMS
+- **VFL5465** Irfan Shaikh — Supervisor, Forge Shop (Week 3 Aug rotating; ph: +919923723662)
+- **VFL5466** Vaibhav Mali — Supervisor, Press Shop (Week 1 Aug rotating; ph: +919607238428)
+- **VFL5467** Ashok Kumar — Supervisor, Final Shop (full name to confirm)
 - **supervisor_id**: partial assignments done in PATCH_05 (Final/Die/Maintenance/Forge); rotating departments need weekly update or a supervisor_rotation table
 - Salary sheet (April 2026) uploaded — preserved for future payroll feature
+- **PATCH_07 corrections**: VFL1463→Press Shop, VFL1556→Press Shop+supervisor, VFL1545→manager, VFL1389→manager, VFL1557→HR dept, VFL5447→Admin dept
+- **Vijay Kumar Yadav**: removed from org chart — never in DB, no action needed
 
 ---
 
@@ -112,6 +120,8 @@ QR salt: PATCH_06 has a commented-out UPDATE — Yash must generate his own secr
 | `PATCH_04_schema_fixes_09Aug2026.sql` | Rename 5s_score → five_s_score, add indexes | ⏳ Run this |
 | `PATCH_05_supervisor_ids_09Aug2026.sql` | VFL1528 phone fix + supervisor/manager/plant_head IDs | ⏳ Run this |
 | `PATCH_06_plant_config_09Aug2026.sql` | Real GPS (19.836079, 75.236261) + QR secret salt | ⏳ Run this |
+| `PATCH_07_org_corrections_09Aug2026.sql` | Dept/role fixes: Dinkar→Press, Shyambabu→Press/sup, Mujahed→manager, Tushar→manager, Milind→HR, Sarang→Admin | ⏳ Run this |
+| `PATCH_08_new_employees_09Aug2026.sql` | 6 new employees: Bharat Salve(VFL5462), Nagnath Kale(VFL5463), Sadashiv Soddy(VFL5464), Irfan Shaikh(VFL5465), Vaibhav Mali(VFL5466), Ashok Kumar(VFL5467) | ⏳ Run this |
 
 ---
 
@@ -237,9 +247,13 @@ app/
 
 ## Pending from Yash (owner)
 
-1. **Org chart (paper)** — which workers go under which supervisor within Heat Treatment, Machine Shop, Cutting Shop; and Press Shop supervisors (Vaibhav Mali, Shakeel Sayyad, Shyambabu Yadav not in employee seed — may need to be added)
-2. **Rotating supervisor update** — Forge/Press/Machine/Electricity/Oil supervisors rotate weekly. `supervisor_id` is a fixed FK so it needs a weekly SQL update (or a new `supervisor_rotation` table). PATCH_05 sets Week 1 (Aug 4-10) for Forge Shop. Week 2/3 needs updating.
+1. **Worker → supervisor mapping** (still on paper) — which workers go under which specific supervisor within Heat Treatment (VFL1066 vs VFL1568 for 3 workers), Machine Shop (3 supervisors VFL1272/1290/1327), Cutting Shop
+2. **Rotating supervisor update** — Week 2 (11-17 Aug): Forge = VFL1516 Subhash Palve, Press = update to next supervisor. Run UPDATE on `supervisor_id` each week.
 3. **VFL1527 phone** — intentionally left NULL; correct number unknown
+4. **Shakeel Sayyad** — on Supervisor_Map (Press, Week 2, ph:7378426599) but NOT in org chart or seed — confirm if needs to be added
+5. **PATCH_09** — 5 employees still need emp_codes + phones: Shaikh Tamizuddin (QA), Sandip Landage (Maintenance), Shaikh Zaker (Press QA), Bholanath Das (QA), Tohid Shaikh (Purchase)
+6. **VFL5463–VFL5467 emp codes** — suggested codes for PATCH_08 new employees; verify against master register before running PATCH_08
+7. **Ashok Kumar full name** — confirm before PATCH_08 is run
 
 ---
 
