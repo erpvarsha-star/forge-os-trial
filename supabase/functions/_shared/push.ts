@@ -28,8 +28,8 @@ export async function notifyEmployees(db: ReturnType<typeof supabaseAdmin>, inpu
   const { employeeIds, type, title, body, relatedEntityType, relatedEntityId } = input;
   if (employeeIds.length === 0) return { notified: 0, pushed: 0 };
 
-  const rows = employeeIds.map((employee_id) => ({
-    employee_id,
+  const rows = employeeIds.map((user_id) => ({
+    user_id,
     type,
     title,
     body,

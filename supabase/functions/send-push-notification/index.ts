@@ -50,7 +50,7 @@ Deno.serve(async (req: Request) => {
   const db = supabaseAdmin();
 
   if (employeeIds.length === 0 && employeeCodes && employeeCodes.length > 0) {
-    const { data, error } = await db.from('employees').select('id').in('employee_code', employeeCodes);
+    const { data, error } = await db.from('employees').select('id').in('emp_code', employeeCodes);
     if (error) return jsonResponse({ error: error.message }, 500);
     employeeIds = (data ?? []).map((e: { id: string }) => e.id);
   }

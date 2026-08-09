@@ -19,11 +19,17 @@ export default function EOTMScreen() {
     const fetch = async () => {
       if (!employee) return
       const now = new Date()
-      const categories = ['attendance', 'production', 'safety', '5s']
+      const month = String(now.getMonth() + 1).padStart(2, '0')
+      const categories = [
+        { key: 'attendance', col: 'attendance_score' },
+        { key: 'production', col: 'production_score' },
+        { key: 'safety', col: 'safety_score' },
+        { key: '5s', col: 'five_s_score' },
+      ]
       const results: any = {}
       for (const cat of categories) {
-        const { data } = await supabase.from('monthly_scores').select('*, employee:employees(name, emp_code, department)').eq('month', String(now.getMonth()).padStart(2, '0')).eq('year', now.getFullYear()).order(`${cat}_score`, { ascending: false }).limit(1).single()
-        if (data) results[cat] = data
+        const { data } = await supabase.from('monthly_scores').select('*, employee:employees(name, emp_code, department)').eq('month', month).eq('year', now.getFullYear()).order(cat.col, { ascending: false }).limit(1).single()
+        if (data) results[cat.key] = data
       }
       setWinners(results)
       setIsLoading(false)

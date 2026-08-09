@@ -38,12 +38,13 @@ Deno.serve(async (req: Request) => {
   try {
     // Step 1 — ensure a pending review row exists per department this month.
     const { data: departments } = await db.from('departments').select('id, name');
+    const monthStr = String(month).padStart(2, '0');
     for (const dept of departments ?? []) {
       await db
         .from('mrm_reviews')
         .upsert(
-          { department_id: dept.id, year, month, status: 'pending' },
-          { onConflict: 'department_id,year,month', ignoreDuplicates: true }
+          { department: dept.name, year, month: monthStr, status: 'pending' },
+          { onConflict: 'department,year,month', ignoreDuplicates: true }
         );
     }
 
@@ -53,9 +54,9 @@ Deno.serve(async (req: Request) => {
 
     const { data: pendingReviews } = await db
       .from('mrm_reviews')
-      .select('id, department_id, departments(name)')
+      .select('id, department')
       .eq('year', year)
-      .eq('month', month)
+      .eq('month', monthStr)
       .eq('status', 'pending');
 
     const isEscalationTime = dayOfMonth > dueDay || (dayOfMonth === dueDay && hour >= 17);
@@ -63,14 +64,14 @@ Deno.serve(async (req: Request) => {
     let escalatedDepartments = 0;
 
     for (const review of pendingReviews ?? []) {
+      const deptName = (review as { department: string }).department ?? 'Department';
+
       const { data: managers } = await db
         .from('employees')
         .select('id')
-        .eq('department_id', review.department_id)
+        .eq('department', deptName)
         .eq('role', 'manager')
         .eq('is_active', true);
-
-      const deptName = (review as { departments?: { name: string } }).departments?.name ?? 'Department';
 
       if (managers && managers.length > 0) {
         await notifyEmployees(db, {
@@ -85,8 +86,6 @@ Deno.serve(async (req: Request) => {
       }
 
       if (isEscalationTime) {
-        await db.from('mrm_reviews').update({ escalated_at: new Date().toISOString() }).eq('id', review.id);
-
         const { data: plantHeadIds } = await db
           .from('employees')
           .select('id')

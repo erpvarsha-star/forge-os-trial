@@ -46,7 +46,7 @@ export default function HrAdminDashboard() {
       supabase.from('attendance_records').select('id', { count: 'exact', head: true }).eq('date', today).eq('status', 'P'),
       supabase.from('advance_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('leave_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-      supabase.from('employees').select('id', { count: 'exact', head: true }).eq('is_active', true).or('full_name.is.null,phone.is.null,department_id.is.null'),
+      supabase.from('employees').select('id', { count: 'exact', head: true }).eq('is_active', true).or('name.is.null,phone.is.null,department.is.null'),
     ])
 
     setStats({

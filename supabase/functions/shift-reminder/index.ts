@@ -40,13 +40,13 @@ function nextMondayToSunday(from: Date): { start: string; end: string } {
 async function weeklyShiftNotify(db: ReturnType<typeof supabaseAdmin>) {
   const { start, end } = nextMondayToSunday(istNow());
 
-  const { data: shifts } = await db
-    .from('shifts')
-    .select('employee_id, shift_type, shift_date')
-    .gte('shift_date', start)
-    .lte('shift_date', end);
+  const { data: assignments } = await db
+    .from('employee_shifts')
+    .select('employee_id, shift:shifts(name, start_time)')
+    .gte('date', start)
+    .lte('date', end);
 
-  const employeesWithShift = new Set<string>((shifts ?? []).map((s: { employee_id: string }) => s.employee_id));
+  const employeesWithShift = new Set<string>((assignments ?? []).map((s: { employee_id: string }) => s.employee_id));
 
   if (employeesWithShift.size > 0) {
     await notifyEmployees(db, {
@@ -96,26 +96,34 @@ async function dailyCheckinReminder(db: ReturnType<typeof supabaseAdmin>) {
   });
 
   const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
-  const dueShiftTypes = Object.entries(shiftTimes)
-    .filter(([, time]) => {
-      const [h, m] = (time as string).split(':').map(Number);
-      const startMinutes = h * 60 + m;
-      const diff = startMinutes - nowMinutes;
-      return diff >= 0 && diff <= 30; // within the next 30 minutes
-    })
-    .map(([shiftType]) => shiftType);
 
-  if (dueShiftTypes.length === 0) {
+  // Find shift names whose start_time falls within the next 30 minutes.
+  const dueTimes = Object.entries(shiftTimes).filter(([, time]) => {
+    const [h, m] = (time as string).split(':').map(Number);
+    const diff = h * 60 + m - nowMinutes;
+    return diff >= 0 && diff <= 30;
+  });
+
+  if (dueTimes.length === 0) {
     return { today, remindedShiftTypes: [], notified: 0 };
   }
 
-  const { data: shifts } = await db
-    .from('shifts')
-    .select('employee_id, shift_type')
-    .eq('shift_date', today)
-    .in('shift_type', dueShiftTypes);
+  const dueShiftTypes = dueTimes.map(([shiftType]) => shiftType);
+  const dueStartTimes = dueTimes.map(([, time]) => time as string);
 
-  const employeeIds = Array.from(new Set<string>((shifts ?? []).map((s: { employee_id: string }) => s.employee_id)));
+  // employee_shifts joined with shifts master — filter by shift start_time
+  const { data: assignments } = await db
+    .from('employee_shifts')
+    .select('employee_id, shift:shifts(name, start_time)')
+    .eq('date', today);
+
+  const employeeIds = Array.from(
+    new Set<string>(
+      (assignments ?? [])
+        .filter((a: { shift?: { start_time?: string } }) => dueStartTimes.includes(a.shift?.start_time ?? ''))
+        .map((a: { employee_id: string }) => a.employee_id)
+    )
+  );
 
   if (employeeIds.length > 0) {
     await notifyEmployees(db, {

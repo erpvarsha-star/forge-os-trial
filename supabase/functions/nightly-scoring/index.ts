@@ -71,8 +71,8 @@ async function computeAttendanceAndOnTime(
     .from('attendance_records')
     .select('status, late_minutes')
     .eq('employee_id', employeeId)
-    .gte('shift_date', start)
-    .lte('shift_date', end);
+    .gte('date', start)
+    .lte('date', end);
 
   const all = rows ?? [];
   const workingDayRows = all.filter((r: { status: string }) => !['H', 'WO'].includes(r.status));
@@ -152,7 +152,7 @@ async function computeTeamControlScore(
   const { count: flagCount } = await db
     .from('fraud_flags')
     .select('id', { count: 'exact', head: true })
-    .eq('supervisor_id', employeeId)
+    .eq('employee_id', employeeId)
     .gte('created_at', `${start}T00:00:00Z`)
     .lte('created_at', `${end}T23:59:59Z`);
 
@@ -171,10 +171,10 @@ function computeBrownie(input: { lcCount: number; onTimeAll: boolean; taskTotal:
 async function computeAttendanceStreakBadge(db: ReturnType<typeof supabaseAdmin>, employeeId: string, asOf: string) {
   const { data: rows } = await db
     .from('attendance_records')
-    .select('shift_date, status')
+    .select('date, status')
     .eq('employee_id', employeeId)
-    .lte('shift_date', asOf)
-    .order('shift_date', { ascending: false })
+    .lte('date', asOf)
+    .order('date', { ascending: false })
     .limit(120);
 
   let streak = 0;
@@ -184,8 +184,7 @@ async function computeAttendanceStreakBadge(db: ReturnType<typeof supabaseAdmin>
     else break;
   }
 
-  if (streak >= 90) return { badge: 'gold_pending_top10pct', streak }; // top-10% check happens after ranking
-  if (streak >= 60) return { badge: 'silver', streak };
+  if (streak >= 60) return { badge: 'gold', streak };
   if (streak >= 30) return { badge: 'bronze', streak };
   return { badge: null, streak };
 }
@@ -295,26 +294,22 @@ Deno.serve(async (req: Request) => {
         {
           employee_id: employee.id,
           year,
-          month,
+          month: String(month).padStart(2, '0'),
           attendance_score: round2(attendanceScore),
-          ontime_score: round2(ontimeScore),
-          task_score: round2(taskScore),
+          on_time_score: round2(ontimeScore),
+          task_completion_score: round2(taskScore),
           kpi_score: round2(kpiScore),
           production_score: round2(productionScore),
-          team_control_score: round2(teamControlScore),
           brownie_points: brownie,
           composite_score: round2(composite),
-          badge,
-          ai_suggestion: aiSuggestion,
-          ai_suggestion_generated_at: aiSuggestion ? new Date().toISOString() : null,
-          computed_at: new Date().toISOString(),
+          eotm_badge: badge,
         },
         { onConflict: 'employee_id,year,month' }
       );
 
       if (incentiveFlag) {
         await db.from('notifications').insert({
-          employee_id: employee.id,
+          user_id: employee.id,
           type: 'production_incentive_flag',
           title: 'Incentive flag',
           body: `Your production efficiency this period is above 100% — flagged for incentive review.`,
@@ -325,27 +320,22 @@ Deno.serve(async (req: Request) => {
     }
 
     // Employee-of-the-Month ranking, per category (Section 2/Module 3).
-    const categories: ScoreCategory[] = ['member', 'operator', 'supervisor', 'manager'];
-    for (const category of categories) {
+    // Top scorer per category gets eotm_badge='gold'; top-3 get 'bronze'.
+    const scoreCategories: ScoreCategory[] = ['member', 'operator', 'supervisor', 'manager'];
+    const monthStr = String(month).padStart(2, '0');
+    for (const category of scoreCategories) {
       const group = scored.filter((s) => s.category === category).sort((a, b) => b.compositeScore - a.compositeScore);
-      const leaderScore = group[0]?.compositeScore ?? 0;
-      const eotmCategory = `best_${category}`;
-
       for (let i = 0; i < group.length; i++) {
         const rank = i + 1;
-        const gap = round2(leaderScore - group[i].compositeScore);
-        await db
-          .from('monthly_scores')
-          .update({
-            eotm_category: eotmCategory,
-            eotm_rank: rank,
-            eotm_gap_to_leader: gap,
-            eotm_winner: rank === 1,
-            badge: rank === 1 ? 'eotm_winner' : undefined,
-          })
-          .eq('employee_id', group[i].employeeId)
-          .eq('year', year)
-          .eq('month', month);
+        const eotmBadge = rank === 1 ? 'gold' : rank <= 3 ? 'bronze' : null;
+        if (eotmBadge !== null) {
+          await db
+            .from('monthly_scores')
+            .update({ eotm_badge: eotmBadge })
+            .eq('employee_id', group[i].employeeId)
+            .eq('year', year)
+            .eq('month', monthStr);
+        }
       }
     }
 
