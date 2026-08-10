@@ -8,7 +8,18 @@
 --    Column names starting with a digit cannot be used in PostgREST
 --    order/filter parameters. The EOTM screen and nightly-scoring now use
 --    five_s_score.
-ALTER TABLE monthly_scores RENAME COLUMN "5s_score" TO five_s_score;
+--    Guarded so re-running this patch (e.g. via COMBINED_DEPLOY) after it
+--    already succeeded once doesn't error with "column 5s_score does not
+--    exist" — it just skips the rename if it's already been done.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'monthly_scores' AND column_name = '5s_score'
+  ) THEN
+    ALTER TABLE monthly_scores RENAME COLUMN "5s_score" TO five_s_score;
+  END IF;
+END $$;
 
 -- 2. Add missing index on employees(auth_user_id).
 --    This column is resolved by every RLS helper function on every request.
