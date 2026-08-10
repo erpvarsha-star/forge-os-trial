@@ -258,19 +258,23 @@ app/
 3. **VFL1527 phone** — intentionally left NULL; correct number unknown
 4. **Shakeel Sayyad** — on Supervisor_Map (Press, Week 2, ph:7378426599) but NOT in org chart, contact list, or salary sheet — confirm if he's an actual employee before adding
 5. **Nagnath Kale / Sadashiv Soddy real emp_codes** — confirmed as genuine outside consultants (not in contact list or salary sheet). Provide a real emp_code from your master register only if they need app logins.
-6. **EAS build config** — no `eas.json` in repo; `app.json` has placeholder bundle ID `com.yourcompany.forgeos` — needed before any app build/deploy
+6. **Real bundle ID before Play Store submission** — `app.json` package/bundleIdentifier is currently `com.vfpl.forgeos` (set 10 Aug as a provisional value so the CI build could run at all — was the placeholder `com.yourcompany.forgeos` before). Confirm or change before any real Play Store listing; it's permanent once published.
+7. **EAS account for signed/production builds** — no Expo account credentials available to Claude; `eas.json` exists (development/preview/production profiles) but `eas build` has never been run. The debug APK below doesn't need this.
 
 ---
 
 ## App build
 
+**Working CI path (debug APK, no Expo account needed) — set up 10 Aug:**
+`.github/workflows/build-apk.yml`, manual `workflow_dispatch` trigger (also fires on push to files it cares about — see the `paths:` filter in the workflow). Go to Actions → Build Android APK → Run workflow, or push a commit touching `app.json`/`eas.json`/`assets/**`/`package.json`. Download the `forge-os-debug-apk` artifact from the finished run (14-day retention). Confirmed working 10 Aug 2026 — first successful run: https://github.com/erpvarsha-star/forge-os-trial/actions/runs/31367802512
+
+Real bugs this took to get green (all fixed in the repo, keep in mind for future dependency bumps):
+- `react-native-screens@3.31.0` ships a broken `postinstall` script (`bob build && husky install`) meant only for its own repo's dev workflow — `npm ci` needs `--ignore-scripts`.
+- `assets/` was completely empty despite `app.json` referencing 5 icon/splash files — currently placeholder art, **swap for real branding before any real build**.
+- `expo-router` declares `expo-linking` as a peer dependency with a wildcard `"*"` version. Left unpinned, npm resolves it to the newest ever published release (was SDK 57, this project is SDK 51) — always pin `expo-linking` explicitly in `package.json` to the SDK-51-era version (`~6.3.0`) or this breaks again on a fresh `npm install`.
+
+**EAS cloud build (signed builds, Play Store submission) — not set up, needs Yash's Expo account:**
 ```bash
-# APK (Android)
 eas build --platform android --profile preview
-
-# Or via dashboard:
-# expo.dev → erp.varsha → forge-os → Builds → New Build
+# or: expo.dev → erp.varsha → forge-os → Builds → New Build
 ```
-
-No `eas.json` in repo — needs to be created before EAS build will work.  
-`app.json` has placeholder bundle ID `com.yourcompany.forgeos` — update before production build.
