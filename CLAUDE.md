@@ -118,13 +118,16 @@ QR salt: PATCH_06 has a commented-out UPDATE — Yash must generate his own secr
 | `WORKER_SEED_04Aug2026.sql` | 39 workers | ✅ Applied |
 | `PATCH_01_hrAdmin_03Aug2026.sql` | Pallavi role fix | ✅ Applied |
 | `PATCH_02_plantHead_phone_04Aug2026.sql` | Fazal plant_head + Yash phone | ✅ Applied |
-| `PATCH_03_phones_09Aug2026.sql` | 95 employee phones | ⏳ Run this |
-| `PATCH_04_schema_fixes_09Aug2026.sql` | Rename 5s_score → five_s_score, add indexes | ⏳ Run this |
-| `PATCH_05_supervisor_ids_09Aug2026.sql` | VFL1528 phone fix + supervisor/manager/plant_head IDs | ⏳ Run this |
-| `PATCH_06_plant_config_09Aug2026.sql` | Real GPS (19.836079, 75.236261) + QR secret salt | ⏳ Run this |
-| `PATCH_07_org_corrections_09Aug2026.sql` | Dept/role fixes: Dinkar→Press, Shyambabu→Press/sup, Mujahed→manager, Tushar→manager, Milind→HR, Sarang→Admin | ⏳ Run this |
-| `PATCH_08_new_employees_09Aug2026.sql` | **CORRECTED 10 Aug** — 4 new employees with real emp_codes: Bharat Salve(VFL5462), Irfan Shaikh(VFL5458), Vaibhav Mali(VFL5459), Ashok Kumar(VFL5460) | ⏳ Run this |
-| `PATCH_09_qa_purchase_maintenance_10Aug2026.sql` | 5 new employees: Tamizuddin(VFL5461), Bholanath Das(VFL5452), Shaikh Zaker(VFL5453), Sandip Landage(VFL5457), Tohid Shaikh(VFL5454) | ⏳ Run this |
+| `PATCH_03_phones_09Aug2026.sql` | 96 employee phones (incl. VFL5337 fix) | ✅ Applied 10 Aug |
+| `PATCH_04_schema_fixes_09Aug2026.sql` | Rename 5s_score → five_s_score, add indexes | ✅ Applied 10 Aug |
+| `PATCH_05_supervisor_ids_09Aug2026.sql` | VFL1528 phone fix + supervisor/manager/plant_head IDs | ✅ Applied 10 Aug |
+| `PATCH_06_plant_config_09Aug2026.sql` | Real GPS (19.836079, 75.236261) | ✅ GPS applied 10 Aug — **QR secret salt still ⏳, must be set manually (never via chat)** |
+| `PATCH_07_org_corrections_09Aug2026.sql` | Dept/role fixes: Dinkar→Press, Shyambabu→Press/sup, Mujahed→manager, Tushar→manager, Milind→HR, Sarang→Admin | ✅ Applied 10 Aug |
+| `PATCH_08_new_employees_09Aug2026.sql` | **CORRECTED 10 Aug** — 4 new employees with real emp_codes: Bharat Salve(VFL5462), Irfan Shaikh(VFL5458), Vaibhav Mali(VFL5459), Ashok Kumar(VFL5460) | ✅ Applied 10 Aug |
+| `PATCH_09_qa_purchase_maintenance_10Aug2026.sql` | 5 new employees: Tamizuddin(VFL5461), Bholanath Das(VFL5452), Shaikh Zaker(VFL5453), Sandip Landage(VFL5457), Tohid Shaikh(VFL5454) | ✅ Applied 10 Aug |
+| `COMBINED_DEPLOY_03to09_10Aug2026.sql` | Combined one-shot version of the 7 patches above, run by Yash via SQL Editor | ✅ Ran 10 Aug — **129 total employees confirmed** |
+
+**Total employees confirmed live: 129** (120 original + 4 PATCH_08 + 5 PATCH_09).
 
 ---
 
