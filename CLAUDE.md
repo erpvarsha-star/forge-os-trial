@@ -2,7 +2,7 @@
 
 **Company**: Varsha Forgings Pvt Ltd (VFPL), Aurangabad  
 **App**: Forge OS — bilingual (EN/HI) React Native attendance + HR system  
-**Last full audit**: 09 August 2026  
+**Last full audit**: 10 August 2026  
 **Branch**: `claude/forge-os-backend-setup-7woj4t`
 
 ---
@@ -83,17 +83,18 @@
 
 - 81 staff employees (EMPLOYEE_SEED_03Aug2026.sql)
 - 39 worker employees (WORKER_SEED_04Aug2026.sql)
-- 120 total; ~95 have phone numbers after PATCH_03; +6 new employees added in PATCH_08
+- 120 original + 4 (PATCH_08) + 6 (PATCH_09) = 130 total once all patches run
+- ~95 of the original 120 have phone numbers after PATCH_03
 - **VFL1527** Sharwan Singh Jodha — phone intentionally left NULL (number given was duplicate of VFL1520)
 - **VFL1528** Bhupendra Kashinath Bharude — phone +918805698127 (fixed in PATCH_05)
-- **VFL5462** Bharat Salve — Manager, Accounts & Finance (emp code confirmed by Yash)
-- **VFL5463** Nagnath Kale — Manager (Consultant), Die Shop
-- **VFL5464** Sadashiv Soddy — Manager (Consultant), Quality/QMS
-- **VFL5465** Irfan Shaikh — Supervisor, Forge Shop (Week 3 Aug rotating; ph: +919923723662)
-- **VFL5466** Vaibhav Mali — Supervisor, Press Shop (Week 1 Aug rotating; ph: +919607238428)
-- **VFL5467** Ashok Kumar — Supervisor, Final Shop (full name to confirm)
+- **VFL5450** Sayed Uzaif Ali — full name in payroll is "Sayed Uzaif Ali Syed Altaf Ali"; confirmed same person, no DB change needed
+- **PATCH_08 (real emp_codes, confirmed against contact list + salary sheet 10 Aug 2026)**:
+  VFL5462 Bharat Vasantrao Salve (Manager, Accounts), VFL5458 Shaikh Irfan (Supervisor, Forge Shop, Week 3 rotating), VFL5459 Vaibhav Mali (Supervisor, Press Shop, Week 1 rotating), VFL5460 Ashok Kumar (Supervisor, Final Shop)
+  ⚠ Supersedes an earlier PATCH_08 committed 09 Aug that used fabricated codes VFL5463/5465/5466/5467 — see correction note in the patch file.
+- **Nagnath Kale / Sadashiv Soddy**: confirmed NOT in payroll (contact list or salary sheet) — genuine outside consultants, no emp_code exists. Not added to DB. Only add if Yash provides a real emp_code and confirms app login is needed.
+- **PATCH_09 (confirmed 10 Aug 2026)**: VFL5461 Shaikh Hafizuddin Tamizuddin (Manager, Quality), VFL5452 Bholanath Das (Forge Shop QA), VFL5453 Shaikh Zaker Abdul Quayyum (Press Shop QA), VFL5457 Sandip Tryambak Landage (Maintenance), VFL5454 Shaikh Tohid Yunus (Purchase) — plus bonus VFL5463 Manoj Anantrao Wagh (Maintenance, found in payroll but not previously tracked)
 - **supervisor_id**: partial assignments done in PATCH_05 (Final/Die/Maintenance/Forge); rotating departments need weekly update or a supervisor_rotation table
-- Salary sheet (April 2026) uploaded — preserved for future payroll feature
+- Salary sheet (Jul 2026 payroll template) — used as source for dept/designation/salary of PATCH_08/09 new hires; contact list (not salary sheet) is the source of truth for phone numbers — several salary-sheet mobile numbers are misaligned/shifted
 - **PATCH_07 corrections**: VFL1463→Press Shop, VFL1556→Press Shop+supervisor, VFL1545→manager, VFL1389→manager, VFL1557→HR dept, VFL5447→Admin dept
 - **Vijay Kumar Yadav**: removed from org chart — never in DB, no action needed
 
@@ -121,7 +122,8 @@ QR salt: PATCH_06 has a commented-out UPDATE — Yash must generate his own secr
 | `PATCH_05_supervisor_ids_09Aug2026.sql` | VFL1528 phone fix + supervisor/manager/plant_head IDs | ⏳ Run this |
 | `PATCH_06_plant_config_09Aug2026.sql` | Real GPS (19.836079, 75.236261) + QR secret salt | ⏳ Run this |
 | `PATCH_07_org_corrections_09Aug2026.sql` | Dept/role fixes: Dinkar→Press, Shyambabu→Press/sup, Mujahed→manager, Tushar→manager, Milind→HR, Sarang→Admin | ⏳ Run this |
-| `PATCH_08_new_employees_09Aug2026.sql` | 6 new employees: Bharat Salve(VFL5462), Nagnath Kale(VFL5463), Sadashiv Soddy(VFL5464), Irfan Shaikh(VFL5465), Vaibhav Mali(VFL5466), Ashok Kumar(VFL5467) | ⏳ Run this |
+| `PATCH_08_new_employees_09Aug2026.sql` | **CORRECTED 10 Aug** — 4 new employees with real emp_codes: Bharat Salve(VFL5462), Irfan Shaikh(VFL5458), Vaibhav Mali(VFL5459), Ashok Kumar(VFL5460) | ⏳ Run this |
+| `PATCH_09_qa_purchase_maintenance_10Aug2026.sql` | 6 new employees: Tamizuddin(VFL5461), Bholanath Das(VFL5452), Shaikh Zaker(VFL5453), Sandip Landage(VFL5457), Tohid Shaikh(VFL5454), Manoj Wagh(VFL5463) | ⏳ Run this |
 
 ---
 
@@ -250,10 +252,9 @@ app/
 1. **Worker → supervisor mapping** (still on paper) — which workers go under which specific supervisor within Heat Treatment (VFL1066 vs VFL1568 for 3 workers), Machine Shop (3 supervisors VFL1272/1290/1327), Cutting Shop
 2. **Rotating supervisor update** — Week 2 (11-17 Aug): Forge = VFL1516 Subhash Palve, Press = update to next supervisor. Run UPDATE on `supervisor_id` each week.
 3. **VFL1527 phone** — intentionally left NULL; correct number unknown
-4. **Shakeel Sayyad** — on Supervisor_Map (Press, Week 2, ph:7378426599) but NOT in org chart or seed — confirm if needs to be added
-5. **PATCH_09** — 5 employees still need emp_codes + phones: Shaikh Tamizuddin (QA), Sandip Landage (Maintenance), Shaikh Zaker (Press QA), Bholanath Das (QA), Tohid Shaikh (Purchase)
-6. **VFL5463–VFL5467 emp codes** — suggested codes for PATCH_08 new employees; verify against master register before running PATCH_08
-7. **Ashok Kumar full name** — confirm before PATCH_08 is run
+4. **Shakeel Sayyad** — on Supervisor_Map (Press, Week 2, ph:7378426599) but NOT in org chart, contact list, or salary sheet — confirm if he's an actual employee before adding
+5. **Nagnath Kale / Sadashiv Soddy real emp_codes** — confirmed as genuine outside consultants (not in contact list or salary sheet). Provide a real emp_code from your master register only if they need app logins.
+6. **EAS build config** — no `eas.json` in repo; `app.json` has placeholder bundle ID `com.yourcompany.forgeos` — needed before any app build/deploy
 
 ---
 
