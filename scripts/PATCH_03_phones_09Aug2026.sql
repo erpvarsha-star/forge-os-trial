@@ -73,6 +73,7 @@ FROM (VALUES
   ('VFL5321', '+919579956176'),  -- Bhaiyyasaheb Sambhaji Patil
   ('VFL5322', '+919767495797'),  -- Jakir Munshi Chaudhari
   ('VFL5324', '+919518300916'),  -- Shivaji Suresh Jaypure
+  ('VFL5337', '+917875491749'),  -- Manoj Anantrao Wagh (was misfiled as new-hire VFL5463 in an earlier PATCH_08/09 draft — corrected 10 Aug)
   ('VFL5347', '+919765961946'),  -- Rajdev Narpat Prasad
   ('VFL5379', '+917057396234'),  -- Gaurav Deelip Kakde
   ('VFL5382', '+919922825336'),  -- Vitthal Uddhav Tekale
@@ -107,7 +108,8 @@ FROM (VALUES
   ('VFL5460', '+919887803962'),  -- Ashok Kumar
   ('VFL5461', '+918857933692'),  -- Shaikh Hafizuddin Tamizuddin
   ('VFL5462', '+919763577926'),  -- Bharat Vasantrao Salve
-  ('VFL5463', '+917875491749'),  -- Manoj Anantrao Wagh
+  -- VFL5463 removed 10 Aug: this phone belongs to VFL5337 (see above), not a
+  -- separate new employee. See PATCH_09 note for the full correction.
 
   -- ── WORKERS (Worker_Cont_No.xlsx) ────────────────────────────────────
   ('VFL4008', '+919881157193'),  -- Dnyaneshwar Nivrutti Harishchandre

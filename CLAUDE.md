@@ -83,8 +83,8 @@
 
 - 81 staff employees (EMPLOYEE_SEED_03Aug2026.sql)
 - 39 worker employees (WORKER_SEED_04Aug2026.sql)
-- 120 original + 4 (PATCH_08) + 6 (PATCH_09) = 130 total once all patches run
-- ~95 of the original 120 have phone numbers after PATCH_03
+- 120 original + 4 (PATCH_08) + 5 (PATCH_09) = 129 total once all patches run
+- ~96 of the original 120 have phone numbers after PATCH_03 (includes VFL5337 fix, 10 Aug)
 - **VFL1527** Sharwan Singh Jodha — phone intentionally left NULL (number given was duplicate of VFL1520)
 - **VFL1528** Bhupendra Kashinath Bharude — phone +918805698127 (fixed in PATCH_05)
 - **VFL5450** Sayed Uzaif Ali — full name in payroll is "Sayed Uzaif Ali Syed Altaf Ali"; confirmed same person, no DB change needed
@@ -92,7 +92,8 @@
   VFL5462 Bharat Vasantrao Salve (Manager, Accounts), VFL5458 Shaikh Irfan (Supervisor, Forge Shop, Week 3 rotating), VFL5459 Vaibhav Mali (Supervisor, Press Shop, Week 1 rotating), VFL5460 Ashok Kumar (Supervisor, Final Shop)
   ⚠ Supersedes an earlier PATCH_08 committed 09 Aug that used fabricated codes VFL5463/5465/5466/5467 — see correction note in the patch file.
 - **Nagnath Kale / Sadashiv Soddy**: confirmed NOT in payroll (contact list or salary sheet) — genuine outside consultants, no emp_code exists. Not added to DB. Only add if Yash provides a real emp_code and confirms app login is needed.
-- **PATCH_09 (confirmed 10 Aug 2026)**: VFL5461 Shaikh Hafizuddin Tamizuddin (Manager, Quality), VFL5452 Bholanath Das (Forge Shop QA), VFL5453 Shaikh Zaker Abdul Quayyum (Press Shop QA), VFL5457 Sandip Tryambak Landage (Maintenance), VFL5454 Shaikh Tohid Yunus (Purchase) — plus bonus VFL5463 Manoj Anantrao Wagh (Maintenance, found in payroll but not previously tracked)
+- **PATCH_09 (confirmed 10 Aug 2026)**: VFL5461 Shaikh Hafizuddin Tamizuddin (Manager, Quality), VFL5452 Bholanath Das (Forge Shop QA), VFL5453 Shaikh Zaker Abdul Quayyum (Press Shop QA), VFL5457 Sandip Tryambak Landage (Maintenance), VFL5454 Shaikh Tohid Yunus (Purchase)
+- **VFL5463 correction (10 Aug 2026)**: "Manoj Anantrao Wagh" is NOT a new employee — he is VFL5337, already in EMPLOYEE_SEED_03Aug2026.sql (same name/dept/salary), just missing his phone. PATCH_03 now sets VFL5337's phone directly instead of PATCH_09 inserting a duplicate VFL5463 row. Caught by cross-checking against the Rev 04 org chart, which shows only one Manoj Wagh (Electrician, Maintenance).
 - **supervisor_id**: partial assignments done in PATCH_05 (Final/Die/Maintenance/Forge); rotating departments need weekly update or a supervisor_rotation table
 - Salary sheet (Jul 2026 payroll template) — used as source for dept/designation/salary of PATCH_08/09 new hires; contact list (not salary sheet) is the source of truth for phone numbers — several salary-sheet mobile numbers are misaligned/shifted
 - **PATCH_07 corrections**: VFL1463→Press Shop, VFL1556→Press Shop+supervisor, VFL1545→manager, VFL1389→manager, VFL1557→HR dept, VFL5447→Admin dept
@@ -123,7 +124,7 @@ QR salt: PATCH_06 has a commented-out UPDATE — Yash must generate his own secr
 | `PATCH_06_plant_config_09Aug2026.sql` | Real GPS (19.836079, 75.236261) + QR secret salt | ⏳ Run this |
 | `PATCH_07_org_corrections_09Aug2026.sql` | Dept/role fixes: Dinkar→Press, Shyambabu→Press/sup, Mujahed→manager, Tushar→manager, Milind→HR, Sarang→Admin | ⏳ Run this |
 | `PATCH_08_new_employees_09Aug2026.sql` | **CORRECTED 10 Aug** — 4 new employees with real emp_codes: Bharat Salve(VFL5462), Irfan Shaikh(VFL5458), Vaibhav Mali(VFL5459), Ashok Kumar(VFL5460) | ⏳ Run this |
-| `PATCH_09_qa_purchase_maintenance_10Aug2026.sql` | 6 new employees: Tamizuddin(VFL5461), Bholanath Das(VFL5452), Shaikh Zaker(VFL5453), Sandip Landage(VFL5457), Tohid Shaikh(VFL5454), Manoj Wagh(VFL5463) | ⏳ Run this |
+| `PATCH_09_qa_purchase_maintenance_10Aug2026.sql` | 5 new employees: Tamizuddin(VFL5461), Bholanath Das(VFL5452), Shaikh Zaker(VFL5453), Sandip Landage(VFL5457), Tohid Shaikh(VFL5454) | ⏳ Run this |
 
 ---
 
