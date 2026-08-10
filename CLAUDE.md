@@ -265,13 +265,21 @@ app/
 
 ## App build
 
-**Working CI path (debug APK, no Expo account needed) — set up 10 Aug:**
-`.github/workflows/build-apk.yml`, manual `workflow_dispatch` trigger (also fires on push to files it cares about — see the `paths:` filter in the workflow). Go to Actions → Build Android APK → Run workflow, or push a commit touching `app.json`/`eas.json`/`assets/**`/`package.json`. Download the `forge-os-debug-apk` artifact from the finished run (14-day retention). Confirmed working 10 Aug 2026 — first successful run: https://github.com/erpvarsha-star/forge-os-trial/actions/runs/31367802512
+**Distribution: direct download link, no Play Store.** Every successful CI run auto-publishes to a GitHub Release. Stable permanent link for WhatsApp/anywhere — always resolves to the newest build:
+`https://github.com/erpvarsha-star/forge-os-trial/releases/latest/download/app-release.apk`
 
-Real bugs this took to get green (all fixed in the repo, keep in mind for future dependency bumps):
+**Working CI path — set up 10 Aug, confirmed producing a genuinely standalone-installable APK 10 Aug:**
+`.github/workflows/build-apk.yml`. Triggers: manual (`workflow_dispatch` — Actions → Build Android APK → Run workflow) or push to files it cares about (see `paths:` filter). Builds `assembleRelease` (NOT `assembleDebug` — see bug list below), then `softprops/action-gh-release` uploads `app-release.apk` straight from the runner to a GitHub Release (`apk-<run number>` tag, `make_latest: true`). This bypasses both the agent sandbox's network restrictions (Azure Blob Storage, which the artifact-download URL uses, is blocked the same as dl.google.com/expo.dev) and chat file-upload limits — Claude never needs to touch the binary. First fully-working run: https://github.com/erpvarsha-star/forge-os-trial/actions/runs/31403403332
+
+Real bugs this took to get green — all fixed in the repo, but re-check these on any future dependency bump, they're exactly the kind of thing that silently breaks again:
 - `react-native-screens@3.31.0` ships a broken `postinstall` script (`bob build && husky install`) meant only for its own repo's dev workflow — `npm ci` needs `--ignore-scripts`.
 - `assets/` was completely empty despite `app.json` referencing 5 icon/splash files — currently placeholder art, **swap for real branding before any real build**.
-- `expo-router` declares `expo-linking` as a peer dependency with a wildcard `"*"` version. Left unpinned, npm resolves it to the newest ever published release (was SDK 57, this project is SDK 51) — always pin `expo-linking` explicitly in `package.json` to the SDK-51-era version (`~6.3.0`) or this breaks again on a fresh `npm install`.
+- `expo-router` declares `expo-linking` as a peer dependency with a wildcard `"*"` version. Left unpinned, npm resolves it to the newest ever published release (was SDK 57, this project is SDK 51) — pinned explicitly to `~6.3.0` in `package.json`.
+- `babel.config.js` had `nativewind/babel` under `plugins` instead of `presets` — it's a preset (returns `{plugins: [...]}`), not a plugin, and Metro crashed outright with `.plugins is not a valid Plugin property`.
+- `package.json` had `"nativewind": "^4.0.0"` (unpinned), which floated to 4.2.x → pulls in `react-native-css-interop@0.2.x`, whose babel plugin unconditionally requires `react-native-worklets/plugin` (Reanimated 4 only) — this project pins `react-native-reanimated@~3.10.0`. Pinned nativewind to `~4.1.23`, the last release whose `react-native-css-interop@0.1.x` uses `react-native-reanimated/plugin` instead.
+- **The build type matters, not just whether Gradle exits 0.** `assembleDebug` succeeded for several runs before anyone noticed it produces an APK with **no embedded JS bundle at all** — React Native's gradle plugin only creates the bundling task for non-debuggable variants. It would have failed immediately for all 129 employees (needs a live Metro dev server). Switched to `assembleRelease`, which `android/app/build.gradle` signs with the debug keystore by default (standard Expo/RN template) — fully standalone, no separate keystore needed since this isn't going to Play Store.
+
+Verification beyond "the Gradle command exited 0": `npx expo export --platform web` (bundles all 2671 modules across every screen/role) + a headless Chromium load of the output, confirming the actual login screen renders with zero console/page errors.
 
 **EAS cloud build (signed builds, Play Store submission) — not set up, needs Yash's Expo account:**
 ```bash
