@@ -57,15 +57,25 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Build debug APK
+      - name: Build release APK (debug-keystore signed, standalone)
+        # NOT assembleDebug: React Native's gradle plugin only creates the JS
+        # bundling task for non-debuggable variants (see
+        # node_modules/@react-native/gradle-plugin/.../TaskConfiguration.kt:
+        # "if (!isDebuggableVariant) { ...create bundle task... }"). A debug
+        # APK ships with no embedded JS at all and requires a Metro dev
+        # server on the same network — useless for sideloading to phones
+        # that aren't connected to one. The generated android/app/build.gradle
+        # signs `release` with the debug keystore by default (standard Expo/RN
+        # template), so assembleRelease produces a fully standalone,
+        # installable APK with zero extra keystore setup.
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleRelease
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: forge-os-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: forge-os-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 14
