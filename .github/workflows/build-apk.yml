@@ -41,6 +41,20 @@ jobs:
       - name: Prebuild native Android project
         run: npx expo prebuild --platform android --no-install
 
+      - name: Pin Gradle wrapper to the version react-native's own template ships
+        # expo prebuild writes gradle-wrapper.properties pointing at Gradle 8.8,
+        # but @react-native/gradle-plugin locks Android Gradle Plugin to 8.2.1
+        # (see node_modules/@react-native/gradle-plugin/gradle/libs.versions.toml),
+        # and AGP 8.2.1 is incompatible with Gradle 8.8 — fails with "Could not
+        # get unknown property 'release' for SoftwareComponent container" and
+        # "Plugin [id: 'expo-module-gradle-plugin'] was not found". React
+        # Native's own template (node_modules/react-native/template/android/
+        # gradle/wrapper/gradle-wrapper.properties) pins Gradle 8.6 for this
+        # exact AGP version — use that instead of what prebuild generates.
+        run: |
+          sed -i 's#distributionUrl=.*#distributionUrl=https\\://services.gradle.org/distributions/gradle-8.6-all.zip#' android/gradle/wrapper/gradle-wrapper.properties
+          cat android/gradle/wrapper/gradle-wrapper.properties
+
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Build debug APK
