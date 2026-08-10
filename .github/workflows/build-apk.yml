@@ -13,6 +13,9 @@ on:
       - 'package.json'
       - 'package-lock.json'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -73,9 +76,28 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease
 
-      - name: Upload APK
+      - name: Upload APK (workflow artifact, 14-day retention)
         uses: actions/upload-artifact@v4
         with:
           name: forge-os-apk
           path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 14
+
+      - name: Publish APK to GitHub Release
+        # Uploads straight from the runner (full internet access) so nobody
+        # has to manually download-then-reupload a large binary through a
+        # network-restricted agent sandbox or a chat upload limit. The
+        # "latest" release + fixed filename means
+        # /releases/latest/download/app-release.apk is a permanent URL that
+        # always points at the most recent successful build.
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: Forge OS APK (build ${{ github.run_number }})
+          make_latest: true
+          files: android/app/build/outputs/apk/release/app-release.apk
+          body: |
+            Debug-keystore-signed release APK for direct sideload install (not distributed via Play Store).
+            Built from commit ${{ github.sha }}.
+
+            Permanent download link (always the latest build): https://github.com/${{ github.repository }}/releases/latest/download/app-release.apk
