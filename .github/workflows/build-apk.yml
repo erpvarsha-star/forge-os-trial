@@ -2,6 +2,16 @@ name: Build Android APK
 
 on:
   workflow_dispatch: {}
+  push:
+    branches:
+      - claude/forge-os-backend-setup-7woj4t
+    paths:
+      - '.github/workflows/build-apk.yml'
+      - 'app.json'
+      - 'eas.json'
+      - 'assets/**'
+      - 'package.json'
+      - 'package-lock.json'
 
 jobs:
   build:
