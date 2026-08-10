@@ -253,13 +253,13 @@ app/
 
 ## Pending from Yash (owner)
 
-1. **Worker → supervisor mapping** (still on paper) — which workers go under which specific supervisor within Heat Treatment (VFL1066 vs VFL1568 for 3 workers), Machine Shop (3 supervisors VFL1272/1290/1327), Cutting Shop
-2. **Rotating supervisor update** — Week 2 (11-17 Aug): Forge = VFL1516 Subhash Palve, Press = update to next supervisor. Run UPDATE on `supervisor_id` each week.
-3. **VFL1527 phone** — intentionally left NULL; correct number unknown
-4. **Shakeel Sayyad** — on Supervisor_Map (Press, Week 2, ph:7378426599) but NOT in org chart, contact list, or salary sheet — confirm if he's an actual employee before adding
+1. **Worker → supervisor mapping** — CLOSED 10 Aug (Yash: "that will happen in the app") — this is an in-app assignment flow, not a DB patch task
+2. **Rotating supervisor update** — CLOSED 10 Aug (Yash: rotations are decided every Friday by HR/IR, cannot be provided in advance) — the weekly `supervisor_id` UPDATE is HR/IR's own task going forward, not tracked here
+3. **VFL1527 phone** — intentionally left NULL; correct number still unknown
+4. **Shakeel Sayyad** — confirmed 10 Aug by Yash as a real employee, phone to stay NULL. Still needs a real `emp_code` (and department/designation/salary from the salary sheet) before he can be inserted — not fabricated, per the VFL5463 lesson (see PATCH_09 correction above). Add once Yash provides the code.
 5. **Nagnath Kale / Sadashiv Soddy real emp_codes** — confirmed as genuine outside consultants (not in contact list or salary sheet). Provide a real emp_code from your master register only if they need app logins.
-6. **Real bundle ID before Play Store submission** — `app.json` package/bundleIdentifier is currently `com.vfpl.forgeos` (set 10 Aug as a provisional value so the CI build could run at all — was the placeholder `com.yourcompany.forgeos` before). Confirm or change before any real Play Store listing; it's permanent once published.
-7. **EAS account for signed/production builds** — no Expo account credentials available to Claude; `eas.json` exists (development/preview/production profiles) but `eas build` has never been run. The debug APK below doesn't need this.
+6. **Real bundle ID before Play Store submission** — **N/A as of 10 Aug**: Yash confirmed the app will NOT go on Play Store — APK will be distributed as a direct download link to all 129 employees (sideload install). `com.vfpl.forgeos` stays as-is, no further action needed on this.
+7. **EAS account for signed/production builds** — not needed given #6 (no Play Store, sideload distribution). The existing debug APK from GitHub Actions is sufficient — Android installs any signed APK (including debug-signed) directly, no Play Store signing required. Only revisit if Yash later decides to publish to Play Store.
 
 ---
 
