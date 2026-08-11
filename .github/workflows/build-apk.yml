@@ -12,6 +12,16 @@ on:
       - 'assets/**'
       - 'package.json'
       - 'package-lock.json'
+      - 'app/**'
+      - 'components/**'
+      - 'constants/**'
+      - 'hooks/**'
+      - 'i18n/**'
+      - 'lib/**'
+      - 'types/**'
+      - 'babel.config.js'
+      - 'tailwind.config.js'
+      - 'tsconfig.json'
 
 permissions:
   contents: write
