@@ -19,8 +19,33 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # EXPO_PUBLIC_* vars are inlined into the JS bundle at build time by
+      # Metro (during the Gradle bundleRelease task), not read at runtime —
+      # without these, supabase-js's createClient() throws on the
+      # non-null-asserted undefined URL/key (lib/supabase.ts) and the app
+      # crashes immediately on launch, before any screen renders.
+      # The URL is not a secret (it's already documented in CLAUDE.md and is
+      # meant to be public); the anon key is protected by RLS and is also
+      # meant to ship inside the client bundle, but per repo policy
+      # (CLAUDE.md: "All secrets via environment variables — never
+      # hardcoded") it's sourced from a GitHub Actions secret rather than
+      # inlined here.
+      EXPO_PUBLIC_SUPABASE_URL: https://odfwtdpvpfzdrznvurru.supabase.co
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verify Supabase secret is configured
+        # A missing secret resolves to an empty string here, not a workflow
+        # error — the Gradle build would still exit 0 and produce an APK,
+        # just one that crashes on launch (the exact bug this workflow
+        # change fixes). Fail loudly instead of shipping that silently.
+        run: |
+          if [ -z "$EXPO_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "::error::EXPO_PUBLIC_SUPABASE_ANON_KEY repo secret is not set (Settings > Secrets and variables > Actions > New repository secret). Value = the anon/publishable key for Supabase project odfwtdpvpfzdrznvurru (dashboard > Settings > API). Without it the APK builds successfully but crashes on launch."
+            exit 1
+          fi
 
       - uses: actions/setup-node@v4
         with:
