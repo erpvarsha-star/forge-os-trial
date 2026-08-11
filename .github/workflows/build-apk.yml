@@ -43,6 +43,10 @@ jobs:
       # inlined here.
       EXPO_PUBLIC_SUPABASE_URL: https://odfwtdpvpfzdrznvurru.supabase.co
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      # Cosmetic, not secret (see lib/config.ts fallbacks) — without this the
+      # login screen shows the literal fallback string "Your Company"
+      # instead of the real company name.
+      EXPO_PUBLIC_COMPANY_NAME: Varsha Forgings Pvt Ltd
     steps:
       - uses: actions/checkout@v4
 
