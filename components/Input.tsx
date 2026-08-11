@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { View, TextInput, Text } from 'react-native'
 
 interface InputProps {
@@ -13,6 +13,10 @@ interface InputProps {
   className?: string
   multiline?: boolean
   numberOfLines?: number
+  /** Optional additions — all default to previous behaviour, safe to omit. */
+  editable?: boolean
+  helperText?: string
+  required?: boolean
 }
 
 export function Input({
@@ -27,10 +31,26 @@ export function Input({
   className = '',
   multiline = false,
   numberOfLines = 1,
+  editable = true,
+  helperText,
+  required = false,
 }: InputProps) {
+  const [isFocused, setIsFocused] = useState(false)
+
+  const borderColor = error
+    ? 'border-status-rejected'
+    : isFocused
+      ? 'border-brand-600'
+      : 'border-ink-300'
+
   return (
     <View className={`${className}`}>
-      {label && <Text className="text-sm font-medium text-gray-700 mb-1">{label}</Text>}
+      {label && (
+        <Text className="text-sm font-semibold text-ink-700 mb-1.5">
+          {label}
+          {required && <Text className="text-status-rejected"> *</Text>}
+        </Text>
+      )}
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -40,12 +60,23 @@ export function Input({
         maxLength={maxLength}
         multiline={multiline}
         numberOfLines={multiline ? numberOfLines : 1}
-        className={`border rounded-lg px-4 py-3 text-base text-gray-900 bg-white ${
-          error ? 'border-red-500' : 'border-gray-300'
-        } ${multiline ? 'h-24 text-top' : ''}`}
-        placeholderTextColor="#9CA3AF"
+        editable={editable}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        // textAlignVertical is a real RN prop for top-aligned multiline text;
+        // the previous `text-top` className isn't a valid utility and was a
+        // no-op, so multiline fields vertically centered their first line.
+        textAlignVertical={multiline ? 'top' : 'center'}
+        className={`border-[1.5px] rounded-lg px-4 py-3.5 text-base text-ink-900 bg-white leading-5 ${borderColor} ${
+          !editable ? 'bg-ink-50 text-ink-500' : ''
+        } ${multiline ? 'min-h-[96px]' : 'min-h-touch'}`}
+        placeholderTextColor="#8B93A3"
       />
-      {error && <Text className="text-sm text-red-500 mt-1">{error}</Text>}
+      {error ? (
+        <Text className="text-sm text-status-rejected mt-1.5 font-medium">{error}</Text>
+      ) : helperText ? (
+        <Text className="text-xs text-ink-500 mt-1.5">{helperText}</Text>
+      ) : null}
     </View>
   )
 }

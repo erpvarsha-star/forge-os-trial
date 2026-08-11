@@ -111,7 +111,15 @@
     "thisMonth": "This Month",
     "lastMonth": "Last Month",
     "add": "Add",
-    "somethingWentWrong": "Something went wrong. Please try again."
+    "somethingWentWrong": "Something went wrong. Please try again.",
+    "pendingCount": "{{count}} Pending",
+    "waitingDays": "{{count}}d ago",
+    "confirmedOfTotal": "{{confirmed}} of {{total}} confirmed",
+    "quickActions": "Quick Actions",
+    "allClear": "All clear",
+    "comingSoon": "Coming Soon",
+    "sampleData": "Sample data",
+    "notConnectedYet": "Not yet connected to live data"
   },
   "auth": {
     "loginTitle": "Welcome to Forge OS",
@@ -225,7 +233,26 @@
     "5sLeaderboard": "5S Leaderboard",
     "takePhoto": "Take Photo",
     "retake": "Retake",
-    "photoSubmitted": "Photo submitted for verification"
+    "photoSubmitted": "Photo submitted for verification",
+    "checkedInAt": "Checked in at {{time}}",
+    "checkedOutAt": "Checked out at {{time}}",
+    "shiftComplete": "Shift complete for today",
+    "noShiftAssigned": "No shift assigned today",
+    "checklistProgress": "{{done}}/{{total}} done",
+    "reportIssue": "Report Issue",
+    "observationsLeftShort": "{{count}} left today",
+    "manageLeave": "Manage leave & apply",
+    "checkingStatus": "Checking status...",
+    "tapWhenInsidePlant": "Make sure you're inside the plant boundary",
+    "noScoreYet": "Your score will appear here once this month's scoring cycle runs.",
+    "payslipNotAvailable": "Payslip for this month isn't ready yet. Check back after payroll is processed.",
+    "noAttendanceThisMonth": "No attendance recorded yet this month",
+    "noLeaveRequests": "No leave requests yet",
+    "noAdvanceRequests": "No advance requests yet",
+    "5sNoChallenge": "No 5S challenge today. Check back tomorrow.",
+    "observationHint": "Spotted a maintenance issue? Log it here so the team can act on it.",
+    "qrHint": "Point your camera at the check-in QR code posted at the plant gate.",
+    "notificationsEmptyTitle": "You're all caught up"
   },
   "supervisor": {
     "teamStatus": "Team Status",
@@ -263,7 +290,17 @@
     "operatorCount": "Operator Count",
     "casualWorkerSaved": "Casual worker count saved",
     "bulkConfirmTitle": "Fraud Alert: Bulk Confirmation",
-    "bulkConfirmBody": "{{name}} confirmed {{count}} team members in {{seconds}} seconds"
+    "bulkConfirmBody": "{{name}} confirmed {{count}} team members in {{seconds}} seconds",
+    "teamSize": "Team Size",
+    "attendanceRate": "Attendance Rate",
+    "noOpenTasks": "No open maintenance tasks",
+    "allTeamConfirmed": "All team members confirmed for today",
+    "no5sSubmissions": "No 5S submissions awaiting verification",
+    "noLeaveApprovals": "No pending leave requests",
+    "noAdvanceApprovals": "No pending advance requests",
+    "advanceApprovals": "Advance Approvals",
+    "casualWorkersToday": "Casual Workers Today",
+    "quickLogs": "Quick Logs"
   },
   "manager": {
     "deptAttendance": "Department Attendance",
@@ -279,7 +316,12 @@
     "assignTask": "Assign Task",
     "taskTitle": "Task Title",
     "taskAssignee": "Assignee",
-    "taskDueDate": "Due Date"
+    "taskDueDate": "Due Date",
+    "noEscalations": "No escalated approvals",
+    "supervisorCount": "Supervisors",
+    "noSupervisors": "No supervisors assigned yet",
+    "reportsComingSoonTitle": "Reports coming soon",
+    "reportsComingSoonBody": "These report exports are not connected to live data yet."
   },
   "plantHead": {
     "plantAttendance": "Plant-Wide Attendance",
@@ -293,7 +335,11 @@
     "mrmCompleted": "Completed",
     "mrmPending": "Pending",
     "emailDashboard": "Email Task Dashboard",
-    "plantScoreOverview": "Plant-Wide Score Overview"
+    "plantScoreOverview": "Plant-Wide Score Overview",
+    "noSignOffs": "Nothing pending your sign-off",
+    "noMrmData": "No MRM reviews submitted this month",
+    "noEmailTasks": "Inbox is clear",
+    "departmentsSubmitted": "Departments Submitted"
   },
   "hrAdmin": {
     "employeeMaster": "Employee Master",
@@ -318,7 +364,14 @@
     "step1": "HR Admin Entry",
     "step2": "Plant Head Approval",
     "step3": "Owner Approval",
-    "step4": "Account Activation"
+    "step4": "Account Activation",
+    "noMissingData": "All employee records are complete",
+    "noPendingActivations": "No employees awaiting activation",
+    "noShiftsYet": "No shifts configured yet",
+    "noAdvancesYet": "No advance requests yet",
+    "totalOutstanding": "Total Outstanding",
+    "pendingActivations": "Pending Activations",
+    "missingFields": "Missing Fields"
   },
   "owner": {
     "kpiDashboard": "KPI Dashboard",
@@ -342,7 +395,11 @@
     "fraudAlerts": "Fraud Alerts",
     "mockLocation": "Mock Location Detected",
     "buddyPunching": "Buddy Punching Suspected",
-    "bulkConfirm": "Bulk Confirmation Anomaly"
+    "bulkConfirm": "Bulk Confirmation Anomaly",
+    "noOpenAlerts": "No open fraud alerts",
+    "noEscalations": "Nothing awaiting your approval",
+    "kpiDataNote": "Sample data shown — production KPI feed is not connected yet",
+    "openAlerts": "Open Alerts"
   },
   "security": {
     "vehicleLog": "Vehicle Log",
@@ -369,6 +426,10 @@
     "mismatchReasonPlaceholder": "Explain the mismatch",
     "alreadyConfirmedAt": "Already confirmed at",
     "reconfirmEod": "Re-confirm EOD",
-    "confirmEod": "Confirm EOD"
+    "confirmEod": "Confirm EOD",
+    "noVehicleEntriesToday": "No vehicle movement logged yet today",
+    "logVehicleHint": "Record every vehicle entering or leaving the plant",
+    "checkpointHint": "Confirm each employee you physically see enter the plant",
+    "eodHint": "Confirm inward and outward vehicle counts match at end of day"
   }
 }

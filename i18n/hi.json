@@ -111,7 +111,15 @@
     "thisMonth": "इस माह",
     "lastMonth": "पिछला माह",
     "add": "जोड़ें",
-    "somethingWentWrong": "कुछ गड़बड़ हुई। कृपया पुनः प्रयास करें।"
+    "somethingWentWrong": "कुछ गड़बड़ हुई। कृपया पुनः प्रयास करें।",
+    "pendingCount": "{{count}} लंबित",
+    "waitingDays": "{{count}} दिन पहले",
+    "confirmedOfTotal": "{{total}} में से {{confirmed}} की पुष्टि",
+    "quickActions": "त्वरित कार्रवाई",
+    "allClear": "सब ठीक है",
+    "comingSoon": "जल्द आ रहा है",
+    "sampleData": "नमूना डेटा",
+    "notConnectedYet": "अभी लाइव डेटा से जुड़ा नहीं है"
   },
   "auth": {
     "loginTitle": "Forge OS में आपका स्वागत है",
@@ -225,7 +233,26 @@
     "5sLeaderboard": "5S लीडरबोर्ड",
     "takePhoto": "फोटो लें",
     "retake": "पुनः लें",
-    "photoSubmitted": "सत्यापन के लिए फोटो जमा किया गया"
+    "photoSubmitted": "सत्यापन के लिए फोटो जमा किया गया",
+    "checkedInAt": "{{time}} बजे चेक-इन किया",
+    "checkedOutAt": "{{time}} बजे चेक-आउट किया",
+    "shiftComplete": "आज की शिफ्ट पूर्ण",
+    "noShiftAssigned": "आज के लिए कोई शिफ्ट नहीं सौंपी गई",
+    "checklistProgress": "{{done}}/{{total}} पूर्ण",
+    "reportIssue": "समस्या दर्ज करें",
+    "observationsLeftShort": "आज {{count}} शेष",
+    "manageLeave": "छुट्टी प्रबंधित करें और आवेदन करें",
+    "checkingStatus": "स्थिति जांची जा रही है...",
+    "tapWhenInsidePlant": "सुनिश्चित करें कि आप प्लांट क्षेत्र के अंदर हैं",
+    "noScoreYet": "इस माह का स्कोरिंग चक्र पूरा होने के बाद आपका स्कोर यहां दिखेगा।",
+    "payslipNotAvailable": "इस माह की पेस्लिप अभी तैयार नहीं है। पेरोल प्रोसेस होने के बाद देखें।",
+    "noAttendanceThisMonth": "इस माह अभी तक कोई उपस्थिति दर्ज नहीं हुई",
+    "noLeaveRequests": "अभी तक कोई छुट्टी अनुरोध नहीं",
+    "noAdvanceRequests": "अभी तक कोई एडवांस अनुरोध नहीं",
+    "5sNoChallenge": "आज कोई 5S चुनौती नहीं है। कल फिर देखें।",
+    "observationHint": "रखरखाव की समस्या दिखी? यहां दर्ज करें ताकि टीम कार्रवाई कर सके।",
+    "qrHint": "प्लांट गेट पर लगे चेक-इन QR कोड पर कैमरा फोकस करें।",
+    "notificationsEmptyTitle": "आप पूरी तरह अपडेट हैं"
   },
   "supervisor": {
     "teamStatus": "टीम की स्थिति",
@@ -263,7 +290,17 @@
     "operatorCount": "ऑपरेटर संख्या",
     "casualWorkerSaved": "कैजुअल वर्कर संख्या सहेजी गई",
     "bulkConfirmTitle": "धोखाधड़ी चेतावनी: थोक पुष्टि",
-    "bulkConfirmBody": "{{name}} ने {{seconds}} सेकंड में {{count}} टीम सदस्यों की पुष्टि की"
+    "bulkConfirmBody": "{{name}} ने {{seconds}} सेकंड में {{count}} टीम सदस्यों की पुष्टि की",
+    "teamSize": "टीम का आकार",
+    "attendanceRate": "उपस्थिति दर",
+    "noOpenTasks": "कोई खुला रखरखाव कार्य नहीं",
+    "allTeamConfirmed": "आज सभी टीम सदस्यों की पुष्टि हो गई",
+    "no5sSubmissions": "सत्यापन हेतु कोई 5S सबमिशन लंबित नहीं",
+    "noLeaveApprovals": "कोई लंबित छुट्टी अनुरोध नहीं",
+    "noAdvanceApprovals": "कोई लंबित एडवांस अनुरोध नहीं",
+    "advanceApprovals": "एडवांस अनुमोदन",
+    "casualWorkersToday": "आज के कैजुअल वर्कर",
+    "quickLogs": "त्वरित लॉग"
   },
   "manager": {
     "deptAttendance": "विभाग उपस्थिति",
@@ -279,7 +316,12 @@
     "assignTask": "कार्य सौंपें",
     "taskTitle": "कार्य शीर्षक",
     "taskAssignee": "सौंपा गया",
-    "taskDueDate": "नियत तारीख"
+    "taskDueDate": "नियत तारीख",
+    "noEscalations": "कोई एस्केलेटेड अनुमोदन नहीं",
+    "supervisorCount": "सुपरवाइजर",
+    "noSupervisors": "अभी तक कोई सुपरवाइजर नियुक्त नहीं",
+    "reportsComingSoonTitle": "रिपोर्ट जल्द आ रही हैं",
+    "reportsComingSoonBody": "ये रिपोर्ट एक्सपोर्ट अभी लाइव डेटा से नहीं जुड़े हैं।"
   },
   "plantHead": {
     "plantAttendance": "प्लांट-वाइड उपस्थिति",
@@ -293,7 +335,11 @@
     "mrmCompleted": "पूर्ण",
     "mrmPending": "लंबित",
     "emailDashboard": "ईमेल कार्य डैशबोर्ड",
-    "plantScoreOverview": "प्लांट-वाइड स्कोर अवलोकन"
+    "plantScoreOverview": "प्लांट-वाइड स्कोर अवलोकन",
+    "noSignOffs": "आपके साइन-ऑफ हेतु कुछ भी लंबित नहीं",
+    "noMrmData": "इस माह कोई MRM समीक्षा जमा नहीं हुई",
+    "noEmailTasks": "इनबॉक्स खाली है",
+    "departmentsSubmitted": "विभागों ने जमा किया"
   },
   "hrAdmin": {
     "employeeMaster": "कर्मचारी मास्टर",
@@ -318,7 +364,14 @@
     "step1": "HR Admin प्रविष्टि",
     "step2": "Plant Head अनुमोदन",
     "step3": "Owner अनुमोदन",
-    "step4": "Account सक्रियण"
+    "step4": "Account सक्रियण",
+    "noMissingData": "सभी कर्मचारी रिकॉर्ड पूर्ण हैं",
+    "noPendingActivations": "सक्रियकरण हेतु कोई कर्मचारी लंबित नहीं",
+    "noShiftsYet": "अभी तक कोई शिफ्ट कॉन्फ़िगर नहीं की गई",
+    "noAdvancesYet": "अभी तक कोई एडवांस अनुरोध नहीं",
+    "totalOutstanding": "कुल बकाया",
+    "pendingActivations": "लंबित सक्रियकरण",
+    "missingFields": "लापता फ़ील्ड"
   },
   "owner": {
     "kpiDashboard": "KPI डैशबोर्ड",
@@ -342,7 +395,11 @@
     "fraudAlerts": "धोखाधड़ी अलर्ट",
     "mockLocation": "नकली लोकेशन का पता चला",
     "buddyPunching": "बडी पंचिंग की संभावना",
-    "bulkConfirm": "थोक पुष्टि असामान्य"
+    "bulkConfirm": "थोक पुष्टि असामान्य",
+    "noOpenAlerts": "कोई खुला धोखाधड़ी अलर्ट नहीं",
+    "noEscalations": "आपके अनुमोदन हेतु कुछ भी लंबित नहीं",
+    "kpiDataNote": "नमूना डेटा दिखाया गया है — उत्पादन KPI फ़ीड अभी जुड़ा नहीं है",
+    "openAlerts": "खुले अलर्ट"
   },
   "security": {
     "vehicleLog": "वाहन लॉग",
@@ -369,6 +426,10 @@
     "mismatchReasonPlaceholder": "अंतर का कारण बताएं",
     "alreadyConfirmedAt": "पहले ही पुष्टि हो चुकी है",
     "reconfirmEod": "ईओडी पुनः पुष्टि करें",
-    "confirmEod": "ईओडी पुष्टि करें"
+    "confirmEod": "ईओडी पुष्टि करें",
+    "noVehicleEntriesToday": "आज तक कोई वाहन आवाजाही दर्ज नहीं हुई",
+    "logVehicleHint": "प्लांट में आने-जाने वाले हर वाहन को दर्ज करें",
+    "checkpointHint": "जिस भी कर्मचारी को आप स्वयं प्लांट में प्रवेश करते देखें, उसकी पुष्टि करें",
+    "eodHint": "दिन के अंत में अंदर और बाहर के वाहनों की गिनती मिलाकर पुष्टि करें"
   }
 }
