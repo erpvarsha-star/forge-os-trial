@@ -27,7 +27,7 @@
 | i18n | i18next + react-i18next — `i18n/en.json` and `i18n/hi.json` |
 | Backend | Supabase (project ref: `odfwtdpvpfzdrznvurru`) |
 | DB | PostgreSQL via Supabase, RLS enforced |
-| Auth | Supabase Phone OTP |
+| Auth | Supabase Auth email+password, presented as **employee code (or mobile) + 6-digit PIN** (PATCH_10, 11 Aug). Phone OTP retained as a fallback but inactive — needs an SMS provider + TRAI DLT registration |
 | Edge functions | Deno (supabase/functions/) |
 | Notifications | Expo Push + Supabase notifications table |
 | PDF | expo-print |
@@ -66,6 +66,23 @@
 
 ### Tables that do NOT exist (referenced in old code)
 `tasks`, `hourly_production`, `shift_reports`, `salary_advances`, `five_s_challenges`, `five_s_challenge_completions`
+
+---
+
+## Authentication — PIN login (PATCH_10, 11 Aug 2026)
+
+**Why not OTP:** Supabase Phone OTP needs a configured SMS provider; for Indian numbers that also means TRAI DLT registration (company docs, days-to-weeks approval) plus per-message cost across 129 employees. Sending without a provider fails with `Unsupported phone provider` — which is exactly what the trial hit on 11 Aug.
+
+**How PIN login works.** Supabase Auth has no native PIN mode, so each active employee is provisioned a real Supabase auth user whose email is synthetic (`<empcode>@forgeos.local`) and whose **password is the PIN**. This keeps us on stock Supabase Auth — real JWTs, sessions, refresh — rather than hand-rolled auth, and every RLS policy keyed on `employees.auth_user_id = auth.uid()` keeps working untouched.
+
+- **Login accepts employee code _or_ mobile number.** Both are needed: ~a third of employees have no phone in the DB (VFL1527 deliberately NULL; only ~96 of 120 got numbers in PATCH_03), so phone alone would lock people out.
+- **Identifier → email resolution** goes through `public.resolve_login_identifier()`, a SECURITY DEFINER function returning *only* the synthetic email. Needed because the lookup happens while still anonymous, when RLS correctly hides `employees`. It does reveal whether a code exists — accepted, since emp_codes are printed on ID cards and the PIN is the secret.
+- **Starting PIN = emp_code digits padded to 6.** `VFL1001` → `001001`. Per-employee, *not* one shared default — a shared default would let anyone sign in as any colleague who hadn't logged in yet.
+- **`must_change_pin` forces a change on first login**, gated in `app/index.tsx` (the only auth guard) and in `login.tsx`. Cleared via `public.mark_pin_changed()` — a SECURITY DEFINER function rather than an RLS update policy, because any policy broad enough to let employees update their own row would also let them edit their own `role`, `salary` or `supervisor_id`.
+
+**⚠ Starting PINs are guessable by design.** Anyone who has seen an ID card can derive a colleague's starting PIN. The window is "until that person first logs in". HR should push everyone through first login promptly.
+
+**OTP is retained, not deleted** — `app/(auth)/login-otp.tsx.bak`, the `signInWithOtp`/`verifyOtp` functions in `hooks/useAuth.ts`, and the phone-based `employees_self_claim` RLS policy are all intact. To revert: configure an SMS provider, restore that screen over `login.tsx`, revert `useAuth.ts`. Nothing in PATCH_10 needs undoing first.
 
 ---
 
@@ -126,6 +143,7 @@ QR salt: PATCH_06 has a commented-out UPDATE — Yash must generate his own secr
 | `PATCH_08_new_employees_09Aug2026.sql` | **CORRECTED 10 Aug** — 4 new employees with real emp_codes: Bharat Salve(VFL5462), Irfan Shaikh(VFL5458), Vaibhav Mali(VFL5459), Ashok Kumar(VFL5460) | ✅ Applied 10 Aug |
 | `PATCH_09_qa_purchase_maintenance_10Aug2026.sql` | 5 new employees: Tamizuddin(VFL5461), Bholanath Das(VFL5452), Shaikh Zaker(VFL5453), Sandip Landage(VFL5457), Tohid Shaikh(VFL5454) | ✅ Applied 10 Aug |
 | `COMBINED_DEPLOY_03to09_10Aug2026.sql` | Combined one-shot version of the 7 patches above, run by Yash via SQL Editor | ✅ Ran 10 Aug — **129 total employees confirmed** |
+| `PATCH_10_pin_auth_11Aug2026.sql` | PIN auth: provisions a Supabase auth user per active employee (synthetic `<empcode>@forgeos.local` email, PIN as password), links `auth_user_id`, adds `must_change_pin`, adds `resolve_login_identifier()` + `mark_pin_changed()` | ⏳ **NOT YET RUN — Yash must run this in the SQL Editor before anyone can log in** |
 
 **Total employees confirmed live: 129** (120 original + 4 PATCH_08 + 5 PATCH_09).
 
@@ -136,7 +154,9 @@ QR salt: PATCH_06 has a commented-out UPDATE — Yash must generate his own secr
 ```
 app/
 ├── index.tsx              — role router (the only auth guard; no guards in layouts)
-├── (auth)/login.tsx       — Phone OTP login
+├── (auth)/login.tsx       — employee code / mobile + PIN login
+├── (auth)/change-pin.tsx  — forced PIN change on first login
+├── (auth)/login-otp.tsx.bak — original OTP screen, kept as fallback (.bak so expo-router ignores it)
 ├── (worker)/              — member role
 │   ├── home.tsx           — GPS check-in/out, QR, daily checklist
 │   ├── attendance.tsx     — monthly calendar
@@ -252,6 +272,8 @@ app/
 ---
 
 ## Pending from Yash (owner)
+
+0. **⚠ RUN `PATCH_10_pin_auth_11Aug2026.sql` IN THE SUPABASE SQL EDITOR** — until this runs, no employee has a Supabase auth user and nobody can log in at all. Everything else about PIN login is already shipped in the app.
 
 1. **Worker → supervisor mapping** — CLOSED 10 Aug (Yash: "that will happen in the app") — this is an in-app assignment flow, not a DB patch task
 2. **Rotating supervisor update** — CLOSED 10 Aug (Yash: rotations are decided every Friday by HR/IR, cannot be provided in advance) — the weekly `supervisor_id` UPDATE is HR/IR's own task going forward, not tracked here

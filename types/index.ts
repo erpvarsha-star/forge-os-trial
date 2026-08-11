@@ -14,6 +14,8 @@ export interface Employee {
   plant_head_id?: string
   salary?: number
   is_active: boolean
+  /** Set by PATCH_10. True until the employee replaces their derived starting PIN. */
+  must_change_pin?: boolean
   created_at: string
   updated_at: string
 }

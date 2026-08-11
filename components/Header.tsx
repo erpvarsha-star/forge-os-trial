@@ -1,7 +1,8 @@
 import React from 'react'
-import { View, Text, Image } from 'react-native'
+import { View, Text } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { APP_CONFIG } from '@/lib/config'
+import { BrandLogo } from '@/components/BrandLogo'
 
 interface HeaderProps {
   empCode?: string
@@ -16,13 +17,7 @@ export function Header({ empCode, role, plantName }: HeaderProps) {
     <View className="bg-white border-b border-gray-200 px-4 py-3">
       <View className="flex-row items-center justify-between">
         <View className="flex-row items-center gap-3">
-          {APP_CONFIG.logoUrl ? (
-            <Image source={{ uri: APP_CONFIG.logoUrl }} className="w-10 h-10 rounded-lg" resizeMode="contain" />
-          ) : (
-            <View className="w-10 h-10 bg-orange-600 rounded-lg items-center justify-center">
-              <Text className="text-white font-bold text-lg">F</Text>
-            </View>
-          )}
+          <BrandLogo size="sm" style={{ width: 40, height: 40 }} />
           <View>
             <Text className="text-sm font-bold text-gray-900">{APP_CONFIG.companyName}</Text>
             <Text className="text-xs text-gray-500">{plantName || t('common.plantName')}</Text>
