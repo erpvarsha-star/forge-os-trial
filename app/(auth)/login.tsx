@@ -22,7 +22,7 @@ import { registerForPushNotificationsAsync } from '@/lib/notifications'
  */
 export default function LoginScreen() {
   const { t } = useTranslation()
-  const { isLoading, isAuthenticated, employee, signInWithPin } = useAuth()
+  const { isLoading, isAuthenticated, employee, loadError, signInWithPin } = useAuth()
   const [identifier, setIdentifier] = useState('')
   const [pin, setPin] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -113,6 +113,18 @@ export default function LoginScreen() {
             />
 
             {!!error && <Text className="text-sm text-red-600 mb-3">{error}</Text>}
+
+            {/* Credentials were accepted but the employee record could not be
+                loaded — a backend/RLS problem, not something the employee can
+                fix by retrying. Show it rather than stalling silently, and
+                include the raw reason so it can be reported to whoever can
+                actually fix it. */}
+            {!error && !!loadError && (
+              <View className="mb-3">
+                <Text className="text-sm text-red-600">{t('auth.profileLoadFailed')}</Text>
+                <Text className="text-xs text-gray-400 mt-1">{loadError}</Text>
+              </View>
+            )}
 
             <Button
               title="auth.login"

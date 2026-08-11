@@ -146,7 +146,8 @@
     "pinMismatch": "PINs do not match",
     "pinTooWeak": "Choose a less obvious PIN",
     "pinSameAsStarting": "Choose a PIN different from your starting PIN",
-    "pinChangeFailed": "Could not update PIN. Please try again."
+    "pinChangeFailed": "Could not update PIN. Please try again.",
+    "profileLoadFailed": "Signed in, but your employee profile could not be loaded. Please report this to HR."
   },
   "worker": {
     "safetyTip": "Safety Tip of the Day",

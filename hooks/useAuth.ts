@@ -9,6 +9,14 @@ interface AuthState {
   employee: Employee | null
   isLoading: boolean
   isAuthenticated: boolean
+  /**
+   * Why the signed-in session could not be turned into an employee. Surfaced
+   * so a backend failure can never again present as a silent dead end: the
+   * RLS recursion bug fixed by PATCH_11 left users authenticated but with no
+   * employee row, and because this error was swallowed the login screen just
+   * sat there showing nothing at all.
+   */
+  loadError: string | null
 }
 
 /**
@@ -34,6 +42,7 @@ export function useAuth() {
     employee: null,
     isLoading: true,
     isAuthenticated: false,
+    loadError: null,
   })
 
   useEffect(() => {
@@ -52,7 +61,7 @@ export function useAuth() {
       if (session?.user?.id) {
         loadEmployee(session.user.id)
       } else {
-        setState({ session: null, employee: null, isLoading: false, isAuthenticated: false })
+        setState({ session: null, employee: null, isLoading: false, isAuthenticated: false, loadError: null })
       }
     })
 
@@ -76,7 +85,16 @@ export function useAuth() {
       .single()
 
     if (error || !data) {
-      setState(s => ({ ...s, isLoading: false, isAuthenticated: false }))
+      // Signed in, but no employee row came back. Never fail silently here —
+      // the user has valid credentials and would otherwise be left staring at
+      // an unchanged login screen with nothing to report to anyone.
+      console.warn('loadEmployee failed', error)
+      setState(s => ({
+        ...s,
+        isLoading: false,
+        isAuthenticated: false,
+        loadError: error?.message ?? 'NO_EMPLOYEE_ROW',
+      }))
       return
     }
 
@@ -88,6 +106,7 @@ export function useAuth() {
       employee,
       isLoading: false,
       isAuthenticated: true,
+      loadError: null,
     })
   }
 
@@ -159,7 +178,7 @@ export function useAuth() {
   const logout = async () => {
     await supabase.auth.signOut()
     await AsyncStorage.removeItem('employee')
-    setState({ session: null, employee: null, isLoading: false, isAuthenticated: false })
+    setState({ session: null, employee: null, isLoading: false, isAuthenticated: false, loadError: null })
     router.replace('/(auth)/login')
   }
 
