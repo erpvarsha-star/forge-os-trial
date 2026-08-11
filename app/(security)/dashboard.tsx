@@ -66,33 +66,33 @@ export default function VehicleLogScreen() {
   const outwardCount = entries.filter(e => e.direction === 'outward').length
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
-        <Text className="text-sm font-bold text-gray-700 mb-2 px-1">{t('common.today')}</Text>
+        <Text className="text-sm font-bold text-ink-700 mb-2 px-1">{t('common.today')}</Text>
         <Card className="mb-5">
           <View className="flex-row">
             <View className="flex-1 items-center">
               <Text className="text-2xl font-bold text-green-600">{inwardCount}</Text>
-              <Text className="text-xs text-gray-500 mt-0.5">{t('security.inward')}</Text>
+              <Text className="text-xs text-ink-500 mt-0.5">{t('security.inward')}</Text>
             </View>
-            <View className="w-px bg-gray-100" />
+            <View className="w-px bg-ink-100" />
             <View className="flex-1 items-center">
               <Text className="text-2xl font-bold text-blue-600">{outwardCount}</Text>
-              <Text className="text-xs text-gray-500 mt-0.5">{t('security.outward')}</Text>
+              <Text className="text-xs text-ink-500 mt-0.5">{t('security.outward')}</Text>
             </View>
           </View>
         </Card>
 
         <Card title={t('security.logVehicle')} className="mb-5">
-          <Text className="text-xs text-gray-500 mb-3 -mt-1">{t('security.logVehicleHint')}</Text>
+          <Text className="text-xs text-ink-500 mb-3 -mt-1">{t('security.logVehicleHint')}</Text>
           <View className="gap-3">
             <Input label={t('security.vehicleNumber')} value={vehicleNumber} onChangeText={setVehicleNumber} />
             <Input label={t('security.driverName')} value={driverName} onChangeText={setDriverName} />
             <Input label={t('security.vendorName')} value={vendorName} onChangeText={setVendorName} />
             <Input label={t('security.material')} value={material} onChangeText={setMaterial} />
 
-            <Text className="text-sm font-medium text-gray-700">{t('security.direction')}</Text>
+            <Text className="text-sm font-medium text-ink-700">{t('security.direction')}</Text>
             <View className="flex-row gap-2">
               <Button
                 title="security.inward"
@@ -114,11 +114,11 @@ export default function VehicleLogScreen() {
           </View>
         </Card>
 
-        <Text className="text-sm font-bold text-gray-700 mb-2 px-1">{t('security.todaysEntries')}</Text>
+        <Text className="text-sm font-bold text-ink-700 mb-2 px-1">{t('security.todaysEntries')}</Text>
         {entries.length === 0 ? (
           <Card className="items-center py-10">
             <ClipboardList size={32} color="#D1D5DB" />
-            <Text className="text-sm text-gray-500 mt-3 text-center">{t('security.noVehicleEntriesToday')}</Text>
+            <Text className="text-sm text-ink-500 mt-3 text-center">{t('security.noVehicleEntriesToday')}</Text>
           </Card>
         ) : (
           entries.map(entry => (
@@ -130,8 +130,8 @@ export default function VehicleLogScreen() {
                   <ArrowUpFromLine size={18} color="#2563EB" />
                 )}
                 <View className="flex-1">
-                  <Text className="text-sm font-bold text-gray-900">{entry.vehicle_number}</Text>
-                  <Text className="text-xs text-gray-500">{entry.vendor_name || entry.driver_name || '-'} {entry.material ? `• ${entry.material}` : ''}</Text>
+                  <Text className="text-sm font-bold text-ink-900">{entry.vehicle_number}</Text>
+                  <Text className="text-xs text-ink-500">{entry.vendor_name || entry.driver_name || '-'} {entry.material ? `• ${entry.material}` : ''}</Text>
                 </View>
               </View>
             </Card>

@@ -87,10 +87,10 @@ export default function LoginScreen() {
         <View className="flex-1 items-center justify-center px-6 py-12">
           <BrandLogo size="lg" />
 
-          <Text className="text-2xl font-bold text-gray-900 mb-1 mt-6">{APP_CONFIG.appName}</Text>
-          <Text className="text-sm text-gray-500 mb-8">{APP_CONFIG.companyName}</Text>
+          <Text className="text-2xl font-bold text-ink-900 mb-1 mt-6">{APP_CONFIG.appName}</Text>
+          <Text className="text-sm text-ink-500 mb-8">{APP_CONFIG.companyName}</Text>
 
-          <Text className="text-xl font-bold text-gray-900 mb-6">{t('auth.loginTitle')}</Text>
+          <Text className="text-xl font-bold text-ink-900 mb-6">{t('auth.loginTitle')}</Text>
 
           <View className="w-full max-w-sm">
             <Input
@@ -122,7 +122,7 @@ export default function LoginScreen() {
             {!error && !!loadError && (
               <View className="mb-3">
                 <Text className="text-sm text-red-600">{t('auth.profileLoadFailed')}</Text>
-                <Text className="text-xs text-gray-400 mt-1">{loadError}</Text>
+                <Text className="text-xs text-ink-400 mt-1">{loadError}</Text>
               </View>
             )}
 
@@ -134,7 +134,7 @@ export default function LoginScreen() {
               disabled={isSubmitting}
             />
 
-            <Text className="text-xs text-gray-400 text-center mt-6">
+            <Text className="text-xs text-ink-400 text-center mt-6">
               {t('auth.pinHelp')}
             </Text>
           </View>

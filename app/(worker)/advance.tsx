@@ -55,21 +55,21 @@ export default function AdvanceScreen() {
   }
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
         <Card className="mb-4">
           <View className="flex-row items-center gap-3">
-            <Wallet size={24} className="text-orange-600" />
+            <Wallet size={24} className="text-brand-600" />
             <View>
-              <Text className="text-2xl font-bold text-gray-900">₹{outstanding.toFixed(2)}</Text>
-              <Text className="text-sm text-gray-500">{t('worker.advanceBalance')}</Text>
+              <Text className="text-2xl font-bold text-ink-900">₹{outstanding.toFixed(2)}</Text>
+              <Text className="text-sm text-ink-500">{t('worker.advanceBalance')}</Text>
             </View>
           </View>
         </Card>
 
         <View className="flex-row justify-between items-center mb-2">
-          <Text className="text-lg font-bold text-gray-900">{t('worker.advanceRequests')}</Text>
+          <Text className="text-lg font-bold text-ink-900">{t('worker.advanceRequests')}</Text>
           <Button
             title="worker.applyAdvance"
             onPress={() => setShowModal(true)}
@@ -82,16 +82,16 @@ export default function AdvanceScreen() {
         {requests.length === 0 ? (
           <Card className="items-center py-10">
             <Wallet size={32} color="#D1D5DB" />
-            <Text className="text-sm text-gray-500 mt-3">{t('worker.noAdvanceRequests')}</Text>
+            <Text className="text-sm text-ink-500 mt-3">{t('worker.noAdvanceRequests')}</Text>
           </Card>
         ) : (
           requests.map(req => (
             <Card key={req.id} className="mb-2">
               <View className="flex-row justify-between items-start">
                 <View className="flex-1 pr-2">
-                  <Text className="text-sm font-bold text-gray-900">₹{req.amount.toFixed(2)}</Text>
-                  <Text className="text-xs text-gray-500 mt-0.5">{req.reason}</Text>
-                  <Text className="text-xs text-gray-500">{t('worker.repaymentMonths')}: {req.repayment_months}</Text>
+                  <Text className="text-sm font-bold text-ink-900">₹{req.amount.toFixed(2)}</Text>
+                  <Text className="text-xs text-ink-500 mt-0.5">{req.reason}</Text>
+                  <Text className="text-xs text-ink-500">{t('worker.repaymentMonths')}: {req.repayment_months}</Text>
                 </View>
                 <View className={`px-2 py-1 rounded-full ${statusColor(req.status)}`}>
                   <Text className="text-xs font-medium capitalize">{t(`common.${req.status}`)}</Text>
@@ -105,7 +105,7 @@ export default function AdvanceScreen() {
       <Modal visible={showModal} transparent animationType="slide">
         <View className="flex-1 bg-black/50 justify-end">
           <View className="bg-white rounded-t-2xl p-6">
-            <Text className="text-lg font-bold text-gray-900 mb-4">{t('worker.applyAdvance')}</Text>
+            <Text className="text-lg font-bold text-ink-900 mb-4">{t('worker.applyAdvance')}</Text>
             <Input
               label={t('worker.advanceAmount')}
               value={amount}

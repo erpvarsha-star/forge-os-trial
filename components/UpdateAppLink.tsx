@@ -14,13 +14,13 @@ export function UpdateAppLink() {
   return (
     <TouchableOpacity
       onPress={() => Linking.openURL(APK_DOWNLOAD_URL)}
-      className="bg-white rounded-xl p-4 mb-2 flex-row items-center justify-between shadow-sm border border-gray-100"
+      className="bg-white rounded-xl p-4 mb-2 flex-row items-center justify-between shadow-sm border border-ink-100"
     >
       <View className="flex-row items-center gap-3">
         <Download size={20} color="#E65C00" />
-        <Text className="text-base text-gray-900">{t('common.updateApp')}</Text>
+        <Text className="text-base text-ink-900">{t('common.updateApp')}</Text>
       </View>
-      <Text className="text-sm text-gray-500">v{Constants.expoConfig?.version}</Text>
+      <Text className="text-sm text-ink-500">v{Constants.expoConfig?.version}</Text>
     </TouchableOpacity>
   )
 }

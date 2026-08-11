@@ -38,37 +38,37 @@ export default function WorkerMore() {
   ]
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
         <Card className="mb-4">
           <View className="flex-row items-center gap-4">
-            <View className="w-16 h-16 bg-orange-100 rounded-full items-center justify-center">
+            <View className="w-16 h-16 bg-brand-100 rounded-full items-center justify-center">
               <User size={28} color="#E65C00" />
             </View>
             <View>
-              <Text className="text-lg font-bold text-gray-900">{employee.name}</Text>
-              <Text className="text-sm text-gray-500">{employee.emp_code}</Text>
-              <Text className="text-sm text-orange-600 capitalize">{employee.role}</Text>
+              <Text className="text-lg font-bold text-ink-900">{employee.name}</Text>
+              <Text className="text-sm text-ink-500">{employee.emp_code}</Text>
+              <Text className="text-sm text-brand-600 capitalize">{employee.role}</Text>
             </View>
           </View>
         </Card>
 
-        <View className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <View className="bg-white rounded-xl shadow-sm border border-ink-100 overflow-hidden">
           {menuItems.map((item, index) => (
             <TouchableOpacity
               key={index}
               onPress={item.onPress}
               className={`p-4 flex-row items-center justify-between ${
-                index < menuItems.length - 1 ? 'border-b border-gray-100' : ''
+                index < menuItems.length - 1 ? 'border-b border-ink-100' : ''
               }`}
             >
               <View className="flex-row items-center gap-3 flex-1">
                 {item.icon}
-                <Text className="text-base text-gray-900 flex-1" numberOfLines={2}>{t(item.label)}</Text>
+                <Text className="text-base text-ink-900 flex-1" numberOfLines={2}>{t(item.label)}</Text>
               </View>
               <View className="flex-row items-center gap-2">
-                {item.value && <Text className="text-sm text-gray-500">{item.value}</Text>}
+                {item.value && <Text className="text-sm text-ink-500">{item.value}</Text>}
                 <ChevronRight size={18} color="#9CA3AF" />
               </View>
             </TouchableOpacity>
@@ -92,12 +92,12 @@ export default function WorkerMore() {
       <Modal visible={showLangModal} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center px-6">
           <View className="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <Text className="text-lg font-bold text-gray-900 mb-4">{t('common.language')}</Text>
+            <Text className="text-lg font-bold text-ink-900 mb-4">{t('common.language')}</Text>
             <TouchableOpacity
               onPress={() => { toggleLanguage(); setShowLangModal(false); }}
-              className="p-4 rounded-lg bg-gray-50 mb-2"
+              className="p-4 rounded-lg bg-ink-50 mb-2"
             >
-              <Text className="text-base text-gray-900">{language === 'hi' ? 'Switch to English' : 'हिंदी में बदलें'}</Text>
+              <Text className="text-base text-ink-900">{language === 'hi' ? 'Switch to English' : 'हिंदी में बदलें'}</Text>
             </TouchableOpacity>
             <Button title="common.close" onPress={() => setShowLangModal(false)} variant="ghost" />
           </View>

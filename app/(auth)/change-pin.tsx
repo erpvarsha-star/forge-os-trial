@@ -77,8 +77,8 @@ export default function ChangePinScreen() {
         <View className="flex-1 items-center justify-center px-6 py-12">
           <BrandLogo size="md" />
 
-          <Text className="text-xl font-bold text-gray-900 mb-2 mt-6">{t('auth.setYourPin')}</Text>
-          <Text className="text-sm text-gray-500 mb-8 text-center">{t('auth.setYourPinHelp')}</Text>
+          <Text className="text-xl font-bold text-ink-900 mb-2 mt-6">{t('auth.setYourPin')}</Text>
+          <Text className="text-sm text-ink-500 mb-8 text-center">{t('auth.setYourPinHelp')}</Text>
 
           <View className="w-full max-w-sm">
             <Input

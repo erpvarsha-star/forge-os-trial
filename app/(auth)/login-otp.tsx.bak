@@ -105,14 +105,14 @@ export default function LoginScreen() {
     >
       <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
         <View className="flex-1 items-center justify-center px-6 py-12">
-          <View className="w-20 h-20 bg-orange-600 rounded-2xl items-center justify-center mb-6 shadow-lg">
+          <View className="w-20 h-20 bg-brand-600 rounded-2xl items-center justify-center mb-6 shadow-lg">
             <Building2 size={40} color="white" />
           </View>
 
-          <Text className="text-2xl font-bold text-gray-900 mb-1">{APP_CONFIG.appName}</Text>
-          <Text className="text-sm text-gray-500 mb-8">{APP_CONFIG.companyName}</Text>
+          <Text className="text-2xl font-bold text-ink-900 mb-1">{APP_CONFIG.appName}</Text>
+          <Text className="text-sm text-ink-500 mb-8">{APP_CONFIG.companyName}</Text>
 
-          <Text className="text-xl font-bold text-gray-900 mb-6">{t('auth.loginTitle')}</Text>
+          <Text className="text-xl font-bold text-ink-900 mb-6">{t('auth.loginTitle')}</Text>
 
           {step === 'phone' ? (
             <View className="w-full gap-4">
@@ -137,7 +137,7 @@ export default function LoginScreen() {
             </View>
           ) : (
             <View className="w-full gap-4">
-              <Text className="text-sm text-gray-600 text-center mb-2">
+              <Text className="text-sm text-ink-600 text-center mb-2">
                 {t('auth.otpSent')}: +91 {phone}
               </Text>
               <Input

@@ -87,22 +87,22 @@ export default function QRScreen() {
   if (hasPermission === null) return <LoadingScreen />
   if (hasPermission === false) {
     return (
-      <View className="flex-1 bg-gray-50">
+      <View className="flex-1 bg-ink-50">
         <Header empCode={employee.emp_code} role={employee.role} />
         <View className="flex-1 items-center justify-center p-6">
           <CameraOff size={40} color="#D1D5DB" />
-          <Text className="text-sm text-gray-500 mt-3 text-center">{t('worker.cameraPermissionRequired')}</Text>
+          <Text className="text-sm text-ink-500 mt-3 text-center">{t('worker.cameraPermissionRequired')}</Text>
         </View>
       </View>
     )
   }
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <View className="flex-1 p-4">
         {!todayRecord?.check_in_time && (
-          <Text className="text-xs text-gray-500 text-center mb-3 px-2">{t('worker.qrHint')}</Text>
+          <Text className="text-xs text-ink-500 text-center mb-3 px-2">{t('worker.qrHint')}</Text>
         )}
         <Card className="flex-1 items-center justify-center">
           {todayRecord?.check_in_time ? (
@@ -117,7 +117,7 @@ export default function QRScreen() {
                 style={StyleSheet.absoluteFillObject}
               />
               <View className="absolute inset-0 items-center justify-center">
-                <View className="w-48 h-48 border-2 border-orange-500 rounded-lg opacity-50" />
+                <View className="w-48 h-48 border-2 border-brand-500 rounded-lg opacity-50" />
               </View>
               <View className="absolute bottom-8 left-0 right-0 items-center">
                 <Text className="text-white text-sm bg-black/50 px-4 py-2 rounded-full">

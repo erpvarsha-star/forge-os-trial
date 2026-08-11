@@ -57,7 +57,7 @@ export default function SecurityCheckpoint2Screen() {
   if (isLoading) return <LoadingScreen />
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <FlatList
         data={pending}
@@ -65,8 +65,8 @@ export default function SecurityCheckpoint2Screen() {
         contentContainerStyle={{ padding: 16 }}
         ListHeaderComponent={
           <View className="mb-3">
-            <Text className="text-xs text-gray-500 mb-3 px-1">{t('security.checkpointHint')}</Text>
-            <Text className="text-sm font-semibold text-gray-600">
+            <Text className="text-xs text-ink-500 mb-3 px-1">{t('security.checkpointHint')}</Text>
+            <Text className="text-sm font-semibold text-ink-600">
               {t('security.pendingConfirmation')} ({pending.length})
             </Text>
           </View>
@@ -74,15 +74,15 @@ export default function SecurityCheckpoint2Screen() {
         ListEmptyComponent={
           <Card className="items-center py-10">
             <CheckCircle2 size={32} color="#16A34A" />
-            <Text className="text-center text-gray-500 mt-3">{t('security.allConfirmed')}</Text>
+            <Text className="text-center text-ink-500 mt-3">{t('security.allConfirmed')}</Text>
           </Card>
         }
         renderItem={({ item }) => (
           <Card className="mb-2">
             <View className="flex-row items-center gap-3">
               <View className="flex-1">
-                <Text className="text-sm font-bold text-gray-900">{item.employees?.name}</Text>
-                <Text className="text-xs text-gray-500">{item.employees?.emp_code} • {item.employees?.department}</Text>
+                <Text className="text-sm font-bold text-ink-900">{item.employees?.name}</Text>
+                <Text className="text-xs text-ink-500">{item.employees?.emp_code} • {item.employees?.department}</Text>
               </View>
               <Button
                 title="security.confirmSeen"
@@ -97,14 +97,14 @@ export default function SecurityCheckpoint2Screen() {
         ListFooterComponent={
           confirmed.length > 0 ? (
             <View className="mt-4">
-              <Text className="text-sm font-semibold text-gray-600 mb-2">{t('security.confirmed')} ({confirmed.length})</Text>
+              <Text className="text-sm font-semibold text-ink-600 mb-2">{t('security.confirmed')} ({confirmed.length})</Text>
               {confirmed.map(row => (
                 <Card key={row.id} className="mb-2">
                   <View className="flex-row items-center gap-3">
                     <CheckCircle2 size={18} color="#16A34A" />
                     <View className="flex-1">
-                      <Text className="text-sm font-bold text-gray-900">{row.employees?.name}</Text>
-                      <Text className="text-xs text-gray-500">{row.employees?.emp_code} • {row.employees?.department}</Text>
+                      <Text className="text-sm font-bold text-ink-900">{row.employees?.name}</Text>
+                      <Text className="text-xs text-ink-500">{row.employees?.emp_code} • {row.employees?.department}</Text>
                     </View>
                   </View>
                 </Card>

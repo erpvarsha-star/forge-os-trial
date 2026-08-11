@@ -65,21 +65,21 @@ export default function EODLockScreen() {
   }
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
-        <Text className="text-sm font-bold text-gray-700 mb-2 px-1">{t('common.today')}</Text>
+        <Text className="text-sm font-bold text-ink-700 mb-2 px-1">{t('common.today')}</Text>
         <Card className="mb-4">
-          <Text className="text-xs text-gray-500 mb-3 -mt-1">{t('security.eodHint')}</Text>
+          <Text className="text-xs text-ink-500 mb-3 -mt-1">{t('security.eodHint')}</Text>
           <View className="flex-row">
             <View className="flex-1 items-center">
               <Text className="text-2xl font-bold text-green-600">{inwardCount}</Text>
-              <Text className="text-xs text-gray-500 mt-0.5">{t('security.inward')}</Text>
+              <Text className="text-xs text-ink-500 mt-0.5">{t('security.inward')}</Text>
             </View>
-            <View className="w-px bg-gray-100" />
+            <View className="w-px bg-ink-100" />
             <View className="flex-1 items-center">
               <Text className="text-2xl font-bold text-blue-600">{outwardCount}</Text>
-              <Text className="text-xs text-gray-500 mt-0.5">{t('security.outward')}</Text>
+              <Text className="text-xs text-ink-500 mt-0.5">{t('security.outward')}</Text>
             </View>
           </View>
         </Card>
@@ -105,11 +105,11 @@ export default function EODLockScreen() {
 
         {existing && (
           <Card className="mb-4">
-            <Text className="text-sm text-gray-600">
+            <Text className="text-sm text-ink-600">
               {t('security.alreadyConfirmedAt')} {new Date(existing.confirmed_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
             </Text>
             {existing.mismatch_reason && (
-              <Text className="text-xs text-gray-500 mt-1">{t('common.reason')}: {existing.mismatch_reason}</Text>
+              <Text className="text-xs text-ink-500 mt-1">{t('common.reason')}: {existing.mismatch_reason}</Text>
             )}
           </Card>
         )}

@@ -58,20 +58,20 @@ export default function NotificationsScreen() {
   if (isLoading) return <LoadingScreen />
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <FlatList
         data={notifications}
         keyExtractor={item => item.id}
         contentContainerStyle={{ padding: 16 }}
         renderItem={({ item }) => (
-          <Card className={`mb-2 ${!item.read ? 'border-orange-200 bg-orange-50' : ''}`}>
+          <Card className={`mb-2 ${!item.read ? 'border-brand-200 bg-brand-50' : ''}`}>
             <View className="flex-row items-start gap-3">
               {getIcon(item.type)}
               <View className="flex-1">
-                <Text className="text-sm font-bold text-gray-900">{item.title}</Text>
-                <Text className="text-xs text-gray-600 mt-1">{item.body}</Text>
-                <Text className="text-xs text-gray-400 mt-2">
+                <Text className="text-sm font-bold text-ink-900">{item.title}</Text>
+                <Text className="text-xs text-ink-600 mt-1">{item.body}</Text>
+                <Text className="text-xs text-ink-400 mt-2">
                   {new Date(item.created_at).toLocaleString()}
                 </Text>
               </View>
@@ -81,8 +81,8 @@ export default function NotificationsScreen() {
         ListEmptyComponent={
           <View className="items-center py-16">
             <Bell size={40} color="#D1D5DB" />
-            <Text className="text-sm font-semibold text-gray-700 mt-3">{t('worker.notificationsEmptyTitle')}</Text>
-            <Text className="text-xs text-gray-400 mt-1">{t('common.noData')}</Text>
+            <Text className="text-sm font-semibold text-ink-700 mt-3">{t('worker.notificationsEmptyTitle')}</Text>
+            <Text className="text-xs text-ink-400 mt-1">{t('common.noData')}</Text>
           </View>
         }
       />

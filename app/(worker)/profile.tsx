@@ -23,15 +23,15 @@ export default function ProfileScreen() {
   ]
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
         <View className="items-center mb-6">
-          <View className="w-24 h-24 bg-orange-100 rounded-full items-center justify-center mb-3">
+          <View className="w-24 h-24 bg-brand-100 rounded-full items-center justify-center mb-3">
             <User size={40} color="#E65C00" />
           </View>
-          <Text className="text-xl font-bold text-gray-900">{employee.name}</Text>
-          <Text className="text-sm text-gray-500">{employee.emp_code}</Text>
+          <Text className="text-xl font-bold text-ink-900">{employee.name}</Text>
+          <Text className="text-sm text-ink-500">{employee.emp_code}</Text>
         </View>
 
         <Card>
@@ -39,13 +39,13 @@ export default function ProfileScreen() {
             <View
               key={index}
               className={`flex-row items-center gap-3 py-3 ${
-                index < fields.length - 1 ? 'border-b border-gray-100' : ''
+                index < fields.length - 1 ? 'border-b border-ink-100' : ''
               }`}
             >
               {field.icon}
               <View className="flex-1">
-                <Text className="text-xs text-gray-500">{t(field.label)}</Text>
-                <Text className="text-sm font-medium text-gray-900 mt-0.5">{field.value || '—'}</Text>
+                <Text className="text-xs text-ink-500">{t(field.label)}</Text>
+                <Text className="text-sm font-medium text-ink-900 mt-0.5">{field.value || '—'}</Text>
               </View>
             </View>
           ))}

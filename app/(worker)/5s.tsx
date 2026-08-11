@@ -78,21 +78,21 @@ export default function FiveSScreen() {
   if (isLoading) return <LoadingScreen />
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
         {challenge ? (
           <>
-            <Card className="mb-4 bg-orange-50 border-orange-200">
+            <Card className="mb-4 bg-brand-50 border-brand-200">
               <View className="flex-row items-center gap-2 mb-2">
-                <Trophy size={20} className="text-orange-600" />
-                <Text className="text-lg font-bold text-orange-800">{t('worker.5sChallenge')}</Text>
+                <Trophy size={20} className="text-brand-600" />
+                <Text className="text-lg font-bold text-brand-800">{t('worker.5sChallenge')}</Text>
               </View>
-              <Text className="text-base text-gray-900 leading-relaxed">
+              <Text className="text-base text-ink-900 leading-relaxed">
                 {isHindi ? challenge.challenge_text_hi : challenge.challenge_text_en}
               </Text>
               {isHindi && (
-                <Text className="text-sm text-gray-600 mt-2 italic">{challenge.challenge_text_en}</Text>
+                <Text className="text-sm text-ink-600 mt-2 italic">{challenge.challenge_text_en}</Text>
               )}
             </Card>
 
@@ -111,22 +111,22 @@ export default function FiveSScreen() {
                   </Text>
                 </View>
                 {submission.status === 'approved' && (
-                  <Text className="text-2xl font-bold text-orange-600">+{submission.points_awarded} pts</Text>
+                  <Text className="text-2xl font-bold text-brand-600">+{submission.points_awarded} pts</Text>
                 )}
               </Card>
             ) : (
               <Card>
-                <Text className="text-sm font-medium text-gray-700 mb-2">{t('worker.5sSubmit')}</Text>
+                <Text className="text-sm font-medium text-ink-700 mb-2">{t('worker.5sSubmit')}</Text>
                 <TouchableOpacity
                   onPress={takePhoto}
-                  className="border-2 border-dashed border-gray-300 rounded-lg h-48 items-center justify-center mb-4"
+                  className="border-2 border-dashed border-ink-300 rounded-lg h-48 items-center justify-center mb-4"
                 >
                   {photoUri ? (
                     <Image source={{ uri: photoUri }} className="w-full h-full rounded-lg" />
                   ) : (
                     <View className="items-center">
                       <CameraIcon size={40} color="#9CA3AF" />
-                      <Text className="text-sm text-gray-500 mt-2">{t('worker.takePhoto')}</Text>
+                      <Text className="text-sm text-ink-500 mt-2">{t('worker.takePhoto')}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -143,7 +143,7 @@ export default function FiveSScreen() {
         ) : (
           <Card className="items-center py-14">
             <Trophy size={40} color="#D1D5DB" />
-            <Text className="text-sm text-gray-500 mt-3 text-center px-4">{t('worker.5sNoChallenge')}</Text>
+            <Text className="text-sm text-ink-500 mt-3 text-center px-4">{t('worker.5sNoChallenge')}</Text>
           </Card>
         )}
       </ScrollView>

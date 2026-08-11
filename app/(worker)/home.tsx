@@ -170,20 +170,20 @@ export default function WorkerHome() {
   const checklistDone = checklist.filter(Boolean).length
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         <View className="p-4 gap-5">
           {/* PRIMARY ACTION — GPS check-in/out dominates the screen */}
-          <View className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <View className="flex-row items-center gap-2 px-5 py-3 border-b border-gray-100 bg-gray-50">
+          <View className="bg-white rounded-2xl border border-ink-100 shadow-sm overflow-hidden">
+            <View className="flex-row items-center gap-2 px-5 py-3 border-b border-ink-100 bg-ink-50">
               <Clock size={16} color="#6B7280" />
               {shift ? (
-                <Text className="text-xs text-gray-600 flex-1" numberOfLines={2}>
+                <Text className="text-xs text-ink-600 flex-1" numberOfLines={2}>
                   {shift.shift.name} · {shift.shift.start_time} – {shift.shift.end_time}
                 </Text>
               ) : (
-                <Text className="text-xs text-gray-400 flex-1" numberOfLines={2}>
+                <Text className="text-xs text-ink-400 flex-1" numberOfLines={2}>
                   {t('worker.noShiftAssigned')}
                 </Text>
               )}
@@ -193,23 +193,23 @@ export default function WorkerHome() {
               {attendanceLoading && !todayRecord ? (
                 <View className="py-3 items-center">
                   <ActivityIndicator color="#E65C00" />
-                  <Text className="text-sm text-gray-400 mt-3">{t('worker.checkingStatus')}</Text>
+                  <Text className="text-sm text-ink-400 mt-3">{t('worker.checkingStatus')}</Text>
                 </View>
               ) : isCheckedOut ? (
                 <View className="items-center">
                   <View className="w-14 h-14 rounded-full bg-green-100 items-center justify-center mb-3">
                     <CheckCircle2 size={28} color="#16A34A" />
                   </View>
-                  <Text className="text-base font-bold text-gray-900 mb-2 text-center">
+                  <Text className="text-base font-bold text-ink-900 mb-2 text-center">
                     {t('worker.shiftComplete')}
                   </Text>
                   {todayRecord?.check_in_time && (
-                    <Text className="text-xs text-gray-500 text-center">
+                    <Text className="text-xs text-ink-500 text-center">
                       {t('worker.checkedInAt', { time: formatTime(todayRecord.check_in_time) })}
                     </Text>
                   )}
                   {todayRecord?.check_out_time && (
-                    <Text className="text-xs text-gray-500 text-center">
+                    <Text className="text-xs text-ink-500 text-center">
                       {t('worker.checkedOutAt', { time: formatTime(todayRecord.check_out_time) })}
                     </Text>
                   )}
@@ -226,11 +226,11 @@ export default function WorkerHome() {
                     icon={<MapPin size={22} color="white" />}
                   />
                   {isCheckedIn && todayRecord?.check_in_time ? (
-                    <Text className="text-xs text-gray-500 mt-3 text-center">
+                    <Text className="text-xs text-ink-500 mt-3 text-center">
                       {t('worker.checkedInAt', { time: formatTime(todayRecord.check_in_time) })}
                     </Text>
                   ) : (
-                    <Text className="text-xs text-gray-400 mt-3 text-center">
+                    <Text className="text-xs text-ink-400 mt-3 text-center">
                       {t('worker.tapWhenInsidePlant')}
                     </Text>
                   )}
@@ -242,12 +242,12 @@ export default function WorkerHome() {
           {isCheckedIn && (
             <Card>
               <View className="flex-row items-center justify-between mb-1">
-                <Text className="text-base font-bold text-gray-900">{t('worker.dailyChecklist')}</Text>
-                <Text className="text-xs font-semibold text-gray-500">
+                <Text className="text-base font-bold text-ink-900">{t('worker.dailyChecklist')}</Text>
+                <Text className="text-xs font-semibold text-ink-500">
                   {t('worker.checklistProgress', { done: checklistDone, total: checklist.length })}
                 </Text>
               </View>
-              <Text className="text-xs text-gray-500 mb-3">{t('worker.checklistRequired')}</Text>
+              <Text className="text-xs text-ink-500 mb-3">{t('worker.checklistRequired')}</Text>
               {[
                 t('worker.checklistItem1'),
                 t('worker.checklistItem2'),
@@ -263,11 +263,11 @@ export default function WorkerHome() {
                   className="flex-row items-center gap-3 py-2.5"
                 >
                   <View className={`w-6 h-6 rounded border-2 items-center justify-center ${
-                    checklist[index] ? 'bg-orange-600 border-orange-600' : 'border-gray-300'
+                    checklist[index] ? 'bg-brand-600 border-brand-600' : 'border-ink-300'
                   }`}>
                     {checklist[index] && <CheckSquare size={16} color="white" />}
                   </View>
-                  <Text className={`text-sm flex-1 ${checklist[index] ? 'text-gray-900 line-through' : 'text-gray-700'}`}>
+                  <Text className={`text-sm flex-1 ${checklist[index] ? 'text-ink-900 line-through' : 'text-ink-700'}`}>
                     {item}
                   </Text>
                 </TouchableOpacity>
@@ -279,29 +279,29 @@ export default function WorkerHome() {
 
           {/* SECONDARY — quick actions, clearly lower visual weight than the hero */}
           <View>
-            <Text className="text-sm font-bold text-gray-700 mb-2 px-1">{t('common.quickActions')}</Text>
+            <Text className="text-sm font-bold text-ink-700 mb-2 px-1">{t('common.quickActions')}</Text>
             <View className="flex-row gap-3">
               <TouchableOpacity
                 onPress={() => router.push('/(worker)/5s')}
-                className="flex-1 bg-white rounded-xl border border-gray-100 shadow-sm py-5 items-center justify-center"
+                className="flex-1 bg-white rounded-xl border border-ink-100 shadow-sm py-5 items-center justify-center"
               >
                 <Camera size={22} color="#E65C00" />
-                <Text className="text-xs font-semibold text-gray-900 mt-2">5S</Text>
+                <Text className="text-xs font-semibold text-ink-900 mt-2">5S</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => router.push('/(worker)/qr')}
-                className="flex-1 bg-white rounded-xl border border-gray-100 shadow-sm py-5 items-center justify-center"
+                className="flex-1 bg-white rounded-xl border border-ink-100 shadow-sm py-5 items-center justify-center"
               >
                 <QrCode size={22} color="#E65C00" />
-                <Text className="text-xs font-semibold text-gray-900 mt-2 text-center">{t('worker.qrCheckIn')}</Text>
+                <Text className="text-xs font-semibold text-ink-900 mt-2 text-center">{t('worker.qrCheckIn')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => router.push('/(worker)/observation')}
-                className="flex-1 bg-white rounded-xl border border-gray-100 shadow-sm py-5 items-center justify-center px-1"
+                className="flex-1 bg-white rounded-xl border border-ink-100 shadow-sm py-5 items-center justify-center px-1"
               >
                 <AlertCircle size={22} color="#E65C00" />
-                <Text className="text-xs font-semibold text-gray-900 mt-2 text-center">{t('worker.reportIssue')}</Text>
-                <Text className="text-[10px] text-gray-400 mt-0.5 text-center">
+                <Text className="text-xs font-semibold text-ink-900 mt-2 text-center">{t('worker.reportIssue')}</Text>
+                <Text className="text-[10px] text-ink-400 mt-0.5 text-center">
                   {t('worker.observationsLeftShort', { count: Math.max(0, MAX_DAILY_OBSERVATIONS - observationCount) })}
                 </Text>
               </TouchableOpacity>
@@ -310,15 +310,15 @@ export default function WorkerHome() {
 
           <TouchableOpacity
             onPress={() => router.push('/(worker)/leave')}
-            className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex-row items-center justify-between"
+            className="bg-white rounded-xl border border-ink-100 shadow-sm p-4 flex-row items-center justify-between"
           >
             <View className="flex-row items-center gap-3 flex-1">
-              <View className="w-10 h-10 rounded-full bg-orange-50 items-center justify-center">
+              <View className="w-10 h-10 rounded-full bg-brand-50 items-center justify-center">
                 <Calendar size={18} color="#E65C00" />
               </View>
               <View className="flex-1">
-                <Text className="text-sm font-bold text-gray-900">{t('worker.leaveBalance')}</Text>
-                <Text className="text-xs text-gray-500">{t('worker.manageLeave')}</Text>
+                <Text className="text-sm font-bold text-ink-900">{t('worker.leaveBalance')}</Text>
+                <Text className="text-xs text-ink-500">{t('worker.manageLeave')}</Text>
               </View>
             </View>
             <ChevronRight size={18} color="#9CA3AF" />
@@ -329,7 +329,7 @@ export default function WorkerHome() {
       <Modal visible={showLateModal} transparent animationType="slide">
         <View className="flex-1 bg-black/50 justify-end">
           <View className="bg-white rounded-t-2xl p-6">
-            <Text className="text-lg font-bold text-gray-900 mb-2">{t('worker.lateReason')}</Text>
+            <Text className="text-lg font-bold text-ink-900 mb-2">{t('worker.lateReason')}</Text>
             <Input
               value={lateReason}
               onChangeText={setLateReason}

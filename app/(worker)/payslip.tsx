@@ -50,10 +50,10 @@ export default function PayslipScreen() {
   if (isLoading) return <LoadingScreen />
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
-        <Text className="text-xl font-bold text-gray-900 mb-4">
+        <Text className="text-xl font-bold text-ink-900 mb-4">
           {record ? t('worker.payslipMonth', { month: record.month }) : t('worker.payslipTitle')}
         </Text>
 
@@ -61,8 +61,8 @@ export default function PayslipScreen() {
           <>
             <Card className="mb-4">
               <View className="items-center py-4">
-                <Text className="text-3xl font-bold text-orange-600">₹{record.net_pay.toFixed(2)}</Text>
-                <Text className="text-sm text-gray-500">{t('worker.netPay')}</Text>
+                <Text className="text-3xl font-bold text-brand-600">₹{record.net_pay.toFixed(2)}</Text>
+                <Text className="text-sm text-ink-500">{t('worker.netPay')}</Text>
               </View>
             </Card>
 
@@ -73,7 +73,7 @@ export default function PayslipScreen() {
                 <Row label={t('worker.conveyance')} value={record.conveyance} />
                 <Row label={t('worker.special')} value={record.special_allowance} />
                 <Row label={t('worker.overtime')} value={record.overtime} />
-                <View className="border-t border-gray-200 pt-2 mt-2">
+                <View className="border-t border-ink-200 pt-2 mt-2">
                   <Row label={t('common.total')} value={record.basic + record.hra + record.conveyance + record.special_allowance + record.overtime} isTotal />
                 </View>
               </View>
@@ -86,7 +86,7 @@ export default function PayslipScreen() {
                 <Row label={t('worker.pt')} value={record.pt} />
                 <Row label={t('worker.advanceRecovery')} value={record.advance_recovery} />
                 <Row label={t('worker.tds')} value={record.tds} />
-                <View className="border-t border-gray-200 pt-2 mt-2">
+                <View className="border-t border-ink-200 pt-2 mt-2">
                   <Row label={t('common.total')} value={record.pf + record.esic + record.pt + record.advance_recovery + record.tds} isTotal />
                 </View>
               </View>
@@ -108,7 +108,7 @@ export default function PayslipScreen() {
         ) : (
           <Card className="items-center py-14">
             <FileText size={40} color="#D1D5DB" />
-            <Text className="text-sm text-gray-500 mt-3 text-center px-4">
+            <Text className="text-sm text-ink-500 mt-3 text-center px-4">
               {t('worker.payslipNotAvailable')}
             </Text>
           </Card>
@@ -121,8 +121,8 @@ export default function PayslipScreen() {
 function Row({ label, value, isTotal = false }: { label: string; value: number; isTotal?: boolean }) {
   return (
     <View className="flex-row justify-between">
-      <Text className={`text-sm ${isTotal ? 'font-bold text-gray-900' : 'text-gray-600'}`}>{label}</Text>
-      <Text className={`text-sm ${isTotal ? 'font-bold text-gray-900' : 'text-gray-900'}`}>₹{value.toFixed(2)}</Text>
+      <Text className={`text-sm ${isTotal ? 'font-bold text-ink-900' : 'text-ink-600'}`}>{label}</Text>
+      <Text className={`text-sm ${isTotal ? 'font-bold text-ink-900' : 'text-ink-900'}`}>₹{value.toFixed(2)}</Text>
     </View>
   )
 }

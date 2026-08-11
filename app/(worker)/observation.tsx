@@ -56,12 +56,12 @@ export default function ObservationScreen() {
   }
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
         <View className="flex-row items-start gap-2 mb-4 px-1">
           <AlertCircle size={16} color="#9CA3AF" style={{ marginTop: 1 }} />
-          <Text className="text-xs text-gray-500 flex-1">{t('worker.observationHint')}</Text>
+          <Text className="text-xs text-ink-500 flex-1">{t('worker.observationHint')}</Text>
         </View>
 
         <Card>
@@ -81,17 +81,17 @@ export default function ObservationScreen() {
             className="mb-4"
           />
 
-          <Text className="text-sm font-medium text-gray-700 mb-2">{t('worker.observationPhoto')}</Text>
+          <Text className="text-sm font-medium text-ink-700 mb-2">{t('worker.observationPhoto')}</Text>
           <TouchableOpacity
             onPress={takePhoto}
-            className="border-2 border-dashed border-gray-300 rounded-lg h-40 items-center justify-center mb-4"
+            className="border-2 border-dashed border-ink-300 rounded-lg h-40 items-center justify-center mb-4"
           >
             {photoUri ? (
               <Image source={{ uri: photoUri }} className="w-full h-full rounded-lg" />
             ) : (
               <View className="items-center">
                 <CameraIcon size={32} color="#9CA3AF" />
-                <Text className="text-sm text-gray-500 mt-2">{t('worker.takePhoto')}</Text>
+                <Text className="text-sm text-ink-500 mt-2">{t('worker.takePhoto')}</Text>
               </View>
             )}
           </TouchableOpacity>

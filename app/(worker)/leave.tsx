@@ -59,28 +59,28 @@ export default function WorkerLeave() {
   }
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
         <Card title={t('worker.leaveBalance')}>
           <View className="flex-row justify-between">
             <View className="items-center">
-              <Text className="text-2xl font-bold text-orange-600">{balance?.earned_leave || 0}</Text>
-              <Text className="text-xs text-gray-500">{t('worker.earnedLeave')}</Text>
+              <Text className="text-2xl font-bold text-brand-600">{balance?.earned_leave || 0}</Text>
+              <Text className="text-xs text-ink-500">{t('worker.earnedLeave')}</Text>
             </View>
             <View className="items-center">
-              <Text className="text-2xl font-bold text-orange-600">{balance?.casual_leave || 0}</Text>
-              <Text className="text-xs text-gray-500">{t('worker.casualLeave')}</Text>
+              <Text className="text-2xl font-bold text-brand-600">{balance?.casual_leave || 0}</Text>
+              <Text className="text-xs text-ink-500">{t('worker.casualLeave')}</Text>
             </View>
             <View className="items-center">
-              <Text className="text-2xl font-bold text-orange-600">{balance?.sick_leave || 0}</Text>
-              <Text className="text-xs text-gray-500">{t('worker.sickLeave')}</Text>
+              <Text className="text-2xl font-bold text-brand-600">{balance?.sick_leave || 0}</Text>
+              <Text className="text-xs text-ink-500">{t('worker.sickLeave')}</Text>
             </View>
           </View>
         </Card>
 
         <View className="mt-4 mb-2 flex-row justify-between items-center">
-          <Text className="text-lg font-bold text-gray-900">{t('worker.leaveRequests')}</Text>
+          <Text className="text-lg font-bold text-ink-900">{t('worker.leaveRequests')}</Text>
           <Button
             title="worker.applyLeave"
             onPress={() => setShowModal(true)}
@@ -93,18 +93,18 @@ export default function WorkerLeave() {
         {requests.length === 0 ? (
           <Card className="items-center py-10">
             <FileText size={32} color="#D1D5DB" />
-            <Text className="text-sm text-gray-500 mt-3">{t('worker.noLeaveRequests')}</Text>
+            <Text className="text-sm text-ink-500 mt-3">{t('worker.noLeaveRequests')}</Text>
           </Card>
         ) : (
           requests.map(req => (
             <Card key={req.id} className="mb-2">
               <View className="flex-row justify-between items-start">
                 <View className="flex-1 pr-2">
-                  <Text className="text-sm font-bold text-gray-900">{leaveTypeLabel(req.type)}</Text>
-                  <Text className="text-xs text-gray-500 mt-0.5">
+                  <Text className="text-sm font-bold text-ink-900">{leaveTypeLabel(req.type)}</Text>
+                  <Text className="text-xs text-ink-500 mt-0.5">
                     {req.start_date} {req.start_date !== req.end_date ? `– ${req.end_date}` : ''}
                   </Text>
-                  <Text className="text-xs text-gray-600 mt-1">{req.reason}</Text>
+                  <Text className="text-xs text-ink-600 mt-1">{req.reason}</Text>
                 </View>
                 <View className={`px-2 py-1 rounded-full ${statusColor(req.status)}`}>
                   <Text className="text-xs font-medium capitalize">{t(`common.${req.status}`)}</Text>
@@ -118,19 +118,19 @@ export default function WorkerLeave() {
       <Modal visible={showModal} transparent animationType="slide">
         <View className="flex-1 bg-black/50 justify-end">
           <View className="bg-white rounded-t-2xl p-6 max-h-[90%]">
-            <Text className="text-lg font-bold text-gray-900 mb-4">{t('worker.applyLeave')}</Text>
+            <Text className="text-lg font-bold text-ink-900 mb-4">{t('worker.applyLeave')}</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text className="text-sm font-medium text-gray-700 mb-2">{t('worker.leaveType')}</Text>
+              <Text className="text-sm font-medium text-ink-700 mb-2">{t('worker.leaveType')}</Text>
               <View className="flex-row flex-wrap gap-2 mb-4">
                 {LEAVE_TYPES.map(type => (
                   <TouchableOpacity
                     key={type.value}
                     onPress={() => setLeaveType(type.value)}
                     className={`px-3 py-2 rounded-lg border ${
-                      leaveType === type.value ? 'bg-orange-600 border-orange-600' : 'border-gray-300'
+                      leaveType === type.value ? 'bg-brand-600 border-brand-600' : 'border-ink-300'
                     }`}
                   >
-                    <Text className={`text-sm ${leaveType === type.value ? 'text-white' : 'text-gray-700'}`}>
+                    <Text className={`text-sm ${leaveType === type.value ? 'text-white' : 'text-ink-700'}`}>
                       {isHindi ? type.labelHi : type.label}
                     </Text>
                   </TouchableOpacity>
