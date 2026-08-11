@@ -41,6 +41,8 @@ jobs:
         # error — the Gradle build would still exit 0 and produce an APK,
         # just one that crashes on launch (the exact bug this workflow
         # change fixes). Fail loudly instead of shipping that silently.
+        # Confirmed this guard actually fires on a real missing secret:
+        # run 31447167307 failed here in 18s before the secret was added.
         run: |
           if [ -z "$EXPO_PUBLIC_SUPABASE_ANON_KEY" ]; then
             echo "::error::EXPO_PUBLIC_SUPABASE_ANON_KEY repo secret is not set (Settings > Secrets and variables > Actions > New repository secret). Value = the anon/publishable key for Supabase project odfwtdpvpfzdrznvurru (dashboard > Settings > API). Without it the APK builds successfully but crashes on launch."
