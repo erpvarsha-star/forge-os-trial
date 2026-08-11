@@ -8,8 +8,9 @@ import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { FiveSChallenge, FiveSSubmission } from '@/types'
-import { Camera } from 'expo-camera'
-import { Camera as CameraIcon, Upload, Trophy, CheckCircle } from 'lucide-react-native'
+import { PhotoCapture } from '@/components/PhotoCapture'
+import { uploadSubmissionPhoto } from '@/lib/photos'
+import { Upload, Trophy, CheckCircle, Clock } from 'lucide-react-native'
 import { TouchableOpacity } from 'react-native'
 
 export default function FiveSScreen() {
@@ -17,7 +18,9 @@ export default function FiveSScreen() {
   const { employee } = useAuth()
   const [challenge, setChallenge] = useState<FiveSChallenge | null>(null)
   const [submission, setSubmission] = useState<FiveSSubmission | null>(null)
-  const [photoUri, setPhotoUri] = useState<string | null>(null)
+  // Base64 is uploaded; the data URI is only for the on-screen preview.
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const isHindi = i18n.language === 'hi'
@@ -48,30 +51,36 @@ export default function FiveSScreen() {
     setIsLoading(false)
   }
 
-  const takePhoto = async () => {
-    const { status } = await Camera.requestCameraPermissionsAsync()
-    if (status !== 'granted') {
-      Alert.alert(t('common.error'), 'Camera permission required')
+  const handleSubmit = async () => {
+    if (!challenge || !photoBase64) return
+    setIsSubmitting(true)
+
+    // Upload before inserting: a 5S submission with no usable photo cannot be
+    // verified by a supervisor, so a failed upload must block the insert
+    // rather than create an unverifiable row.
+    const { path, error: uploadError } = await uploadSubmissionPhoto(employee!.id, photoBase64, '5s')
+    if (uploadError || !path) {
+      setIsSubmitting(false)
+      Alert.alert(t('common.error'), t('worker.photoUploadFailed'))
       return
     }
-    setPhotoUri('https://placeholder.com/5s-photo.jpg')
-  }
 
-  const handleSubmit = async () => {
-    if (!challenge || !photoUri) return
-    setIsSubmitting(true)
     const { error } = await supabase.from('5s_submissions').insert({
       employee_id: employee!.id,
       challenge_id: challenge.id,
-      photo_url: photoUri,
+      photo_url: path,
       status: 'pending',
       points_awarded: 0,
     })
     setIsSubmitting(false)
-    if (!error) {
-      Alert.alert(t('common.success'), t('worker.photoSubmitted'))
-      fetchChallenge()
+    if (error) {
+      Alert.alert(t('common.error'), t('common.somethingWentWrong'))
+      return
     }
+    Alert.alert(t('common.success'), t('worker.photoSubmitted'))
+    setPhotoBase64(null)
+    setPhotoPreview(null)
+    fetchChallenge()
   }
 
   if (!employee) return <LoadingScreen />
@@ -102,7 +111,7 @@ export default function FiveSScreen() {
                   {submission.status === 'approved' ? (
                     <CheckCircle size={20} className="text-green-600" />
                   ) : (
-                    <CameraIcon size={20} className="text-yellow-600" />
+                    <Clock size={20} className="text-yellow-600" />
                   )}
                   <Text className={`text-sm font-bold ${
                     submission.status === 'approved' ? 'text-green-600' : 'text-yellow-600'
@@ -117,24 +126,18 @@ export default function FiveSScreen() {
             ) : (
               <Card>
                 <Text className="text-sm font-medium text-ink-700 mb-2">{t('worker.5sSubmit')}</Text>
-                <TouchableOpacity
-                  onPress={takePhoto}
-                  className="border-2 border-dashed border-ink-300 rounded-lg h-48 items-center justify-center mb-4"
-                >
-                  {photoUri ? (
-                    <Image source={{ uri: photoUri }} className="w-full h-full rounded-lg" />
-                  ) : (
-                    <View className="items-center">
-                      <CameraIcon size={40} color="#9CA3AF" />
-                      <Text className="text-sm text-ink-500 mt-2">{t('worker.takePhoto')}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
+                <PhotoCapture
+                  previewUri={photoPreview}
+                  onCaptured={(base64) => {
+                    setPhotoBase64(base64)
+                    setPhotoPreview(`data:image/jpeg;base64,${base64}`)
+                  }}
+                />
                 <Button
                   title="common.submit"
                   onPress={handleSubmit}
                   loading={isSubmitting}
-                  disabled={!photoUri}
+                  disabled={!photoBase64}
                   icon={<Upload size={18} color="white" />}
                 />
               </Card>

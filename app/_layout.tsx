@@ -10,7 +10,9 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { BrandLogo } from '@/components/BrandLogo'
+import { UpdateBanner } from '@/components/UpdateBanner'
 import '@/i18n'
 
 // Kept short deliberately — this is a shift-floor app opened many times a
@@ -66,7 +68,11 @@ export default function RootLayout() {
   const [showReveal, setShowReveal] = useState(true)
 
   return (
-    <>
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      {/* Above the navigator so it reads as a system-level notice rather than
+          part of whichever screen happens to be showing. Renders nothing at
+          all unless a newer release actually exists. */}
+      <UpdateBanner />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(worker)" />
@@ -79,7 +85,7 @@ export default function RootLayout() {
       </Stack>
       <StatusBar style="dark" />
       {showReveal && <LaunchReveal onDone={() => setShowReveal(false)} />}
-    </>
+    </SafeAreaView>
   )
 }
 

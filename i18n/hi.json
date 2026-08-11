@@ -120,7 +120,9 @@
     "comingSoon": "जल्द आ रहा है",
     "sampleData": "नमूना डेटा",
     "notConnectedYet": "अभी लाइव डेटा से जुड़ा नहीं है",
-    "quality": "गुणवत्ता"
+    "quality": "गुणवत्ता",
+    "updateAvailable": "अपडेट उपलब्ध है",
+    "updateAvailableBody": "Forge OS का नया संस्करण इंस्टॉल के लिए तैयार है।"
   },
   "auth": {
     "loginTitle": "Forge OS में आपका स्वागत है",
@@ -259,7 +261,9 @@
     "observationAreaPlaceholder": "जैसे, मशीन #3, असेंबली लाइन A",
     "observationIssuePlaceholder": "समस्या का वर्णन करें...",
     "payslipTitle": "पेस्लिप",
-    "cameraPermissionRequired": "QR स्कैन करने के लिए कैमरा अनुमति आवश्यक है"
+    "cameraPermissionRequired": "QR स्कैन करने के लिए कैमरा अनुमति आवश्यक है",
+    "photoUploadFailed": "फोटो अपलोड नहीं हो सका। कनेक्शन जांचकर पुनः प्रयास करें।",
+    "observationSubmitted": "अवलोकन जमा हो गया"
   },
   "supervisor": {
     "teamStatus": "टीम की स्थिति",
@@ -341,7 +345,20 @@
     "reportTypeAttendance": "विभाग उपस्थिति रिपोर्ट",
     "reportTypeProduction": "उत्पादन सारांश",
     "reportTypeScore": "स्कोर वितरण",
-    "plannedReports": "योजनाबद्ध रिपोर्ट"
+    "plannedReports": "योजनाबद्ध रिपोर्ट",
+    "halfDay": "आधा दिन",
+    "thisMonthLabel": "इस माह",
+    "lateInstances": "देरी से आगमन",
+    "openObservations": "खुली समस्याएँ",
+    "attendanceTrend": "उपस्थिति रुझान",
+    "attendanceTrendHint": "पिछले 10 कार्यदिवसों में उपस्थिति %",
+    "attendanceBreakdown": "उपस्थिति विवरण",
+    "topPerformers": "शीर्ष प्रदर्शनकर्ता",
+    "topPerformersHint": "इस माह के संयुक्त स्कोर अनुसार",
+    "noScoresYet": "अभी कोई स्कोर नहीं",
+    "noScoresYetBody": "स्कोर हर रात गणना होते हैं। कल देखें।",
+    "noDeptEmployees": "आपके विभाग में कोई कर्मचारी नहीं",
+    "noDeptEmployeesBody": "यदि यह गलत लगे तो HR से संपर्क करें।"
   },
   "plantHead": {
     "plantAttendance": "प्लांट-वाइड उपस्थिति",
@@ -424,7 +441,18 @@
     "noOpenAlerts": "कोई खुला धोखाधड़ी अलर्ट नहीं",
     "noEscalations": "आपके अनुमोदन हेतु कुछ भी लंबित नहीं",
     "kpiDataNote": "नमूना डेटा दिखाया गया है — उत्पादन KPI फ़ीड अभी जुड़ा नहीं है",
-    "openAlerts": "खुले अलर्ट"
+    "openAlerts": "खुले अलर्ट",
+    "plantWide": "संपूर्ण प्लांट",
+    "attendanceToday": "आज की उपस्थिति",
+    "activeEmployees": "सक्रिय कर्मचारी",
+    "openFraudAlerts": "खुले अलर्ट",
+    "departmentsTracked": "विभाग",
+    "attendanceTrendTitle": "उपस्थिति रुझान",
+    "attendanceTrendHint": "मासिक उपस्थिति %, पिछले 6 माह",
+    "noAttendanceData": "अभी कोई उपस्थिति दर्ज नहीं",
+    "noAttendanceDataBody": "कर्मचारियों के चेक-इन करते ही यह चार्ट भर जाएगा।",
+    "deptScoreTitle": "विभाग अनुसार औसत स्कोर",
+    "deptScoreHint": "संयुक्त स्कोर, इस वर्ष"
   },
   "security": {
     "vehicleLog": "वाहन लॉग",

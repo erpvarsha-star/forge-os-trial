@@ -17,25 +17,58 @@
  * covered by the monthly composite score in the source document and are
  * skipped here.
  *
- * NOTE: per-employee KPI *actuals* aren't modeled as their own table yet
- * (only `role_kpis` target/weightage definitions exist) — kpi_score uses
- * task-completion rate as an interim proxy until a dedicated kpi_actuals
- * table and capture flow exist. Everything else is computed directly from
- * operational tables.
+ * ---------------------------------------------------------------------------
+ * REWRITTEN 11 Aug 2026 — this function previously queried three tables that
+ * do not exist in the deployed schema (`tasks`, `hourly_production`,
+ * `shift_reports`). Supabase returns an error rather than throwing, the code
+ * defaulted each to an empty array, and the result was that roughly half of
+ * every composite score was silently computed as zero for all 129 employees.
+ *
+ * Each component now reads a table that actually exists:
+ *   task        <- maintenance_observations (what supervisor/tasks.tsx treats
+ *                  as the task list already)
+ *   teamControl <- data_collection_submissions (FINAL_SCHEMA labels this
+ *                  "(shift reports)"; it carries supervisor_id + date, so the
+ *                  swap is 1:1 with the old shift_reports query)
+ *   kpi         <- mrm_reviews for supervisor/manager (department-level, the
+ *                  only real KPI actuals captured anywhere), falling back to
+ *                  the task ratio for members, who have no MRM row
+ *   production  <- REMOVED. No per-employee production data is captured
+ *                  anywhere in the system, so this could never be anything but
+ *                  zero. Its weight is redistributed across attendance/ontime/
+ *                  task rather than left as dead weight that silently caps
+ *                  everyone's achievable score. `production_score` is still
+ *                  written as 0 so worker/score.tsx and types/index.ts keep
+ *                  working untouched.
+ *
+ * Also now persists `five_s_score` and `safety_score`. owner/eotm.tsx ranks
+ * two of its four Employee-of-the-Month categories on those columns, but
+ * nothing had ever written them — every row sat at the default 0, so those two
+ * winners were whichever row happened to sort first. They are real values now.
  */
 
 import { handleOptions, jsonResponse } from '../_shared/cors.ts';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
 
+// Every row must total 100 before brownie points; asserted at boot below.
 const SCORE_WEIGHTS: Record<
   'member' | 'operator' | 'supervisor' | 'manager',
-  { attendance: number; ontime: number; task: number; kpi: number; production: number; teamControl: number }
+  { attendance: number; ontime: number; task: number; kpi: number; teamControl: number }
 > = {
-  member: { attendance: 30, ontime: 10, task: 20, kpi: 20, production: 20, teamControl: 0 },
-  operator: { attendance: 20, ontime: 10, task: 10, kpi: 20, production: 30, teamControl: 10 },
-  supervisor: { attendance: 25, ontime: 10, task: 25, kpi: 30, production: 0, teamControl: 10 },
-  manager: { attendance: 20, ontime: 10, task: 25, kpi: 35, production: 0, teamControl: 10 },
+  member: { attendance: 40, ontime: 15, task: 25, kpi: 20, teamControl: 0 },
+  operator: { attendance: 35, ontime: 15, task: 20, kpi: 20, teamControl: 10 },
+  supervisor: { attendance: 25, ontime: 10, task: 25, kpi: 30, teamControl: 10 },
+  manager: { attendance: 20, ontime: 10, task: 25, kpi: 35, teamControl: 10 },
 };
+
+// A mis-summed weight row silently rescales everyone in that category, which
+// is invisible in the output — fail loudly at module load instead.
+for (const [category, w] of Object.entries(SCORE_WEIGHTS)) {
+  const total = w.attendance + w.ontime + w.task + w.kpi + w.teamControl;
+  if (total !== 100) {
+    throw new Error(`SCORE_WEIGHTS.${category} sums to ${total}, expected 100`);
+  }
+}
 
 const MAX_BROWNIE_POINTS = 10;
 
@@ -76,7 +109,10 @@ async function computeAttendanceAndOnTime(
 
   const all = rows ?? [];
   const workingDayRows = all.filter((r: { status: string }) => !['H', 'WO'].includes(r.status));
-  const presentRows = workingDayRows.filter((r: { status: string }) => ['P', 'OT', 'LC'].includes(r.status));
+  // 'P' and 'HL' are the only present-at-work statuses. The previous version
+  // also matched 'OT' and 'LC', which the attendance_records.status CHECK
+  // constraint forbids — they could never appear, so those were dead branches.
+  const presentRows = workingDayRows.filter((r: { status: string }) => ['P', 'HL'].includes(r.status));
   const onTimeRows = presentRows.filter((r: { late_minutes: number }) => (r.late_minutes ?? 0) === 0);
 
   const attendanceRatio = workingDayRows.length > 0 ? presentRows.length / workingDayRows.length : 0;
@@ -86,50 +122,114 @@ async function computeAttendanceAndOnTime(
   return { attendanceRatio, onTimeRatio, lcCount, presentDays: presentRows.length };
 }
 
+/**
+ * Task completion, sourced from maintenance_observations — the only per-employee
+ * work-item table that exists, and the one supervisor/tasks.tsx already presents
+ * as the task list.
+ *
+ * maintenance_observations has no `points` or `due_date`, so this is a plain
+ * resolved/raised ratio rather than the old points-weighted one. Raising nothing
+ * scores neutral full credit (as before): most employees are not expected to
+ * file observations, and penalising them for that would make the score mostly a
+ * measure of how often someone reports problems.
+ */
 async function computeTaskRatio(db: ReturnType<typeof supabaseAdmin>, employeeId: string, start: string, end: string) {
   const { data: rows } = await db
-    .from('tasks')
-    .select('status, points, due_date, completed_at')
-    .eq('assigned_to', employeeId)
-    .gte('due_date', start)
-    .lte('due_date', end);
+    .from('maintenance_observations')
+    .select('status')
+    .eq('employee_id', employeeId)
+    .gte('created_at', `${start}T00:00:00Z`)
+    .lte('created_at', `${end}T23:59:59Z`);
 
   const all = rows ?? [];
-  if (all.length === 0) return { ratio: 1, onTimeAll: true, total: 0 }; // no tasks due = neutral full credit
+  if (all.length === 0) return { ratio: 1, onTimeAll: true, total: 0 };
 
-  const totalPoints = all.reduce((s: number, t: { points: number }) => s + (t.points ?? 0), 0);
-  const donePoints = all
-    .filter((t: { status: string }) => t.status === 'done')
-    .reduce((s: number, t: { points: number }) => s + (t.points ?? 0), 0);
+  const resolved = all.filter((o: { status: string }) => o.status === 'resolved').length;
 
-  const onTimeAll = all.every(
-    (t: { status: string; due_date: string; completed_at: string | null }) =>
-      t.status === 'done' && t.completed_at !== null && t.completed_at.slice(0, 10) <= t.due_date
-  );
-
-  return { ratio: totalPoints > 0 ? donePoints / totalPoints : 1, onTimeAll, total: all.length };
+  return {
+    ratio: resolved / all.length,
+    // No due dates exist on observations, so "on time" degrades to "everything
+    // raised this month was seen through to resolved".
+    onTimeAll: resolved === all.length,
+    total: all.length,
+  };
 }
 
-async function computeProductionScore(db: ReturnType<typeof supabaseAdmin>, employeeId: string, start: string, end: string) {
+/**
+ * KPI actuals. mrm_reviews is the only place real KPI numbers are captured, and
+ * it is department-level and manager-submitted (see app/(manager)/mrm.tsx,
+ * whose inputs are 0-100).
+ *
+ * Members have no MRM row of their own, so they fall back to the task ratio.
+ * That fallback is what the whole function used to do for everyone, via a bare
+ * `kpiRatio = taskRatio`, which meant task performance was silently counted
+ * twice for every role.
+ */
+async function computeKpiRatio(
+  db: ReturnType<typeof supabaseAdmin>,
+  category: ScoreCategory,
+  department: string | null,
+  monthStr: string,
+  year: number,
+  taskRatio: number
+): Promise<number> {
+  if ((category !== 'supervisor' && category !== 'manager') || !department) return taskRatio;
+
+  const { data: review } = await db
+    .from('mrm_reviews')
+    .select('safety_score, quality_score, delivery_score, cost_score, morale_score')
+    .eq('department', department)
+    .eq('month', monthStr)
+    .eq('year', year)
+    .maybeSingle();
+
+  // No review submitted yet this month — fall back rather than score a zero
+  // the employee has no way to influence.
+  if (!review) return taskRatio;
+
+  const parts = [
+    review.safety_score,
+    review.quality_score,
+    review.delivery_score,
+    review.cost_score,
+    review.morale_score,
+  ].map((v: number | null) => Number(v ?? 0));
+
+  const avg = parts.reduce((s, v) => s + v, 0) / parts.length;
+  return Math.max(0, Math.min(1, avg / 100));
+}
+
+/**
+ * 5S participation, written to monthly_scores.five_s_score.
+ * Raw approved-point total: owner/eotm.tsx ranks on this column descending, so
+ * an absolute total is what that screen needs.
+ */
+async function computeFiveSScore(db: ReturnType<typeof supabaseAdmin>, employeeId: string, start: string, end: string) {
   const { data: rows } = await db
-    .from('hourly_production')
-    .select('efficiency_pct')
+    .from('5s_submissions')
+    .select('points_awarded')
     .eq('employee_id', employeeId)
-    .gte('shift_date', start)
-    .lte('shift_date', end)
-    .not('efficiency_pct', 'is', null);
+    .eq('status', 'approved')
+    .gte('created_at', `${start}T00:00:00Z`)
+    .lte('created_at', `${end}T23:59:59Z`);
 
-  const effs = (rows ?? []).map((r: { efficiency_pct: number }) => r.efficiency_pct);
-  if (effs.length === 0) return { ratio: 0, avgEfficiency: null as number | null, incentiveFlag: false };
+  return (rows ?? []).reduce((s: number, r: { points_awarded: number }) => s + Number(r.points_awarded ?? 0), 0);
+}
 
-  const avg = effs.reduce((s: number, e: number) => s + e, 0) / effs.length;
-  let ratio: number;
-  if (avg >= 100) ratio = 1;
-  else if (avg >= 90) ratio = 1;
-  else if (avg >= 80) ratio = 0.8;
-  else ratio = 0.5; // below 80% = alert band; partial credit, not zero
+/**
+ * Safety, written to monthly_scores.safety_score. 100 clean, each fraud flag
+ * costs 20, floored at 0 — so eotm.tsx's safety category ranks on something
+ * real instead of a table of zeroes.
+ */
+async function computeSafetyScore(db: ReturnType<typeof supabaseAdmin>, employeeId: string, start: string, end: string) {
+  const { count } = await db
+    .from('fraud_flags')
+    .select('id', { count: 'exact', head: true })
+    .eq('employee_id', employeeId)
+    .gte('created_at', `${start}T00:00:00Z`)
+    .lte('created_at', `${end}T23:59:59Z`);
 
-  return { ratio, avgEfficiency: avg, incentiveFlag: avg > 100 };
+  return Math.max(0, 100 - (count ?? 0) * 20);
 }
 
 async function computeTeamControlScore(
@@ -140,12 +240,16 @@ async function computeTeamControlScore(
   end: string,
   workingDays: number
 ) {
+  // data_collection_submissions is the real shift-report table (FINAL_SCHEMA
+  // annotates it "(shift reports)"), and is what supervisor/shift-report.tsx
+  // writes. Same supervisor_id + date shape as the old non-existent
+  // `shift_reports` query, so this is a direct swap.
   const { count: reportCount } = await db
-    .from('shift_reports')
+    .from('data_collection_submissions')
     .select('id', { count: 'exact', head: true })
     .eq('supervisor_id', employeeId)
-    .gte('shift_date', start)
-    .lte('shift_date', end);
+    .gte('date', start)
+    .lte('date', end);
 
   const reportRatio = workingDays > 0 ? Math.min(1, (reportCount ?? 0) / workingDays) : 0;
 
@@ -179,7 +283,8 @@ async function computeAttendanceStreakBadge(db: ReturnType<typeof supabaseAdmin>
 
   let streak = 0;
   for (const row of rows ?? []) {
-    if (['P', 'OT'].includes(row.status)) streak += 1;
+    // 'OT' is not a permitted attendance_records.status value; 'P'/'HL' are.
+    if (['P', 'HL'].includes(row.status)) streak += 1;
     else if (['H', 'WO'].includes(row.status)) continue; // doesn't break streak
     else break;
   }
@@ -246,32 +351,33 @@ Deno.serve(async (req: Request) => {
     if (error) return jsonResponse({ error: error.message }, 500);
 
     const scored: Array<{ employeeId: string; category: ScoreCategory; compositeScore: number }> = [];
+    const monthStr = String(month).padStart(2, '0');
 
     for (const employee of employees ?? []) {
       const category = await scoreCategoryFor(db, employee);
       if (!category) continue;
 
       const weights = SCORE_WEIGHTS[category];
+
       const { attendanceRatio, onTimeRatio, lcCount, presentDays } = await computeAttendanceAndOnTime(db, employee.id, start, end);
       const { ratio: taskRatio, onTimeAll, total: taskTotal } = await computeTaskRatio(db, employee.id, start, end);
-      const { ratio: productionRatio, avgEfficiency, incentiveFlag } = await computeProductionScore(db, employee.id, start, end);
+      const kpiRatio = await computeKpiRatio(db, category, employee.department, monthStr, year, taskRatio);
       const teamControlRatio =
         weights.teamControl > 0
           ? await computeTeamControlScore(db, employee.id, employee.department, start, end, presentDays || daysInMonth)
           : 0;
 
-      // Interim KPI proxy — see module docstring.
-      const kpiRatio = taskRatio;
+      const fiveSScore = await computeFiveSScore(db, employee.id, start, end);
+      const safetyScore = await computeSafetyScore(db, employee.id, start, end);
 
       const attendanceScore = attendanceRatio * weights.attendance;
       const ontimeScore = onTimeRatio * weights.ontime;
       const taskScore = taskRatio * weights.task;
       const kpiScore = kpiRatio * weights.kpi;
-      const productionScore = productionRatio * weights.production;
       const teamControlScore = teamControlRatio * weights.teamControl;
 
       const brownie = computeBrownie({ lcCount, onTimeAll, taskTotal });
-      const composite = attendanceScore + ontimeScore + taskScore + kpiScore + productionScore + teamControlScore + brownie;
+      const composite = attendanceScore + ontimeScore + taskScore + kpiScore + teamControlScore + brownie;
 
       const { badge, streak } = await computeAttendanceStreakBadge(db, employee.id, end);
 
@@ -282,11 +388,11 @@ Deno.serve(async (req: Request) => {
         ontimeScore: Math.round(ontimeScore),
         taskScore: Math.round(taskScore),
         kpiScore: Math.round(kpiScore),
-        productionScore: Math.round(productionScore),
         teamControlScore: Math.round(teamControlScore),
+        fiveSScore,
+        safetyScore,
         brownie,
         compositeScore: Math.round(composite),
-        avgEfficiency,
         attendanceStreakDays: streak,
       });
 
@@ -299,7 +405,12 @@ Deno.serve(async (req: Request) => {
           on_time_score: round2(ontimeScore),
           task_completion_score: round2(taskScore),
           kpi_score: round2(kpiScore),
-          production_score: round2(productionScore),
+          // Always 0 — no per-employee production data is captured anywhere.
+          // The column is still written so worker/score.tsx (which renders it
+          // for operators) and types/index.ts keep working unchanged.
+          production_score: 0,
+          five_s_score: round2(fiveSScore),
+          safety_score: round2(safetyScore),
           brownie_points: brownie,
           composite_score: round2(composite),
           eotm_badge: badge,
@@ -307,22 +418,12 @@ Deno.serve(async (req: Request) => {
         { onConflict: 'employee_id,year,month' }
       );
 
-      if (incentiveFlag) {
-        await db.from('notifications').insert({
-          user_id: employee.id,
-          type: 'production_incentive_flag',
-          title: 'Incentive flag',
-          body: `Your production efficiency this period is above 100% — flagged for incentive review.`,
-        });
-      }
-
       scored.push({ employeeId: employee.id, category, compositeScore: composite });
     }
 
     // Employee-of-the-Month ranking, per category (Section 2/Module 3).
     // Top scorer per category gets eotm_badge='gold'; top-3 get 'bronze'.
     const scoreCategories: ScoreCategory[] = ['member', 'operator', 'supervisor', 'manager'];
-    const monthStr = String(month).padStart(2, '0');
     for (const category of scoreCategories) {
       const group = scored.filter((s) => s.category === category).sort((a, b) => b.compositeScore - a.compositeScore);
       for (let i = 0; i < group.length; i++) {

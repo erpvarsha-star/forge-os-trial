@@ -8,30 +8,21 @@ import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
-import { Camera } from 'expo-camera'
-import { Camera as CameraIcon, Upload, AlertCircle } from 'lucide-react-native'
-import { TouchableOpacity } from 'react-native'
+import { PhotoCapture } from '@/components/PhotoCapture'
+import { uploadSubmissionPhoto } from '@/lib/photos'
+import { Upload, AlertCircle } from 'lucide-react-native'
 
 export default function ObservationScreen() {
   const { t } = useTranslation()
   const { employee } = useAuth()
   const [area, setArea] = useState('')
   const [issue, setIssue] = useState('')
-  const [photoUri, setPhotoUri] = useState<string | null>(null)
+  // Base64 is what gets uploaded; the local file URI is only for the preview.
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   if (!employee) return <LoadingScreen />
-
-  const takePhoto = async () => {
-    const { status } = await Camera.requestCameraPermissionsAsync()
-    if (status !== 'granted') {
-      Alert.alert(t('common.error'), 'Camera permission required')
-      return
-    }
-    // In real implementation, use Camera component
-    // For now, simulate
-    setPhotoUri('https://placeholder.com/photo.jpg')
-  }
 
   const handleSubmit = async () => {
     if (!area || !issue) {
@@ -39,20 +30,37 @@ export default function ObservationScreen() {
       return
     }
     setIsSubmitting(true)
+
+    // Upload first: a failed upload must not silently produce an observation
+    // with no photo attached when the user believes they attached one.
+    let storedPath: string | null = null
+    if (photoBase64) {
+      const { path, error: uploadError } = await uploadSubmissionPhoto(employee.id, photoBase64, 'obs')
+      if (uploadError) {
+        setIsSubmitting(false)
+        Alert.alert(t('common.error'), t('worker.photoUploadFailed'))
+        return
+      }
+      storedPath = path
+    }
+
     const { error } = await supabase.from('maintenance_observations').insert({
       employee_id: employee.id,
       area,
       issue_description: issue,
-      photo_url: photoUri,
+      photo_url: storedPath,
       status: 'open',
     })
     setIsSubmitting(false)
-    if (!error) {
-      Alert.alert(t('common.success'), 'Observation submitted')
-      setArea('')
-      setIssue('')
-      setPhotoUri(null)
+    if (error) {
+      Alert.alert(t('common.error'), t('common.somethingWentWrong'))
+      return
     }
+    Alert.alert(t('common.success'), t('worker.observationSubmitted'))
+    setArea('')
+    setIssue('')
+    setPhotoBase64(null)
+    setPhotoPreview(null)
   }
 
   return (
@@ -82,19 +90,13 @@ export default function ObservationScreen() {
           />
 
           <Text className="text-sm font-medium text-ink-700 mb-2">{t('worker.observationPhoto')}</Text>
-          <TouchableOpacity
-            onPress={takePhoto}
-            className="border-2 border-dashed border-ink-300 rounded-lg h-40 items-center justify-center mb-4"
-          >
-            {photoUri ? (
-              <Image source={{ uri: photoUri }} className="w-full h-full rounded-lg" />
-            ) : (
-              <View className="items-center">
-                <CameraIcon size={32} color="#9CA3AF" />
-                <Text className="text-sm text-ink-500 mt-2">{t('worker.takePhoto')}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          <PhotoCapture
+            previewUri={photoPreview}
+            onCaptured={(base64) => {
+              setPhotoBase64(base64)
+              setPhotoPreview(`data:image/jpeg;base64,${base64}`)
+            }}
+          />
 
           <Button
             title="common.submit"

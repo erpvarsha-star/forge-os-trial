@@ -146,7 +146,10 @@ QR salt: PATCH_06 has a commented-out UPDATE — Yash must generate his own secr
 | `PATCH_10_pin_auth_11Aug2026.sql` | PIN auth: provisions a Supabase auth user per active employee (synthetic `<empcode>@forgeos.local` email, PIN as password), links `auth_user_id`, adds `must_change_pin`, adds `resolve_login_identifier()` + `mark_pin_changed()` | ✅ Applied 11 Aug — sign-in confirmed working |
 | `PATCH_11_rls_recursion_fix_11Aug2026.sql` | Marks `current_employee_id()`, `get_current_employee_role()`, `is_management()` as SECURITY DEFINER. Without this, selecting from `employees` recurses into its own RLS policy and dies with "stack depth limit exceeded", so login succeeds but the employee row never loads | ⏳ Not yet run — included in the combined file below |
 | `PATCH_12_rls_hardening_11Aug2026.sql` | Closes the 7 open RLS holes from "Known RLS issues": employees INSERT was trivially true for any signed-in user (privilege escalation), notifications INSERT was `check (true)`, fraud_alerts/fraud_flags INSERT unscoped, attendance_records + leave_requests + advance_requests not scoped to a supervisor's own team, mrm_reviews readable by everyone. Adds the missing notifications UPDATE so the bell can be cleared | ⏳ Not yet run — included in the combined file below |
-| `COMBINED_DEPLOY_11to12_11Aug2026.sql` | **⚡ THE ONLY FILE TO RUN ⚡** — PATCH_11 + PATCH_12 concatenated (generated, cannot drift). Idempotent | ⏳ **RUN THIS ONE** |
+| `COMBINED_DEPLOY_11to12_11Aug2026.sql` | PATCH_11 + PATCH_12 concatenated (generated, cannot drift). Idempotent | ✅ Ran 11 Aug — confirmed by Yash |
+| `PATCH_13_photo_storage_11Aug2026.sql` | Creates the private `submission-photos` Storage bucket + RLS so 5S/maintenance photos have somewhere to go. There was no bucket in the project at all; the camera screens wrote a hardcoded placeholder.com URL | ⏳ Not yet run — in the combined file below |
+| `COMBINED_DEPLOY_13_11Aug2026.sql` | **⚡ THE ONLY FILE TO RUN ⚡** — PATCH_13. Run BEFORE installing the new APK or photo upload fails | ⏳ **RUN THIS ONE** |
+| `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee | ♾️ On demand |
 
 **Total employees confirmed live: 129** (120 original + 4 PATCH_08 + 5 PATCH_09).
 
@@ -276,7 +279,7 @@ app/
 
 ## Pending from Yash (owner)
 
-0. **⚠ RUN `COMBINED_DEPLOY_11to12_11Aug2026.sql` IN THE SUPABASE SQL EDITOR — this single file is everything outstanding.** PATCH_10 is applied and sign-in works, but the post-login employee lookup hits infinite RLS recursion (PATCH_11 fixes it, login dead-ends without it) and the 7 known RLS holes are now reachable by 129 real authenticated users (PATCH_12 closes them). Do not run PATCH_10 again.
+0. **⚠ RUN `COMBINED_DEPLOY_13_11Aug2026.sql` IN THE SUPABASE SQL EDITOR, BEFORE installing the next APK.** It creates the photo-storage bucket the newly-wired camera uploads to; without it, 5S and maintenance photo submission fails. PATCH_10 and COMBINED_DEPLOY_11to12 are already applied — do not re-run them.
 
 1. **Worker → supervisor mapping** — CLOSED 10 Aug (Yash: "that will happen in the app") — this is an in-app assignment flow, not a DB patch task
 2. **Rotating supervisor update** — CLOSED 10 Aug (Yash: rotations are decided every Friday by HR/IR, cannot be provided in advance) — the weekly `supervisor_id` UPDATE is HR/IR's own task going forward, not tracked here

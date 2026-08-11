@@ -83,6 +83,22 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Stamp build number into app.json
+        # UpdateBanner compares the installed versionCode against the numeric
+        # part of the latest GitHub release tag (apk-<run number>). Both must
+        # come from the same counter or the banner either never fires or fires
+        # on every launch. Done before prebuild so it lands in the manifest.
+        run: |
+          node -e "
+            const fs = require('fs');
+            const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+            app.expo.android.versionCode = Number(process.env.RUN_NUMBER);
+            fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
+            console.log('versionCode set to', app.expo.android.versionCode);
+          "
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+
       - name: Prebuild native Android project
         run: npx expo prebuild --platform android --no-install
 

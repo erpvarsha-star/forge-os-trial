@@ -22,6 +22,8 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.vfpl.forgeos",
+      "_comment_versionCode": "Overwritten by .github/workflows/build-apk.yml with the CI run number, so the installed build number matches the apk-<n> release tag. components/UpdateBanner.tsx compares the two to decide whether a newer APK exists; leaving this at a static 1 would make every build look out of date.",
+      "versionCode": 1,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",

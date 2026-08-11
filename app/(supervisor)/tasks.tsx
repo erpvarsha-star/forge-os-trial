@@ -8,6 +8,7 @@ import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { MaintenanceObservation } from '@/types'
+import { SignedImage } from '@/components/SignedImage'
 import { CheckSquare, ClipboardList, Users, Wrench, ClipboardCheck } from 'lucide-react-native'
 import { router } from 'expo-router'
 import { BRAND, INK } from '@/components/theme'
@@ -87,6 +88,10 @@ export default function SupervisorTasks() {
                   </View>
                 </View>
               </View>
+              {/* The reporter's photo was captured and stored but never shown
+                  anywhere — a supervisor deciding whether to action a fault
+                  should be able to see it. */}
+              {!!task.photo_url && <SignedImage path={task.photo_url} className="w-full h-40 rounded-lg mt-3" />}
               <Button title="supervisor.markComplete" onPress={() => markComplete(task.id)} variant="outline" size="sm" icon={<CheckSquare size={14} color={BRAND[600]} />} className="mt-3 self-start" />
             </Card>
           ))

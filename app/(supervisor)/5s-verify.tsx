@@ -9,6 +9,7 @@ import { Input } from '@/components/Input'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { FiveSSubmission } from '@/types'
+import { SignedImage } from '@/components/SignedImage'
 import { CheckCircle, XCircle, ImageOff } from 'lucide-react-native'
 import { INK } from '@/components/theme'
 
@@ -63,7 +64,7 @@ export default function FiveSVerifyScreen() {
         ) : (
           submissions.map(sub => (
             <Card key={sub.id} className="mb-4">
-              <Image source={{ uri: sub.photo_url }} className="w-full h-48 rounded-lg mb-3" resizeMode="cover" />
+              <SignedImage path={sub.photo_url} className="w-full h-48 rounded-lg mb-3" />
               <Text className="text-sm font-semibold text-ink-900 mb-3">{sub.employee?.name} <Text className="font-mono text-ink-500 text-xs">({sub.employee?.emp_code})</Text></Text>
               <Input label={t('supervisor.pointsToAward')} value={points[sub.id] || ''} onChangeText={v => setPoints(p => ({ ...p, [sub.id]: v }))} keyboardType="numeric" className="mb-3" />
               <View className="flex-row gap-2">

@@ -120,7 +120,9 @@
     "comingSoon": "Coming Soon",
     "sampleData": "Sample data",
     "notConnectedYet": "Not yet connected to live data",
-    "quality": "Quality"
+    "quality": "Quality",
+    "updateAvailable": "Update available",
+    "updateAvailableBody": "A newer version of Forge OS is ready to install."
   },
   "auth": {
     "loginTitle": "Welcome to Forge OS",
@@ -259,7 +261,9 @@
     "observationAreaPlaceholder": "e.g., Machine #3, Assembly Line A",
     "observationIssuePlaceholder": "Describe the issue...",
     "payslipTitle": "Payslip",
-    "cameraPermissionRequired": "Camera permission is required for QR scanning"
+    "cameraPermissionRequired": "Camera permission is required for QR scanning",
+    "photoUploadFailed": "Photo upload failed. Check your connection and try again.",
+    "observationSubmitted": "Observation submitted"
   },
   "supervisor": {
     "teamStatus": "Team Status",
@@ -341,7 +345,20 @@
     "reportTypeAttendance": "Department Attendance Report",
     "reportTypeProduction": "Production Summary",
     "reportTypeScore": "Score Distribution",
-    "plannedReports": "Planned Reports"
+    "plannedReports": "Planned Reports",
+    "halfDay": "Half Day",
+    "thisMonthLabel": "This month",
+    "lateInstances": "Late Arrivals",
+    "openObservations": "Open Issues",
+    "attendanceTrend": "Attendance Trend",
+    "attendanceTrendHint": "Present % on the last 10 recorded working days",
+    "attendanceBreakdown": "Attendance Breakdown",
+    "topPerformers": "Top Performers",
+    "topPerformersHint": "By composite score this month",
+    "noScoresYet": "No scores yet",
+    "noScoresYetBody": "Scores are calculated nightly. Check back tomorrow.",
+    "noDeptEmployees": "No employees in your department",
+    "noDeptEmployeesBody": "Contact HR if this looks wrong."
   },
   "plantHead": {
     "plantAttendance": "Plant-Wide Attendance",
@@ -424,7 +441,18 @@
     "noOpenAlerts": "No open fraud alerts",
     "noEscalations": "Nothing awaiting your approval",
     "kpiDataNote": "Sample data shown — production KPI feed is not connected yet",
-    "openAlerts": "Open Alerts"
+    "openAlerts": "Open Alerts",
+    "plantWide": "Plant-wide",
+    "attendanceToday": "Attendance Today",
+    "activeEmployees": "Active Employees",
+    "openFraudAlerts": "Open Alerts",
+    "departmentsTracked": "Departments",
+    "attendanceTrendTitle": "Attendance Trend",
+    "attendanceTrendHint": "Monthly present %, last 6 months",
+    "noAttendanceData": "No attendance recorded yet",
+    "noAttendanceDataBody": "This chart fills in as employees check in.",
+    "deptScoreTitle": "Average Score by Department",
+    "deptScoreHint": "Composite score, this year"
   },
   "security": {
     "vehicleLog": "Vehicle Log",
