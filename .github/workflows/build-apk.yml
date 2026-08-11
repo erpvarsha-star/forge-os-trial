@@ -47,6 +47,7 @@ jobs:
       # login screen shows the literal fallback string "Your Company"
       # instead of the real company name.
       EXPO_PUBLIC_COMPANY_NAME: Varsha Forgings Pvt Ltd
+      # Confirmed spelling matches CLAUDE.md's header and .env exactly.
     steps:
       - uses: actions/checkout@v4
 
