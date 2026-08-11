@@ -7,6 +7,7 @@ import { Header } from '@/components/Header'
 import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
+import { UpdateAppLink } from '@/components/UpdateAppLink'
 import { removePushToken } from '@/lib/notifications'
 import { LogOut, Globe, Shield } from 'lucide-react-native'
 import { TouchableOpacity } from 'react-native'
@@ -31,6 +32,7 @@ export default function PlantHeadMore() {
           <View className="flex-row items-center gap-3"><Globe size={20} color="#E65C00" /><Text className="text-base text-gray-900">{t('common.language')}</Text></View>
           <Text className="text-sm text-gray-500">{language === 'hi' ? 'हिंदी' : 'English'}</Text>
         </TouchableOpacity>
+        <UpdateAppLink />
         <Button title="common.logout" onPress={handleLogout} variant="danger" size="lg" className="mt-4" icon={<LogOut size={20} color="white" />} />
       </ScrollView>
     </View>

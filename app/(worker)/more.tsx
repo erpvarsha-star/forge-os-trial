@@ -7,6 +7,7 @@ import { Header } from '@/components/Header'
 import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
+import { UpdateAppLink } from '@/components/UpdateAppLink'
 import { removePushToken } from '@/lib/notifications'
 import { router } from 'expo-router'
 import {
@@ -69,6 +70,8 @@ export default function WorkerMore() {
             </View>
           </TouchableOpacity>
         ))}
+
+        <UpdateAppLink />
 
         <Button
           title="common.logout"
