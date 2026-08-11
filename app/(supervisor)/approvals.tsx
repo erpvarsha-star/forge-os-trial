@@ -19,6 +19,11 @@ export default function SupervisorApprovals() {
   const [isLoading, setIsLoading] = useState(true)
   const [rejectionReason, setRejectionReason] = useState('')
   const [rejectingId, setRejectingId] = useState<string | null>(null)
+  // Leave and advance rejections share one modal — without tracking which
+  // kind is being rejected, confirming an advance rejection ran the leave
+  // UPDATE against leave_requests using an advance_requests id, matching no
+  // rows and silently doing nothing.
+  const [rejectingType, setRejectingType] = useState<'leave' | 'advance'>('leave')
 
   useEffect(() => { fetchApprovals() }, [employee])
 
@@ -41,9 +46,32 @@ export default function SupervisorApprovals() {
     fetchApprovals()
   }
 
-  const rejectLeave = async () => {
+  const approveAdvance = async (id: string, amount: number) => {
+    // outstanding_balance starts at the full amount — payroll recovery
+    // (advance_recovery on payroll_records) draws this down over
+    // repayment_months.
+    await supabase
+      .from('advance_requests')
+      .update({ status: 'approved', approved_by: employee!.id, approved_at: new Date().toISOString(), outstanding_balance: amount })
+      .eq('id', id)
+    fetchApprovals()
+  }
+
+  const confirmRejection = async () => {
     if (!rejectingId) return
-    await supabase.from('leave_requests').update({ status: 'rejected', approved_by: employee!.id, approved_at: new Date().toISOString(), rejection_reason: rejectionReason }).eq('id', rejectingId)
+    if (rejectingType === 'advance') {
+      // advance_requests has no rejection_reason column (see FINAL_SCHEMA) —
+      // only the status fields are written here.
+      await supabase
+        .from('advance_requests')
+        .update({ status: 'rejected', approved_by: employee!.id, approved_at: new Date().toISOString() })
+        .eq('id', rejectingId)
+    } else {
+      await supabase
+        .from('leave_requests')
+        .update({ status: 'rejected', approved_by: employee!.id, approved_at: new Date().toISOString(), rejection_reason: rejectionReason })
+        .eq('id', rejectingId)
+    }
     setRejectingId(null); setRejectionReason(''); fetchApprovals()
   }
 
@@ -62,7 +90,7 @@ export default function SupervisorApprovals() {
             </View>
             <View className="flex-row gap-2">
               <Button title="supervisor.approve" onPress={() => approveLeave(req.id)} variant="primary" size="sm" className="flex-1" icon={<CheckCircle size={14} color="white" />} />
-              <Button title="supervisor.reject" onPress={() => setRejectingId(req.id)} variant="danger" size="sm" className="flex-1" icon={<XCircle size={14} color="white" />} />
+              <Button title="supervisor.reject" onPress={() => { setRejectingType('leave'); setRejectingId(req.id) }} variant="danger" size="sm" className="flex-1" icon={<XCircle size={14} color="white" />} />
             </View>
           </Card>
         ))}
@@ -75,8 +103,8 @@ export default function SupervisorApprovals() {
               <Text className="text-xs text-gray-600 mt-1">{req.reason}</Text>
             </View>
             <View className="flex-row gap-2">
-              <Button title="supervisor.approve" onPress={() => {}} variant="primary" size="sm" className="flex-1" />
-              <Button title="supervisor.reject" onPress={() => setRejectingId(req.id)} variant="danger" size="sm" className="flex-1" />
+              <Button title="supervisor.approve" onPress={() => approveAdvance(req.id, req.amount)} variant="primary" size="sm" className="flex-1" icon={<CheckCircle size={14} color="white" />} />
+              <Button title="supervisor.reject" onPress={() => { setRejectingType('advance'); setRejectingId(req.id) }} variant="danger" size="sm" className="flex-1" icon={<XCircle size={14} color="white" />} />
             </View>
           </Card>
         ))}
@@ -85,8 +113,10 @@ export default function SupervisorApprovals() {
         <View className="flex-1 bg-black/50 justify-end">
           <View className="bg-white rounded-t-2xl p-6">
             <Text className="text-lg font-bold text-gray-900 mb-2">{t('supervisor.reject')}</Text>
-            <Input value={rejectionReason} onChangeText={setRejectionReason} placeholder={t('common.reason')} multiline numberOfLines={3} className="mb-4" />
-            <Button title="common.confirm" onPress={rejectLeave} />
+            {rejectingType === 'leave' && (
+              <Input value={rejectionReason} onChangeText={setRejectionReason} placeholder={t('common.reason')} multiline numberOfLines={3} className="mb-4" />
+            )}
+            <Button title="common.confirm" onPress={confirmRejection} />
             <Button title="common.cancel" onPress={() => setRejectingId(null)} variant="ghost" />
           </View>
         </View>

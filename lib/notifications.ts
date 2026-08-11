@@ -1,4 +1,5 @@
 import * as Notifications from 'expo-notifications'
+import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 import { supabase } from './supabase'
 
@@ -10,38 +11,64 @@ Notifications.setNotificationHandler({
   }),
 })
 
+/**
+ * Registers this device for push notifications. Never throws: push is a
+ * nice-to-have, but this runs on the login path (app/(auth)/login.tsx) right
+ * before the post-login redirect, so anything thrown here would strand the
+ * user on a spinning login button *after* their OTP already succeeded.
+ *
+ * That is not hypothetical — in a standalone APK (as opposed to Expo Go)
+ * getExpoPushTokenAsync() requires an EAS projectId, and app.json has none
+ * configured yet, so it throws "No projectId found" for every employee.
+ * Returning null keeps login working; push simply stays inactive until an
+ * EAS project is set up and its id added to app.json (extra.eas.projectId).
+ */
 export async function registerForPushNotificationsAsync(userId: string) {
-  const { status: existingStatus } = await Notifications.getPermissionsAsync()
-  let finalStatus = existingStatus
+  try {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync()
+    let finalStatus = existingStatus
 
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync()
-    finalStatus = status
-  }
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync()
+      finalStatus = status
+    }
 
-  if (finalStatus !== 'granted') {
+    if (finalStatus !== 'granted') {
+      return null
+    }
+
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId
+    const token = (await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined)).data
+
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#E65C00',
+      })
+    }
+
+    // onConflict must name user_id: push_tokens' primary key is `id` (which
+    // we never send), so the default conflict target never matches and the
+    // upsert degrades into an INSERT that trips the `unique (user_id)`
+    // constraint on every login after the first, leaving a stale token.
+    await supabase.from('push_tokens').upsert(
+      {
+        user_id: userId,
+        token,
+        platform: Platform.OS,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id' }
+    )
+
+    return token
+  } catch (err) {
+    console.warn('push registration skipped:', err)
     return null
   }
-
-  const token = (await Notifications.getExpoPushTokenAsync()).data
-
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#E65C00',
-    })
-  }
-
-  await supabase.from('push_tokens').upsert({
-    user_id: userId,
-    token,
-    platform: Platform.OS,
-    updated_at: new Date().toISOString(),
-  })
-
-  return token
 }
 
 export async function removePushToken(userId: string) {
