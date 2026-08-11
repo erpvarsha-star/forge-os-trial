@@ -9,7 +9,8 @@ import { Input } from '@/components/Input'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { LeaveRequest, AdvanceRequest } from '@/types'
-import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react-native'
+import { CheckCircle, XCircle, Inbox } from 'lucide-react-native'
+import { INK } from '@/components/theme'
 
 export default function SupervisorApprovals() {
   const { t } = useTranslation()
@@ -75,48 +76,101 @@ export default function SupervisorApprovals() {
     setRejectingId(null); setRejectionReason(''); fetchApprovals()
   }
 
+  // Presentational only — how long a request has been sitting in the queue.
+  const waitingLabel = (createdAt: string) => {
+    const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000)
+    return days <= 0 ? t('common.today') : t('common.waitingDays', { count: days })
+  }
+
   if (!employee) return <LoadingScreen />
+  if (isLoading) return <LoadingScreen />
+
+  const totalPending = leaves.length + advances.length
+
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
-      <ScrollView className="flex-1 p-4">
-        <Text className="text-lg font-bold text-gray-900 mb-2">{t('supervisor.pendingLeaves')}</Text>
-        {leaves.map(req => (
-          <Card key={req.id} className="mb-2">
-            <View className="mb-2">
-              <Text className="text-sm font-bold text-gray-900">{req.employee?.name} ({req.employee?.emp_code})</Text>
-              <Text className="text-xs text-gray-500">{req.type}: {req.start_date} to {req.end_date} ({req.days} days)</Text>
-              <Text className="text-xs text-gray-600 mt-1">{req.reason}</Text>
+      <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 32 }}>
+        <View className="flex-row items-center justify-between mb-5">
+          <Text className="text-2xl font-bold text-ink-900 tracking-tight">{t('common.approvals')}</Text>
+          {totalPending > 0 && (
+            <View className="bg-status-pending-bg px-3 py-1 rounded-full">
+              <Text className="text-sm font-bold text-status-pending">{t('common.pendingCount', { count: totalPending })}</Text>
             </View>
-            <View className="flex-row gap-2">
-              <Button title="supervisor.approve" onPress={() => approveLeave(req.id)} variant="primary" size="sm" className="flex-1" icon={<CheckCircle size={14} color="white" />} />
-              <Button title="supervisor.reject" onPress={() => { setRejectingType('leave'); setRejectingId(req.id) }} variant="danger" size="sm" className="flex-1" icon={<XCircle size={14} color="white" />} />
-            </View>
+          )}
+        </View>
+
+        {totalPending === 0 ? (
+          <Card className="items-center py-10">
+            <Inbox size={32} color={INK[300]} />
+            <Text className="text-sm text-ink-500 mt-3 text-center">{t('common.allClear')}</Text>
           </Card>
-        ))}
-        {advances.length > 0 && <Text className="text-lg font-bold text-gray-900 mb-2 mt-4">{t('common.advance')} {t('common.approvals')}</Text>}
-        {advances.map(req => (
-          <Card key={req.id} className="mb-2">
-            <View className="mb-2">
-              <Text className="text-sm font-bold text-gray-900">{req.employee?.name}</Text>
-              <Text className="text-xs text-gray-500">₹{req.amount} • {req.repayment_months} months</Text>
-              <Text className="text-xs text-gray-600 mt-1">{req.reason}</Text>
-            </View>
-            <View className="flex-row gap-2">
-              <Button title="supervisor.approve" onPress={() => approveAdvance(req.id, req.amount)} variant="primary" size="sm" className="flex-1" icon={<CheckCircle size={14} color="white" />} />
-              <Button title="supervisor.reject" onPress={() => { setRejectingType('advance'); setRejectingId(req.id) }} variant="danger" size="sm" className="flex-1" icon={<XCircle size={14} color="white" />} />
-            </View>
-          </Card>
-        ))}
+        ) : (
+          <>
+            {leaves.length > 0 && (
+              <>
+                <Text className="text-xs font-semibold uppercase tracking-wider text-ink-400 mb-2">{t('supervisor.pendingLeaves')}</Text>
+                {leaves.map(req => (
+                  <Card key={req.id} className="mb-3">
+                    <View className="flex-row items-start justify-between mb-2">
+                      <View className="flex-1 pr-2">
+                        <Text className="text-base font-bold text-ink-900">{req.employee?.name}</Text>
+                        <Text className="text-xs font-mono text-ink-500 mt-0.5">{req.employee?.emp_code}</Text>
+                      </View>
+                      <Text className="text-xs text-ink-400">{waitingLabel(req.created_at)}</Text>
+                    </View>
+                    <View className="flex-row flex-wrap items-center gap-2 mb-2">
+                      <View className="bg-ink-100 rounded-full px-2 py-0.5">
+                        <Text className="text-xs font-semibold text-ink-600">{req.type}</Text>
+                      </View>
+                      <Text className="text-xs text-ink-500">{req.start_date} → {req.end_date} ({req.days}d)</Text>
+                    </View>
+                    {!!req.reason && <Text className="text-sm text-ink-600 mb-3">{req.reason}</Text>}
+                    <View className="flex-row gap-2">
+                      <Button title="supervisor.approve" onPress={() => approveLeave(req.id)} variant="primary" size="sm" className="flex-1" icon={<CheckCircle size={14} color="white" />} />
+                      <Button title="supervisor.reject" onPress={() => { setRejectingType('leave'); setRejectingId(req.id) }} variant="danger" size="sm" className="flex-1" icon={<XCircle size={14} color="white" />} />
+                    </View>
+                  </Card>
+                ))}
+              </>
+            )}
+
+            {advances.length > 0 && (
+              <>
+                <Text className="text-xs font-semibold uppercase tracking-wider text-ink-400 mb-2 mt-2">{t('supervisor.advanceApprovals')}</Text>
+                {advances.map(req => (
+                  <Card key={req.id} className="mb-3">
+                    <View className="flex-row items-start justify-between mb-2">
+                      <View className="flex-1 pr-2">
+                        <Text className="text-base font-bold text-ink-900">{req.employee?.name}</Text>
+                        <Text className="text-xs font-mono text-ink-500 mt-0.5">{req.employee?.emp_code}</Text>
+                      </View>
+                      <View className="items-end">
+                        <Text className="text-lg font-bold text-brand-600 font-mono">₹{req.amount.toLocaleString()}</Text>
+                        <Text className="text-xs text-ink-400">{waitingLabel(req.created_at)}</Text>
+                      </View>
+                    </View>
+                    <Text className="text-xs text-ink-500 mb-2">{req.repayment_months} {t('worker.repaymentMonths')}</Text>
+                    {!!req.reason && <Text className="text-sm text-ink-600 mb-3">{req.reason}</Text>}
+                    <View className="flex-row gap-2">
+                      <Button title="supervisor.approve" onPress={() => approveAdvance(req.id, req.amount)} variant="primary" size="sm" className="flex-1" icon={<CheckCircle size={14} color="white" />} />
+                      <Button title="supervisor.reject" onPress={() => { setRejectingType('advance'); setRejectingId(req.id) }} variant="danger" size="sm" className="flex-1" icon={<XCircle size={14} color="white" />} />
+                    </View>
+                  </Card>
+                ))}
+              </>
+            )}
+          </>
+        )}
       </ScrollView>
       <Modal visible={!!rejectingId} transparent animationType="slide">
         <View className="flex-1 bg-black/50 justify-end">
           <View className="bg-white rounded-t-2xl p-6">
-            <Text className="text-lg font-bold text-gray-900 mb-2">{t('supervisor.reject')}</Text>
+            <Text className="text-lg font-bold text-ink-900 mb-3">{t('supervisor.reject')}</Text>
             {rejectingType === 'leave' && (
               <Input value={rejectionReason} onChangeText={setRejectionReason} placeholder={t('common.reason')} multiline numberOfLines={3} className="mb-4" />
             )}
-            <Button title="common.confirm" onPress={confirmRejection} />
+            <Button title="common.confirm" onPress={confirmRejection} variant="danger" className="mb-2" />
             <Button title="common.cancel" onPress={() => setRejectingId(null)} variant="ghost" />
           </View>
         </View>

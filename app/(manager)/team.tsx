@@ -8,6 +8,7 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { Employee } from '@/types'
 import { Users, User } from 'lucide-react-native'
+import { INK } from '@/components/theme'
 
 export default function ManagerTeam() {
   const { t } = useTranslation()
@@ -25,25 +26,42 @@ export default function ManagerTeam() {
   }
 
   if (!employee) return <LoadingScreen />
+  if (isLoading) return <LoadingScreen />
+
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <FlatList
         data={supervisors}
         keyExtractor={item => item.id}
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+        ListHeaderComponent={
+          <View className="flex-row items-center justify-between mb-4">
+            <Text className="text-2xl font-bold text-ink-900 tracking-tight">{t('common.team')}</Text>
+            {supervisors.length > 0 && (
+              <View className="bg-ink-100 px-3 py-1 rounded-full">
+                <Text className="text-sm font-bold text-ink-600">{supervisors.length} {t('manager.supervisorCount')}</Text>
+              </View>
+            )}
+          </View>
+        }
         renderItem={({ item }) => (
-          <Card className="mb-2">
+          <Card className="mb-3">
             <View className="flex-row items-center gap-3">
-              <View className="w-10 h-10 bg-gray-100 rounded-full items-center justify-center"><User size={18} color="#6B7280" /></View>
-              <View>
-                <Text className="text-sm font-bold text-gray-900">{item.name}</Text>
-                <Text className="text-xs text-gray-500">{item.emp_code} • {item.department}</Text>
+              <View className="w-10 h-10 bg-ink-100 rounded-full items-center justify-center"><User size={18} color={INK[500]} /></View>
+              <View className="flex-1">
+                <Text className="text-sm font-bold text-ink-900">{item.name}</Text>
+                <Text className="text-xs text-ink-500 font-mono">{item.emp_code} • {item.department}</Text>
               </View>
             </View>
           </Card>
         )}
-        ListEmptyComponent={<Text className="text-center text-gray-500 py-8">{t('common.noData')}</Text>}
+        ListEmptyComponent={
+          <Card className="items-center py-10">
+            <Users size={32} color={INK[300]} />
+            <Text className="text-sm text-ink-500 mt-3 text-center">{t('manager.noSupervisors')}</Text>
+          </Card>
+        }
       />
     </View>
   )

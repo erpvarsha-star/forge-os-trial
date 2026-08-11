@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { View, Text, ScrollView, Alert, Modal, TouchableOpacity } from 'react-native'
+import { View, Text, ScrollView, Alert, Modal, TouchableOpacity, ActivityIndicator } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/hooks/useAuth'
 import { useAttendance } from '@/hooks/useAttendance'
@@ -17,7 +17,6 @@ import { MapPin, Clock, CheckSquare, AlertCircle, Camera, QrCode, CheckCircle2, 
 import { router } from 'expo-router'
 import * as Location from 'expo-location'
 import Constants from 'expo-constants'
-import { ActivityIndicator } from 'react-native'
 
 export default function WorkerHome() {
   const { t } = useTranslation()
@@ -287,7 +286,7 @@ export default function WorkerHome() {
                 className="flex-1 bg-white rounded-xl border border-gray-100 shadow-sm py-5 items-center justify-center"
               >
                 <Camera size={22} color="#E65C00" />
-                <Text className="text-xs font-semibold text-gray-900 mt-2">{t('common.observation') === t('common.observation') ? '5S' : '5S'}</Text>
+                <Text className="text-xs font-semibold text-gray-900 mt-2">5S</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => router.push('/(worker)/qr')}

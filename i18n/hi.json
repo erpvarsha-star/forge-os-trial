@@ -119,7 +119,8 @@
     "allClear": "सब ठीक है",
     "comingSoon": "जल्द आ रहा है",
     "sampleData": "नमूना डेटा",
-    "notConnectedYet": "अभी लाइव डेटा से जुड़ा नहीं है"
+    "notConnectedYet": "अभी लाइव डेटा से जुड़ा नहीं है",
+    "quality": "गुणवत्ता"
   },
   "auth": {
     "loginTitle": "Forge OS में आपका स्वागत है",
@@ -252,7 +253,13 @@
     "5sNoChallenge": "आज कोई 5S चुनौती नहीं है। कल फिर देखें।",
     "observationHint": "रखरखाव की समस्या दिखी? यहां दर्ज करें ताकि टीम कार्रवाई कर सके।",
     "qrHint": "प्लांट गेट पर लगे चेक-इन QR कोड पर कैमरा फोकस करें।",
-    "notificationsEmptyTitle": "आप पूरी तरह अपडेट हैं"
+    "notificationsEmptyTitle": "आप पूरी तरह अपडेट हैं",
+    "advanceAmountPlaceholder": "राशि दर्ज करें",
+    "repaymentMonthsPlaceholder": "जैसे, 3",
+    "observationAreaPlaceholder": "जैसे, मशीन #3, असेंबली लाइन A",
+    "observationIssuePlaceholder": "समस्या का वर्णन करें...",
+    "payslipTitle": "पेस्लिप",
+    "cameraPermissionRequired": "QR स्कैन करने के लिए कैमरा अनुमति आवश्यक है"
   },
   "supervisor": {
     "teamStatus": "टीम की स्थिति",
@@ -300,7 +307,10 @@
     "noAdvanceApprovals": "कोई लंबित एडवांस अनुरोध नहीं",
     "advanceApprovals": "एडवांस अनुमोदन",
     "casualWorkersToday": "आज के कैजुअल वर्कर",
-    "quickLogs": "त्वरित लॉग"
+    "quickLogs": "त्वरित लॉग",
+    "productionDetails": "उत्पादन विवरण",
+    "shiftVerification": "शिफ्ट सत्यापन",
+    "shiftReportSubmitted": "शिफ्ट रिपोर्ट जमा हुई"
   },
   "manager": {
     "deptAttendance": "विभाग उपस्थिति",
@@ -321,7 +331,17 @@
     "supervisorCount": "सुपरवाइजर",
     "noSupervisors": "अभी तक कोई सुपरवाइजर नियुक्त नहीं",
     "reportsComingSoonTitle": "रिपोर्ट जल्द आ रही हैं",
-    "reportsComingSoonBody": "ये रिपोर्ट एक्सपोर्ट अभी लाइव डेटा से नहीं जुड़े हैं।"
+    "reportsComingSoonBody": "ये रिपोर्ट एक्सपोर्ट अभी लाइव डेटा से नहीं जुड़े हैं।",
+    "safetyScore": "सुरक्षा स्कोर (0-100)",
+    "qualityScore": "गुणवत्ता स्कोर (0-100)",
+    "deliveryScore": "डिलीवरी स्कोर (0-100)",
+    "costScore": "लागत स्कोर (0-100)",
+    "moraleScore": "मनोबल स्कोर (0-100)",
+    "mrmSubmitted": "MRM समीक्षा जमा हुई",
+    "reportTypeAttendance": "विभाग उपस्थिति रिपोर्ट",
+    "reportTypeProduction": "उत्पादन सारांश",
+    "reportTypeScore": "स्कोर वितरण",
+    "plannedReports": "योजनाबद्ध रिपोर्ट"
   },
   "plantHead": {
     "plantAttendance": "प्लांट-वाइड उपस्थिति",
@@ -339,7 +359,8 @@
     "noSignOffs": "आपके साइन-ऑफ हेतु कुछ भी लंबित नहीं",
     "noMrmData": "इस माह कोई MRM समीक्षा जमा नहीं हुई",
     "noEmailTasks": "इनबॉक्स खाली है",
-    "departmentsSubmitted": "विभागों ने जमा किया"
+    "departmentsSubmitted": "विभागों ने जमा किया",
+    "priorityLabel": "प्राथमिकता"
   },
   "hrAdmin": {
     "employeeMaster": "कर्मचारी मास्टर",
@@ -371,7 +392,11 @@
     "noAdvancesYet": "अभी तक कोई एडवांस अनुरोध नहीं",
     "totalOutstanding": "कुल बकाया",
     "pendingActivations": "लंबित सक्रियकरण",
-    "missingFields": "लापता फ़ील्ड"
+    "missingFields": "लापता फ़ील्ड",
+    "outstanding": "बकाया",
+    "supervisorField": "सुपरवाइजर",
+    "employeeLabel": "कर्मचारी",
+    "shiftAssigned": "शिफ्ट सौंपी गई"
   },
   "owner": {
     "kpiDashboard": "KPI डैशबोर्ड",

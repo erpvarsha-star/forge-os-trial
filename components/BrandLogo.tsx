@@ -10,12 +10,19 @@ interface BrandLogoProps {
   style?: StyleProp<ImageStyle>
 }
 
-// Tailwind's w-8/w-16/w-32 scale (32/64/128px) — matches the sizing already
-// used for icon tiles elsewhere in the app (e.g. LoadingScreen's w-16 h-16).
-const SIZE_CLASSES: Record<BrandLogoSize, string> = {
-  sm: 'w-8 h-8',
-  md: 'w-16 h-16',
-  lg: 'w-32 h-32',
+// Matches Tailwind's w-8/w-16/w-32 scale (32/64/128px) and the icon-tile
+// sizing already used elsewhere (e.g. LoadingScreen's w-16 h-16).
+//
+// Applied as explicit numbers rather than `w-8`/`w-16`/`w-32` classes: those
+// classes do NOT size an <Image>, which falls back to the asset's intrinsic
+// dimensions instead. That silently rendered every BrandLogo at the source
+// asset's full 256x256 — the login screen's logo was double its intended
+// 128px and swamped the layout, and Header only looked right because it
+// happened to pass an inline width/height override.
+const SIZE_PX: Record<BrandLogoSize, number> = {
+  sm: 32,
+  md: 64,
+  lg: 128,
 }
 
 /**
@@ -32,8 +39,9 @@ export function BrandLogo({ size = 'md', className = '', style }: BrandLogoProps
     <Image
       source={require('@/assets/brand/logo-256.png')}
       resizeMode="contain"
-      className={`${SIZE_CLASSES[size]} rounded-xl ${className}`}
-      style={style}
+      className={className}
+      // `style` comes last so an explicit override from a caller still wins.
+      style={[{ width: SIZE_PX[size], height: SIZE_PX[size] }, style]}
       accessibilityLabel="Varsha Forgings"
     />
   )

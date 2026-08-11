@@ -7,7 +7,8 @@ import { Card } from '@/components/Card'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { FraudAlert } from '@/types'
-import { AlertTriangle, MapPin, Users, Zap } from 'lucide-react-native'
+import { AlertTriangle, MapPin, Users, Zap, ShieldCheck } from 'lucide-react-native'
+import { STATUS } from '@/components/theme'
 
 export default function OwnerAlerts() {
   const { t } = useTranslation()
@@ -26,32 +27,65 @@ export default function OwnerAlerts() {
   }, [employee])
 
   const getIcon = (type: string) => {
+    const color = STATUS.rejected.fg
     switch (type) {
-      case 'mock_location': return <MapPin size={20} className="text-red-600" />
-      case 'buddy_punching': return <Users size={20} className="text-red-600" />
-      case 'bulk_confirm': return <Zap size={20} className="text-red-600" />
-      default: return <AlertTriangle size={20} className="text-red-600" />
+      case 'mock_location': return <MapPin size={18} color={color} />
+      case 'buddy_punching': return <Users size={18} color={color} />
+      case 'bulk_confirm': return <Zap size={18} color={color} />
+      default: return <AlertTriangle size={18} color={color} />
+    }
+  }
+
+  const severityBadge = (severity: string) => {
+    switch (severity) {
+      case 'high': return { bg: 'bg-status-rejected-bg', text: 'text-status-rejected' }
+      case 'medium': return { bg: 'bg-status-pending-bg', text: 'text-status-pending' }
+      default: return { bg: 'bg-ink-100', text: 'text-ink-600' }
     }
   }
 
   if (!employee) return <LoadingScreen />
+  if (isLoading) return <LoadingScreen />
+
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
-      <ScrollView className="flex-1 p-4">
-        <Text className="text-xl font-bold text-gray-900 mb-4">{t('owner.fraudAlerts')}</Text>
-        {alerts.map(alert => (
-          <Card key={alert.id} className="mb-2 bg-red-50 border-red-200">
-            <View className="flex-row items-start gap-3">
-              {getIcon(alert.type)}
-              <View className="flex-1">
-                <Text className="text-sm font-bold text-red-800">{t(`owner.${alert.type}`)}</Text>
-                <Text className="text-xs text-red-700 mt-1">{alert.description}</Text>
-                <Text className="text-xs text-red-600 mt-1 capitalize">Severity: {alert.severity}</Text>
-              </View>
+      <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 32 }}>
+        <View className="flex-row items-center justify-between mb-5">
+          <Text className="text-2xl font-bold text-ink-900 tracking-tight">{t('owner.fraudAlerts')}</Text>
+          {alerts.length > 0 && (
+            <View className="bg-status-rejected-bg px-3 py-1 rounded-full">
+              <Text className="text-sm font-bold text-status-rejected">{t('owner.openAlerts')}: {alerts.length}</Text>
             </View>
+          )}
+        </View>
+
+        {alerts.length === 0 ? (
+          <Card className="items-center py-10">
+            <ShieldCheck size={32} color={STATUS.approved.fg} />
+            <Text className="text-sm text-ink-500 mt-3 text-center">{t('owner.noOpenAlerts')}</Text>
           </Card>
-        ))}
+        ) : (
+          alerts.map(alert => {
+            const badge = severityBadge(alert.severity)
+            return (
+              <Card key={alert.id} className="mb-3 bg-status-rejected-bg" variant="flat">
+                <View className="flex-row items-start gap-3">
+                  <View className="w-9 h-9 rounded-full bg-white items-center justify-center mt-0.5">{getIcon(alert.type)}</View>
+                  <View className="flex-1">
+                    <View className="flex-row items-center justify-between">
+                      <Text className="text-sm font-bold text-status-rejected flex-1 pr-2">{t(`owner.${alert.type}`)}</Text>
+                      <View className={`px-2 py-0.5 rounded-full ${badge.bg}`}>
+                        <Text className={`text-xs font-bold capitalize ${badge.text}`}>{alert.severity}</Text>
+                      </View>
+                    </View>
+                    <Text className="text-xs text-ink-700 mt-1">{alert.description}</Text>
+                  </View>
+                </View>
+              </Card>
+            )
+          })
+        )}
       </ScrollView>
     </View>
   )

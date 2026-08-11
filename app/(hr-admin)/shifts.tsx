@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase'
 import { Shift, Employee } from '@/types'
 import { Calendar, Plus, Clock } from 'lucide-react-native'
 import { TouchableOpacity } from 'react-native'
+import { BRAND, INK } from '@/components/theme'
 
 export default function ShiftsScreen() {
   const { t } = useTranslation()
@@ -46,53 +47,70 @@ export default function ShiftsScreen() {
       date: selectedDate,
     })
     setShowModal(false)
-    Alert.alert(t('common.success'), 'Shift assigned')
+    Alert.alert(t('common.success'), t('hrAdmin.shiftAssigned'))
   }
 
   if (!employee) return <LoadingScreen />
+  if (isLoading) return <LoadingScreen />
+
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
-      <ScrollView className="flex-1 p-4">
-        <View className="flex-row justify-between items-center mb-4">
-          <Text className="text-xl font-bold text-gray-900">{t('hrAdmin.shiftPlanning')}</Text>
-          <Button title="" onPress={() => setShowModal(true)} icon={<Plus size={20} color="white" />} />
+      <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 32 }}>
+        <View className="flex-row justify-between items-center mb-5">
+          <Text className="text-2xl font-bold text-ink-900 tracking-tight">{t('hrAdmin.shiftPlanning')}</Text>
+          <TouchableOpacity
+            onPress={() => setShowModal(true)}
+            className="w-11 h-11 rounded-full bg-brand-600 items-center justify-center shadow-card"
+            accessibilityRole="button"
+            accessibilityLabel={t('hrAdmin.assignShift')}
+          >
+            <Plus size={22} color="white" />
+          </TouchableOpacity>
         </View>
-        {shifts.map(shift => (
-          <Card key={shift.id} className="mb-2">
-            <View className="flex-row items-center gap-3">
-              <Clock size={18} className="text-orange-600" />
-              <View>
-                <Text className="text-sm font-bold text-gray-900">{shift.name}</Text>
-                <Text className="text-xs text-gray-500">{shift.start_time} - {shift.end_time}</Text>
-              </View>
-            </View>
+
+        {shifts.length === 0 ? (
+          <Card className="items-center py-10">
+            <Calendar size={32} color={INK[300]} />
+            <Text className="text-sm text-ink-500 mt-3 text-center">{t('hrAdmin.noShiftsYet')}</Text>
           </Card>
-        ))}
+        ) : (
+          shifts.map(shift => (
+            <Card key={shift.id} className="mb-3">
+              <View className="flex-row items-center gap-3">
+                <View className="w-10 h-10 rounded-full bg-brand-50 items-center justify-center"><Clock size={18} color={BRAND[600]} /></View>
+                <View>
+                  <Text className="text-sm font-bold text-ink-900">{shift.name}</Text>
+                  <Text className="text-xs text-ink-500 font-mono mt-0.5">{shift.start_time} - {shift.end_time}</Text>
+                </View>
+              </View>
+            </Card>
+          ))
+        )}
       </ScrollView>
 
       <Modal visible={showModal} transparent animationType="slide">
         <View className="flex-1 bg-black/50 justify-end">
           <View className="bg-white rounded-t-2xl p-6">
-            <Text className="text-lg font-bold text-gray-900 mb-4">{t('hrAdmin.assignShift')}</Text>
-            <Text className="text-sm font-medium text-gray-700 mb-2">Employee</Text>
+            <Text className="text-lg font-bold text-ink-900 mb-4">{t('hrAdmin.assignShift')}</Text>
+            <Text className="text-sm font-semibold text-ink-700 mb-2">{t('hrAdmin.employeeLabel')}</Text>
             <ScrollView horizontal className="mb-4" showsHorizontalScrollIndicator={false}>
               {employees.map(emp => (
-                <TouchableOpacity key={emp.id} onPress={() => setSelectedEmployee(emp.id)} className={`mr-2 px-3 py-2 rounded-lg border ${selectedEmployee === emp.id ? 'bg-orange-600 border-orange-600' : 'border-gray-300'}`}>
-                  <Text className={`text-sm ${selectedEmployee === emp.id ? 'text-white' : 'text-gray-700'}`}>{emp.name}</Text>
+                <TouchableOpacity key={emp.id} onPress={() => setSelectedEmployee(emp.id)} className={`mr-2 px-3 py-2.5 rounded-lg border min-h-touch justify-center ${selectedEmployee === emp.id ? 'bg-brand-600 border-brand-600' : 'border-ink-200'}`}>
+                  <Text className={`text-sm ${selectedEmployee === emp.id ? 'text-white font-semibold' : 'text-ink-700'}`}>{emp.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <Text className="text-sm font-medium text-gray-700 mb-2">Shift</Text>
+            <Text className="text-sm font-semibold text-ink-700 mb-2">{t('common.shift')}</Text>
             <ScrollView horizontal className="mb-4" showsHorizontalScrollIndicator={false}>
               {shifts.map(shift => (
-                <TouchableOpacity key={shift.id} onPress={() => setSelectedShift(shift.id)} className={`mr-2 px-3 py-2 rounded-lg border ${selectedShift === shift.id ? 'bg-orange-600 border-orange-600' : 'border-gray-300'}`}>
-                  <Text className={`text-sm ${selectedShift === shift.id ? 'text-white' : 'text-gray-700'}`}>{shift.name}</Text>
+                <TouchableOpacity key={shift.id} onPress={() => setSelectedShift(shift.id)} className={`mr-2 px-3 py-2.5 rounded-lg border min-h-touch justify-center ${selectedShift === shift.id ? 'bg-brand-600 border-brand-600' : 'border-ink-200'}`}>
+                  <Text className={`text-sm ${selectedShift === shift.id ? 'text-white font-semibold' : 'text-ink-700'}`}>{shift.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <Input label={t('common.date')} value={selectedDate} onChangeText={setSelectedDate} placeholder="YYYY-MM-DD" />
-            <Button title="common.save" onPress={assignShift} className="mt-4" />
+            <Input label={t('common.date')} value={selectedDate} onChangeText={setSelectedDate} placeholder="YYYY-MM-DD" className="mb-4" />
+            <Button title="common.save" onPress={assignShift} className="mb-2" />
             <Button title="common.cancel" onPress={() => setShowModal(false)} variant="ghost" />
           </View>
         </View>

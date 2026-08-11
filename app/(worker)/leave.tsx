@@ -9,10 +9,11 @@ import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { LEAVE_TYPES } from '@/constants'
-import { Plus, Calendar, CheckCircle, XCircle, Clock } from 'lucide-react-native'
+import { Plus, Calendar, CheckCircle, XCircle, Clock, FileText } from 'lucide-react-native'
 
 export default function WorkerLeave() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const isHindi = i18n.language === 'hi'
   const { employee } = useAuth()
   const { requests, balance, isLoading, applyLeave, refresh } = useLeave(employee?.id || '')
   const [showModal, setShowModal] = useState(false)
@@ -23,6 +24,13 @@ export default function WorkerLeave() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   if (!employee) return <LoadingScreen />
+  if (isLoading) return <LoadingScreen />
+
+  const leaveTypeLabel = (value: string) => {
+    const match = LEAVE_TYPES.find(lt => lt.value === value)
+    if (!match) return value
+    return isHindi ? match.labelHi : match.label
+  }
 
   const handleApply = async () => {
     if (!startDate || !endDate || !reason) {
@@ -82,22 +90,29 @@ export default function WorkerLeave() {
           />
         </View>
 
-        {requests.map(req => (
-          <Card key={req.id} className="mb-2">
-            <View className="flex-row justify-between items-start">
-              <View>
-                <Text className="text-sm font-bold text-gray-900">{req.type}</Text>
-                <Text className="text-xs text-gray-500">
-                  {req.start_date} {req.start_date !== req.end_date ? `to ${req.end_date}` : ''}
-                </Text>
-                <Text className="text-xs text-gray-600 mt-1">{req.reason}</Text>
-              </View>
-              <View className={`px-2 py-1 rounded-full ${statusColor(req.status)}`}>
-                <Text className="text-xs font-medium capitalize">{req.status}</Text>
-              </View>
-            </View>
+        {requests.length === 0 ? (
+          <Card className="items-center py-10">
+            <FileText size={32} color="#D1D5DB" />
+            <Text className="text-sm text-gray-500 mt-3">{t('worker.noLeaveRequests')}</Text>
           </Card>
-        ))}
+        ) : (
+          requests.map(req => (
+            <Card key={req.id} className="mb-2">
+              <View className="flex-row justify-between items-start">
+                <View className="flex-1 pr-2">
+                  <Text className="text-sm font-bold text-gray-900">{leaveTypeLabel(req.type)}</Text>
+                  <Text className="text-xs text-gray-500 mt-0.5">
+                    {req.start_date} {req.start_date !== req.end_date ? `– ${req.end_date}` : ''}
+                  </Text>
+                  <Text className="text-xs text-gray-600 mt-1">{req.reason}</Text>
+                </View>
+                <View className={`px-2 py-1 rounded-full ${statusColor(req.status)}`}>
+                  <Text className="text-xs font-medium capitalize">{t(`common.${req.status}`)}</Text>
+                </View>
+              </View>
+            </Card>
+          ))
+        )}
       </ScrollView>
 
       <Modal visible={showModal} transparent animationType="slide">
@@ -116,7 +131,7 @@ export default function WorkerLeave() {
                     }`}
                   >
                     <Text className={`text-sm ${leaveType === type.value ? 'text-white' : 'text-gray-700'}`}>
-                      {t('common.language') === 'hi' ? type.labelHi : type.label}
+                      {isHindi ? type.labelHi : type.label}
                     </Text>
                   </TouchableOpacity>
                 ))}

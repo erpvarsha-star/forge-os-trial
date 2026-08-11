@@ -9,7 +9,7 @@ import { Input } from '@/components/Input'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { Camera } from 'expo-camera'
-import { Camera as CameraIcon, Upload } from 'lucide-react-native'
+import { Camera as CameraIcon, Upload, AlertCircle } from 'lucide-react-native'
 import { TouchableOpacity } from 'react-native'
 
 export default function ObservationScreen() {
@@ -59,12 +59,17 @@ export default function ObservationScreen() {
     <View className="flex-1 bg-gray-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
+        <View className="flex-row items-start gap-2 mb-4 px-1">
+          <AlertCircle size={16} color="#9CA3AF" style={{ marginTop: 1 }} />
+          <Text className="text-xs text-gray-500 flex-1">{t('worker.observationHint')}</Text>
+        </View>
+
         <Card>
           <Input
             label={t('worker.observationArea')}
             value={area}
             onChangeText={setArea}
-            placeholder="e.g., Machine #3, Assembly Line A"
+            placeholder={t('worker.observationAreaPlaceholder')}
           />
           <Input
             label={t('worker.observationIssue')}
@@ -72,7 +77,7 @@ export default function ObservationScreen() {
             onChangeText={setIssue}
             multiline
             numberOfLines={4}
-            placeholder="Describe the issue..."
+            placeholder={t('worker.observationIssuePlaceholder')}
             className="mb-4"
           />
 

@@ -119,7 +119,8 @@
     "allClear": "All clear",
     "comingSoon": "Coming Soon",
     "sampleData": "Sample data",
-    "notConnectedYet": "Not yet connected to live data"
+    "notConnectedYet": "Not yet connected to live data",
+    "quality": "Quality"
   },
   "auth": {
     "loginTitle": "Welcome to Forge OS",
@@ -252,7 +253,13 @@
     "5sNoChallenge": "No 5S challenge today. Check back tomorrow.",
     "observationHint": "Spotted a maintenance issue? Log it here so the team can act on it.",
     "qrHint": "Point your camera at the check-in QR code posted at the plant gate.",
-    "notificationsEmptyTitle": "You're all caught up"
+    "notificationsEmptyTitle": "You're all caught up",
+    "advanceAmountPlaceholder": "Enter amount",
+    "repaymentMonthsPlaceholder": "e.g., 3",
+    "observationAreaPlaceholder": "e.g., Machine #3, Assembly Line A",
+    "observationIssuePlaceholder": "Describe the issue...",
+    "payslipTitle": "Payslip",
+    "cameraPermissionRequired": "Camera permission is required for QR scanning"
   },
   "supervisor": {
     "teamStatus": "Team Status",
@@ -300,7 +307,10 @@
     "noAdvanceApprovals": "No pending advance requests",
     "advanceApprovals": "Advance Approvals",
     "casualWorkersToday": "Casual Workers Today",
-    "quickLogs": "Quick Logs"
+    "quickLogs": "Quick Logs",
+    "productionDetails": "Production Details",
+    "shiftVerification": "Shift Verification",
+    "shiftReportSubmitted": "Shift report submitted"
   },
   "manager": {
     "deptAttendance": "Department Attendance",
@@ -321,7 +331,17 @@
     "supervisorCount": "Supervisors",
     "noSupervisors": "No supervisors assigned yet",
     "reportsComingSoonTitle": "Reports coming soon",
-    "reportsComingSoonBody": "These report exports are not connected to live data yet."
+    "reportsComingSoonBody": "These report exports are not connected to live data yet.",
+    "safetyScore": "Safety Score (0-100)",
+    "qualityScore": "Quality Score (0-100)",
+    "deliveryScore": "Delivery Score (0-100)",
+    "costScore": "Cost Score (0-100)",
+    "moraleScore": "Morale Score (0-100)",
+    "mrmSubmitted": "MRM review submitted",
+    "reportTypeAttendance": "Department Attendance Report",
+    "reportTypeProduction": "Production Summary",
+    "reportTypeScore": "Score Distribution",
+    "plannedReports": "Planned Reports"
   },
   "plantHead": {
     "plantAttendance": "Plant-Wide Attendance",
@@ -339,7 +359,8 @@
     "noSignOffs": "Nothing pending your sign-off",
     "noMrmData": "No MRM reviews submitted this month",
     "noEmailTasks": "Inbox is clear",
-    "departmentsSubmitted": "Departments Submitted"
+    "departmentsSubmitted": "Departments Submitted",
+    "priorityLabel": "Priority"
   },
   "hrAdmin": {
     "employeeMaster": "Employee Master",
@@ -371,7 +392,11 @@
     "noAdvancesYet": "No advance requests yet",
     "totalOutstanding": "Total Outstanding",
     "pendingActivations": "Pending Activations",
-    "missingFields": "Missing Fields"
+    "missingFields": "Missing Fields",
+    "outstanding": "Outstanding",
+    "supervisorField": "Supervisor",
+    "employeeLabel": "Employee",
+    "shiftAssigned": "Shift assigned"
   },
   "owner": {
     "kpiDashboard": "KPI Dashboard",

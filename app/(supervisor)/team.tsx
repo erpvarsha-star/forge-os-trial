@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import { notifyEmployeesByRole } from '@/lib/notifications'
 import { Employee, AttendanceRecord } from '@/types'
 import { User, Users, CheckCircle2 } from 'lucide-react-native'
+import { BRAND, INK } from '@/components/theme'
 
 // Workflow 11 (Fraud Detection): more than 10 confirmations in 90 seconds by
 // the same supervisor is treated as bulk/buddy confirmation and flagged.
@@ -88,7 +89,7 @@ export default function SupervisorTeam() {
   }
 
   const statusDot = (status?: string) => {
-    switch (status) { case 'P': return 'bg-green-500'; case 'A': return 'bg-red-500'; case 'L': return 'bg-yellow-500'; default: return 'bg-gray-300'; }
+    switch (status) { case 'P': return 'bg-status-present'; case 'A': return 'bg-status-absent'; case 'L': return 'bg-status-late'; default: return 'bg-ink-200'; }
   }
 
   if (!employee) return <LoadingScreen />
@@ -97,7 +98,7 @@ export default function SupervisorTeam() {
   const confirmedCount = team.filter(m => m.attendance?.status === 'P' || m.attendance?.status === 'A').length
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <FlatList
         data={team}
@@ -105,25 +106,25 @@ export default function SupervisorTeam() {
         contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
         ListHeaderComponent={
           <View className="mb-4">
-            <Text className="text-2xl font-bold text-gray-900 mb-3">{t('common.team')}</Text>
+            <Text className="text-2xl font-bold text-ink-900 tracking-tight mb-3">{t('common.team')}</Text>
             {team.length > 0 && (
               <Card className="flex-row items-center gap-3 py-3">
-                <View className="w-9 h-9 rounded-full bg-orange-50 items-center justify-center"><CheckCircle2 size={18} color="#E65C00" /></View>
-                <Text className="text-sm font-semibold text-gray-900 flex-1">
+                <View className="w-9 h-9 rounded-full bg-brand-50 items-center justify-center"><CheckCircle2 size={18} color={BRAND[600]} /></View>
+                <Text className="text-sm font-semibold text-ink-900 flex-1">
                   {t('common.confirmedOfTotal', { confirmed: confirmedCount, total: team.length })}
                 </Text>
               </Card>
             )}
-            <Text className="text-xs text-gray-500 mt-3">{t('supervisor.confirmAttendance')}</Text>
+            <Text className="text-xs text-ink-500 mt-3">{t('supervisor.confirmAttendance')}</Text>
           </View>
         }
         renderItem={({ item }) => (
           <Card className="mb-3">
             <View className="flex-row items-center gap-3 mb-3">
-              <View className="w-10 h-10 bg-gray-100 rounded-full items-center justify-center"><User size={20} color="#6B7280" /></View>
+              <View className="w-10 h-10 bg-ink-100 rounded-full items-center justify-center"><User size={20} color={INK[500]} /></View>
               <View className="flex-1">
-                <Text className="text-sm font-bold text-gray-900">{item.name}</Text>
-                <Text className="text-xs text-gray-500 font-mono">{item.emp_code} • {item.category}</Text>
+                <Text className="text-sm font-bold text-ink-900">{item.name}</Text>
+                <Text className="text-xs text-ink-500 font-mono">{item.emp_code} • {item.category}</Text>
               </View>
               <View className={`w-3 h-3 rounded-full ${statusDot(item.attendance?.status)}`} />
             </View>
@@ -131,24 +132,24 @@ export default function SupervisorTeam() {
               <TouchableOpacity
                 onPress={() => confirmAttendance(item, 'P')}
                 disabled={confirmingId === item.id}
-                className={`flex-1 rounded-lg py-3 items-center justify-center min-h-[44px] ${item.attendance?.status === 'P' ? 'bg-green-600' : 'bg-green-50'}`}
+                className={`flex-1 rounded-lg py-3 items-center justify-center min-h-touch ${item.attendance?.status === 'P' ? 'bg-status-present' : 'bg-status-present-bg'}`}
               >
-                <Text className={`text-sm font-semibold ${item.attendance?.status === 'P' ? 'text-white' : 'text-green-700'}`}>{t('supervisor.markPresent')}</Text>
+                <Text className={`text-sm font-semibold ${item.attendance?.status === 'P' ? 'text-white' : 'text-status-present'}`}>{t('supervisor.markPresent')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => confirmAttendance(item, 'A')}
                 disabled={confirmingId === item.id}
-                className={`flex-1 rounded-lg py-3 items-center justify-center min-h-[44px] ${item.attendance?.status === 'A' ? 'bg-red-600' : 'bg-red-50'}`}
+                className={`flex-1 rounded-lg py-3 items-center justify-center min-h-touch ${item.attendance?.status === 'A' ? 'bg-status-absent' : 'bg-status-absent-bg'}`}
               >
-                <Text className={`text-sm font-semibold ${item.attendance?.status === 'A' ? 'text-white' : 'text-red-700'}`}>{t('supervisor.markAbsent')}</Text>
+                <Text className={`text-sm font-semibold ${item.attendance?.status === 'A' ? 'text-white' : 'text-status-absent'}`}>{t('supervisor.markAbsent')}</Text>
               </TouchableOpacity>
             </View>
           </Card>
         )}
         ListEmptyComponent={
           <Card className="items-center py-10">
-            <Users size={32} color="#D1D5DB" />
-            <Text className="text-sm text-gray-500 mt-3 text-center">{t('common.noData')}</Text>
+            <Users size={32} color={INK[300]} />
+            <Text className="text-sm text-ink-500 mt-3 text-center">{t('common.noData')}</Text>
           </Card>
         }
       />

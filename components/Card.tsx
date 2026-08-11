@@ -1,5 +1,8 @@
 import React from 'react'
 import { View, Text } from 'react-native'
+// Side-effect import — see the comment in theme.ts for why this is here
+// instead of the app's root layout.
+import './theme'
 
 interface CardProps {
   children: React.ReactNode

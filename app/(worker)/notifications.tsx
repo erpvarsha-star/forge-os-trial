@@ -79,9 +79,10 @@ export default function NotificationsScreen() {
           </Card>
         )}
         ListEmptyComponent={
-          <View className="items-center py-12">
+          <View className="items-center py-16">
             <Bell size={40} color="#D1D5DB" />
-            <Text className="text-sm text-gray-500 mt-2">{t('common.noData')}</Text>
+            <Text className="text-sm font-semibold text-gray-700 mt-3">{t('worker.notificationsEmptyTitle')}</Text>
+            <Text className="text-xs text-gray-400 mt-1">{t('common.noData')}</Text>
           </View>
         }
       />

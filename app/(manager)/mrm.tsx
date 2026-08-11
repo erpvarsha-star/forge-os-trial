@@ -8,7 +8,8 @@ import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
-import { Save } from 'lucide-react-native'
+import { Save, AlertTriangle } from 'lucide-react-native'
+import { STATUS } from '@/components/theme'
 
 export default function MRMScreen() {
   const { t } = useTranslation()
@@ -39,25 +40,37 @@ export default function MRMScreen() {
       status: 'submitted',
     })
     setIsSubmitting(false)
-    Alert.alert(t('common.success'), 'MRM review submitted')
+    Alert.alert(t('common.success'), t('manager.mrmSubmitted'))
   }
 
   const isOverdue = new Date().getDate() > 10
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
-      <ScrollView className="flex-1 p-4">
-        {isOverdue && <Card className="mb-4 bg-red-50 border-red-200"><Text className="text-sm text-red-600 font-bold">{t('manager.mrmOverdue')}</Text></Card>}
+      <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 32 }}>
+        <View className="mb-5">
+          <Text className="text-2xl font-bold text-ink-900 tracking-tight">{t('manager.mrmForm')}</Text>
+        </View>
+
+        {isOverdue && (
+          <Card className="mb-4 bg-status-rejected-bg" variant="flat">
+            <View className="flex-row items-center gap-2">
+              <AlertTriangle size={18} color={STATUS.rejected.fg} />
+              <Text className="text-sm font-bold text-status-rejected flex-1">{t('manager.mrmOverdue')}</Text>
+            </View>
+          </Card>
+        )}
         <Card>
-          <Text className="text-lg font-bold text-gray-900 mb-1">{t('manager.mrmForm')}</Text>
-          <Text className="text-xs text-gray-500 mb-4">{t('manager.mrmDeadline')}</Text>
-          <Input label="Safety Score (0-100)" value={safety} onChangeText={setSafety} keyboardType="numeric" maxLength={3} />
-          <Input label="Quality Score (0-100)" value={quality} onChangeText={setQuality} keyboardType="numeric" maxLength={3} />
-          <Input label="Delivery Score (0-100)" value={delivery} onChangeText={setDelivery} keyboardType="numeric" maxLength={3} />
-          <Input label="Cost Score (0-100)" value={cost} onChangeText={setCost} keyboardType="numeric" maxLength={3} />
-          <Input label="Morale Score (0-100)" value={morale} onChangeText={setMorale} keyboardType="numeric" maxLength={3} />
-          <Button title="common.submit" onPress={handleSubmit} loading={isSubmitting} icon={<Save size={18} color="white" />} />
+          <Text className="text-xs text-ink-500 mb-4">{t('manager.mrmDeadline')}</Text>
+          <View className="gap-3">
+            <Input label={t('manager.safetyScore')} value={safety} onChangeText={setSafety} keyboardType="numeric" maxLength={3} />
+            <Input label={t('manager.qualityScore')} value={quality} onChangeText={setQuality} keyboardType="numeric" maxLength={3} />
+            <Input label={t('manager.deliveryScore')} value={delivery} onChangeText={setDelivery} keyboardType="numeric" maxLength={3} />
+            <Input label={t('manager.costScore')} value={cost} onChangeText={setCost} keyboardType="numeric" maxLength={3} />
+            <Input label={t('manager.moraleScore')} value={morale} onChangeText={setMorale} keyboardType="numeric" maxLength={3} />
+            <Button title="common.submit" onPress={handleSubmit} loading={isSubmitting} icon={<Save size={18} color="white" />} className="mt-1" />
+          </View>
         </Card>
       </ScrollView>
     </View>

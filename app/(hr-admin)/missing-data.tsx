@@ -7,7 +7,8 @@ import { Card } from '@/components/Card'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { Employee } from '@/types'
-import { AlertCircle, User } from 'lucide-react-native'
+import { AlertCircle, CheckCircle2 } from 'lucide-react-native'
+import { STATUS } from '@/components/theme'
 
 export default function MissingDataScreen() {
   const { t } = useTranslation()
@@ -29,24 +30,53 @@ export default function MissingDataScreen() {
   }, [employee])
 
   if (!employee) return <LoadingScreen />
+  if (isLoading) return <LoadingScreen />
+
+  const missingFieldLabels = (emp: Employee) => {
+    const fields: string[] = []
+    if (!emp.department) fields.push(t('common.department'))
+    if (!emp.category) fields.push(t('common.category'))
+    if (!emp.supervisor_id) fields.push(t('hrAdmin.supervisorField'))
+    return fields
+  }
+
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
-      <ScrollView className="flex-1 p-4">
-        <Text className="text-xl font-bold text-gray-900 mb-4">{t('hrAdmin.missingData')}</Text>
-        {incomplete.map(emp => (
-          <Card key={emp.id} className="mb-2 bg-yellow-50 border-yellow-200">
-            <View className="flex-row items-center gap-3">
-              <AlertCircle size={18} className="text-yellow-600" />
-              <View>
-                <Text className="text-sm font-bold text-gray-900">{emp.name} ({emp.emp_code})</Text>
-                <Text className="text-xs text-yellow-700">
-                  Missing: {!emp.department ? 'Department ' : ''}{!emp.category ? 'Category ' : ''}{!emp.supervisor_id ? 'Supervisor' : ''}
-                </Text>
-              </View>
+      <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 32 }}>
+        <View className="flex-row items-center justify-between mb-5">
+          <Text className="text-2xl font-bold text-ink-900 tracking-tight">{t('hrAdmin.missingData')}</Text>
+          {incomplete.length > 0 && (
+            <View className="bg-status-pending-bg px-3 py-1 rounded-full">
+              <Text className="text-sm font-bold text-status-pending">{incomplete.length}</Text>
             </View>
+          )}
+        </View>
+
+        {incomplete.length === 0 ? (
+          <Card className="items-center py-10">
+            <CheckCircle2 size={32} color={STATUS.approved.fg} />
+            <Text className="text-sm text-ink-500 mt-3 text-center">{t('hrAdmin.noMissingData')}</Text>
           </Card>
-        ))}
+        ) : (
+          incomplete.map(emp => (
+            <Card key={emp.id} className="mb-3 bg-status-pending-bg" variant="flat">
+              <View className="flex-row items-start gap-3">
+                <AlertCircle size={18} color={STATUS.pending.fg} style={{ marginTop: 1 }} />
+                <View className="flex-1">
+                  <Text className="text-sm font-bold text-ink-900">{emp.name} <Text className="font-mono text-xs text-ink-500">({emp.emp_code})</Text></Text>
+                  <View className="flex-row flex-wrap gap-1.5 mt-2">
+                    {missingFieldLabels(emp).map(f => (
+                      <View key={f} className="bg-white rounded-full px-2 py-0.5">
+                        <Text className="text-xs font-semibold text-status-pending">{f}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              </View>
+            </Card>
+          ))
+        )}
       </ScrollView>
     </View>
   )

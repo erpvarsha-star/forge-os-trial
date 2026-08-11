@@ -41,6 +41,11 @@ const ink = {
 }
 
 module.exports = {
+  // Required for NativeWind v4's metro/CSS pipeline (react-native-css-interop)
+  // to recognize this as a NativeWind project at all — without it,
+  // `withNativeWind()` in metro.config.js refuses to run and no `className`
+  // anywhere in the app resolves to any style, on any platform.
+  presets: [require('nativewind/preset')],
   content: ['./app/**/*.{js,jsx,ts,tsx}', './components/**/*.{js,jsx,ts,tsx}'],
   theme: {
     extend: {

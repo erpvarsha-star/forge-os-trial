@@ -141,8 +141,9 @@ export default function FiveSScreen() {
             )}
           </>
         ) : (
-          <Card>
-            <Text className="text-sm text-gray-500 text-center">{t('common.noData')}</Text>
+          <Card className="items-center py-14">
+            <Trophy size={40} color="#D1D5DB" />
+            <Text className="text-sm text-gray-500 mt-3 text-center px-4">{t('worker.5sNoChallenge')}</Text>
           </Card>
         )}
       </ScrollView>

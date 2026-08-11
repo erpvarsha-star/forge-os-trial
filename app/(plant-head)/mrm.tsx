@@ -7,7 +7,8 @@ import { Card } from '@/components/Card'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { MRMReview } from '@/types'
-import { CheckCircle, Clock } from 'lucide-react-native'
+import { CheckCircle, Clock, FileText } from 'lucide-react-native'
+import { STATUS, INK } from '@/components/theme'
 
 export default function PlantHeadMRM() {
   const { t } = useTranslation()
@@ -27,22 +28,47 @@ export default function PlantHeadMRM() {
   }, [employee])
 
   if (!employee) return <LoadingScreen />
+  if (isLoading) return <LoadingScreen />
+
+  const submittedCount = reviews.filter(r => r.status === 'submitted').length
+
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
-      <ScrollView className="flex-1 p-4">
-        <Text className="text-xl font-bold text-gray-900 mb-4">{t('plantHead.mrmStatus')}</Text>
-        {reviews.map(review => (
-          <Card key={review.id} className="mb-2">
-            <View className="flex-row items-center justify-between">
-              <View>
-                <Text className="text-sm font-bold text-gray-900">{review.department}</Text>
-                <Text className="text-xs text-gray-500">Safety: {review.safety_score} | Quality: {review.quality_score}</Text>
-              </View>
-              {review.status === 'submitted' ? <CheckCircle size={20} className="text-green-600" /> : <Clock size={20} className="text-yellow-600" />}
-            </View>
+      <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 32 }}>
+        <View className="mb-5">
+          <Text className="text-2xl font-bold text-ink-900 tracking-tight">{t('plantHead.mrmStatus')}</Text>
+        </View>
+
+        {reviews.length > 0 && (
+          <Card className="mb-4 flex-row items-center justify-between">
+            <Text className="text-sm font-semibold text-ink-700">{t('plantHead.departmentsSubmitted')}</Text>
+            <Text className="text-lg font-bold text-brand-600 tabular-nums">{submittedCount} / {reviews.length}</Text>
           </Card>
-        ))}
+        )}
+
+        {reviews.length === 0 ? (
+          <Card className="items-center py-10">
+            <FileText size={32} color={INK[300]} />
+            <Text className="text-sm text-ink-500 mt-3 text-center">{t('plantHead.noMrmData')}</Text>
+          </Card>
+        ) : (
+          reviews.map(review => (
+            <Card key={review.id} className="mb-3">
+              <View className="flex-row items-center justify-between">
+                <View className="flex-1 pr-2">
+                  <Text className="text-sm font-bold text-ink-900">{review.department}</Text>
+                  <Text className="text-xs text-ink-500 mt-0.5">{t('common.safety')}: {review.safety_score} | {t('common.quality')}: {review.quality_score}</Text>
+                </View>
+                {review.status === 'submitted' ? (
+                  <View className="w-8 h-8 rounded-full bg-status-approved-bg items-center justify-center"><CheckCircle size={16} color={STATUS.approved.fg} /></View>
+                ) : (
+                  <View className="w-8 h-8 rounded-full bg-status-pending-bg items-center justify-center"><Clock size={16} color={STATUS.pending.fg} /></View>
+                )}
+              </View>
+            </Card>
+          ))
+        )}
       </ScrollView>
     </View>
   )

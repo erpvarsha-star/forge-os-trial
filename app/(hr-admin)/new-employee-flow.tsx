@@ -7,7 +7,8 @@ import { Card } from '@/components/Card'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { Employee } from '@/types'
-import { CheckCircle, Clock, User } from 'lucide-react-native'
+import { Clock, User, UserCheck } from 'lucide-react-native'
+import { BRAND, STATUS, INK } from '@/components/theme'
 
 export default function NewEmployeeFlowScreen() {
   const { t } = useTranslation()
@@ -26,34 +27,57 @@ export default function NewEmployeeFlowScreen() {
   }, [employee])
 
   if (!employee) return <LoadingScreen />
+  if (isLoading) return <LoadingScreen />
+
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
-      <ScrollView className="flex-1 p-4">
-        <Text className="text-xl font-bold text-gray-900 mb-4">{t('hrAdmin.newEmployeeFlow')}</Text>
-        <Text className="text-sm text-gray-500 mb-4">{t('hrAdmin.activationSteps')}</Text>
-        <View className="flex-row justify-between mb-4 px-2">
-          {['step1', 'step2', 'step3', 'step4'].map((step, i) => (
-            <View key={step} className="items-center flex-1">
-              <View className={`w-8 h-8 rounded-full items-center justify-center mb-1 ${i === 0 ? 'bg-orange-600' : 'bg-gray-200'}`}>
-                <Text className={`text-xs font-bold ${i === 0 ? 'text-white' : 'text-gray-500'}`}>{i + 1}</Text>
-              </View>
-              <Text className="text-xs text-gray-500 text-center">{t(`hrAdmin.${step}`)}</Text>
+      <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 32 }}>
+        <View className="flex-row items-center justify-between mb-2">
+          <Text className="text-2xl font-bold text-ink-900 tracking-tight">{t('hrAdmin.newEmployeeFlow')}</Text>
+          {pending.length > 0 && (
+            <View className="bg-status-pending-bg px-3 py-1 rounded-full">
+              <Text className="text-sm font-bold text-status-pending">{t('common.pendingCount', { count: pending.length })}</Text>
             </View>
-          ))}
+          )}
         </View>
-        {pending.map(emp => (
-          <Card key={emp.id} className="mb-2">
-            <View className="flex-row items-center gap-3">
-              <User size={18} className="text-orange-600" />
-              <View className="flex-1">
-                <Text className="text-sm font-bold text-gray-900">{emp.name}</Text>
-                <Text className="text-xs text-gray-500">{emp.emp_code} • {emp.phone}</Text>
+        <Text className="text-sm text-ink-500 mb-4">{t('hrAdmin.activationSteps')}</Text>
+
+        <Card className="mb-6">
+          <View className="flex-row justify-between px-1">
+            {['step1', 'step2', 'step3', 'step4'].map((step, i) => (
+              <View key={step} className="items-center flex-1">
+                <View className={`w-8 h-8 rounded-full items-center justify-center mb-1.5 ${i === 0 ? 'bg-brand-600' : 'bg-ink-100'}`}>
+                  <Text className={`text-xs font-bold ${i === 0 ? 'text-white' : 'text-ink-500'}`}>{i + 1}</Text>
+                </View>
+                <Text className="text-2xs text-ink-500 text-center leading-4">{t(`hrAdmin.${step}`)}</Text>
               </View>
-              <Clock size={16} className="text-yellow-600" />
-            </View>
+            ))}
+          </View>
+        </Card>
+
+        <Text className="text-xs font-semibold uppercase tracking-wider text-ink-400 mb-2">{t('hrAdmin.pendingActivations')}</Text>
+        {pending.length === 0 ? (
+          <Card className="items-center py-10">
+            <UserCheck size={32} color={INK[300]} />
+            <Text className="text-sm text-ink-500 mt-3 text-center">{t('hrAdmin.noPendingActivations')}</Text>
           </Card>
-        ))}
+        ) : (
+          pending.map(emp => (
+            <Card key={emp.id} className="mb-3">
+              <View className="flex-row items-center gap-3">
+                <View className="w-10 h-10 rounded-full bg-brand-50 items-center justify-center"><User size={18} color={BRAND[600]} /></View>
+                <View className="flex-1">
+                  <Text className="text-sm font-bold text-ink-900">{emp.name}</Text>
+                  <Text className="text-xs text-ink-500 font-mono mt-0.5">{emp.emp_code} • {emp.phone || '—'}</Text>
+                </View>
+                <View className="w-8 h-8 rounded-full bg-status-pending-bg items-center justify-center">
+                  <Clock size={15} color={STATUS.pending.fg} />
+                </View>
+              </View>
+            </Card>
+          ))
+        )}
       </ScrollView>
     </View>
   )

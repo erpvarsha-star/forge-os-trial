@@ -54,24 +54,30 @@ export default function WorkerMore() {
           </View>
         </Card>
 
-        {menuItems.map((item, index) => (
-          <TouchableOpacity
-            key={index}
-            onPress={item.onPress}
-            className="bg-white rounded-xl p-4 mb-2 flex-row items-center justify-between shadow-sm border border-gray-100"
-          >
-            <View className="flex-row items-center gap-3">
-              {item.icon}
-              <Text className="text-base text-gray-900">{t(item.label)}</Text>
-            </View>
-            <View className="flex-row items-center gap-2">
-              {item.value && <Text className="text-sm text-gray-500">{item.value}</Text>}
-              <ChevronRight size={18} color="#9CA3AF" />
-            </View>
-          </TouchableOpacity>
-        ))}
+        <View className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          {menuItems.map((item, index) => (
+            <TouchableOpacity
+              key={index}
+              onPress={item.onPress}
+              className={`p-4 flex-row items-center justify-between ${
+                index < menuItems.length - 1 ? 'border-b border-gray-100' : ''
+              }`}
+            >
+              <View className="flex-row items-center gap-3 flex-1">
+                {item.icon}
+                <Text className="text-base text-gray-900 flex-1" numberOfLines={2}>{t(item.label)}</Text>
+              </View>
+              <View className="flex-row items-center gap-2">
+                {item.value && <Text className="text-sm text-gray-500">{item.value}</Text>}
+                <ChevronRight size={18} color="#9CA3AF" />
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-        <UpdateAppLink />
+        <View className="mt-4">
+          <UpdateAppLink />
+        </View>
 
         <Button
           title="common.logout"

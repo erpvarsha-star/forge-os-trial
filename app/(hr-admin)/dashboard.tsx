@@ -7,7 +7,8 @@ import { Card } from '@/components/Card'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { router } from 'expo-router'
-import { Users, AlertCircle, CreditCard, Calendar } from 'lucide-react-native'
+import { Users, AlertCircle, CreditCard, Calendar, ChevronRight } from 'lucide-react-native'
+import { BRAND, STATUS, INK } from '@/components/theme'
 
 interface DashboardStats {
   totalEmployees: number
@@ -60,79 +61,92 @@ export default function HrAdminDashboard() {
   }
 
   if (!employee) return <LoadingScreen />
+  if (isLoading) return <LoadingScreen />
 
   const attendancePct = stats.totalEmployees > 0
     ? ((stats.presentToday / stats.totalEmployees) * 100).toFixed(1)
     : '0.0'
 
-  return (
-    <View className="flex-1 bg-gray-50">
-      <Header empCode={employee.emp_code} role={employee.role} />
-      <ScrollView className="flex-1 p-4">
-        <Text className="text-xl font-bold text-gray-900 mb-4">{t('hrAdmin.employeeMaster')}</Text>
+  const rows = [
+    {
+      key: 'missing-data',
+      icon: <AlertCircle size={20} color={stats.missingDataCount > 0 ? STATUS.rejected.fg : INK[400]} />,
+      label: t('hrAdmin.missingData'),
+      path: '/(hr-admin)/missing-data',
+      badge: stats.missingDataCount,
+      badgeTone: stats.missingDataCount > 0 ? 'rejected' : 'neutral',
+    },
+    {
+      key: 'advance-ledger',
+      icon: <CreditCard size={20} color={BRAND[600]} />,
+      label: t('hrAdmin.advanceLedger'),
+      path: '/(hr-admin)/advance-ledger',
+      badge: stats.pendingAdvances,
+      badgeTone: stats.pendingAdvances > 0 ? 'pending' : 'neutral',
+    },
+    {
+      key: 'shifts',
+      icon: <Calendar size={20} color={BRAND[600]} />,
+      label: t('hrAdmin.shiftPlanning'),
+      path: '/(hr-admin)/shifts',
+      badge: null,
+      badgeTone: 'neutral' as const,
+    },
+    {
+      key: 'new-employee-flow',
+      icon: <Users size={20} color={BRAND[600]} />,
+      label: t('hrAdmin.newEmployeeFlow'),
+      path: '/(hr-admin)/new-employee-flow',
+      badge: stats.pendingLeaves,
+      badgeTone: stats.pendingLeaves > 0 ? 'pending' : 'neutral',
+    },
+  ] as const
 
-        <View className="flex-row gap-3 mb-3">
-          <Card className="flex-1 items-center py-4">
-            <Text className="text-3xl font-bold text-orange-600">{stats.totalEmployees}</Text>
-            <Text className="text-xs text-gray-500 mt-1 text-center">{t('common.total')} {t('common.name')}</Text>
+  const badgeClasses: Record<string, { bg: string; text: string }> = {
+    rejected: { bg: 'bg-status-rejected-bg', text: 'text-status-rejected' },
+    pending: { bg: 'bg-status-pending-bg', text: 'text-status-pending' },
+    neutral: { bg: 'bg-ink-100', text: 'text-ink-500' },
+  }
+
+  return (
+    <View className="flex-1 bg-ink-50">
+      <Header empCode={employee.emp_code} role={employee.role} />
+      <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 32 }}>
+        <View className="mb-5">
+          <Text className="text-2xl font-bold text-ink-900 tracking-tight">{t('hrAdmin.employeeMaster')}</Text>
+        </View>
+
+        <View className="flex-row gap-3 mb-6">
+          <Card className="flex-1 items-center py-5">
+            <Text className="text-3xl font-bold text-brand-600 tabular-nums">{stats.totalEmployees}</Text>
+            <Text className="text-xs text-ink-500 mt-1 text-center">{t('common.total')} {t('common.name')}</Text>
           </Card>
-          <Card className="flex-1 items-center py-4">
-            <Text className="text-3xl font-bold text-green-600">{attendancePct}%</Text>
-            <Text className="text-xs text-gray-500 mt-1 text-center">{t('common.present')} {t('common.date')}</Text>
+          <Card className="flex-1 items-center py-5">
+            <Text className="text-3xl font-bold text-status-approved tabular-nums">{attendancePct}%</Text>
+            <Text className="text-xs text-ink-500 mt-1 text-center">{t('common.present')} {t('common.date')}</Text>
           </Card>
         </View>
 
-        <TouchableOpacity onPress={() => router.push('/(hr-admin)/missing-data')}>
-          <Card className="mb-3 flex-row items-center justify-between">
-            <View className="flex-row items-center gap-3">
-              <AlertCircle size={20} color={stats.missingDataCount > 0 ? '#DC2626' : '#9CA3AF'} />
-              <Text className="text-base font-medium text-gray-900">{t('hrAdmin.missingData')}</Text>
-            </View>
-            <View className={`px-2 py-1 rounded-full ${stats.missingDataCount > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
-              <Text className={`text-sm font-bold ${stats.missingDataCount > 0 ? 'text-red-700' : 'text-gray-500'}`}>
-                {stats.missingDataCount}
-              </Text>
-            </View>
-          </Card>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.push('/(hr-admin)/advance-ledger')}>
-          <Card className="mb-3 flex-row items-center justify-between">
-            <View className="flex-row items-center gap-3">
-              <CreditCard size={20} color="#E65C00" />
-              <Text className="text-base font-medium text-gray-900">{t('hrAdmin.advanceLedger')}</Text>
-            </View>
-            <View className={`px-2 py-1 rounded-full ${stats.pendingAdvances > 0 ? 'bg-orange-100' : 'bg-gray-100'}`}>
-              <Text className={`text-sm font-bold ${stats.pendingAdvances > 0 ? 'text-orange-700' : 'text-gray-500'}`}>
-                {stats.pendingAdvances} {t('common.pending')}
-              </Text>
-            </View>
-          </Card>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.push('/(hr-admin)/shifts')}>
-          <Card className="mb-3 flex-row items-center justify-between">
-            <View className="flex-row items-center gap-3">
-              <Calendar size={20} color="#E65C00" />
-              <Text className="text-base font-medium text-gray-900">{t('hrAdmin.shiftPlanning')}</Text>
-            </View>
-            <Text className="text-sm text-gray-500">{t('common.view')}</Text>
-          </Card>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.push('/(hr-admin)/new-employee-flow')}>
-          <Card className="mb-3 flex-row items-center justify-between">
-            <View className="flex-row items-center gap-3">
-              <Users size={20} color="#E65C00" />
-              <Text className="text-base font-medium text-gray-900">{t('hrAdmin.newEmployeeFlow')}</Text>
-            </View>
-            <View className={`px-2 py-1 rounded-full ${stats.pendingLeaves > 0 ? 'bg-yellow-100' : 'bg-gray-100'}`}>
-              <Text className={`text-sm font-bold ${stats.pendingLeaves > 0 ? 'text-yellow-700' : 'text-gray-500'}`}>
-                {stats.pendingLeaves} {t('common.pending')}
-              </Text>
-            </View>
-          </Card>
-        </TouchableOpacity>
+        <Text className="text-xs font-semibold uppercase tracking-wider text-ink-400 mb-2">{t('common.overview')}</Text>
+        {rows.map(row => (
+          <TouchableOpacity key={row.key} onPress={() => router.push(row.path as any)} className="mb-3 min-h-touch">
+            <Card className="flex-row items-center justify-between">
+              <View className="flex-row items-center gap-3 flex-1">
+                {row.icon}
+                <Text className="text-base font-medium text-ink-900 flex-1">{row.label}</Text>
+              </View>
+              {row.badge !== null ? (
+                <View className={`px-2.5 py-1 rounded-full ${badgeClasses[row.badgeTone].bg}`}>
+                  <Text className={`text-sm font-bold ${badgeClasses[row.badgeTone].text}`}>
+                    {row.badge} {row.badge > 0 ? t('common.pending') : ''}
+                  </Text>
+                </View>
+              ) : (
+                <ChevronRight size={18} color="#B9C0CC" />
+              )}
+            </Card>
+          </TouchableOpacity>
+        ))}
       </ScrollView>
     </View>
   )

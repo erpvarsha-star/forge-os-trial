@@ -68,16 +68,21 @@ export default function EODLockScreen() {
     <View className="flex-1 bg-gray-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
-        <View className="flex-row gap-3 mb-4">
-          <Card className="flex-1 items-center">
-            <Text className="text-2xl font-bold text-green-600">{inwardCount}</Text>
-            <Text className="text-xs text-gray-500">{t('security.inward')}</Text>
-          </Card>
-          <Card className="flex-1 items-center">
-            <Text className="text-2xl font-bold text-blue-600">{outwardCount}</Text>
-            <Text className="text-xs text-gray-500">{t('security.outward')}</Text>
-          </Card>
-        </View>
+        <Text className="text-sm font-bold text-gray-700 mb-2 px-1">{t('common.today')}</Text>
+        <Card className="mb-4">
+          <Text className="text-xs text-gray-500 mb-3 -mt-1">{t('security.eodHint')}</Text>
+          <View className="flex-row">
+            <View className="flex-1 items-center">
+              <Text className="text-2xl font-bold text-green-600">{inwardCount}</Text>
+              <Text className="text-xs text-gray-500 mt-0.5">{t('security.inward')}</Text>
+            </View>
+            <View className="w-px bg-gray-100" />
+            <View className="flex-1 items-center">
+              <Text className="text-2xl font-bold text-blue-600">{outwardCount}</Text>
+              <Text className="text-xs text-gray-500 mt-0.5">{t('security.outward')}</Text>
+            </View>
+          </View>
+        </Card>
 
         <Card className={mismatch ? 'border-red-300 mb-4' : 'border-green-300 mb-4'}>
           <View className="flex-row items-center gap-2 mb-2">
@@ -110,7 +115,7 @@ export default function EODLockScreen() {
         )}
 
         <Button
-          title={existing ? t('security.reconfirmEod') : t('security.confirmEod')}
+          title={existing ? 'security.reconfirmEod' : 'security.confirmEod'}
           onPress={confirmEod}
           loading={isConfirming}
           variant={mismatch ? 'danger' : 'primary'}

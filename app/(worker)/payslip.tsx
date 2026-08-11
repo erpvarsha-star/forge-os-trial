@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase'
 import { PayrollRecord } from '@/types'
 import { generatePayslip } from '@/lib/payslip'
 import * as Sharing from 'expo-sharing'
-import { Download, Printer } from 'lucide-react-native'
+import { Download, FileText } from 'lucide-react-native'
 
 export default function PayslipScreen() {
   const { t } = useTranslation()
@@ -54,7 +54,7 @@ export default function PayslipScreen() {
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
         <Text className="text-xl font-bold text-gray-900 mb-4">
-          {t('worker.payslipMonth', { month: record?.month || '--' })}
+          {record ? t('worker.payslipMonth', { month: record.month }) : t('worker.payslipTitle')}
         </Text>
 
         {record ? (
@@ -106,8 +106,11 @@ export default function PayslipScreen() {
             />
           </>
         ) : (
-          <Card>
-            <Text className="text-sm text-gray-500 text-center">{t('common.noData')}</Text>
+          <Card className="items-center py-14">
+            <FileText size={40} color="#D1D5DB" />
+            <Text className="text-sm text-gray-500 mt-3 text-center px-4">
+              {t('worker.payslipNotAvailable')}
+            </Text>
           </Card>
         )}
       </ScrollView>

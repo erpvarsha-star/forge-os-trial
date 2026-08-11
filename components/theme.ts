@@ -1,3 +1,16 @@
+// NativeWind v4's CSS pipeline (metro.config.js + tailwind.config.js preset)
+// generates actual styles from Tailwind classes, but nothing ever executes
+// that generated stylesheet unless some JS module explicitly imports the
+// CSS entry file — conventionally done once in the app's root layout. This
+// repo's root layout (app/_layout.tsx) is out of this design-system change's
+// scope, so the import lives here instead: theme.ts is transitively reached
+// by every screen (all of them import at least one shared component, and
+// every one of those components imports this file), so this import runs
+// before first paint regardless of which screen loads first. If a future
+// change moves this to app/_layout.tsx (the more conventional location),
+// remove it from here to avoid double-registration.
+import '../global.css'
+
 /**
  * Raw design-token values, mirroring tailwind.config.js.
  *

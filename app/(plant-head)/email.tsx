@@ -8,6 +8,7 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { EmailTask } from '@/types'
 import { Mail, Inbox } from 'lucide-react-native'
+import { BRAND, INK } from '@/components/theme'
 
 export default function PlantHeadEmail() {
   const { t } = useTranslation()
@@ -26,23 +27,42 @@ export default function PlantHeadEmail() {
   }, [employee])
 
   if (!employee) return <LoadingScreen />
+  if (isLoading) return <LoadingScreen />
+
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
-      <ScrollView className="flex-1 p-4">
-        <Text className="text-xl font-bold text-gray-900 mb-4">{t('plantHead.emailDashboard')}</Text>
-        {tasks.map(task => (
-          <Card key={task.id} className="mb-2">
-            <View className="flex-row items-start gap-3">
-              <Mail size={18} className="text-orange-600 mt-0.5" />
-              <View className="flex-1">
-                <Text className="text-sm font-bold text-gray-900">{task.subject}</Text>
-                <Text className="text-xs text-gray-500">{task.sender} • {task.inbox}</Text>
-                <Text className="text-xs text-orange-600 mt-1">Priority: {task.priority}</Text>
-              </View>
+      <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 32 }}>
+        <View className="flex-row items-center justify-between mb-5">
+          <Text className="text-2xl font-bold text-ink-900 tracking-tight">{t('plantHead.emailDashboard')}</Text>
+          {tasks.length > 0 && (
+            <View className="bg-status-pending-bg px-3 py-1 rounded-full">
+              <Text className="text-sm font-bold text-status-pending">{tasks.length}</Text>
             </View>
+          )}
+        </View>
+
+        {tasks.length === 0 ? (
+          <Card className="items-center py-10">
+            <Inbox size={32} color={INK[300]} />
+            <Text className="text-sm text-ink-500 mt-3 text-center">{t('plantHead.noEmailTasks')}</Text>
           </Card>
-        ))}
+        ) : (
+          tasks.map(task => (
+            <Card key={task.id} className="mb-3">
+              <View className="flex-row items-start gap-3">
+                <View className="w-9 h-9 rounded-full bg-brand-50 items-center justify-center mt-0.5"><Mail size={16} color={BRAND[600]} /></View>
+                <View className="flex-1">
+                  <Text className="text-sm font-bold text-ink-900">{task.subject}</Text>
+                  <Text className="text-xs text-ink-500 mt-0.5">{task.sender} • {task.inbox}</Text>
+                </View>
+                <View className="bg-brand-50 rounded-full px-2 py-0.5">
+                  <Text className="text-xs font-bold text-brand-700">{t('plantHead.priorityLabel')} {task.priority}</Text>
+                </View>
+              </View>
+            </Card>
+          ))
+        )}
       </ScrollView>
     </View>
   )

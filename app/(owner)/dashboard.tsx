@@ -6,9 +6,10 @@ import { Header } from '@/components/Header'
 import { Card } from '@/components/Card'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
-import { TrendingUp, DollarSign, Users, Award } from 'lucide-react-native'
+import { TrendingUp, Award } from 'lucide-react-native'
 import { TouchableOpacity } from 'react-native'
 import { router } from 'expo-router'
+import { BRAND, STATUS } from '@/components/theme'
 
 export default function OwnerDashboard() {
   const { t } = useTranslation()
@@ -40,44 +41,49 @@ export default function OwnerDashboard() {
   }, [employee])
 
   if (!employee) return <LoadingScreen />
+  if (isLoading) return <LoadingScreen />
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
-      <ScrollView className="flex-1 p-4">
-        <Text className="text-xl font-bold text-gray-900 mb-4">{t('owner.kpiDashboard')}</Text>
-        <View className="flex-row gap-3 mb-4">
-          <Card className="flex-1 items-center">
-            <TrendingUp size={24} className="text-green-600 mb-1" />
-            <Text className="text-2xl font-bold text-gray-900">{kpi.attendance.toFixed(1)}%</Text>
-            <Text className="text-xs text-gray-500">{t('owner.attendanceKpi')}</Text>
+      <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 32 }}>
+        <View className="mb-5">
+          <Text className="text-2xl font-bold text-ink-900 tracking-tight">{t('owner.kpiDashboard')}</Text>
+        </View>
+
+        <View className="flex-row gap-3 mb-6">
+          <Card className="flex-1 items-center py-4">
+            <View className="w-9 h-9 rounded-full bg-status-approved-bg items-center justify-center mb-2"><TrendingUp size={18} color={STATUS.approved.fg} /></View>
+            <Text className="text-2xl font-bold text-ink-900 tabular-nums">{kpi.attendance.toFixed(1)}%</Text>
+            <Text className="text-xs text-ink-500 mt-0.5 text-center">{t('owner.attendanceKpi')}</Text>
           </Card>
-          <Card className="flex-1 items-center">
-            <TrendingUp size={24} className="text-blue-600 mb-1" />
-            <Text className="text-2xl font-bold text-gray-900">{kpi.production}%</Text>
-            <Text className="text-xs text-gray-500">{t('owner.productionKpi')}</Text>
+          <Card className="flex-1 items-center py-4">
+            <View className="w-9 h-9 rounded-full bg-ink-100 items-center justify-center mb-2"><TrendingUp size={18} color="#4B5265" /></View>
+            <Text className="text-2xl font-bold text-ink-900 tabular-nums">{kpi.production}%</Text>
+            <Text className="text-xs text-ink-500 mt-0.5 text-center">{t('owner.productionKpi')}</Text>
           </Card>
-          <Card className="flex-1 items-center">
-            <Award size={24} className="text-orange-600 mb-1" />
-            <Text className="text-2xl font-bold text-gray-900">{kpi.score}</Text>
-            <Text className="text-xs text-gray-500">{t('owner.scoreKpi')}</Text>
+          <Card className="flex-1 items-center py-4">
+            <View className="w-9 h-9 rounded-full bg-brand-50 items-center justify-center mb-2"><Award size={18} color={BRAND[600]} /></View>
+            <Text className="text-2xl font-bold text-ink-900 tabular-nums">{kpi.score}</Text>
+            <Text className="text-xs text-ink-500 mt-0.5 text-center">{t('owner.scoreKpi')}</Text>
           </Card>
         </View>
 
-        <TouchableOpacity onPress={() => router.push('/(owner)/eotm')} className="mb-4">
-          <Card className="bg-orange-50 border-orange-200">
+        <TouchableOpacity onPress={() => router.push('/(owner)/eotm')} className="mb-6 min-h-touch">
+          <Card className="bg-brand-50" variant="flat">
             <View className="flex-row items-center gap-3">
-              <Award size={24} className="text-orange-600" />
-              <Text className="text-base font-bold text-orange-800">{t('owner.eotm')}</Text>
+              <Award size={22} color={BRAND[600]} />
+              <Text className="text-base font-bold text-brand-800 flex-1">{t('owner.eotm')}</Text>
             </View>
           </Card>
         </TouchableOpacity>
 
-        <Card title={t('owner.costSummary')}>
-          <View className="gap-2">
-            <View className="flex-row justify-between"><Text className="text-sm text-gray-600">{t('owner.payrollCost')}</Text><Text className="text-sm font-bold text-gray-900">₹{kpi.payroll.toLocaleString()}</Text></View>
-            <View className="flex-row justify-between"><Text className="text-sm text-gray-600">{t('owner.advanceCost')}</Text><Text className="text-sm font-bold text-gray-900">₹{kpi.advances.toLocaleString()}</Text></View>
-            <View className="flex-row justify-between"><Text className="text-sm text-gray-600">{t('owner.incentiveCost')}</Text><Text className="text-sm font-bold text-gray-900">₹{kpi.incentives.toLocaleString()}</Text></View>
+        <Text className="text-xs font-semibold uppercase tracking-wider text-ink-400 mb-2">{t('owner.costSummary')}</Text>
+        <Card>
+          <View className="gap-3">
+            <View className="flex-row justify-between items-center"><Text className="text-sm text-ink-600">{t('owner.payrollCost')}</Text><Text className="text-base font-bold text-ink-900 font-mono tabular-nums">₹{kpi.payroll.toLocaleString()}</Text></View>
+            <View className="flex-row justify-between items-center"><Text className="text-sm text-ink-600">{t('owner.advanceCost')}</Text><Text className="text-base font-bold text-ink-900 font-mono tabular-nums">₹{kpi.advances.toLocaleString()}</Text></View>
+            <View className="flex-row justify-between items-center"><Text className="text-sm text-ink-600">{t('owner.incentiveCost')}</Text><Text className="text-base font-bold text-ink-900 font-mono tabular-nums">₹{kpi.incentives.toLocaleString()}</Text></View>
           </View>
         </Card>
       </ScrollView>

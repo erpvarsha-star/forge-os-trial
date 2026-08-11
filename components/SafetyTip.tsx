@@ -16,16 +16,21 @@ export function SafetyTip({ dayIndex }: SafetyTipProps) {
   const isHindi = i18n.language === 'hi'
 
   return (
-    <Card className="bg-amber-50 border-amber-200">
+    <Card variant="flat" className="bg-status-late-bg border-amber-200">
       <View className="flex-row items-start gap-3">
-        <AlertTriangle size={20} className="text-amber-600 mt-0.5" />
+        <View className="w-8 h-8 rounded-full bg-white items-center justify-center mt-0.5">
+          {/* lucide icons don't pick up NativeWind className here — pass
+              color explicitly, matching how every other icon in this app
+              is colored. */}
+          <AlertTriangle size={18} color="#A6650A" />
+        </View>
         <View className="flex-1">
-          <Text className="text-sm font-bold text-amber-800 mb-1">{t('worker.safetyTip')}</Text>
-          <Text className="text-sm text-amber-900 leading-relaxed">
+          <Text className="text-sm font-bold text-status-late mb-1">{t('worker.safetyTip')}</Text>
+          <Text className="text-sm text-ink-800 leading-relaxed">
             {isHindi ? tip.hi : tip.en}
           </Text>
           {isHindi && (
-            <Text className="text-xs text-amber-700 mt-1 italic">{tip.en}</Text>
+            <Text className="text-xs text-ink-500 mt-1 italic">{tip.en}</Text>
           )}
         </View>
       </View>

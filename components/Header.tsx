@@ -3,6 +3,9 @@ import { View, Text } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { APP_CONFIG } from '@/lib/config'
 import { BrandLogo } from '@/components/BrandLogo'
+// Side-effect import — see the comment in theme.ts for why this is here
+// instead of the app's root layout.
+import './theme'
 
 interface HeaderProps {
   empCode?: string

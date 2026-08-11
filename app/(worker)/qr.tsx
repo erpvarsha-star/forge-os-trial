@@ -10,7 +10,7 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { getCurrentLocation, getPlantConfig, isInsideGeofence } from '@/lib/location'
 import { supabase } from '@/lib/supabase'
 import { BarCodeScanner } from 'expo-barcode-scanner'
-import { QrCode, ScanLine } from 'lucide-react-native'
+import { QrCode, ScanLine, CameraOff } from 'lucide-react-native'
 
 export default function QRScreen() {
   const { t } = useTranslation()
@@ -90,7 +90,8 @@ export default function QRScreen() {
       <View className="flex-1 bg-gray-50">
         <Header empCode={employee.emp_code} role={employee.role} />
         <View className="flex-1 items-center justify-center p-6">
-          <Text className="text-sm text-gray-500">Camera permission required for QR scanning</Text>
+          <CameraOff size={40} color="#D1D5DB" />
+          <Text className="text-sm text-gray-500 mt-3 text-center">{t('worker.cameraPermissionRequired')}</Text>
         </View>
       </View>
     )
@@ -100,6 +101,9 @@ export default function QRScreen() {
     <View className="flex-1 bg-gray-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <View className="flex-1 p-4">
+        {!todayRecord?.check_in_time && (
+          <Text className="text-xs text-gray-500 text-center mb-3 px-2">{t('worker.qrHint')}</Text>
+        )}
         <Card className="flex-1 items-center justify-center">
           {todayRecord?.check_in_time ? (
             <View className="items-center">

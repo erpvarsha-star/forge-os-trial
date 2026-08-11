@@ -8,7 +8,8 @@ import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { LeaveRequest, AdvanceRequest } from '@/types'
-import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react-native'
+import { AlertTriangle, CheckCircle, XCircle, Inbox } from 'lucide-react-native'
+import { INK, STATUS } from '@/components/theme'
 
 export default function ManagerApprovals() {
   const { t } = useTranslation()
@@ -46,35 +47,95 @@ export default function ManagerApprovals() {
     fetchApprovals()
   }
 
+  const waitingLabel = (createdAt: string) => {
+    const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000)
+    return days <= 0 ? t('common.today') : t('common.waitingDays', { count: days })
+  }
+
   if (!employee) return <LoadingScreen />
+  if (isLoading) return <LoadingScreen />
+
+  const totalPending = leaves.length + advances.length
+
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
-      <ScrollView className="flex-1 p-4">
-        <Text className="text-lg font-bold text-gray-900 mb-2">{t('manager.escalatedApprovals')}</Text>
-        {leaves.map(req => (
-          <Card key={req.id} className="mb-2">
-            <Text className="text-sm font-bold text-gray-900">{req.employee?.name}</Text>
-            <Text className="text-xs text-gray-500">{req.type}: {req.start_date} to {req.end_date}</Text>
-            <View className="flex-row gap-2 mt-2">
-              <Button title="supervisor.approve" onPress={() => approve('leave_requests', req.id)} size="sm" className="flex-1" icon={<CheckCircle size={14} color="white" />} />
-              <Button title="supervisor.reject" onPress={() => reject('leave_requests', req.id)} variant="danger" size="sm" className="flex-1" icon={<XCircle size={14} color="white" />} />
+      <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 32 }}>
+        <View className="flex-row items-center justify-between mb-5">
+          <Text className="text-2xl font-bold text-ink-900 tracking-tight">{t('manager.escalatedApprovals')}</Text>
+          {totalPending > 0 && (
+            <View className="bg-status-pending-bg px-3 py-1 rounded-full">
+              <Text className="text-sm font-bold text-status-pending">{t('common.pendingCount', { count: totalPending })}</Text>
             </View>
+          )}
+        </View>
+
+        {totalPending === 0 ? (
+          <Card className="items-center py-10">
+            <Inbox size={32} color={INK[300]} />
+            <Text className="text-sm text-ink-500 mt-3 text-center">{t('manager.noEscalations')}</Text>
           </Card>
-        ))}
-        {advances.map(req => (
-          <Card key={req.id} className="mb-2">
-            <Text className="text-sm font-bold text-gray-900">{req.employee?.name}</Text>
-            <Text className="text-xs text-gray-500">₹{req.amount}</Text>
-            {req.amount > (req.employee?.salary || 0) * 0.3 && (
-              <View className="flex-row items-center gap-1 mt-1"><AlertTriangle size={14} className="text-red-600" /><Text className="text-xs text-red-600">{t('manager.advanceSafetyCheck')}</Text></View>
+        ) : (
+          <>
+            {leaves.length > 0 && (
+              <>
+                <Text className="text-xs font-semibold uppercase tracking-wider text-ink-400 mb-2">{t('supervisor.pendingLeaves')}</Text>
+                {leaves.map(req => (
+                  <Card key={req.id} className="mb-3">
+                    <View className="flex-row items-start justify-between mb-2">
+                      <View className="flex-1 pr-2">
+                        <Text className="text-base font-bold text-ink-900">{req.employee?.name}</Text>
+                        <Text className="text-xs text-ink-500 mt-0.5">{req.employee?.department}</Text>
+                      </View>
+                      <Text className="text-xs text-ink-400">{waitingLabel(req.created_at)}</Text>
+                    </View>
+                    <View className="flex-row items-center gap-2 mb-3">
+                      <View className="bg-ink-100 rounded-full px-2 py-0.5"><Text className="text-xs font-semibold text-ink-600">{req.type}</Text></View>
+                      <Text className="text-xs text-ink-500">{req.start_date} → {req.end_date}</Text>
+                    </View>
+                    <View className="flex-row gap-2">
+                      <Button title="supervisor.approve" onPress={() => approve('leave_requests', req.id)} size="sm" className="flex-1" icon={<CheckCircle size={14} color="white" />} />
+                      <Button title="supervisor.reject" onPress={() => reject('leave_requests', req.id)} variant="danger" size="sm" className="flex-1" icon={<XCircle size={14} color="white" />} />
+                    </View>
+                  </Card>
+                ))}
+              </>
             )}
-            <View className="flex-row gap-2 mt-2">
-              <Button title="supervisor.approve" onPress={() => approve('advance_requests', req.id)} size="sm" className="flex-1" />
-              <Button title="supervisor.reject" onPress={() => reject('advance_requests', req.id)} variant="danger" size="sm" className="flex-1" />
-            </View>
-          </Card>
-        ))}
+
+            {advances.length > 0 && (
+              <>
+                <Text className="text-xs font-semibold uppercase tracking-wider text-ink-400 mb-2 mt-2">{t('supervisor.advanceApprovals')}</Text>
+                {advances.map(req => {
+                  const isRisky = req.amount > (req.employee?.salary || 0) * 0.3
+                  return (
+                    <Card key={req.id} className="mb-3">
+                      <View className="flex-row items-start justify-between mb-2">
+                        <View className="flex-1 pr-2">
+                          <Text className="text-base font-bold text-ink-900">{req.employee?.name}</Text>
+                          <Text className="text-xs text-ink-500 mt-0.5">{req.employee?.department}</Text>
+                        </View>
+                        <View className="items-end">
+                          <Text className="text-lg font-bold text-brand-600 font-mono">₹{req.amount.toLocaleString()}</Text>
+                          <Text className="text-xs text-ink-400">{waitingLabel(req.created_at)}</Text>
+                        </View>
+                      </View>
+                      {isRisky && (
+                        <View className="flex-row items-center gap-1.5 mb-3 bg-status-rejected-bg rounded-lg px-2.5 py-1.5 self-start">
+                          <AlertTriangle size={14} color={STATUS.rejected.fg} />
+                          <Text className="text-xs font-semibold text-status-rejected">{t('manager.advanceSafetyCheck')}</Text>
+                        </View>
+                      )}
+                      <View className="flex-row gap-2">
+                        <Button title="supervisor.approve" onPress={() => approve('advance_requests', req.id)} size="sm" className="flex-1" icon={<CheckCircle size={14} color="white" />} />
+                        <Button title="supervisor.reject" onPress={() => reject('advance_requests', req.id)} variant="danger" size="sm" className="flex-1" icon={<XCircle size={14} color="white" />} />
+                      </View>
+                    </Card>
+                  )
+                })}
+              </>
+            )}
+          </>
+        )}
       </ScrollView>
     </View>
   )

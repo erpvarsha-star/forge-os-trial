@@ -8,6 +8,7 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { MonthlyScore } from '@/types'
 import { Award, Medal, Star, Trophy } from 'lucide-react-native'
+import { BRAND, STATUS } from '@/components/theme'
 
 export default function EOTMScreen() {
   const { t } = useTranslation()
@@ -38,29 +39,35 @@ export default function EOTMScreen() {
   }, [employee])
 
   if (!employee) return <LoadingScreen />
+  if (isLoading) return <LoadingScreen />
 
   const categories = [
-    { key: 'attendance', icon: <Star size={24} className="text-yellow-500" />, label: 'owner.eotmAttendance' },
-    { key: 'production', icon: <Trophy size={24} className="text-orange-600" />, label: 'owner.eotmProduction' },
-    { key: 'safety', icon: <Medal size={24} className="text-blue-600" />, label: 'owner.eotmSafety' },
-    { key: '5s', icon: <Award size={24} className="text-green-600" />, label: 'owner.eotm5s' },
+    { key: 'attendance', icon: <Star size={22} color="#B45309" />, tint: 'bg-amber-50', label: 'owner.eotmAttendance' },
+    { key: 'production', icon: <Trophy size={22} color={BRAND[600]} />, tint: 'bg-brand-50', label: 'owner.eotmProduction' },
+    { key: 'safety', icon: <Medal size={22} color="#1D4ED8" />, tint: 'bg-blue-50', label: 'owner.eotmSafety' },
+    { key: '5s', icon: <Award size={22} color={STATUS.approved.fg} />, tint: 'bg-status-approved-bg', label: 'owner.eotm5s' },
   ]
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
-      <ScrollView className="flex-1 p-4">
-        <Text className="text-xl font-bold text-gray-900 mb-4">{t('owner.eotm')}</Text>
+      <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 32 }}>
+        <View className="mb-5">
+          <Text className="text-2xl font-bold text-ink-900 tracking-tight">{t('owner.eotm')}</Text>
+        </View>
         {categories.map(cat => (
           <Card key={cat.key} className="mb-3">
-            <View className="flex-row items-center gap-3 mb-2">{cat.icon}<Text className="text-base font-bold text-gray-900">{t(cat.label)}</Text></View>
+            <View className="flex-row items-center gap-3 mb-3">
+              <View className={`w-10 h-10 rounded-full items-center justify-center ${cat.tint}`}>{cat.icon}</View>
+              <Text className="text-base font-bold text-ink-900 flex-1">{t(cat.label)}</Text>
+            </View>
             {winners[cat.key] ? (
-              <View>
-                <Text className="text-lg font-bold text-orange-600">{winners[cat.key].employee?.name}</Text>
-                <Text className="text-xs text-gray-500">{winners[cat.key].employee?.emp_code} • {winners[cat.key].employee?.department}</Text>
+              <View className="pl-1">
+                <Text className="text-lg font-bold text-brand-600">{winners[cat.key].employee?.name}</Text>
+                <Text className="text-xs text-ink-500 font-mono mt-0.5">{winners[cat.key].employee?.emp_code} • {winners[cat.key].employee?.department}</Text>
               </View>
             ) : (
-              <Text className="text-sm text-gray-500">{t('common.noData')}</Text>
+              <Text className="text-sm text-ink-500 pl-1">{t('common.noData')}</Text>
             )}
           </Card>
         ))}

@@ -64,11 +64,19 @@ export default function SecurityCheckpoint2Screen() {
         keyExtractor={item => item.id}
         contentContainerStyle={{ padding: 16 }}
         ListHeaderComponent={
-          <Text className="text-sm font-semibold text-gray-600 mb-2">
-            {t('security.pendingConfirmation')} ({pending.length})
-          </Text>
+          <View className="mb-3">
+            <Text className="text-xs text-gray-500 mb-3 px-1">{t('security.checkpointHint')}</Text>
+            <Text className="text-sm font-semibold text-gray-600">
+              {t('security.pendingConfirmation')} ({pending.length})
+            </Text>
+          </View>
         }
-        ListEmptyComponent={<Card><Text className="text-center text-gray-500 py-4">{t('security.allConfirmed')}</Text></Card>}
+        ListEmptyComponent={
+          <Card className="items-center py-10">
+            <CheckCircle2 size={32} color="#16A34A" />
+            <Text className="text-center text-gray-500 mt-3">{t('security.allConfirmed')}</Text>
+          </Card>
+        }
         renderItem={({ item }) => (
           <Card className="mb-2">
             <View className="flex-row items-center gap-3">
@@ -77,7 +85,7 @@ export default function SecurityCheckpoint2Screen() {
                 <Text className="text-xs text-gray-500">{item.employees?.emp_code} • {item.employees?.department}</Text>
               </View>
               <Button
-                title={t('security.confirmSeen')}
+                title="security.confirmSeen"
                 onPress={() => confirmSeen(item)}
                 loading={confirmingId === item.id}
                 size="sm"
@@ -92,8 +100,13 @@ export default function SecurityCheckpoint2Screen() {
               <Text className="text-sm font-semibold text-gray-600 mb-2">{t('security.confirmed')} ({confirmed.length})</Text>
               {confirmed.map(row => (
                 <Card key={row.id} className="mb-2">
-                  <Text className="text-sm font-bold text-gray-900">{row.employees?.name}</Text>
-                  <Text className="text-xs text-gray-500">{row.employees?.emp_code} • {row.employees?.department}</Text>
+                  <View className="flex-row items-center gap-3">
+                    <CheckCircle2 size={18} color="#16A34A" />
+                    <View className="flex-1">
+                      <Text className="text-sm font-bold text-gray-900">{row.employees?.name}</Text>
+                      <Text className="text-xs text-gray-500">{row.employees?.emp_code} • {row.employees?.department}</Text>
+                    </View>
+                  </View>
                 </Card>
               ))}
             </View>

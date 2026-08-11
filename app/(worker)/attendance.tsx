@@ -26,20 +26,32 @@ export default function WorkerAttendance() {
     <View className="flex-1 bg-gray-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
-        <View className="flex-row gap-3 mb-4">
-          <Card className="flex-1 items-center">
-            <Text className="text-2xl font-bold text-green-600">{present}</Text>
-            <Text className="text-xs text-gray-500">{t('common.present')}</Text>
-          </Card>
-          <Card className="flex-1 items-center">
-            <Text className="text-2xl font-bold text-red-600">{absent}</Text>
-            <Text className="text-xs text-gray-500">{t('common.absent')}</Text>
-          </Card>
-          <Card className="flex-1 items-center">
-            <Text className="text-2xl font-bold text-yellow-600">{late}</Text>
-            <Text className="text-xs text-gray-500">{t('common.late')}</Text>
-          </Card>
-        </View>
+        <Text className="text-sm font-bold text-gray-700 mb-2 px-1">{t('common.thisMonth')}</Text>
+        <Card className="mb-5">
+          <View className="flex-row">
+            <View className="flex-1 items-center">
+              <Text className="text-2xl font-bold text-green-600">{present}</Text>
+              <Text className="text-xs text-gray-500 mt-0.5">{t('common.present')}</Text>
+            </View>
+            <View className="w-px bg-gray-100" />
+            <View className="flex-1 items-center">
+              <Text className="text-2xl font-bold text-red-600">{absent}</Text>
+              <Text className="text-xs text-gray-500 mt-0.5">{t('common.absent')}</Text>
+            </View>
+            <View className="w-px bg-gray-100" />
+            <View className="flex-1 items-center">
+              <Text className="text-2xl font-bold text-yellow-600">{late}</Text>
+              <Text className="text-xs text-gray-500 mt-0.5">{t('common.late')}</Text>
+            </View>
+          </View>
+        </Card>
+
+        {records.length === 0 && (
+          <Text className="text-xs text-gray-400 text-center mb-3">
+            {t('worker.noAttendanceThisMonth')}
+          </Text>
+        )}
+
         <AttendanceCalendar records={records} month={currentMonth} year={currentYear} />
       </ScrollView>
     </View>

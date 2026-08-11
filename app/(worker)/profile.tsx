@@ -34,17 +34,22 @@ export default function ProfileScreen() {
           <Text className="text-sm text-gray-500">{employee.emp_code}</Text>
         </View>
 
-        {fields.map((field, index) => (
-          <Card key={index} className="mb-2">
-            <View className="flex-row items-center gap-3">
+        <Card>
+          {fields.map((field, index) => (
+            <View
+              key={index}
+              className={`flex-row items-center gap-3 py-3 ${
+                index < fields.length - 1 ? 'border-b border-gray-100' : ''
+              }`}
+            >
               {field.icon}
-              <View>
+              <View className="flex-1">
                 <Text className="text-xs text-gray-500">{t(field.label)}</Text>
-                <Text className="text-sm font-medium text-gray-900">{field.value}</Text>
+                <Text className="text-sm font-medium text-gray-900 mt-0.5">{field.value || '—'}</Text>
               </View>
             </View>
-          </Card>
-        ))}
+          ))}
+        </Card>
       </ScrollView>
     </View>
   )

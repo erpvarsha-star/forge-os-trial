@@ -22,6 +22,7 @@ export default function AdvanceScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   if (!employee) return <LoadingScreen />
+  if (isLoading) return <LoadingScreen />
 
   const outstanding = requests
     .filter(r => r.status === 'approved')
@@ -78,20 +79,27 @@ export default function AdvanceScreen() {
           />
         </View>
 
-        {requests.map(req => (
-          <Card key={req.id} className="mb-2">
-            <View className="flex-row justify-between items-start">
-              <View>
-                <Text className="text-sm font-bold text-gray-900">₹{req.amount.toFixed(2)}</Text>
-                <Text className="text-xs text-gray-500">{req.reason}</Text>
-                <Text className="text-xs text-gray-500">{req.repayment_months} months</Text>
-              </View>
-              <View className={`px-2 py-1 rounded-full ${statusColor(req.status)}`}>
-                <Text className="text-xs font-medium capitalize">{req.status}</Text>
-              </View>
-            </View>
+        {requests.length === 0 ? (
+          <Card className="items-center py-10">
+            <Wallet size={32} color="#D1D5DB" />
+            <Text className="text-sm text-gray-500 mt-3">{t('worker.noAdvanceRequests')}</Text>
           </Card>
-        ))}
+        ) : (
+          requests.map(req => (
+            <Card key={req.id} className="mb-2">
+              <View className="flex-row justify-between items-start">
+                <View className="flex-1 pr-2">
+                  <Text className="text-sm font-bold text-gray-900">₹{req.amount.toFixed(2)}</Text>
+                  <Text className="text-xs text-gray-500 mt-0.5">{req.reason}</Text>
+                  <Text className="text-xs text-gray-500">{t('worker.repaymentMonths')}: {req.repayment_months}</Text>
+                </View>
+                <View className={`px-2 py-1 rounded-full ${statusColor(req.status)}`}>
+                  <Text className="text-xs font-medium capitalize">{t(`common.${req.status}`)}</Text>
+                </View>
+              </View>
+            </Card>
+          ))
+        )}
       </ScrollView>
 
       <Modal visible={showModal} transparent animationType="slide">
@@ -103,14 +111,14 @@ export default function AdvanceScreen() {
               value={amount}
               onChangeText={setAmount}
               keyboardType="numeric"
-              placeholder="Enter amount"
+              placeholder={t('worker.advanceAmountPlaceholder')}
             />
             <Input
               label={t('worker.repaymentMonths')}
               value={repaymentMonths}
               onChangeText={setRepaymentMonths}
               keyboardType="numeric"
-              placeholder="e.g., 3"
+              placeholder={t('worker.repaymentMonthsPlaceholder')}
             />
             <Input
               label={t('worker.advanceReason')}
