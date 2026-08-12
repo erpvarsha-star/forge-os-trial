@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/hooks/useAuth'
 import { useAttendance } from '@/hooks/useAttendance'
 import { Header } from '@/components/Header'
+import { FactoryOsLink } from '@/components/FactoryOsLink'
 import { SafetyTip } from '@/components/SafetyTip'
 import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
@@ -173,6 +174,7 @@ export default function WorkerHome() {
     <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+        <FactoryOsLink />
         <View className="p-4 gap-5">
           {/* PRIMARY ACTION — GPS check-in/out dominates the screen */}
           <View className="bg-white rounded-2xl border border-ink-100 shadow-sm overflow-hidden">

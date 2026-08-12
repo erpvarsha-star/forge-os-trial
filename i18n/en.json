@@ -128,7 +128,10 @@
     "checkingForUpdates": "Checking for updates…",
     "upToDate": "Up to date",
     "updateCheckFailed": "Could not check for updates",
-    "new": "NEW"
+    "new": "NEW",
+    "factoryOs": "Factory OS Dashboard",
+    "factoryOsHint": "Opens the operations dashboard in your browser",
+    "cannotOpenLink": "Could not open the link on this device."
   },
   "auth": {
     "loginTitle": "Welcome to Forge OS",

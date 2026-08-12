@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Alert } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/hooks/useAuth'
 import { Header } from '@/components/Header'
+import { FactoryOsLink } from '@/components/FactoryOsLink'
 import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
@@ -69,6 +70,7 @@ export default function VehicleLogScreen() {
     <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
+        <FactoryOsLink />
         <Text className="text-sm font-bold text-ink-700 mb-2 px-1">{t('common.today')}</Text>
         <Card className="mb-5">
           <View className="flex-row">

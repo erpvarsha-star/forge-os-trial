@@ -128,7 +128,10 @@
     "checkingForUpdates": "अपडेट जांचा जा रहा है…",
     "upToDate": "नवीनतम संस्करण",
     "updateCheckFailed": "अपडेट जांच नहीं हो सकी",
-    "new": "नया"
+    "new": "नया",
+    "factoryOs": "फैक्ट्री OS डैशबोर्ड",
+    "factoryOsHint": "ऑपरेशंस डैशबोर्ड ब्राउज़र में खोलता है",
+    "cannotOpenLink": "इस डिवाइस पर लिंक नहीं खुल सका।"
   },
   "auth": {
     "loginTitle": "Forge OS में आपका स्वागत है",
