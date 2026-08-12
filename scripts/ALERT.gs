@@ -6,6 +6,25 @@
 
 var DASH_ID = '1GHdhrRtOhQFshsAOCK4n3GiJp-6a03k8bn0V_M04wSY';
 
+// ── SUPABASE CREDENTIALS ──────────────────────────────────
+// Fill the key in HERE, in the Apps Script editor, and you can skip the
+// Script Properties screen entirely.
+//
+// ⚠ THE COPY OF THIS FILE IN GIT KEEPS THE KEY LINE EMPTY, DELIBERATELY, AND
+// MUST STAY THAT WAY. A service_role / sb_secret_ key bypasses RLS completely
+// — it can read and rewrite every employee's salary, phone number and
+// attendance. Committed once, it is in the repository's history permanently,
+// even if a later commit removes it. Your Apps Script project is private to
+// you; a git repo is not the same kind of place.
+//
+// So: the live script has the key, the repo copy does not, and those two
+// files differ by exactly this one line forever. That difference is correct.
+//
+// Script Properties still win if they are set, so you can move the key out of
+// the file later without editing anything.
+var SUPABASE_URL_INLINE = 'https://odfwtdpvpfzdrznvurru.supabase.co';
+var SUPABASE_SERVICE_ROLE_KEY_INLINE = '';   // <-- paste the key between these quotes
+
 // ── DEPARTMENT LIST ──────────────────────────────────────
 var DEPARTMENTS = [
   'Cutting', 'Forge', 'Press', 'Machine', 'HT', 'Final',
@@ -1028,11 +1047,31 @@ function processFormSubmissions() {
   // Find column indexes (form responses can have different column order)
   var headers = data[0];
   var colIndex = {};
-  var expectedCols = ['Timestamp', 'Department', 'Supervisor Name', 'Phone', 'Telegram Chat ID', 'Week Start (Monday)', 'Week End (Sunday)'];
+  var expectedCols = ['Timestamp', 'Department', 'Supervisor Name', 'Phone', 'Telegram Chat ID', 'Week Start', 'Week End'];
+  
+  // ⚠ FIXED 12 Aug 2026 — this importer had never added a single supervisor.
+  // It looked for headers named exactly 'Week Start (Monday)' and
+  // 'Week End (Sunday)'. The live registration form writes 'Week Start
+  // (Saturday)' and 'Week End (Thursday)', so neither matched, the missing-
+  // column check below fired, and the function returned before doing any work
+  // — silently, every single time. SUPERVISOR_MAP has rows because they were
+  // put there some other way.
+  //
+  // Rather than pick a convention and risk being wrong about the working week,
+  // the two week columns now match on PREFIX, so 'Week Start (Saturday)',
+  // 'Week Start (Monday)' and a bare 'Week Start' all resolve. The other five
+  // columns still need an exact match, because a loose match there could bind
+  // the wrong column.
+  var PREFIX_MATCHED = { 'Week Start': true, 'Week End': true };
   
   expectedCols.forEach(function(colName) {
     for (var i = 0; i < headers.length; i++) {
-      if (headers[i] && headers[i].toString().trim() === colName) {
+      var header = headers[i] ? headers[i].toString().trim() : '';
+      if (!header) continue;
+      var hit = PREFIX_MATCHED[colName]
+        ? header.indexOf(colName) === 0
+        : header === colName;
+      if (hit) {
         colIndex[colName] = i;
         break;
       }
@@ -1064,8 +1103,8 @@ function processFormSubmissions() {
     var supervisor = (row[colIndex['Supervisor Name']] || '').toString().trim();
     var phone = (row[colIndex['Phone']] || '').toString().trim();
     var chatId = (row[colIndex['Telegram Chat ID']] || '').toString().trim();
-    var weekStart = row[colIndex['Week Start (Monday)']];
-    var weekEnd = row[colIndex['Week End (Sunday)']];
+    var weekStart = row[colIndex['Week Start']];
+    var weekEnd = row[colIndex['Week End']];
     
     if (!department || !supervisor) {
       Logger.log('⚠️ Row ' + (i+1) + ' missing department or supervisor name. Skipping.');
@@ -1621,6 +1660,28 @@ function rebuildWeeklyPerformance() {
 var SUPABASE_PUSH_BATCH = 500;
 
 /**
+ * Where the credentials come from, in order of preference.
+ *
+ * Script Properties win over the inline constants, so moving the key out of
+ * the file later needs no code change — set the two properties and the inline
+ * values stop being consulted.
+ */
+function getSupabaseCredentials_() {
+  var props = PropertiesService.getScriptProperties();
+  var url = props.getProperty('SUPABASE_URL') || SUPABASE_URL_INLINE;
+  var key = props.getProperty('SUPABASE_SERVICE_ROLE_KEY') || SUPABASE_SERVICE_ROLE_KEY_INLINE;
+
+  if (!url || !key) {
+    throw new Error(
+      'No Supabase credentials. Either paste your key into ' +
+      'SUPABASE_SERVICE_ROLE_KEY_INLINE at the top of this file, or set ' +
+      'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Project Settings → Script Properties.'
+    );
+  }
+  return { url: url, key: key };
+}
+
+/**
  * Upserts rows into a Supabase table, batched.
  *
  * Uses Prefer: resolution=merge-duplicates against the table's row_key unique
@@ -1630,12 +1691,9 @@ var SUPABASE_PUSH_BATCH = 500;
 function supabasePush_(table, rows) {
   if (!rows || rows.length === 0) return 0;
 
-  var props = PropertiesService.getScriptProperties();
-  var baseUrl = props.getProperty('SUPABASE_URL');
-  var serviceKey = props.getProperty('SUPABASE_SERVICE_ROLE_KEY');
-  if (!baseUrl || !serviceKey) {
-    throw new Error('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Script Properties first.');
-  }
+  var creds = getSupabaseCredentials_();
+  var baseUrl = creds.url;
+  var serviceKey = creds.key;
 
   var sent = 0;
   for (var i = 0; i < rows.length; i += SUPABASE_PUSH_BATCH) {
@@ -1793,10 +1851,7 @@ function syncOpsDashboardToSupabase() {
  * mistake surfaces here rather than silently on a timer at 01:00.
  */
 function testSupabaseSync() {
-  var props = PropertiesService.getScriptProperties();
-  if (!props.getProperty('SUPABASE_URL') || !props.getProperty('SUPABASE_SERVICE_ROLE_KEY')) {
-    throw new Error('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Project Settings → Script Properties, then run this again.');
-  }
+  getSupabaseCredentials_();   // throws with instructions if neither source is filled in
   syncOpsDashboardToSupabase();
   Logger.log('✅ Supabase sync test passed. Check the app: manager → Reports, supervisor → Forms.');
 }
