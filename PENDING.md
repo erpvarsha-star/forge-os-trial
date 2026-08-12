@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 11 Aug 2026, after build 23.
+**Last updated:** 12 Aug 2026, after the ALERT.gs audit.
 
 ---
 
@@ -64,7 +64,12 @@ Found the real setup rather than asking. Live files:
 - **Final production**: `Date | Process | Shift | VF_No | Qty` — e.g. Shot Blasting
 - **Energy**: ~25 meters mapped to shops, kWh MTD and % of total per department
 - **Consumables**: Zycril mixing, avg daily Forge/HT litres
-- **Shift master**: S1 08:30-15:30, S2 15:30-23:30, S3 23:30-08:30, 60 min break, 15 min grace
+- **Shift master**: S1 08:30-15:30, S2 15:30-23:30, S3 23:30-08:30, 60 min break.
+  **Grace is 60 minutes, not 15** — corrected 12 Aug from the live `ALERT.gs`.
+  The `15` in that config is `reminder` (minutes *before* the deadline). Real
+  deadlines: **S1 16:30, S2 00:30, S3 09:30**.
+- **Ten departments, not six**: Cutting, Forge, Press, Machine, HT, Final,
+  Electricity, Oil, Staff Manpower, Contract Manpower.
 
 ### Two things this changes
 
@@ -119,32 +124,58 @@ a shift, and the model must not assume one-owner-per-department.
 
 ---
 
-## 🎯 NEXT BUILD — form-compliance scoring + reminders (defined 12 Aug)
+## 🔴 ALERT.gs — audited 12 Aug, three defects found and fixed in repo
 
-**The score is about filling the form on time for your shift** — not production
-output. That is a different feature from anything currently built, and it replaces
-my earlier guess that scoring should track production quantity.
+The Apps Script running on the Operations Dashboard is now checked in at
+`scripts/ALERT.gs` (baseline commit `1e5283e`, fixes `eb70e8f`).
 
-What it needs:
+**⚠ ACTION FOR YASH — paste the fixed `scripts/ALERT.gs` over ALERT.gs in the
+Apps Script editor, then run `testComplianceScoring()`, then
+`setupDynamicSupervisorTabs()`, then `deployShiftTrackingTriggers()`.**
+That is one paste and three menu clicks; nothing needs retyping.
 
-1. **Responsibility roster** — who must fill which department's form, per shift.
-   Many-to-many (Todmal → Cutting + HT; Ashok Sharma → Cutting). The dashboard's
-   first tab already captures this weekly (Department, Supervisor Name, Phone,
-   Telegram Chat ID, Week Start Sat → Week End Thu), which also solves the
-   long-standing "rotating supervisor" problem listed further down.
-2. **Expected-submission schedule** — one row per (responsible person, department,
-   shift, date) that is due.
-3. **Actual submissions** — imported from the Forms/Sheet, matched to the expected
-   row, with the submission timestamp.
-4. **On-time determination** — submitted before the shift's end
-   (S1 15:30, S2 23:30, S3 08:30 next day), using the 15-min grace already in the
-   shift master.
-5. **Scoring** — feeds `monthly_scores`. Replaces the removed production component
-   for supervisors with something they actually control.
-6. **In-app pending count** — a badge/count of forms due-but-not-submitted.
-7. **Telegram escalation** — final reminder only, after in-app is ignored.
+| # | Defect | Status |
+|---|---|---|
+| 1 | Reminder ended with the literal text `[Google Form Link]` — supervisors told to upload with no link | ✅ fixed; links now come from a new `FORM_LINKS` tab |
+| 2 | `hasDataForShift_` could never return true → **every alert since 5 Aug has been a false positive** | ✅ fixed |
+| 3 | `DATA_SUBMISSION_LOG` / `WEEKLY_PERFORMANCE` had headers but nothing ever wrote to them | ✅ fixed |
 
-⚠ Open questions blocking the build are in the decisions section above.
+**Defect 2 in detail.** The function parsed the RAW tabs' first column as a
+timestamp and required `getHours() >= 8/15/23`. Those columns hold a date only
+(`4/1/2026`), so `getHours()` is always 0 and the test never passed.
+`ESCALATION_LOG` confirms it: 29 of 37 sweeps between 5 and 12 Aug escalated
+**all ten departments at once**, the rest being one sweep split over a minute
+boundary. Supervisors have been receiving alerts that are wrong every single
+time — which is the likeliest reason they are ignored.
+
+**Scoring, as agreed 12 Aug**: 100 points on time, −10 per started hour late,
+zero at 10 h. Deadline = shift end + the 60-minute grace.
+
+### Still open on the Sheets side
+
+- [ ] **Confirm the form links.** Drive holds many similarly-named copies of
+      each shop form; the seeded URLs are the most recently modified match per
+      department and are **guesses**. Check the `FORM_LINKS` tab and fix any
+      wrong row there (the tab overrides the code).
+- [ ] **Staff Manpower has no identifiable form** — no candidate found in
+      Drive. Paste its link into `FORM_LINKS` or tell me the file name.
+- [ ] **Week start is inconsistent, and it breaks supervisor import.** The live
+      registration form writes `Week Start (Saturday)` / `Week End (Thursday)`;
+      `processFormSubmissions()` looks for `Week Start (Monday)` /
+      `Week End (Sunday)`, finds neither, logs "missing columns" and returns.
+      So that importer has never added anyone. `SUPERVISOR_MAP` does have rows,
+      so they are getting in another way — confirm which week convention is
+      real and I will align both ends. Left as-is deliberately rather than
+      guessing.
+- [ ] **Several `SUPERVISOR_MAP` rows have a blank Telegram Chat ID** (e.g.
+      Pravin Sonavane, Machine). Those supervisors get no direct message — the
+      alert falls back to the group chat.
+
+### Still open on the app side
+
+- [ ] **In-app pending-forms count** — the badge showing how many forms are due
+      but not submitted. Not started. Needs the Forms → Supabase decision below.
+- [ ] Telegram escalation already exists in ALERT.gs and needs nothing new.
 
 ---
 
