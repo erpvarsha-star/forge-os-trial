@@ -74,7 +74,8 @@ session.
 | `employees` | `emp_code`, `name`, `department` (TEXT), `supervisor_id`, `manager_id`, `plant_head_id`, `language_preference`, `category`, `salary` |
 | `attendance_records` | `date` (not shift_date), `status` CHECK('P','A','L','WO','H','HL'), `checkpoint2_confirmed_by`, `checkpoint3_confirmed_by` |
 | `monthly_scores` | `on_time_score`, `task_completion_score`, `eotm_badge` CHECK('bronze','gold'), `five_s_score` (was "5s_score" before PATCH_04) |
-| `notifications` | `user_id` (not employee_id), `read` (not is_read) |
+| `notifications` | `user_id` (not employee_id), `read` (not is_read), `related_entity_type`/`related_entity_id` both TEXT (added by PATCH_14) |
+| `form_links` | `department` (uses `employees.department` spelling — 'Heat Treatment', not ALERT.gs's 'HT'), `form_name`, `url`, `send_in_reminder`, `sort_order` |
 | `push_tokens` | `user_id` (not employee_id), `token`, `platform` |
 | `leave_balances` | `earned_leave`, `casual_leave`, `sick_leave` |
 | `advance_requests` | `employee_id`, `amount`, `reason`, `repayment_months`, `status`, `outstanding_balance` |
@@ -83,7 +84,7 @@ session.
 | `fraud_flags` | `employee_id`, `flag_type` TEXT, `description`, `reviewed` |
 
 ### Tables that DO exist (FINAL_SCHEMA)
-`employees`, `departments`, `plant_config`, `attendance_records`, `shifts`, `employee_shifts`, `leave_balances`, `leave_requests`, `advance_requests`, `payroll_records`, `monthly_scores`, `maintenance_observations`, `"5s_challenges"`, `"5s_submissions"`, `casual_workers`, `data_collection_submissions`, `mrm_reviews`, `fraud_alerts`, `fraud_flags`, `vehicle_log`, `eod_confirmations`, `email_tasks`, `notifications`, `push_tokens`
+`employees`, `departments`, `plant_config`, `attendance_records`, `shifts`, `employee_shifts`, `leave_balances`, `leave_requests`, `advance_requests`, `payroll_records`, `monthly_scores`, `maintenance_observations`, `"5s_challenges"`, `"5s_submissions"`, `casual_workers`, `data_collection_submissions`, `mrm_reviews`, `fraud_alerts`, `fraud_flags`, `vehicle_log`, `eod_confirmations`, `email_tasks`, `notifications`, `push_tokens`, `form_links` (PATCH_14)
 
 ### Tables that do NOT exist (referenced in old code)
 `tasks`, `hourly_production`, `shift_reports`, `salary_advances`, `five_s_challenges`, `five_s_challenge_completions`
@@ -191,14 +192,15 @@ QR salt: PATCH_06 has a commented-out UPDATE — Yash must generate his own secr
 | `PATCH_12_rls_hardening_11Aug2026.sql` | Closes the 7 open RLS holes from "Known RLS issues": employees INSERT was trivially true for any signed-in user (privilege escalation), notifications INSERT was `check (true)`, fraud_alerts/fraud_flags INSERT unscoped, attendance_records + leave_requests + advance_requests not scoped to a supervisor's own team, mrm_reviews readable by everyone. Adds the missing notifications UPDATE so the bell can be cleared | ⏳ Not yet run — included in the combined file below |
 | `COMBINED_DEPLOY_11to12_11Aug2026.sql` | PATCH_11 + PATCH_12 concatenated (generated, cannot drift). Idempotent | ✅ Ran 11 Aug — confirmed by Yash |
 | `PATCH_13_photo_storage_11Aug2026.sql` | Creates the private `submission-photos` Storage bucket + RLS so 5S/maintenance photos have somewhere to go. There was no bucket in the project at all; the camera screens wrote a hardcoded placeholder.com URL | ⏳ Not yet run — in the combined file below |
-| `COMBINED_DEPLOY_13_11Aug2026.sql` | **⚡ THE ONLY FILE TO RUN ⚡** — PATCH_13. Run BEFORE installing the new APK or photo upload fails | ⏳ **RUN THIS ONE** |
+| `PATCH_14_form_registry_12Aug2026.sql` | `form_links` table + 24 daily forms seeded from Yash's registry sheet (keyed to `employees.department` spellings, not ALERT.gs's), `plant_config.form_shift_schedule` for the deadline times, and the missing `notifications.related_entity_type` / `related_entity_id` columns that had been making every server-side notification insert fail silently | ⏳ Not yet run — included in the combined file below |
+| `COMBINED_DEPLOY_13to14_12Aug2026.sql` | **⚡ THE ONLY FILE TO RUN ⚡** — PATCH_13 + PATCH_14. Supersedes `COMBINED_DEPLOY_13_11Aug2026.sql` (deleted; its contents are inside this one). Run BEFORE installing the new APK or photo upload and the Forms tab both fail | ⏳ **RUN THIS ONE** |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee | ♾️ On demand |
 
 **Total employees confirmed live: 129** (120 original + 4 PATCH_08 + 5 PATCH_09).
 
 ---
 
-## App screen map (50 screens, 7 role groups)
+## App screen map (52 screens, 7 role groups)
 
 ```
 app/
@@ -224,6 +226,7 @@ app/
 │   ├── team.tsx           — confirm P/A per member (checkpoint 3)
 │   ├── tasks.tsx          — resolve maintenance observations
 │   ├── approvals.tsx      — approve leave/advance requests
+│   ├── forms.tsx          — Google Forms for this department (PATCH_14)
 │   ├── shift-report.tsx   — submit shift production data
 │   ├── casual-workers.tsx — log casual worker counts
 │   ├── 5s-verify.tsx      — approve/reject 5S submissions
@@ -232,8 +235,9 @@ app/
 │   ├── dashboard.tsx      — department attendance %
 │   ├── team.tsx           — list supervisors under this manager
 │   ├── approvals.tsx      — approve escalated leave/advance
+│   ├── forms.tsx          — Google Forms for this department (PATCH_14)
 │   ├── mrm.tsx            — submit MRM review
-│   ├── reports.tsx        — (placeholder, not implemented)
+│   ├── reports.tsx        — department-scoped reports
 │   └── more.tsx
 ├── (hr-admin)/
 │   ├── dashboard.tsx      — stats: total, present, pending advances/leaves
@@ -270,12 +274,12 @@ app/
 | `nightly-scoring` | Composite monthly score for all members/supervisors/managers | Nightly 22:00 IST |
 | `fraud-detector` | GPS + bulk-confirmation fraud checks | Called by app on check-in/supervisor confirm |
 | `mrm-reminder` | Ensure MRM rows exist; remind managers 8th-10th; escalate to plant_head | Daily |
-| `shift-reminder` | Weekly shift notify (Thursday) + daily check-in reminder (hourly) | Thursday + hourly |
+| `shift-reminder` | Weekly shift notify (Thursday) + daily check-in reminder (hourly) + `forms_due_reminder`, which nudges a department's supervisors/managers 15 min before each shift's form deadline | Thursday + hourly + every 15 min (`{"mode":"forms_due_reminder"}`, needs its own cron entry — mode inference never picks it) |
 | `five-s-challenge-generator` | Generate daily 5S challenge via Gemini | Daily |
 | `send-push-notification` | HTTP dispatcher — write notification row + Expo push | On-demand |
 
 **Shared helpers** (`supabase/functions/_shared/`):
-- `push.ts` — `notifyEmployees()` inserts `notifications` rows (`user_id` column) + Expo push batch
+- `push.ts` — `notifyEmployees()` inserts `notifications` rows (`user_id` column) + Expo push batch. ⚠ It also writes `related_entity_type` / `related_entity_id`, which existed only in the OLD schema until PATCH_14 added them — before that every insert was rejected by PostgREST and the error was discarded, so no server-side notification ever reached anyone. It now throws on insert failure.
 - `supabaseAdmin.ts` — service-role client + `getPlantConfig()`
 - `geo.ts` — Haversine distance in metres
 - `cors.ts` — CORS headers + `jsonResponse()`
@@ -322,7 +326,9 @@ app/
 
 ## Pending from Yash (owner)
 
-0. **⚠ RUN `COMBINED_DEPLOY_13_11Aug2026.sql` IN THE SUPABASE SQL EDITOR, BEFORE installing the next APK.** It creates the photo-storage bucket the newly-wired camera uploads to; without it, 5S and maintenance photo submission fails. PATCH_10 and COMBINED_DEPLOY_11to12 are already applied — do not re-run them.
+0. **⚠ RUN `COMBINED_DEPLOY_13to14_12Aug2026.sql` IN THE SUPABASE SQL EDITOR, BEFORE installing the next APK.** It creates the photo-storage bucket the newly-wired camera uploads to (without it 5S and maintenance photo submission fails), adds the `form_links` registry the new Forms tab reads, and adds the two `notifications` columns whose absence has been silently killing every server-side notification insert. PATCH_10 and COMBINED_DEPLOY_11to12 are already applied — do not re-run them.
+
+   Also needed, in the Supabase dashboard: a cron entry for `shift-reminder` every 15 minutes with body `{"mode":"forms_due_reminder"}`. Without it the shift form reminders never fire.
 
 1. **Worker → supervisor mapping** — CLOSED 10 Aug (Yash: "that will happen in the app") — this is an in-app assignment flow, not a DB patch task
 2. **Rotating supervisor update** — CLOSED 10 Aug (Yash: rotations are decided every Friday by HR/IR, cannot be provided in advance) — the weekly `supervisor_id` UPDATE is HR/IR's own task going forward, not tracked here

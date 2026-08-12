@@ -37,7 +37,16 @@ export async function notifyEmployees(db: ReturnType<typeof supabaseAdmin>, inpu
     related_entity_id: relatedEntityId ?? null,
   }));
 
-  await db.from('notifications').insert(rows);
+  // Never swallow this. It failed silently for every edge function until
+  // 12 Aug, because push.ts writes related_entity_type/related_entity_id and
+  // the deployed schema (FINAL_SCHEMA) had neither column — PostgREST
+  // rejected the insert with PGRST204 and nobody saw it. PATCH_14 adds the
+  // columns; this check is what stops the next such mismatch from hiding.
+  const { error: insertError } = await db.from('notifications').insert(rows);
+  if (insertError) {
+    console.error('notifications insert failed', { type, count: rows.length, error: insertError });
+    throw new Error(`notifications insert failed: ${insertError.message}`);
+  }
 
   const { data: tokens } = await db
     .from('push_tokens')

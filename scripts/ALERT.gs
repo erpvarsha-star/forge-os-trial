@@ -81,13 +81,19 @@ var DEPT_FORM_SEED = [
   ['Contract Manpower', '', '', '', '', 'NO']
 ];
 
-// ── COMPLIANCE SCORING ────────────────────────────────────
-// Yash, 12 Aug: "partial credit depending on delay every hour 10 percent
-// reduction." Submitting by the deadline (shift end + 60 min grace, already
-// encoded in SHIFT_CONFIG_DATA) scores full marks; every started hour past it
-// costs 10 points, reaching zero at 10 hours late.
-var SCORE_MAX_POINTS = 100;
-var SCORE_PENALTY_PER_HOUR = 10;
+// ── SUBMISSION TRACKING (NOT SCORING) ─────────────────────
+// Yash, 12 Aug: the dashboard shift timings are NOT to be used for scoring —
+// they are for driving notifications in the app. The points scheme that used
+// to live here (100 on time, -10 per started hour late) has been removed.
+//
+// What stays is the factual record: for each (date, department, shift),
+// whether the data arrived on time, arrived late, or never arrived, and by
+// how many minutes. No points, no percentage, no ranking. That record is what
+// tells the app which forms are still outstanding; turning it into a number
+// against a person's name is a separate decision nobody has taken.
+//
+// To restore scoring, see commit eb70e8f — scoreForDelay_(), the Points
+// column and performanceBand_() are intact there.
 
 // A (department, shift, date) with still no data this long after its deadline
 // is closed out as MISSING and scored zero, so the day can be totalled.
@@ -231,7 +237,7 @@ function createDataSubmissionLogTab_(ss) {
   sh.clearContents();
   sh.clearFormats();
   
-  var headers = ['Date', 'Department', 'Shift', 'Supervisor', 'Entry Time', 'Status', 'Delay (mins)', 'Points'];
+  var headers = ['Date', 'Department', 'Shift', 'Supervisor', 'Entry Time', 'Status', 'Delay (mins)'];
   sh.getRange(1, 1, 1, headers.length).setValues([headers])
     .setFontWeight('bold')
     .setBackground('#1565C0')
@@ -247,7 +253,7 @@ function createWeeklyPerformanceTab_(ss) {
   sh.clearContents();
   sh.clearFormats();
   
-  var headers = ['Rank', 'Supervisor', 'Department', 'Week', 'Total', 'On Time', 'Late', 'Missing', 'Score %', 'Points', 'Performance'];
+  var headers = ['Supervisor', 'Department', 'Week', 'Total', 'On Time', 'Late', 'Missing'];
   sh.getRange(1, 1, 1, headers.length).setValues([headers])
     .setFontWeight('bold')
     .setBackground('#1565C0')
@@ -1224,15 +1230,15 @@ function quickProcessForm() {
 //      end with the literal text "[Google Form Link]" — a placeholder that was
 //      never filled in — so supervisors were told to upload with no way to.
 //
-//   2. Compliance scoring. DATA_SUBMISSION_LOG and WEEKLY_PERFORMANCE were
-//      created with their headers ("Delay (mins)", "Points", "Score %") but
-//      nothing ever wrote a row to either. They are still empty in the live
-//      sheet. recordShiftCompliance() fills the first, rebuildWeeklyPerformance()
-//      rolls it up into the second.
+//   2. A submission record. DATA_SUBMISSION_LOG and WEEKLY_PERFORMANCE were
+//      created with headers but nothing ever wrote a row to either — both are
+//      still empty in the live sheet. recordShiftCompliance() fills the first,
+//      rebuildWeeklyPerformance() rolls it up into the second.
 //
-// Scoring rule (Yash, 12 Aug): on time = full marks, then 10% off per hour of
-// delay. Delay is measured from the shift's deadline, which already includes
-// the 60-minute grace period.
+// What that record is NOT (Yash, 12 Aug): a score. It logs on time / late /
+// missing and the delay in minutes, so the app knows what is outstanding.
+// The points scheme drafted earlier the same day was removed — the shift
+// timings drive notifications in the app, not a number against a name.
 
 // ── FORM_LINKS TAB ────────────────────────────────────────
 
@@ -1372,13 +1378,6 @@ function getShiftDeadlineDateTime_(shift, shiftDate) {
   return d;
 }
 
-/** On time = full marks; 10 points off per started hour late; floor of zero. */
-function scoreForDelay_(delayMins) {
-  if (delayMins <= 0) return SCORE_MAX_POINTS;
-  var hoursLate = Math.ceil(delayMins / 60);
-  return Math.max(0, SCORE_MAX_POINTS - (SCORE_PENALTY_PER_HOUR * hoursLate));
-}
-
 // ── COMPLIANCE SWEEP ──────────────────────────────────────
 
 /** Keys already present in DATA_SUBMISSION_LOG, so the sweep stays idempotent. */
@@ -1447,8 +1446,7 @@ function recordShiftCompliance() {
             supervisor.name || 'Unknown',
             Utilities.formatDate(now, 'Asia/Kolkata', 'HH:mm'),
             delay === 0 ? 'ON TIME' : 'LATE',
-            delay,
-            scoreForDelay_(delay)
+            delay
           ]);
           logged[key] = true;
         } else if (minutesPastDeadline > MISSING_CUTOFF_HOURS * 60) {
@@ -1459,8 +1457,7 @@ function recordShiftCompliance() {
             supervisor.name || 'Unknown',
             '',
             'MISSING',
-            '',
-            0
+            ''
           ]);
           logged[key] = true;
         }
@@ -1500,16 +1497,13 @@ function weekStartFor_(date) {
   return Utilities.formatDate(d, 'Asia/Kolkata', 'yyyy-MM-dd');
 }
 
-function performanceBand_(scorePct) {
-  if (scorePct >= 90) return '🟢 Excellent';
-  if (scorePct >= 75) return '🟡 Good';
-  if (scorePct >= 50) return '🟠 Needs improvement';
-  return '🔴 Poor';
-}
-
 /**
  * Rebuilds WEEKLY_PERFORMANCE from DATA_SUBMISSION_LOG. Rebuilt rather than
  * appended so a corrected log row is reflected on the next run.
+ *
+ * Counts only — submitted on time, submitted late, never submitted. The
+ * score, points and performance band this used to emit were removed 12 Aug
+ * (see the note at the top of the file).
  */
 function rebuildWeeklyPerformance() {
   var ss = SpreadsheetApp.openById(DASH_ID);
@@ -1524,7 +1518,7 @@ function rebuildWeeklyPerformance() {
     return;
   }
   
-  var data = log.getRange(2, 1, log.getLastRow() - 1, 8).getValues();
+  var data = log.getRange(2, 1, log.getLastRow() - 1, 7).getValues();
   var groups = {};
   
   data.forEach(function(r) {
@@ -1536,17 +1530,15 @@ function rebuildWeeklyPerformance() {
     var dept = (r[1] || '').toString().trim();
     var supervisor = (r[3] || 'Unknown').toString().trim();
     var status = (r[5] || '').toString().trim().toUpperCase();
-    var points = Number(r[7]) || 0;
     var week = weekStartFor_(dt);
     
     var key = supervisor + '|' + dept + '|' + week;
     if (!groups[key]) {
       groups[key] = { supervisor: supervisor, dept: dept, week: week,
-                      total: 0, onTime: 0, late: 0, missing: 0, points: 0 };
+                      total: 0, onTime: 0, late: 0, missing: 0 };
     }
     var g = groups[key];
     g.total++;
-    g.points += points;
     if (status === 'ON TIME') g.onTime++;
     else if (status === 'LATE') g.late++;
     else g.missing++;
@@ -1555,17 +1547,17 @@ function rebuildWeeklyPerformance() {
   var list = [];
   Object.keys(groups).forEach(function(k) { list.push(groups[k]); });
   
-  list.forEach(function(g) {
-    g.scorePct = g.total > 0 ? Math.round(g.points / g.total) : 0;
-  });
+  // Sorted for readability only — by week, then department, then name. This
+  // is deliberately NOT a ranking: the previous version ordered supervisors
+  // best-to-worst by points, which is the scoring Yash asked to drop.
   list.sort(function(a, b) {
-    if (b.scorePct !== a.scorePct) return b.scorePct - a.scorePct;
-    return b.onTime - a.onTime;
+    if (a.week !== b.week) return a.week < b.week ? 1 : -1;
+    if (a.dept !== b.dept) return a.dept < b.dept ? -1 : 1;
+    return a.supervisor < b.supervisor ? -1 : 1;
   });
   
-  var rows = list.map(function(g, i) {
-    return [i + 1, g.supervisor, g.dept, g.week, g.total, g.onTime, g.late,
-            g.missing, g.scorePct, g.points, performanceBand_(g.scorePct)];
+  var rows = list.map(function(g) {
+    return [g.supervisor, g.dept, g.week, g.total, g.onTime, g.late, g.missing];
   });
   
   if (out.getLastRow() > 1) {
@@ -1581,9 +1573,12 @@ function rebuildWeeklyPerformance() {
 // ── SELF-CHECK ────────────────────────────────────────────
 
 /**
- * Run this after pasting the script. It exercises the pure logic — scoring
- * curve, deadline rollovers, shift normalisation — without touching Telegram,
- * and reports the form link configured for each department.
+ * Run this after pasting the script. It exercises the pure logic — deadline
+ * rollovers and shift normalisation — without touching Telegram, and reports
+ * the form links configured for each department.
+ *
+ * Keeps its name so the instructions already given to Yash still apply, even
+ * though the scoring curve it used to check is gone.
  */
 function testComplianceScoring() {
   var failures = [];
@@ -1592,14 +1587,6 @@ function testComplianceScoring() {
       failures.push(label + ': got ' + actual + ', expected ' + expected);
     }
   }
-  
-  check('on time',        scoreForDelay_(0),   100);
-  check('1 min late',     scoreForDelay_(1),   90);
-  check('60 min late',    scoreForDelay_(60),  90);
-  check('61 min late',    scoreForDelay_(61),  80);
-  check('5 h late',       scoreForDelay_(300), 50);
-  check('10 h late',      scoreForDelay_(600), 0);
-  check('20 h late',      scoreForDelay_(1200), 0);
   
   var base = new Date(2026, 7, 12);          // 12 Aug 2026
   function dl(shift) {
@@ -1629,7 +1616,7 @@ function testComplianceScoring() {
   
   Logger.log('=== SELF-CHECK ===');
   if (failures.length === 0) {
-    Logger.log('✅ All ' + 16 + ' logic checks passed.');
+    Logger.log('✅ All 9 logic checks passed.');
   } else {
     failures.forEach(function(f) { Logger.log('❌ ' + f); });
     throw new Error(failures.length + ' self-check failure(s) — see log.');

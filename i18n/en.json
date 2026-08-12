@@ -133,6 +133,16 @@
     "factoryOsHint": "Opens the operations dashboard in your browser",
     "cannotOpenLink": "Could not open the link on this device."
   },
+  "forms": {
+    "tab": "Forms",
+    "title": "Daily Forms",
+    "count": "{{count}} form(s)",
+    "nextDeadline": "Next form deadline {{time}}",
+    "deadlineHint": "Submit before this time",
+    "notReminded": "no reminder",
+    "emptyTitle": "No forms listed",
+    "emptyMessage": "No daily forms are set up for {{department}} yet. HR can add them."
+  },
   "auth": {
     "loginTitle": "Welcome to Forge OS",
     "enterPhone": "Enter your phone number",

@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 12 Aug 2026, after the ALERT.gs audit.
+**Last updated:** 12 Aug 2026, after the forms tab + shift notification work.
 
 ---
 
@@ -148,8 +148,12 @@ timestamp and required `getHours() >= 8/15/23`. Those columns hold a date only
 boundary. Supervisors have been receiving alerts that are wrong every single
 time — which is the likeliest reason they are ignored.
 
-**Scoring, as agreed 12 Aug**: 100 points on time, −10 per started hour late,
-zero at 10 h. Deadline = shift end + the 60-minute grace.
+**Scoring — REMOVED 12 Aug, later the same day.** Yash: the dashboard timings
+are for notifications in the app, not for scoring. `scoreForDelay_()`, the
+`Points` column, `Score %` and the performance band are gone from ALERT.gs.
+What remains is the factual record — on time / late / missing, and the delay in
+minutes — which is what tells the app what is outstanding. Restore from commit
+`eb70e8f` if that decision ever reverses.
 
 ### Still open on the Sheets side
 
@@ -161,8 +165,11 @@ zero at 10 h. Deadline = shift end + the 60-minute grace.
 - [ ] **Which daily form feeds the production dashboard?** Each shop has 3–6
       daily forms (`<Shop> PMS`, `<Shop> Daily check sheet`, `<Shop> Planning`,
       plus dispatch/57F4 on Machine and Final). The reminder currently lists
-      all of them. Set `Send in reminder?` to `NO` in `FORM_LINKS` for any that
-      should not be chased per shift — no code change needed.
+      all of them. Two mute switches now exist, both data not code:
+      `Send in reminder?` = `NO` in the sheet's `FORM_LINKS` tab (Telegram
+      side), and `send_in_reminder = false` in the `form_links` table (app
+      side). Say which forms should not be chased per shift and I will set
+      both, or set them yourself — nothing needs a redeploy.
 - [ ] **Four ALERT.gs departments are absent from the registry**: Electricity,
       Oil, Staff Manpower, Contract Manpower. The registry instead has Die Shop,
       VMC Shop, Maintenance, Quality, Store, Purchase, HR, Admin, Design,
@@ -175,15 +182,64 @@ zero at 10 h. Deadline = shift end + the 60-minute grace.
       so they are getting in another way — confirm which week convention is
       real and I will align both ends. Left as-is deliberately rather than
       guessing.
+- [x] **Phone numbers — CLOSED 12 Aug.** Yash: "you dont need phone numbers."
+      Not asked for again.
+
 - [ ] **Several `SUPERVISOR_MAP` rows have a blank Telegram Chat ID** (e.g.
       Pravin Sonavane, Machine). Those supervisors get no direct message — the
-      alert falls back to the group chat.
+      alert falls back to the group chat. Lower stakes now that the in-app
+      Forms tab exists as a second route.
 
 ### Still open on the app side
 
-- [ ] **In-app pending-forms count** — the badge showing how many forms are due
-      but not submitted. Not started. Needs the Forms → Supabase decision below.
+- [x] **Forms tab — BUILT 12 Aug.** Yash: "we give one tab on their page for
+      forms .... where we give them the list of forms." `components/FormsScreen.tsx`,
+      mounted as a tab on the supervisor and manager layouts. Lists that
+      employee's department forms from the `form_links` table (PATCH_14), tap
+      to open the responder link, with the next shift deadline at the top.
+      Reaches the phone without Firebase — it is a screen, not a push.
+- [x] **Shift-timing notifications — BUILT 12 Aug.** Yash: the dashboard
+      timings are for app notifications, not scoring. `shift-reminder` gained a
+      `forms_due_reminder` mode firing 15 min before each deadline
+      (16:30 / 00:30 / 09:30), deduped so one nudge goes out per shift.
+- [ ] **Cron entry for `forms_due_reminder`** — needs adding in the Supabase
+      dashboard: every 15 minutes, POST body `{"mode":"forms_due_reminder"}`.
+      Mode inference deliberately never picks this one, so without the cron
+      entry it never runs.
+- [ ] **Pending-forms count on the tab** — the tab lists what is due but cannot
+      yet say what has already been submitted today. Needs the Forms → Supabase
+      decision above (a form response has to reach the DB before the app can
+      tick it off).
 - [ ] Telegram escalation already exists in ALERT.gs and needs nothing new.
+
+---
+
+## 🔴 In-app notifications have never worked — found and fixed 12 Aug
+
+`supabase/functions/_shared/push.ts` writes every notification row as
+`{ user_id, type, title, body, related_entity_type, related_entity_id }`.
+The last two columns exist **only** in `supabase/migrations/20260803090000_initial_schema.sql`
+— the old spec schema CLAUDE.md says to ignore. They are not in
+`FINAL_SCHEMA_02Aug2026.sql`, which is what is deployed.
+
+PostgREST rejects an insert naming a column that does not exist, and
+`notifyEmployees()` never checked the error:
+
+```ts
+await db.from('notifications').insert(rows);   // error discarded
+```
+
+So the insert has failed every time, for every caller — `nightly-scoring`,
+`fraud-detector`, `mrm-reminder`, `shift-reminder`. **The notification bell has
+never received a single row from the server.** It stayed invisible because
+Android push was separately broken on FCM, so "no notification arrived" already
+had an accepted explanation.
+
+- ✅ PATCH_14 adds both columns (`text`, not `uuid` — the forms reminder keys
+  on `yyyy-mm-dd|Shift n`).
+- ✅ `push.ts` now throws on insert failure instead of swallowing it.
+- ⏳ Verify after running the combined deploy: trigger any edge function and
+  check `select count(*) from notifications`.
 
 ---
 

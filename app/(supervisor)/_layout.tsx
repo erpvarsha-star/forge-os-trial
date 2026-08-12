@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router'
 import { useTranslation } from 'react-i18next'
-import { BarChart3, Users, ClipboardList, CheckCircle, MoreHorizontal } from 'lucide-react-native'
+import { BarChart3, Users, ClipboardList, CheckCircle, ClipboardCheck, MoreHorizontal } from 'lucide-react-native'
 
 export default function SupervisorLayout() {
   const { t } = useTranslation()
@@ -10,6 +10,7 @@ export default function SupervisorLayout() {
       <Tabs.Screen name="team" options={{ title: t('common.team'), tabBarIcon: ({ color }) => <Users size={22} color={color} /> }} />
       <Tabs.Screen name="tasks" options={{ title: t('common.tasks'), tabBarIcon: ({ color }) => <ClipboardList size={22} color={color} /> }} />
       <Tabs.Screen name="approvals" options={{ title: t('common.approvals'), tabBarIcon: ({ color }) => <CheckCircle size={22} color={color} /> }} />
+      <Tabs.Screen name="forms" options={{ title: t('forms.tab'), tabBarIcon: ({ color }) => <ClipboardCheck size={22} color={color} /> }} />
       <Tabs.Screen name="more" options={{ title: t('common.more'), tabBarIcon: ({ color }) => <MoreHorizontal size={22} color={color} /> }} />
     </Tabs>
   )

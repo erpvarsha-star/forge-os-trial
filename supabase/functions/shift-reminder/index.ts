@@ -14,8 +14,18 @@
  *    reminds the assigned employee to check in, feeding the late-detection
  *    flow in Workflow 1.
  *
- * POST body: { "mode": "weekly_shift_notify" | "daily_checkin_reminder" }
- * If omitted, mode is inferred from the current IST day of week.
+ * 3. `forms_due_reminder` (schedule: every 15 minutes) — raises an in-app
+ *    notification shortly before each shift's Google Form deadline, per Yash
+ *    12 Aug: the Operations Dashboard shift timings are for notifying people
+ *    in the app, not for scoring them. Deadlines come from
+ *    plant_config.form_shift_schedule; the forms come from form_links
+ *    (PATCH_14), so muting a form is a boolean in the table, not a redeploy.
+ *
+ * POST body: { "mode": "weekly_shift_notify" | "daily_checkin_reminder"
+ *                    | "forms_due_reminder" }
+ * If omitted, mode is inferred from the current IST day of week — which never
+ * infers forms_due_reminder, so that one needs its own cron entry passing
+ * {"mode":"forms_due_reminder"} explicitly.
  */
 
 import { handleOptions, jsonResponse } from '../_shared/cors.ts';
@@ -137,6 +147,126 @@ async function dailyCheckinReminder(db: ReturnType<typeof supabaseAdmin>) {
   return { today, remindedShiftTypes: dueShiftTypes, notified: employeeIds.length };
 }
 
+interface ShiftWindow {
+  shift: string;
+  start: string;
+  end: string;
+  deadline: string;
+}
+
+interface FormShiftSchedule {
+  lead_minutes: number;
+  shifts: ShiftWindow[];
+}
+
+/**
+ * Notifies the people responsible for a department's daily Google Forms that
+ * the deadline for the shift just ending is close.
+ *
+ * ⚠ The cron interval must be no coarser than `lead_minutes`, or the window
+ * closes between two invocations and the reminder is simply never sent. With
+ * the seeded lead of 15 minutes, run this every 15 minutes. Widening the lead
+ * in plant_config is the supported way to run it less often — the dedupe
+ * below means a wider window still sends exactly one nudge per shift.
+ */
+async function formsDueReminder(db: ReturnType<typeof supabaseAdmin>) {
+  const now = istNow();
+  const schedule = await getPlantConfig<FormShiftSchedule>(db, 'form_shift_schedule', {
+    lead_minutes: 15,
+    shifts: [],
+  });
+
+  const lead = Number(schedule.lead_minutes) || 15;
+  const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+
+  const dueShifts = (schedule.shifts ?? []).filter((s) => {
+    const [h, m] = (s.deadline ?? '').split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return false;
+
+    // A deadline past midnight (Shift 2 ends 23:30, due 00:30) reads as a
+    // large negative difference late in the evening; roll it forward a day.
+    let diff = h * 60 + m - nowMinutes;
+    if (diff < -12 * 60) diff += 24 * 60;
+
+    return diff >= 0 && diff <= lead;
+  });
+
+  if (dueShifts.length === 0) {
+    return { dueShifts: [], notified: 0 };
+  }
+
+  // Only forms still flagged for reminders. A form can stay listed in the app
+  // tab (is_active) while being left out of the nudge (send_in_reminder).
+  const { data: forms } = await db
+    .from('form_links')
+    .select('department, form_name')
+    .eq('is_active', true)
+    .eq('send_in_reminder', true);
+
+  const byDepartment = new Map<string, string[]>();
+  for (const f of (forms ?? []) as { department: string; form_name: string }[]) {
+    const list = byDepartment.get(f.department) ?? [];
+    list.push(f.form_name);
+    byDepartment.set(f.department, list);
+  }
+
+  if (byDepartment.size === 0) {
+    return { dueShifts: dueShifts.map((s) => s.shift), notified: 0 };
+  }
+
+  const { data: recipients } = await db
+    .from('employees')
+    .select('id, department')
+    .in('department', Array.from(byDepartment.keys()))
+    .in('role', ['supervisor', 'manager'])
+    .eq('is_active', true);
+
+  // The IST calendar date the deadline falls on. Because this only runs
+  // inside the lead window, "now" is already on the deadline's own day even
+  // for the 00:30 one.
+  const dateStr = now.toISOString().slice(0, 10);
+  let notified = 0;
+  const skipped: string[] = [];
+
+  for (const shift of dueShifts) {
+    for (const [department, formNames] of byDepartment) {
+      const dedupeKey = `${dateStr}|${shift.shift}|${department}`;
+
+      const { data: already } = await db
+        .from('notifications')
+        .select('id')
+        .eq('type', 'form_due_reminder')
+        .eq('related_entity_id', dedupeKey)
+        .limit(1);
+
+      if (already && already.length > 0) {
+        skipped.push(dedupeKey);
+        continue;
+      }
+
+      const employeeIds = (recipients ?? [])
+        .filter((e: { department: string }) => e.department === department)
+        .map((e: { id: string }) => e.id);
+
+      if (employeeIds.length === 0) continue;
+
+      const result = await notifyEmployees(db, {
+        employeeIds,
+        type: 'form_due_reminder',
+        title: `${shift.shift} forms due ${shift.deadline}`,
+        body:
+          `${formNames.length} daily form(s) for ${department} are due by ${shift.deadline}. ` +
+          `Open the Forms tab to submit.`,
+        relatedEntityType: 'form_links',
+        relatedEntityId: dedupeKey,
+      });
+      notified += result.notified;
+    }
+  }
+
+  return { dueShifts: dueShifts.map((s) => s.shift), departments: byDepartment.size, notified, skipped };
+}
+
 Deno.serve(async (req: Request) => {
   const preflight = handleOptions(req);
   if (preflight) return preflight;
@@ -163,6 +293,9 @@ Deno.serve(async (req: Request) => {
     }
     if (mode === 'daily_checkin_reminder') {
       return jsonResponse({ mode, ...(await dailyCheckinReminder(db)) });
+    }
+    if (mode === 'forms_due_reminder') {
+      return jsonResponse({ mode, ...(await formsDueReminder(db)) });
     }
     return jsonResponse({ error: 'Unknown mode' }, 400);
   } catch (err) {
