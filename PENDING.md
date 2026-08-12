@@ -298,9 +298,11 @@ had an accepted explanation.
       PATCH_06 left it commented out deliberately (must not be committed to git).
       Generate with `python3 -c "import secrets; print(secrets.token_hex(24))"`
       and set it directly in the Supabase SQL Editor.
-- [ ] **Alert/notification copy in Hindi** — several `Alert.alert()` calls in
-      `worker/home.tsx`, `qr.tsx`, `5s.tsx`, `observation.tsx`, `payslip.tsx`
-      still use hardcoded English strings instead of `t()`.
+- [x] **Alert copy in Hindi — VERIFIED DONE 12 Aug.** All 38 `Alert.alert()`
+      calls already use `t()`. Audited properly with `scripts/check-i18n.mjs`:
+      Hindi covers 100% of English, and one key used on two dashboards
+      (`common.overview`) had no entry at all — it was rendering the literal
+      text "common.overview" as a section heading. Now added.
 - [x] **`types/database.ts` — DELETED 12 Aug.** It mirrored the old schema and
       nothing imported it; it existed only to mislead. `types/index.ts` is the
       single type source.
