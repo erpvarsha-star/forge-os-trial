@@ -12,12 +12,12 @@ import { Input } from '@/components/Input'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { getCurrentLocation, getPlantConfig, isInsideGeofence } from '@/lib/location'
 import { supabase } from '@/lib/supabase'
+import { getDeviceId } from '@/lib/deviceId'
 import { EmployeeShift } from '@/types'
 import { MAX_DAILY_OBSERVATIONS } from '@/constants'
 import { MapPin, Clock, CheckSquare, AlertCircle, Camera, QrCode, CheckCircle2, Calendar, ChevronRight } from 'lucide-react-native'
 import { router } from 'expo-router'
 import * as Location from 'expo-location'
-import Constants from 'expo-constants'
 
 export default function WorkerHome() {
   const { t } = useTranslation()
@@ -43,7 +43,9 @@ export default function WorkerHome() {
       .select('*, shift:shifts(*)')
       .eq('employee_id', employee.id)
       .eq('date', today)
-      .single()
+      // maybeSingle, not single: most employees have no shift row for today,
+      // and single() treats "no rows" as an error (PGRST116).
+      .maybeSingle()
     if (data) setShift(data as EmployeeShift)
   }
 
@@ -93,7 +95,7 @@ export default function WorkerHome() {
     // Step 5 fraud detection: mock-location + same-device-different-employee ("buddy device")
     const providerStatus = await Location.getProviderStatusAsync()
     const mockDetected = !providerStatus.gpsAvailable
-    const deviceId = Constants.deviceId || Constants.sessionId
+    const deviceId = await getDeviceId()
 
     const todayStr = new Date().toISOString().split('T')[0]
     const { data: buddyCheck } = await supabase
@@ -102,7 +104,8 @@ export default function WorkerHome() {
       .eq('device_id', deviceId)
       .eq('date', todayStr)
       .neq('employee_id', employee.id)
-      .single()
+      // No buddy is the normal case, and single() would call that an error.
+      .maybeSingle()
 
     if (buddyCheck) {
       await supabase.from('fraud_flags').insert({

@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 12 Aug 2026, after PATCH_13-15 were applied to the live database.
+**Last updated:** 12 Aug 2026, after the admin view-as and the plant dashboard.
 
 ---
 
@@ -279,10 +279,9 @@ had an accepted explanation.
 
 ## 🟢 Untested — needs a real device / real data
 
-- [ ] **Role-by-role walkthrough** using the seven test logins (owner, plant
-      head, HR admin, manager, supervisor, security guard, member). Nobody has
-      confirmed each role sees the right screens with real data.
-      Reset each account afterwards with `scripts/HR_reset_pin.sql`.
+- [ ] **Role-by-role walkthrough** — now much cheaper: sign in as VFL1001 and
+      use **More → View as** to step through all seven roles and every
+      department. No second login, no PIN resets, nothing to undo afterwards.
 - [ ] **5S photo submission end-to-end** — capture → upload → supervisor sees it.
       The one path in build 22/23 I could not test: no device, and Supabase is
       unreachable from the build sandbox.
@@ -302,8 +301,15 @@ had an accepted explanation.
 - [ ] **Alert/notification copy in Hindi** — several `Alert.alert()` calls in
       `worker/home.tsx`, `qr.tsx`, `5s.tsx`, `observation.tsx`, `payslip.tsx`
       still use hardcoded English strings instead of `t()`.
-- [ ] **`types/database.ts` mirrors the OLD schema** and is misleading. Either
-      delete it or regenerate from FINAL_SCHEMA.
+- [x] **`types/database.ts` — DELETED 12 Aug.** It mirrored the old schema and
+      nothing imported it; it existed only to mislead. `types/index.ts` is the
+      single type source.
+- [x] **Buddy-device fraud check — FIXED 12 Aug, it had never fired.**
+      `worker/home.tsx` used `Constants.deviceId || Constants.sessionId`.
+      `Constants.deviceId` was removed from Expo years before SDK 51, so it is
+      always undefined and every check-in wrote a fresh `sessionId` — meaning
+      the "same device, different employee, same day" lookup could never match.
+      Now a stable per-install id in `lib/deviceId.ts`.
 - [ ] **Rotating supervisor assignment** — HR/IR decide weekly; no in-app flow.
       Currently a manual `supervisor_id` UPDATE. Closed as out of scope 10 Aug,
       but will keep needing manual SQL.

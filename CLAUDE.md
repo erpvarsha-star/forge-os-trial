@@ -205,7 +205,8 @@ QR salt: PATCH_06 has a commented-out UPDATE — Yash must generate his own secr
 
 ```
 app/
-├── index.tsx              — role router (the only auth guard; no guards in layouts)
+├── index.tsx              — role router (the only auth guard; routes on the EFFECTIVE role, see view-as)
+├── view-as.tsx            — admin inspection: render the app as any role/department/category
 ├── (auth)/login.tsx       — employee code / mobile + PIN login
 ├── (auth)/change-pin.tsx  — forced PIN change on first login
 ├── (auth)/login-otp.tsx.bak — original OTP screen, kept as fallback (.bak so expo-router ignores it)
@@ -268,6 +269,48 @@ app/
 
 ---
 
+## Admin "view as" (12 Aug 2026)
+
+Owner, plant_head and hr_admin can inspect the app as any role, department or
+category — `app/view-as.tsx`, reached from their `more.tsx`. Replaces signing
+in as seven employees and resetting each PIN with `HR_reset_pin.sql`.
+
+**Presentation only.** `hooks/useViewAs.ts` (zustand + AsyncStorage) changes
+which screens render and which department they query; every request still
+carries the admin's own JWT, so RLS answers for their real role. It can only
+ever show *less* than the admin may see, never more. The picker is gated on the
+REAL role, so a switch cannot reach the switcher. Writes still land under the
+admin's own id — an approval made while viewing as a supervisor is recorded as
+the admin's.
+
+`hooks/useEffectiveIdentity.ts` is what screens should read when deciding what
+to SHOW; keep using `employee.id` for anything they WRITE.
+`components/ViewAsBanner.tsx` is mounted in the root layout so it cannot be
+navigated away from.
+
+---
+
+## Plant dashboard — `dashboard/index.html` (12 Aug 2026)
+
+One self-contained HTML file for HR and the plant head. No build step, no
+server, no CDN — vanilla JS, hand-rolled SVG, inline CSS. Download and open.
+
+Signs in with the same emp code/mobile + PIN via `resolve_login_identifier`,
+then queries as that user, so **RLS is the security boundary, not the file**.
+The embedded key is the *publishable* key (public by design, already in the
+APK). A `service_role` / `sb_secret_` key must never go in this file.
+
+Shows: today's headcount/present/attendance/late, pending approvals, open fraud
+alerts, a 30-day attendance trend, app adoption (first logins via
+`must_change_pin`, push registration), late-comers, low scores with an
+adjustable threshold, per-department breakdown, a data-quality list, today's
+form submissions, and month-to-date production.
+
+**Warnings** write a real `notifications` row, which works because PATCH_12
+made `notifications_insert` require `is_management()`.
+
+---
+
 ## Edge functions (6, all Deno)
 
 | Function | Purpose | Cron |
@@ -303,14 +346,10 @@ app/
 
 | Screen | Issue |
 |---|---|
-| `worker/home.tsx` | `employee_shifts` join syntax incorrect; `Constants.deviceId` deprecated |
+| ~~`worker/home.tsx`~~ | ✅ Fixed 12 Aug. `Constants.deviceId` has not existed in Expo for years, so the buddy-device fraud check compared a fresh `sessionId` on every launch and could never match — no buddy flag was ever raised. Now `lib/deviceId.ts`, persisted per install. `.single()` → `.maybeSingle()` on the two optional lookups |
 | `worker/5s.tsx` | Camera `takePhoto()` uses placeholder URL — not wired to expo-camera |
 | `worker/observation.tsx` | Camera not wired |
-| `supervisor/approvals.tsx` | Advance approve button is a no-op `onPress={() => {}}` |
 | `supervisor/casual-workers.tsx` | Upsert conflict key uses `date` — check if `CasualWorkersRow` matches FINAL_SCHEMA |
-| `manager/reports.tsx` | Entirely static placeholder — not implemented |
-| `owner/kpi.tsx` | All chart data hardcoded — not wired to DB |
-| `(all roles)/payslip.tsx` | No null check on payroll_records — crashes if record absent |
 | All screens | No auth guard in individual route layouts — only `app/index.tsx` routes by role |
 
 ---
