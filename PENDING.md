@@ -45,14 +45,65 @@ drop frequently at this site; work must never be lost mid-task.
 
 ---
 
+## 🔎 Google Forms / Factory OS — investigated 12 Aug via Drive connector
+
+Found the real setup rather than asking. Live files:
+
+| File | ID | Note |
+|---|---|---|
+| **VFPL Factory OS — Supervisor Data Entry (Dynamic)** (Form) | `1Op5qSke8gYYVKeTXA6YhsuqRfEWM-y8Oc9lLlWwcsJI` | created 4 Aug, modified 10 Aug — the daily-entry form |
+| **VFPL Operations Dashboard 2026-27** (Sheet) | `1GHdhrRtOhQFshsAOCK4n3GiJp-6a03k8bn0V_M04wSY` | **modified 12 Aug 04:50 — actively in use** |
+| Per-shop forms | various | Cutting / Press / Forge / HT / Final / Machine, "Planning" + shift variants |
+
+### What the dashboard actually contains
+
+- **Supervisor weekly registration**: Timestamp, Email, Department, Supervisor Name,
+  Phone, **Telegram Chat ID**, Week Start (Sat) / Week End (Thu)
+- **Cutting production**: `Date | Machine | Shift | VF_No | Qty` — real rows since 1 Apr
+- **HT production**: `Date | Furnace | Shift | Qty` — First/Second/Third Shift
+- **Final production**: `Date | Process | Shift | VF_No | Qty` — e.g. Shot Blasting
+- **Energy**: ~25 meters mapped to shops, kWh MTD and % of total per department
+- **Consumables**: Zycril mixing, avg daily Forge/HT litres
+- **Shift master**: S1 08:30-15:30, S2 15:30-23:30, S3 23:30-08:30, 60 min break, 15 min grace
+
+### Two things this changes
+
+1. **Production data DOES exist** — contradicting the basis on which I removed the
+   production component from `nightly-scoring`. Important nuance: it is per
+   **machine/furnace/process per shift**, NOT per employee. So removing it from the
+   *individual* score was still correct, but it can absolutely drive
+   **department-level production on the owner/manager dashboards**. Currently the app
+   shows nothing from it.
+2. **Supervisors already have Telegram Chat IDs on file.** That is a notification
+   channel needing no Firebase, no FCM, and no Play Store — a working alternative
+   to the Expo Push route that is currently blocked.
+
+### Data quality issue spotted
+In the Cutting table the `Shift` column holds a **person's name** ("B.S. Todmal"),
+not a shift, while HT/Final correctly hold "First/Second/Third/General Shift".
+Worth fixing at the form, or the importer must tolerate both.
+
+---
+
 ## 🟡 Needs a decision from Yash
 
-- [ ] **Google Forms per department — is this actually wanted?**
-      The README frames the app as the *replacement* for "disconnected Google
-      Forms", and `supervisor/shift-report.tsx` → `data_collection_submissions`
-      is that replacement. So no Forms are linked, by design.
-      If you still want Forms feeding the database, the **Zapier connector** can
-      bridge Google Forms → Supabase without new app code. Say the word.
+- [ ] **How should Forms → app data flow?** (Forms confirmed in daily use.)
+      Options, in order of my preference:
+      **(a) Sheet → Supabase sync** — an Apps Script on the Operations Dashboard
+      pushing new production rows into Supabase, modelled on the existing
+      `scripts/MigrateToSupabase.gs`. You paste one script, authorise once, done.
+      **(b) Zapier** — Google Forms trigger → Supabase row. No script, but a Zap
+      per form and an ongoing Zapier dependency.
+      **(c) Read-only Drive pull** — I read the Sheet on demand. No automation,
+      no live dashboard.
+      Needs new tables for machine/furnace/process production (none of the three
+      shapes fits `data_collection_submissions`).
+
+- [ ] **Telegram for notifications instead of Expo Push?**
+      Supervisors' Telegram Chat IDs are already collected weekly. A Telegram bot
+      would sidestep Firebase/FCM entirely for supervisor-level alerts. Cheaper and
+      faster than the Firebase route, but only reaches people who have Telegram —
+      fine for supervisors, unproven for ~90 shop-floor workers.
 
 - [ ] **`scripts/MigrateToSupabase.gs` has never been installed.**
       Google Apps Script that syncs the Employee Master Google Sheet → Supabase.
