@@ -1,5 +1,5 @@
 /**
- * 5s-challenge-generator
+ * five-s-challenge-generator
  *
  * Generates one 5S housekeeping challenge for today by calling Gemini,
  * and writes it to the "5s_challenges" table (quoted — table name starts
@@ -80,7 +80,7 @@ Deno.serve(async (req: Request) => {
 
     return jsonResponse({ date: today, challenge });
   } catch (err) {
-    console.error('5s-challenge-generator failed', err);
+    console.error('five-s-challenge-generator failed', err);
     return jsonResponse({ error: err instanceof Error ? err.message : 'Internal error' }, 500);
   }
 });

@@ -58,7 +58,7 @@ below.
   - `shift-reminder` — Thursday shift-planning + daily shift-start reminders.
   - `mrm-reminder` — Monthly Review reminders/escalation from the 8th to the
     10th of each month (Workflow 8).
-  - `5s-challenge-generator` — generates a daily 5S housekeeping challenge per
+  - `five-s-challenge-generator` — generates a daily 5S housekeeping challenge per
     department/shift to drive floor engagement.
 - **`lib/supabase.ts`** / **`lib/config.ts`** — typed Supabase client and central
   plant configuration (GPS/geofence, role colours, deduction rates, shift times).

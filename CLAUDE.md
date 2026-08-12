@@ -271,7 +271,7 @@ app/
 | `fraud-detector` | GPS + bulk-confirmation fraud checks | Called by app on check-in/supervisor confirm |
 | `mrm-reminder` | Ensure MRM rows exist; remind managers 8th-10th; escalate to plant_head | Daily |
 | `shift-reminder` | Weekly shift notify (Thursday) + daily check-in reminder (hourly) | Thursday + hourly |
-| `5s-challenge-generator` | Generate daily 5S challenge via Gemini | Daily |
+| `five-s-challenge-generator` | Generate daily 5S challenge via Gemini | Daily |
 | `send-push-notification` | HTTP dispatcher — write notification row + Expo push | On-demand |
 
 **Shared helpers** (`supabase/functions/_shared/`):
