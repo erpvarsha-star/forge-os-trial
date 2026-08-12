@@ -52,7 +52,7 @@ jobs:
       # employees.category). Not a secret — it is a URL compiled into the APK.
       # If empty the button hides itself rather than shipping a dead link, so
       # an unset value is safe.
-      EXPO_PUBLIC_FACTORY_OS_URL: ${{ vars.EXPO_PUBLIC_FACTORY_OS_URL }}
+      EXPO_PUBLIC_FACTORY_OS_URL: https://erpvarsha-star.github.io/vfpl-dashboard-26-27/
       # Confirmed spelling matches CLAUDE.md's header and .env exactly.
     steps:
       - uses: actions/checkout@v4
