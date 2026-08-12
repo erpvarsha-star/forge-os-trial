@@ -35,29 +35,51 @@ var SHIFT_CONFIG_DATA = {
 
 // ── FORM LINKS ────────────────────────────────────────────
 // Supervisors were being told to "upload NOW" with a literal
-// "[Google Form Link]" placeholder in place of the link (the reminder text
-// below used to hardcode that string). These are the defaults; the live
-// values are read from the FORM_LINKS tab so they can be corrected in the
-// sheet without touching this script.
+// "[Google Form Link]" placeholder where the link should have been.
 //
-// ⚠ UNVERIFIED: the Drive account holds many similarly-named copies of each
-// shop form. These IDs are the most recently modified form matching each
-// department, which is a guess, not a confirmation. Check the FORM_LINKS tab
-// and fix any row that points at the wrong form before relying on it.
+// These rows come from Yash's form registry sheet
+// (1M2E83q64BXzfGwZsNQ_9u2jdfzwJPrJlD8WKRKgG554), which lists every form by
+// department, responsible person and frequency, with the published
+// /forms/d/e/.../viewform responder links — not the /edit links a Drive file
+// listing gives you. Only the Daily forms are seeded here; the
+// "As & When Required" ones (gate pass, hospital, advance, leave) are not
+// chased per shift.
+//
+// The FORM_LINKS tab is the live source and overrides this seed, so links can
+// be corrected in the sheet without editing the script.
 var FORM_LINKS_TAB = 'FORM_LINKS';
 
-var DEPT_FORM_URLS = {
-  'Cutting':           'https://docs.google.com/forms/d/1McrXNxk4ONInXZs0n49XcIKzBokTS7hm5sIvmKtxq9g/viewform',
-  'Forge':             'https://docs.google.com/forms/d/1apx3pWQ9C96NDbUqOaGqRS6w-Kxln7prDQpp0-CsOD4/viewform',
-  'Press':             'https://docs.google.com/forms/d/1iLnuviUMFSdJAuTtAplf1JdRf-RvaHDwqDG4TC5UVDs/viewform',
-  'Machine':           'https://docs.google.com/forms/d/1ziDAdP41suLvQeik5vxFyMdyuz07xNHwPSUWCPVbEOo/viewform',
-  'HT':                'https://docs.google.com/forms/d/1_uY2LszTjxvtgCNcW5QQu55zhZNI-fNCQQ1EHtllb1U/viewform',
-  'Final':             'https://docs.google.com/forms/d/1_Xx35Upx6bA7nHSt1FIqTKoWI5YyE-hl1w3a1y5QjN8/viewform',
-  'Electricity':       'https://docs.google.com/forms/d/1CmIHObgxnXto26703qLDrfsmN2SIC2NCtVJIPH-upUA/viewform',
-  'Oil':               'https://docs.google.com/forms/d/1xuj71eNOPGLt3fXzqjKwQ0CmwhPhdueEXeVqo1uzfJE/viewform',
-  'Staff Manpower':    '',
-  'Contract Manpower': 'https://docs.google.com/forms/d/1nnJU91_X2amQdQh7Dq0c-JGMJqVni_Z2bSDcjzp1-XE/viewform'
-};
+// [department, form name, frequency, responsible person, url, send in reminder]
+var DEPT_FORM_SEED = [
+  ['Cutting', 'Cutting PMS', 'Daily', 'Sudeep Singh', 'https://docs.google.com/forms/d/e/1FAIpQLSf0yqwPXjd8kWwqgpgcDRmYq7Z8PeOV0ifY8lmZycC_MDibjw/viewform', 'YES'],
+  ['Cutting', 'Cutting Daily check sheet', 'Daily', 'Sudeep Singh', 'https://docs.google.com/forms/d/e/1FAIpQLSf9m5VVFlVpEaoRYMPZ1MEOnZyaWnkdnIyVYG2yDj736jy-Bg/viewform', 'YES'],
+  ['Cutting', 'Cutting Planning', 'Daily', 'Sudeep Singh', 'https://docs.google.com/forms/d/e/1FAIpQLSe9vMmKukDFGNKptsJMOu4ICtSgds4adrhw1Czcjb1XSodSHg/viewform', 'YES'],
+  ['Cutting', 'Overtime Form', 'Daily', 'Sudeep Singh', 'https://docs.google.com/forms/d/e/1FAIpQLSf9zPvnTSMDE8AT_vrs9W8y2efwXxTbpJ2FlrRJl2TLoGKGXw/viewform', 'YES'],
+  ['Forge', 'Forge Daily check sheet', 'Daily', 'Sudeep Singh Laxman Yadav Subhash Sitaram Palve Saroj Avdesh Singh Shaikh Irfan', 'https://docs.google.com/forms/d/e/1FAIpQLSfEzztMshze903rfc6vobPK0AZudZ9MfM-Mahsuzzj3ie1tEw/viewform', 'YES'],
+  ['Forge', 'Forge PMS', 'Daily', 'Sudeep Singh Laxman Yadav Subhash Sitaram Palve Saroj Avdesh Singh Shaikh Irfan', 'https://docs.google.com/forms/d/e/1FAIpQLSeXwEc4jMUmwTySfvFrm4bOqbB01gW5cS_yeiRe6VmlWKDntQ/viewform', 'YES'],
+  ['Forge', 'Forge Shop Planning', 'Daily', 'Sudeep Singh Laxman Yadav Subhash Sitaram Palve Saroj Avdesh Singh Shaikh Irfan', 'https://docs.google.com/forms/d/e/1FAIpQLSc1cbhgqSJVuLXFJ6xCr5pkfN0UBhok8mpi6sIcA1AY6BsJSQ/viewform', 'YES'],
+  ['Press', 'Press Daily check sheet', 'Daily', 'Dinkar Landge Shyambabu Radheshyam Yadav Chandan Milind Sonapasare Manbodh Sambhu Sah Shaikh Zaker Abdul Quayyum Vaibhav Mali', 'https://docs.google.com/forms/d/e/1FAIpQLSc0QOVHipibWe2B4pENewKxJt7O36xe4eRDMxNqr_UYf7Ei2A/viewform', 'YES'],
+  ['Press', 'Press PMS', 'Daily', 'Dinkar Landge Shyambabu Radheshyam Yadav Chandan Milind Sonapasare Manbodh Sambhu Sah Shaikh Zaker Abdul Quayyum Vaibhav Mali', 'https://docs.google.com/forms/d/e/1FAIpQLSerCkOEK8Y9olorgA4OtusaaBXxA9G7RgHcq9IXJmCabcfRMg/viewform', 'YES'],
+  ['Press', 'Press Shop Planning', 'Daily', 'Dinkar Landge Shyambabu Radheshyam Yadav Chandan Milind Sonapasare Manbodh Sambhu Sah Shaikh Zaker Abdul Quayyum Vaibhav Mali', 'https://docs.google.com/forms/d/e/1FAIpQLSe9fhnfuCG_DjAPij5jk0k5K3ix9OCs7bHTxAX5eQtCK0Tgsw/viewform', 'YES'],
+  ['Machine', 'Machine Daily check sheet', 'Daily', 'Haribhau Shamrao Datar. Pravin Pundalik Sonavane Santosh Vishwanath Sawai Bhupendra Kashinath Bharude Shaikh Wajid shaikh Shabbir Ramesh Narayan Gote Anna Pralhad Deshmukh Bhaiyyasaheb Sambhaji Patil Vitthal Uddhav Tekale', 'https://docs.google.com/forms/d/e/1FAIpQLSeBWFirZX18C1Sqz4hiTzLnPSDqXGEbYLH5LWmo3Gy6Rx0kQA/viewform', 'YES'],
+  ['Machine', 'Machine PMS', 'Daily', 'Haribhau Shamrao Datar. Pravin Pundalik Sonavane Santosh Vishwanath Sawai Bhupendra Kashinath Bharude Shaikh Wajid shaikh Shabbir Ramesh Narayan Gote Anna Pralhad Deshmukh Bhaiyyasaheb Sambhaji Patil Vitthal Uddhav Tekale', 'https://docs.google.com/forms/d/e/1FAIpQLSdzriZ1FIXAdrt247msSFabUSnLn5ctdBkyl_4NyRL_b_UBSg/viewform', 'YES'],
+  ['Machine', 'Machine Shop Planning', 'Daily', 'Haribhau Shamrao Datar. Pravin Pundalik Sonavane Santosh Vishwanath Sawai Bhupendra Kashinath Bharude Shaikh Wajid shaikh Shabbir Ramesh Narayan Gote Anna Pralhad Deshmukh Bhaiyyasaheb Sambhaji Patil Vitthal Uddhav Tekale', 'https://docs.google.com/forms/d/e/1FAIpQLSfkmTouMWhxG-7SbnwcV4wbQJrPJOxD9cdnvHWrdh3fZIIc4Q/viewform', 'YES'],
+  ['Machine', 'VFPL Sales Dispatch Actual Form', 'Daily', 'Haribhau Shamrao Datar. Pravin Pundalik Sonavane Santosh Vishwanath Sawai Bhupendra Kashinath Bharude Shaikh Wajid shaikh Shabbir Ramesh Narayan Gote Anna Pralhad Deshmukh Bhaiyyasaheb Sambhaji Patil Vitthal Uddhav Tekale', 'https://docs.google.com/forms/d/e/1FAIpQLSerDrMI7SlhB5HEHyUDuxfPJrCuvpwkyl9pw2lOYqwOaUqteg/viewform', 'YES'],
+  ['Machine', 'Dispatch Plan-Machine Shop', 'Daily', 'Haribhau Shamrao Datar. Pravin Pundalik Sonavane Santosh Vishwanath Sawai Bhupendra Kashinath Bharude Shaikh Wajid shaikh Shabbir Ramesh Narayan Gote Anna Pralhad Deshmukh Bhaiyyasaheb Sambhaji Patil Vitthal Uddhav Tekale', 'https://docs.google.com/forms/d/e/1FAIpQLSdcZw9VVStYMhy17zHu5hnB-mC9sn6Pq0V5SkIZCfV1uzTPUA/viewform', 'YES'],
+  ['HT', 'HT Daily check sheet', 'Daily', 'Balasaheb Shivaji Todmal Ramnath Babasaheb Gadekar', 'https://docs.google.com/forms/d/e/1FAIpQLSc5M5SVkihS7FIZCLF-8Me5wGseyQIU88x0p1Zs1aB5ZThrRw/viewform', 'YES'],
+  ['HT', 'HT PMS', 'Daily', 'Balasaheb Shivaji Todmal Ramnath Babasaheb Gadekar', 'https://docs.google.com/forms/d/e/1FAIpQLSdVaiBzMydIQxI0h77R78_aPyFzuLjIFFpUY2T1qTQrfwl8Jg/viewform', 'YES'],
+  ['HT', 'HT Shop Planning', 'Daily', 'Balasaheb Shivaji Todmal Ramnath Babasaheb Gadekar', 'https://docs.google.com/forms/d/e/1FAIpQLSeeuJRiGEtT3wst31Qs5f9BX3NpLXLW5StmwpYTJldAXayaSg/viewform', 'YES'],
+  ['Final', 'Final Daily check sheet', 'Daily', 'Jakir Munshi Chaudhari Subhash Shivanand Thorat Ashok Kumar', 'https://docs.google.com/forms/d/e/1FAIpQLScnN9MwSqunjomGCTo73GuIBHBw1xHTj4j8u_49PZsAZzM1hQ/viewform', 'YES'],
+  ['Final', 'Final PMS', 'Daily', 'Jakir Munshi Chaudhari Subhash Shivanand Thorat Ashok Kumar', 'https://docs.google.com/forms/d/e/1FAIpQLSdyxVMje-Ke51r6AnNbh81mFgbDzjJGQbjkfcpFHk4S1BbMYA/viewform', 'YES'],
+  ['Final', 'VFPL Sales Dispatch Actual Form', 'Daily', 'Jakir Munshi Chaudhari Subhash Shivanand Thorat Ashok Kumar', 'https://docs.google.com/forms/d/e/1FAIpQLSerDrMI7SlhB5HEHyUDuxfPJrCuvpwkyl9pw2lOYqwOaUqteg/viewform', 'YES'],
+  ['Final', 'Final Shop Planning', 'Daily', 'Jakir Munshi Chaudhari Subhash Shivanand Thorat Ashok Kumar', 'https://docs.google.com/forms/d/e/1FAIpQLSff5rk2BDx-2ky64_rrVUXlrxdgqI4mvHL-Kcf5eBhHa8nA2w/viewform', 'YES'],
+  ['Final', '57F4 Inward Form', 'Daily', 'Jakir Munshi Chaudhari Subhash Shivanand Thorat Ashok Kumar', 'https://docs.google.com/forms/d/e/1FAIpQLSdHaCr9PfjKFv_nRIQGy_0uBo6SmoXfJe06ZNWW5-zBONkA-w/viewform', 'YES'],
+  ['Final', '57F4 Outward Form', 'Daily', 'Jakir Munshi Chaudhari Subhash Shivanand Thorat Ashok Kumar', 'https://docs.google.com/forms/d/e/1FAIpQLSdfReEVbGGGNC6CwIPDq53syvvkomXj2gfIWNBQehjozUD1DA/viewform', 'YES'],
+  ['Electricity', '', '', '', '', 'NO'],
+  ['Oil', '', '', '', '', 'NO'],
+  ['Staff Manpower', '', '', '', '', 'NO'],
+  ['Contract Manpower', '', '', '', '', 'NO']
+];
 
 // ── COMPLIANCE SCORING ────────────────────────────────────
 // Yash, 12 Aug: "partial credit depending on delay every hour 10 percent
@@ -555,8 +577,9 @@ function buildMissingListText_(missing) {
     lines.push('  • ' + m.department + ' — 👤 ' + m.supervisor + phoneText);
     // The DME chases these by hand; give them the form to forward rather than
     // making them hunt for it per department.
-    var url = getFormUrlForDept_(m.department);
-    if (url) lines.push('    🔗 ' + url);
+    getFormsForDept_(m.department).forEach(function(f) {
+      lines.push('    🔗 ' + f.name + ': ' + f.url);
+    });
   });
   return lines.join('\n');
 }
@@ -1223,7 +1246,14 @@ function quickProcessForm() {
  */
 function createFormLinksTab_(ss) {
   var sh = ss.getSheetByName(FORM_LINKS_TAB);
-  var headers = ['Department', 'Form URL', 'Notes'];
+  var headers = ['Department', 'Form Name', 'Frequency', 'Responsible Person', 'Form URL', 'Send in reminder?'];
+  
+  // An earlier version of this script created FORM_LINKS with three columns.
+  // Rebuild rather than half-migrate if the shape does not match.
+  if (sh && sh.getLastColumn() < headers.length) {
+    ss.deleteSheet(sh);
+    sh = null;
+  }
   
   if (!sh) {
     sh = ss.insertSheet(FORM_LINKS_TAB);
@@ -1233,52 +1263,86 @@ function createFormLinksTab_(ss) {
       .setFontColor('#FFFFFF');
   }
   
+  // Keyed on department + form name so re-running setup never overwrites a
+  // link someone has corrected in the sheet, and never duplicates a row.
   var existing = {};
   if (sh.getLastRow() > 1) {
-    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
-    rows.forEach(function(r) { existing[(r[0] || '').toString().trim()] = true; });
+    sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues().forEach(function(r) {
+      existing[(r[0] || '').toString().trim() + '|' + (r[1] || '').toString().trim()] = true;
+    });
   }
   
-  var added = 0;
-  DEPARTMENTS.forEach(function(dept) {
-    if (existing[dept]) return;
-    var url = DEPT_FORM_URLS[dept] || '';
-    sh.appendRow([dept, url, url ? 'Auto-filled — CHECK this is the right form' : 'No form identified — paste the link here']);
-    added++;
+  var toAdd = [];
+  DEPT_FORM_SEED.forEach(function(row) {
+    if (existing[row[0] + '|' + row[1]]) return;
+    toAdd.push(row);
   });
   
+  if (toAdd.length > 0) {
+    sh.getRange(sh.getLastRow() + 1, 1, toAdd.length, headers.length).setValues(toAdd);
+  }
+  
   sh.autoResizeColumns(1, headers.length);
-  Logger.log('  ✅ ' + FORM_LINKS_TAB + ' ready (' + added + ' department(s) added)');
+  Logger.log('  \u2705 ' + FORM_LINKS_TAB + ' ready (' + toAdd.length + ' row(s) added)');
+  
+  var noForm = [];
+  DEPARTMENTS.forEach(function(dept) {
+    if (getFormsForDept_(dept).length === 0) noForm.push(dept);
+  });
+  if (noForm.length > 0) {
+    Logger.log('  \u26a0 No form link for: ' + noForm.join(', '));
+  }
 }
 
-var _formUrlCache = null;
+var _formCache = null;
 
-/** Form URL for a department: FORM_LINKS tab first, code defaults as fallback. */
-function getFormUrlForDept_(dept) {
-  if (_formUrlCache === null) {
-    _formUrlCache = {};
+/**
+ * The daily forms a department must submit: FORM_LINKS tab first, falling back
+ * to DEPT_FORM_SEED when the tab has not been created yet. Rows with
+ * "Send in reminder?" set to anything other than YES are skipped, which is how
+ * a form gets muted without deleting its row.
+ */
+function getFormsForDept_(dept) {
+  if (_formCache === null) {
+    _formCache = {};
+    var rows = null;
     var sh = SpreadsheetApp.openById(DASH_ID).getSheetByName(FORM_LINKS_TAB);
-    if (sh && sh.getLastRow() > 1) {
-      var data = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
-      data.forEach(function(r) {
-        var d = (r[0] || '').toString().trim();
-        var u = (r[1] || '').toString().trim();
-        if (d && u) _formUrlCache[d] = u;
-      });
+    if (sh && sh.getLastRow() > 1 && sh.getLastColumn() >= 6) {
+      rows = sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues();
+    } else {
+      rows = DEPT_FORM_SEED;
     }
+    rows.forEach(function(r) {
+      var d = (r[0] || '').toString().trim();
+      var name = (r[1] || '').toString().trim();
+      var url = (r[4] || '').toString().trim();
+      var include = (r[5] || '').toString().trim().toUpperCase();
+      if (!d || !url || include !== 'YES') return;
+      if (!_formCache[d]) _formCache[d] = [];
+      _formCache[d].push({ name: name, url: url });
+    });
   }
-  return _formUrlCache[dept] || DEPT_FORM_URLS[dept] || '';
+  return _formCache[dept] || [];
 }
 
 /**
- * The upload line for a reminder. When no link is configured, say so plainly
+ * The upload block for a reminder. When nothing is configured, say so plainly
  * rather than printing a placeholder that looks like a link — the failure that
- * started this whole section.
+ * started all this.
  */
 function buildFormLinkLine_(dept) {
-  var url = getFormUrlForDept_(dept);
-  if (url) return '🔗 Upload here: ' + url;
-  return '⚠️ No form link configured for ' + dept + ' — add it to the ' + FORM_LINKS_TAB + ' tab.';
+  var forms = getFormsForDept_(dept);
+  if (forms.length === 0) {
+    return '\u26a0\ufe0f No form link configured for ' + dept + ' \u2014 add it to the ' + FORM_LINKS_TAB + ' tab.';
+  }
+  if (forms.length === 1) {
+    return '\ud83d\udd17 Upload here: ' + forms[0].url;
+  }
+  var lines = ['\ud83d\udd17 Forms due for ' + dept + ':'];
+  forms.forEach(function(f) {
+    lines.push('  \u2022 ' + f.name + '\n    ' + f.url);
+  });
+  return lines.join('\n');
 }
 
 // ── SHIFT DEADLINES AS REAL DATES ─────────────────────────
@@ -1554,8 +1618,13 @@ function testComplianceScoring() {
   
   Logger.log('=== FORM LINKS ===');
   DEPARTMENTS.forEach(function(dept) {
-    var url = getFormUrlForDept_(dept);
-    Logger.log('  ' + (url ? '✅' : '❌') + ' ' + dept + ': ' + (url || 'NOT CONFIGURED'));
+    var forms = getFormsForDept_(dept);
+    if (forms.length === 0) {
+      Logger.log('  ❌ ' + dept + ': NOT CONFIGURED');
+      return;
+    }
+    Logger.log('  ✅ ' + dept + ': ' + forms.length + ' form(s)');
+    forms.forEach(function(f) { Logger.log('       • ' + f.name + ' — ' + f.url); });
   });
   
   Logger.log('=== SELF-CHECK ===');

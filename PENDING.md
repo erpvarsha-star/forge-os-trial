@@ -153,12 +153,20 @@ zero at 10 h. Deadline = shift end + the 60-minute grace.
 
 ### Still open on the Sheets side
 
-- [ ] **Confirm the form links.** Drive holds many similarly-named copies of
-      each shop form; the seeded URLs are the most recently modified match per
-      department and are **guesses**. Check the `FORM_LINKS` tab and fix any
-      wrong row there (the tab overrides the code).
-- [ ] **Staff Manpower has no identifiable form** — no candidate found in
-      Drive. Paste its link into `FORM_LINKS` or tell me the file name.
+- [x] **Form links — SOLVED 12 Aug** from Yash's form registry sheet
+      (`1M2E83q64BXzfGwZsNQ_9u2jdfzwJPrJlD8WKRKgG554`), which lists every form
+      by department, responsible person and frequency with the **published
+      `/forms/d/e/.../viewform` responder links**. Replaces the guessed `/edit`
+      URLs entirely. 24 daily forms seeded across the six shop departments.
+- [ ] **Which daily form feeds the production dashboard?** Each shop has 3–6
+      daily forms (`<Shop> PMS`, `<Shop> Daily check sheet`, `<Shop> Planning`,
+      plus dispatch/57F4 on Machine and Final). The reminder currently lists
+      all of them. Set `Send in reminder?` to `NO` in `FORM_LINKS` for any that
+      should not be chased per shift — no code change needed.
+- [ ] **Four ALERT.gs departments are absent from the registry**: Electricity,
+      Oil, Staff Manpower, Contract Manpower. The registry instead has Die Shop,
+      VMC Shop, Maintenance, Quality, Store, Purchase, HR, Admin, Design,
+      Marketing and Accounts. Which of those should the shift alerts cover?
 - [ ] **Week start is inconsistent, and it breaks supervisor import.** The live
       registration form writes `Week Start (Saturday)` / `Week End (Thursday)`;
       `processFormSubmissions()` looks for `Week Start (Monday)` /
