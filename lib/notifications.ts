@@ -18,10 +18,15 @@ Notifications.setNotificationHandler({
  * user on a spinning login button *after* their OTP already succeeded.
  *
  * That is not hypothetical — in a standalone APK (as opposed to Expo Go)
- * getExpoPushTokenAsync() requires an EAS projectId, and app.json has none
- * configured yet, so it throws "No projectId found" for every employee.
- * Returning null keeps login working; push simply stays inactive until an
- * EAS project is set up and its id added to app.json (extra.eas.projectId).
+ * getExpoPushTokenAsync() requires an EAS projectId. app.json had none until
+ * 11 Aug, so this threw "No projectId found" for every employee and
+ * push_tokens stayed permanently empty.
+ *
+ * The projectId is now set (app.json extra.eas.projectId), so token
+ * registration can succeed. Android DELIVERY additionally requires FCM
+ * credentials on the Expo project — see CLAUDE.md. Until those exist a token
+ * may be issued but pushes will not arrive, which is exactly why this stays
+ * non-throwing: an incomplete push setup must never block login.
  */
 export async function registerForPushNotificationsAsync(userId: string) {
   try {

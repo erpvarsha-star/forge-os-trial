@@ -57,6 +57,13 @@
         }
       ]
     ],
-    "scheme": "forgeos"
+    "scheme": "forgeos",
+    "owner": "erp.varsha",
+    "extra": {
+      "eas": {
+        "_comment": "Not a secret — this UUID is compiled into the APK and ships to every phone. Required by Notifications.getExpoPushTokenAsync() in lib/notifications.ts; without it that call throws 'No projectId found' in a standalone build, push_tokens stays permanently empty, and every notification the edge functions send goes nowhere.",
+        "projectId": "832b3a3c-b4f7-4c27-9644-554ea6dc94b7"
+      }
+    }
   }
 }

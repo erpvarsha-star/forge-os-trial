@@ -86,6 +86,28 @@
 
 ---
 
+## Push notifications — partially wired (11 Aug 2026)
+
+**Status: project ID set, Android delivery still blocked on FCM.**
+
+`Notifications.getExpoPushTokenAsync()` requires an EAS `projectId`. `app.json` had none, so it threw `No projectId found` in every standalone APK, `push_tokens` stayed permanently empty, and **all** push went nowhere — not just update alerts, but `shift-reminder`, `fraud-detector`, `mrm-reminder` and `send-push-notification`, i.e. four of the six edge functions.
+
+- ✅ `app.json` → `extra.eas.projectId` = `832b3a3c-b4f7-4c27-9644-554ea6dc94b7` (provided by Yash 11 Aug). Not a secret — it is compiled into the APK.
+- ✅ `owner` set to `erp.varsha` so EAS resolves the project.
+- ⏳ **Android FCM credentials — NOT done, and push will not arrive without them.** Expo's push service relays to Firebase Cloud Messaging for Android. Required:
+  1. Firebase console → create/open a project → add an Android app with package `com.vfpl.forgeos`
+  2. Download `google-services.json` into the repo root
+  3. Add `"googleServicesFile": "./google-services.json"` under `expo.android` in `app.json`
+  4. Upload the FCM **V1 service account JSON** to the Expo project (expo.dev → forge-os → Credentials → Android, or `eas credentials`)
+
+  Without steps 1-4 the native FCM token cannot be obtained, so `getExpoPushTokenAsync()` still fails — it is caught and returns null (login is never blocked), but no device ever registers.
+
+**Note `google-services.json` is a config file, not a secret**, but it identifies the Firebase project — commit it deliberately, not accidentally.
+
+⚠ Push only starts working for employees who **reinstall** after these land: the projectId is compiled in at build time.
+
+---
+
 ## Roles (7)
 
 `owner` > `plant_head` > `hr_admin` + `manager` > `supervisor` > `security_guard` + `member`
