@@ -9,6 +9,7 @@ import { StatTile } from '@/components/StatTile'
 import { EmptyState } from '@/components/EmptyState'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
+import { ProductionSummary } from '@/components/ProductionSummary'
 import { BarChart } from 'react-native-chart-kit'
 import { Users, CalendarCheck, ShieldAlert, TrendingUp, BarChart3 } from 'lucide-react-native'
 import { BRAND, INK } from '@/components/theme'
@@ -139,6 +140,8 @@ export default function OwnerKPI() {
           <Text className="text-2xl font-bold text-ink-900 tracking-tight">{t('owner.kpiDashboard')}</Text>
           <Text className="text-sm text-ink-500 mt-0.5">{t('owner.plantWide')}</Text>
         </View>
+
+        <ProductionSummary />
 
         <View className="flex-row gap-3 mb-3">
           <StatTile

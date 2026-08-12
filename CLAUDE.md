@@ -84,7 +84,7 @@ session.
 | `fraud_flags` | `employee_id`, `flag_type` TEXT, `description`, `reviewed` |
 
 ### Tables that DO exist (FINAL_SCHEMA)
-`employees`, `departments`, `plant_config`, `attendance_records`, `shifts`, `employee_shifts`, `leave_balances`, `leave_requests`, `advance_requests`, `payroll_records`, `monthly_scores`, `maintenance_observations`, `"5s_challenges"`, `"5s_submissions"`, `casual_workers`, `data_collection_submissions`, `mrm_reviews`, `fraud_alerts`, `fraud_flags`, `vehicle_log`, `eod_confirmations`, `email_tasks`, `notifications`, `push_tokens`, `form_links` (PATCH_14)
+`employees`, `departments`, `plant_config`, `attendance_records`, `shifts`, `employee_shifts`, `leave_balances`, `leave_requests`, `advance_requests`, `payroll_records`, `monthly_scores`, `maintenance_observations`, `"5s_challenges"`, `"5s_submissions"`, `casual_workers`, `data_collection_submissions`, `mrm_reviews`, `fraud_alerts`, `fraud_flags`, `vehicle_log`, `eod_confirmations`, `email_tasks`, `notifications`, `push_tokens`, `form_links` (PATCH_14), `form_submissions` + `production_records` (PATCH_15)
 
 ### Tables that do NOT exist (referenced in old code)
 `tasks`, `hourly_production`, `shift_reports`, `salary_advances`, `five_s_challenges`, `five_s_challenge_completions`
@@ -193,7 +193,8 @@ QR salt: PATCH_06 has a commented-out UPDATE — Yash must generate his own secr
 | `COMBINED_DEPLOY_11to12_11Aug2026.sql` | PATCH_11 + PATCH_12 concatenated (generated, cannot drift). Idempotent | ✅ Ran 11 Aug — confirmed by Yash |
 | `PATCH_13_photo_storage_11Aug2026.sql` | Creates the private `submission-photos` Storage bucket + RLS so 5S/maintenance photos have somewhere to go. There was no bucket in the project at all; the camera screens wrote a hardcoded placeholder.com URL | ⏳ Not yet run — in the combined file below |
 | `PATCH_14_form_registry_12Aug2026.sql` | `form_links` table + 24 daily forms seeded from Yash's registry sheet (keyed to `employees.department` spellings, not ALERT.gs's), `plant_config.form_shift_schedule` for the deadline times, and the missing `notifications.related_entity_type` / `related_entity_id` columns that had been making every server-side notification insert fail silently | ⏳ Not yet run — included in the combined file below |
-| `COMBINED_DEPLOY_13to14_12Aug2026.sql` | **⚡ THE ONLY FILE TO RUN ⚡** — PATCH_13 + PATCH_14. Supersedes `COMBINED_DEPLOY_13_11Aug2026.sql` (deleted; its contents are inside this one). Run BEFORE installing the new APK or photo upload and the Forms tab both fail | ⏳ **RUN THIS ONE** |
+| `PATCH_15_ops_sync_12Aug2026.sql` | `form_submissions` + `production_records` — landing tables for the Operations Dashboard sync. Select-only RLS; writes come from Apps Script with the service role | ⏳ Not yet run — included in the combined file below |
+| `COMBINED_DEPLOY_13to15_12Aug2026.sql` | **⚡ THE ONLY FILE TO RUN ⚡** — PATCH_13 + 14 + 15. Supersedes `COMBINED_DEPLOY_13to14` and `COMBINED_DEPLOY_13` (both deleted; contents are inside this one) | ⏳ **RUN THIS ONE** |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee | ♾️ On demand |
 
 **Total employees confirmed live: 129** (120 original + 4 PATCH_08 + 5 PATCH_09).
@@ -326,9 +327,11 @@ app/
 
 ## Pending from Yash (owner)
 
-0. **⚠ RUN `COMBINED_DEPLOY_13to14_12Aug2026.sql` IN THE SUPABASE SQL EDITOR, BEFORE installing the next APK.** It creates the photo-storage bucket the newly-wired camera uploads to (without it 5S and maintenance photo submission fails), adds the `form_links` registry the new Forms tab reads, and adds the two `notifications` columns whose absence has been silently killing every server-side notification insert. PATCH_10 and COMBINED_DEPLOY_11to12 are already applied — do not re-run them.
+0. **⚠ RUN `COMBINED_DEPLOY_13to15_12Aug2026.sql` IN THE SUPABASE SQL EDITOR, BEFORE installing the next APK.** It creates the photo-storage bucket the newly-wired camera uploads to (without it 5S and maintenance photo submission fails), adds the `form_links` registry the new Forms tab reads, and adds the two `notifications` columns whose absence has been silently killing every server-side notification insert. PATCH_10 and COMBINED_DEPLOY_11to12 are already applied — do not re-run them.
 
    Also needed, in the Supabase dashboard: a cron entry for `shift-reminder` every 15 minutes with body `{"mode":"forms_due_reminder"}`. Without it the shift form reminders never fire.
+
+   And in the Apps Script editor, after pasting `scripts/ALERT.gs`: Project Settings → Script Properties → add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, then run `testSupabaseSync()` once. Without those two properties the dashboard→app sync never runs, so the Forms tab cannot show what is outstanding and department production stays empty. **The service role key must never be pasted into chat.**
 
 1. **Worker → supervisor mapping** — CLOSED 10 Aug (Yash: "that will happen in the app") — this is an in-app assignment flow, not a DB patch task
 2. **Rotating supervisor update** — CLOSED 10 Aug (Yash: rotations are decided every Friday by HR/IR, cannot be provided in advance) — the weekly `supervisor_id` UPDATE is HR/IR's own task going forward, not tracked here

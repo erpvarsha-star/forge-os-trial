@@ -96,7 +96,7 @@ a shift, and the model must not assume one-owner-per-department.
 
 ## 🟡 Needs a decision from Yash
 
-- [ ] **How should Forms → app data flow?** (Forms confirmed in daily use.)
+- [x] **Forms → app data flow — DECIDED 12 Aug, option (a).**
       Options, in order of my preference:
       **(a) Sheet → Supabase sync** — an Apps Script on the Operations Dashboard
       pushing new production rows into Supabase, modelled on the existing
@@ -113,11 +113,18 @@ a shift, and the model must not assume one-owner-per-department.
       reminder / escalation** after in-app has been ignored. Both, not either.
       In-app count needs no Firebase. Telegram needs a bot token (see below).
 
-- [ ] **`scripts/MigrateToSupabase.gs` has never been installed.**
-      Google Apps Script that syncs the Employee Master Google Sheet → Supabase.
-      Written, committed, never run. Needs pasting into the Sheet's Apps Script
-      editor (README step 5). Only relevant if the Sheet is still the source of
-      truth for employee data.
+- [x] **`scripts/MigrateToSupabase.gs` — AUDITED AND FIXED 12 Aug. It had never
+      worked.** Written against the old spec schema, so every field it pushed
+      was wrong: `department_id` (employees.department is TEXT, no FK),
+      `salary_structure` (does not exist — FINAL_SCHEMA has a single `salary`),
+      plus `designation`, `date_of_joining`, bank/PF/UAN/ESIC/PAN columns that
+      do not exist either. The first employee push would have been rejected
+      outright; nobody noticed because it was committed and never installed.
+      Now rewritten to FINAL_SCHEMA. Its production sync was **removed** rather
+      than fixed — it posted to `hourly_production`, another table that does not
+      exist, and production is now handled properly by ALERT.gs → PATCH_15.
+      Still optional: the database is the source of truth for all 129 employees,
+      so only install this if the Employee Master Sheet becomes the master again.
 
 - [ ] **OTA silent updates (EAS Update)** — deferred by agreement. Needs
       `EXPO_TOKEN` above. Changes how the APK is built; recommend after the trial.
@@ -206,10 +213,22 @@ minutes — which is what tells the app what is outstanding. Restore from commit
       dashboard: every 15 minutes, POST body `{"mode":"forms_due_reminder"}`.
       Mode inference deliberately never picks this one, so without the cron
       entry it never runs.
-- [ ] **Pending-forms count on the tab** — the tab lists what is due but cannot
-      yet say what has already been submitted today. Needs the Forms → Supabase
-      decision above (a form response has to reach the DB before the app can
-      tick it off).
+- [x] **Pending-forms status on the tab — BUILT 12 Aug.** Forms → Supabase went
+      with option (a), the Apps Script push, as recommended. `syncOpsDashboardToSupabase()`
+      in ALERT.gs pushes DATA_SUBMISSION_LOG into `form_submissions` every 15
+      minutes, and the tab shows a submitted/pending chip per shift.
+      ⚠ **Per shift, not per form** — the RAW tabs record that a department
+      submitted for a shift, never which of its 3-6 daily forms it was. Per-form
+      ticking needs each form's own response sheet wired up; not started.
+- [x] **Department production on the dashboards — BUILT 12 Aug.**
+      `production_records` (PATCH_15) + `components/ProductionSummary.tsx`,
+      mounted on manager → Reports (scoped to their shop, grouped by machine)
+      and owner → KPI (all shops). Renders nothing until the sync has run, so
+      it is safe to ship before Yash sets the Script Properties.
+- [ ] **Script Properties for the sync** — `SUPABASE_URL` and
+      `SUPABASE_SERVICE_ROLE_KEY` in the Apps Script editor, then run
+      `testSupabaseSync()` once. Until this is done both features above show
+      nothing. The service role key must never be pasted into chat.
 - [ ] Telegram escalation already exists in ALERT.gs and needs nothing new.
 
 ---

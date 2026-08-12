@@ -9,6 +9,7 @@ import { StatTile } from '@/components/StatTile'
 import { EmptyState } from '@/components/EmptyState'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
+import { ProductionSummary } from '@/components/ProductionSummary'
 import { Users, CalendarCheck, Clock, Wrench, FileText } from 'lucide-react-native'
 import { BRAND, INK } from '@/components/theme'
 
@@ -166,6 +167,8 @@ export default function ManagerReports() {
             {employee.department} · {t('manager.thisMonthLabel')}
           </Text>
         </View>
+
+        <ProductionSummary department={employee.department} />
 
         {headcount === 0 ? (
           <Card>

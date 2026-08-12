@@ -141,7 +141,14 @@
     "deadlineHint": "Submit before this time",
     "notReminded": "no reminder",
     "emptyTitle": "No forms listed",
-    "emptyMessage": "No daily forms are set up for {{department}} yet. HR can add them."
+    "emptyMessage": "No daily forms are set up for {{department}} yet. HR can add them.",
+    "shiftIn": "submitted",
+    "shiftPending": "pending"
+  },
+  "production": {
+    "title": "Production this month",
+    "monthTotal": "{{qty}} total",
+    "footnote": "Per machine/furnace/process, per shift — not per employee."
   },
   "auth": {
     "loginTitle": "Welcome to Forge OS",

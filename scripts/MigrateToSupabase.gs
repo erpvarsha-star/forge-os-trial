@@ -12,6 +12,30 @@
  * 1. Open the Employee Master Google Sheet -> Extensions -> Apps Script.
  * 2. Paste this whole file in as a script file (e.g. MigrateToSupabase.gs).
  * 3. Project Settings -> Script Properties, add:
+ * ⚠ AUDITED 12 Aug 2026 — THIS SCRIPT HAD NEVER WORKED. It was written
+ * against supabase/migrations/20260803090000_initial_schema.sql, the old
+ * spec-derived schema, not against FINAL_SCHEMA_02Aug2026.sql which is what is
+ * deployed. Every field it pushed was wrong:
+ *
+ *   department_id      -> employees.department is TEXT, there is no FK
+ *   salary_structure   -> does not exist; FINAL_SCHEMA has a single `salary`
+ *   designation, date_of_joining, date_of_birth, gender, bank_*, pf_number,
+ *   uan, esic_number, pan  -> none of these columns exist
+ *
+ * So the very first employee push would have been rejected outright. Nobody
+ * noticed because the script was committed and never installed.
+ *
+ * Fixed below to FINAL_SCHEMA. The production-form sync was REMOVED rather
+ * than fixed: it posted to `hourly_production`, a table that does not exist
+ * either, and production is now handled properly by syncProductionToSupabase()
+ * in scripts/ALERT.gs, reading the Operations Dashboard RAW tabs into
+ * production_records (PATCH_15). Two paths for the same data, one of them
+ * broken, is worse than one that works.
+ *
+ * STILL OPTIONAL. The database is currently the source of truth for all 129
+ * employees. Only install this if the Employee Master Sheet becomes the master
+ * again.
+ *
  *      SUPABASE_URL                = https://your-project-ref.supabase.co
  *      SUPABASE_SERVICE_ROLE_KEY   = your-service-role-key   (server-side only — never share this sheet)
  * 4. Run `createTriggers` once from the Apps Script editor (grants OAuth scopes).
@@ -20,7 +44,6 @@
  *
  * WHAT RUNS ON A SCHEDULE (installed by createTriggers)
  *   - syncEmployeeMaster          every 15 minutes  (Employee Master -> employees)
- *   - syncPriorityOneForms        every 2 hours     (production forms -> hourly_production)
  *   - monitorStaleSheets          daily             (Section 4 "not updated in 48 hours" alert)
  */
 
@@ -44,24 +67,8 @@ var EMPLOYEE_MASTER_COLUMNS = {
   phone: 'Phone',
   role: 'Role',
   department: 'Department',
-  designation: 'Designation',
-  date_of_joining: 'Date of Joining',
-  date_of_birth: 'Date of Birth',
-  gender: 'Gender',
-  bank_account_number: 'Bank Account Number',
-  bank_ifsc: 'Bank IFSC',
-  bank_name: 'Bank Name',
-  pf_number: 'PF Number',
-  uan: 'UAN',
-  esic_number: 'ESIC Number',
-  pan: 'PAN',
-  basic: 'Basic',
-  hra: 'HRA',
-  conveyance: 'Conveyance',
-  washing: 'Washing',
-  education: 'Education',
-  vda: 'VDA',
-  heat: 'Heat Allowance',
+  category: 'Category',
+  salary: 'Salary',
 };
 
 var SYNCED_COLUMN_HEADER = 'Synced At'; // written back by this script after a successful push
@@ -75,10 +82,9 @@ function createTriggers() {
   deleteAllTriggers_();
 
   ScriptApp.newTrigger('syncEmployeeMaster').timeBased().everyMinutes(15).create();
-  ScriptApp.newTrigger('syncPriorityOneForms').timeBased().everyHours(2).create();
   ScriptApp.newTrigger('monitorStaleSheets').timeBased().everyDays(1).atHour(9).create();
 
-  Logger.log('Triggers installed: syncEmployeeMaster (15 min), syncPriorityOneForms (2 hr), monitorStaleSheets (daily 9am).');
+  Logger.log('Triggers installed: syncEmployeeMaster (15 min), monitorStaleSheets (daily 9am).');
 }
 
 function deleteAllTriggers_() {
@@ -152,43 +158,18 @@ function syncEmployeeMaster() {
 
 function buildEmployeePayload_(row, headerMap) {
   var c = EMPLOYEE_MASTER_COLUMNS;
-  var payload = {
+
+  // FINAL_SCHEMA employees columns only. `department` is plain text — there is
+  // no departments FK to look up, which also removes a REST round-trip per row.
+  return {
     emp_code: getCell_(row, headerMap, c.emp_code),
     name: getCell_(row, headerMap, c.name),
     phone: normalizePhone_(getCell_(row, headerMap, c.phone)),
     role: normalizeRole_(getCell_(row, headerMap, c.role)),
-    designation: getCell_(row, headerMap, c.designation) || null,
-    date_of_joining: formatDate_(getCell_(row, headerMap, c.date_of_joining)),
-    date_of_birth: formatDate_(getCell_(row, headerMap, c.date_of_birth)),
-    gender: getCell_(row, headerMap, c.gender) || null,
-    bank_account_number: getCell_(row, headerMap, c.bank_account_number) || null,
-    bank_ifsc: getCell_(row, headerMap, c.bank_ifsc) || null,
-    bank_name: getCell_(row, headerMap, c.bank_name) || null,
-    pf_number: getCell_(row, headerMap, c.pf_number) || null,
-    uan: getCell_(row, headerMap, c.uan) || null,
-    esic_number: getCell_(row, headerMap, c.esic_number) || null,
-    pan: getCell_(row, headerMap, c.pan) || null,
-    salary_structure: {
-      basic: toNumber_(getCell_(row, headerMap, c.basic)),
-      hra: toNumber_(getCell_(row, headerMap, c.hra)),
-      conveyance: toNumber_(getCell_(row, headerMap, c.conveyance)),
-      washing: toNumber_(getCell_(row, headerMap, c.washing)),
-      education: toNumber_(getCell_(row, headerMap, c.education)),
-      vda: toNumber_(getCell_(row, headerMap, c.vda)),
-      heat: toNumber_(getCell_(row, headerMap, c.heat)),
-    },
+    department: getCell_(row, headerMap, c.department) || null,
+    category: getCell_(row, headerMap, c.category) || null,
+    salary: toNumber_(getCell_(row, headerMap, c.salary)),
   };
-
-  var departmentName = getCell_(row, headerMap, c.department);
-  if (departmentName) {
-    var dept = supabaseRequest_('GET', '/rest/v1/departments', null, {
-      select: 'id',
-      name: 'eq.' + departmentName,
-    });
-    if (dept && dept.length > 0) payload.department_id = dept[0].id;
-  }
-
-  return payload;
 }
 
 function notifyPlantHeadOfNewEmployee_(employeePayload) {
@@ -208,84 +189,6 @@ function notifyPlantHeadOfNewEmployee_(employeePayload) {
     };
   });
   supabaseRequest_('POST', '/rest/v1/notifications', notifications);
-}
-
-// ---------------------------------------------------------------------------
-// PRIORITY 1 PRODUCTION FORMS -> hourly_production  (every 2 hours)
-// ---------------------------------------------------------------------------
-
-/**
- * Generic sync for a daily check sheet whose rows map 1:1 to a production
- * entry. Column headers below are the common denominator across the
- * Priority 1 sheets (Section 4) — adjust per-sheet if a form's headers
- * differ from this shape.
- */
-var PRODUCTION_FORM_COLUMNS = {
-  emp_code: 'Employee Code',
-  machine_id: 'Machine',
-  part_number: 'Part Number',
-  shift_date: 'Date',
-  shift_type: 'Shift',
-  hour_slot: 'Hour',
-  parts_made: 'Parts Made',
-};
-
-function syncPriorityOneForms() {
-  syncProductionSheet_(SHEET_NAMES.FORGE_SHOP_DAILY);
-  syncProductionSheet_(SHEET_NAMES.MACHINE_SHOP_PMS);
-  syncProductionSheet_(SHEET_NAMES.HT_SHOP_DAILY);
-  syncProductionSheet_(SHEET_NAMES.PRESS_SHOP_DAILY);
-}
-
-function syncProductionSheet_(sheetName) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-  if (!sheet) {
-    Logger.log('Sheet not found, skipping: ' + sheetName);
-    return;
-  }
-
-  var headerMap = buildHeaderMap_(sheet);
-  var syncedCol = getOrCreateColumn_(sheet, headerMap, SYNCED_COLUMN_HEADER);
-  var data = sheet.getDataRange().getValues();
-  var pushed = 0;
-
-  for (var r = 1; r < data.length; r++) {
-    var row = data[r];
-    if (row[syncedCol - 1]) continue; // already synced — form responses are append-only, never re-pushed
-
-    var employeeCode = getCell_(row, headerMap, PRODUCTION_FORM_COLUMNS.emp_code);
-    if (!employeeCode) continue;
-
-    var employees = supabaseRequest_('GET', '/rest/v1/employees', null, {
-      select: 'id,department_id',
-      emp_code: 'eq.' + employeeCode,
-    });
-    if (!employees || employees.length === 0) {
-      Logger.log('Unknown emp_code in ' + sheetName + ' row ' + (r + 1) + ': ' + employeeCode);
-      continue;
-    }
-
-    var payload = {
-      employee_id: employees[0].id,
-      department_id: employees[0].department_id,
-      machine_id: getCell_(row, headerMap, PRODUCTION_FORM_COLUMNS.machine_id) || 'UNKNOWN',
-      shift_date: formatDate_(getCell_(row, headerMap, PRODUCTION_FORM_COLUMNS.shift_date)),
-      shift_type: normalizeShiftType_(getCell_(row, headerMap, PRODUCTION_FORM_COLUMNS.shift_type)),
-      hour_slot: toNumber_(getCell_(row, headerMap, PRODUCTION_FORM_COLUMNS.hour_slot)) || 1,
-      parts_made: toNumber_(getCell_(row, headerMap, PRODUCTION_FORM_COLUMNS.parts_made)) || 0,
-      entry_type: 'hourly',
-    };
-
-    try {
-      supabaseRequest_('POST', '/rest/v1/hourly_production', payload);
-      sheet.getRange(r + 1, syncedCol).setValue(new Date());
-      pushed++;
-    } catch (err) {
-      Logger.log('syncProductionSheet_ failed for ' + sheetName + ' row ' + (r + 1) + ': ' + err);
-    }
-  }
-
-  Logger.log('syncProductionSheet_(' + sheetName + '): pushed=' + pushed);
 }
 
 // ---------------------------------------------------------------------------
@@ -312,7 +215,9 @@ function monitorStaleSheets() {
     if (lastRow < 2) return; // no data rows yet
 
     var headerMap = buildHeaderMap_(sheet);
-    var dateCol = headerMap[PRODUCTION_FORM_COLUMNS.shift_date.toLowerCase()];
+    // Whichever column is called Date / Shift Date, else fall back to the
+    // first column, which is where a Forms response sheet puts its timestamp.
+    var dateCol = headerMap['shift date'] || headerMap['date'];
     var lastEntryDate = dateCol ? sheet.getRange(lastRow, dateCol).getValue() : sheet.getRange(lastRow, 1).getValue();
     if (!(lastEntryDate instanceof Date)) return;
 

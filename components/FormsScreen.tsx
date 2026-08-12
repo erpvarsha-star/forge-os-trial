@@ -39,6 +39,11 @@ interface FormLink {
   send_in_reminder: boolean
 }
 
+interface FormSubmission {
+  shift: string | null
+  status: 'ON TIME' | 'LATE' | 'MISSING'
+}
+
 interface ShiftWindow {
   shift: string
   start: string
@@ -84,13 +89,17 @@ export function FormsScreen() {
   const { employee } = useAuth()
   const [forms, setForms] = useState<FormLink[]>([])
   const [shifts, setShifts] = useState<ShiftWindow[]>([])
+  const [submitted, setSubmitted] = useState<Record<string, FormSubmission['status']>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   const load = useCallback(async () => {
     if (!employee) return
 
-    const [formsResult, configResult] = await Promise.all([
+    // IST calendar date — the plant's day, not the device's UTC day.
+    const today = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10)
+
+    const [formsResult, configResult, submissionResult] = await Promise.all([
       supabase
         .from('form_links')
         .select('*')
@@ -102,6 +111,11 @@ export function FormsScreen() {
         .select('config_value')
         .eq('config_key', 'form_shift_schedule')
         .maybeSingle(),
+      supabase
+        .from('form_submissions')
+        .select('shift, status')
+        .eq('department', employee.department)
+        .eq('date', today),
     ])
 
     if (formsResult.data) setForms(formsResult.data as FormLink[])
@@ -110,6 +124,15 @@ export function FormsScreen() {
     // cannot say when the next one is due.
     const schedule = configResult.data?.config_value as { shifts?: ShiftWindow[] } | null
     setShifts(Array.isArray(schedule?.shifts) ? schedule.shifts : [])
+
+    // Per SHIFT, not per form — the dashboard records that a department
+    // submitted for a shift, never which of its 3-6 daily forms it was. The
+    // tab can therefore say a shift is outstanding, not which form is.
+    const status: Record<string, FormSubmission['status']> = {}
+    for (const row of (submissionResult.data ?? []) as FormSubmission[]) {
+      if (row.shift) status[row.shift] = row.status
+    }
+    setSubmitted(status)
 
     setIsLoading(false)
   }, [employee])
@@ -156,6 +179,28 @@ export function FormsScreen() {
             <Text className="text-xs text-ink-500 mt-0.5">
               {employee.department} · {t('forms.count', { count: forms.length })}
             </Text>
+
+            {shifts.length > 0 && (
+              <View className="flex-row gap-2 mt-3">
+                {shifts.map(s => {
+                  const state = submitted[s.shift]
+                  const done = state === 'ON TIME' || state === 'LATE'
+                  return (
+                    <View
+                      key={s.shift}
+                      className={`flex-1 rounded-xl px-2 py-2 border ${
+                        done ? 'bg-green-50 border-green-200' : 'bg-white border-ink-100'
+                      }`}
+                    >
+                      <Text className="text-xs font-bold text-ink-900" numberOfLines={1}>{s.shift}</Text>
+                      <Text className={`text-xs mt-0.5 ${done ? 'text-green-700' : 'text-ink-500'}`} numberOfLines={1}>
+                        {done ? t('forms.shiftIn') : t('forms.shiftPending')}
+                      </Text>
+                    </View>
+                  )
+                })}
+              </View>
+            )}
 
             {due && (
               <Card variant="flat" className="mt-3 bg-brand-50 border-brand-200">

@@ -26,6 +26,24 @@ var DEPT_TO_RAW_TAB = {
   'Contract Manpower': 'RAW_MANPOWER_CONTRACT'
 };
 
+// ── DEPARTMENT NAME MAPPING (dashboard -> app database) ───
+// The Operations Dashboard and the Forge OS employees table use different
+// vocabularies for the same shops: 'HT' here is 'Heat Treatment' there,
+// 'Forge' is 'Forge Shop'. Anything pushed to Supabase must be translated, or
+// the app's department filter silently matches nothing.
+//
+// The four departments with no entry (Electricity, Oil, Staff Manpower,
+// Contract Manpower) have no matching employees.department value and no forms
+// in the registry — they are dashboard-only concepts and are not synced.
+var DEPT_TO_DB_DEPARTMENT = {
+  'Cutting': 'Cutting Shop',
+  'Forge':   'Forge Shop',
+  'Press':   'Press Shop',
+  'Machine': 'Machine Shop',
+  'HT':      'Heat Treatment',
+  'Final':   'Final Shop'
+};
+
 // ── SHIFT CONFIG ──────────────────────────────────────────
 var SHIFT_CONFIG_DATA = {
   'Shift 1': { start: '8:30', end: '15:30', grace: 60, deadline: '16:30', reminder: 15 },
@@ -851,7 +869,7 @@ function sendWeeklyPerformance() {
 function deployShiftTrackingTriggers() {
   ScriptApp.getProjectTriggers().forEach(function(t) {
     var func = t.getHandlerFunction();
-    if (['sendGentleReminder', 'sendDMEDeadlineAlert', 'sendFollowUpAlert', 'sendDailySummary', 'sendWeeklyPerformance', 'recordShiftCompliance', 'rebuildWeeklyPerformance'].indexOf(func) > -1) {
+    if (['sendGentleReminder', 'sendDMEDeadlineAlert', 'sendFollowUpAlert', 'sendDailySummary', 'sendWeeklyPerformance', 'recordShiftCompliance', 'rebuildWeeklyPerformance', 'syncOpsDashboardToSupabase'].indexOf(func) > -1) {
       ScriptApp.deleteTrigger(t);
     }
   });
@@ -872,12 +890,17 @@ function deployShiftTrackingTriggers() {
   
   ScriptApp.newTrigger('sendWeeklyPerformance').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(9).nearMinute(0).create();
   
-  // Compliance scoring. The RAW tabs carry no submission timestamp (date only),
+  // Submission sweep. The RAW tabs carry no submission timestamp (date only),
   // so the sweep's own run time is the best available proxy for when data
-  // arrived. Every 15 minutes keeps that proxy well inside the one-hour
-  // buckets the 10%-per-hour penalty is measured in.
+  // arrived. Every 15 minutes keeps that proxy tight enough to be useful.
   ScriptApp.newTrigger('recordShiftCompliance').timeBased().everyMinutes(15).create();
   ScriptApp.newTrigger('rebuildWeeklyPerformance').timeBased().atHour(1).nearMinute(0).everyDays(1).create();
+  
+  // Push to Supabase right after each compliance sweep, so the app's Forms tab
+  // and the department production figures are never more than ~15 minutes
+  // behind the sheet. Skipped silently if the Script Properties are not set,
+  // so deploying triggers before configuring credentials is not a failure.
+  ScriptApp.newTrigger('syncOpsDashboardToSupabase').timeBased().everyMinutes(15).create();
   
   Logger.log('✅ All shift tracking triggers deployed successfully!');
 }
@@ -1568,6 +1591,214 @@ function rebuildWeeklyPerformance() {
   }
   
   Logger.log('✅ WEEKLY_PERFORMANCE rebuilt: ' + rows.length + ' row(s).');
+}
+
+
+// ============================================================
+// SUPABASE SYNC — dashboard data into the app
+// ============================================================
+//
+// The Forge OS app cannot read a Google Sheet. Two things it needs live only
+// here, so they get pushed to Supabase:
+//
+//   form_submissions    — which (date, department, shift) actually came in,
+//                         so the Forms tab can show what is outstanding
+//   production_records  — the RAW tab rows, so department production can
+//                         appear on the manager and owner dashboards
+//
+// Both land in tables created by PATCH_15. Writes use the service role key,
+// which bypasses RLS — that is why neither table has an INSERT policy and why
+// nothing installed on a phone can forge a row.
+//
+// ⚠ SETUP, ONCE. In the Apps Script editor: Project Settings → Script
+// Properties → add
+//     SUPABASE_URL               https://odfwtdpvpfzdrznvurru.supabase.co
+//     SUPABASE_SERVICE_ROLE_KEY  <the service_role key from Supabase>
+// The service role key must never be committed to git or pasted into chat.
+// scripts/MigrateToSupabase.gs uses the same two properties, so if that
+// script was ever configured these are already set.
+
+var SUPABASE_PUSH_BATCH = 500;
+
+/**
+ * Upserts rows into a Supabase table, batched.
+ *
+ * Uses Prefer: resolution=merge-duplicates against the table's row_key unique
+ * constraint, so a sweep that re-reads yesterday updates rather than
+ * duplicates. Returns the number of rows sent.
+ */
+function supabasePush_(table, rows) {
+  if (!rows || rows.length === 0) return 0;
+
+  var props = PropertiesService.getScriptProperties();
+  var baseUrl = props.getProperty('SUPABASE_URL');
+  var serviceKey = props.getProperty('SUPABASE_SERVICE_ROLE_KEY');
+  if (!baseUrl || !serviceKey) {
+    throw new Error('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Script Properties first.');
+  }
+
+  var sent = 0;
+  for (var i = 0; i < rows.length; i += SUPABASE_PUSH_BATCH) {
+    var batch = rows.slice(i, i + SUPABASE_PUSH_BATCH);
+    var res = UrlFetchApp.fetch(baseUrl.replace(/\/$/, '') + '/rest/v1/' + table, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: {
+        apikey: serviceKey,
+        Authorization: 'Bearer ' + serviceKey,
+        Prefer: 'resolution=merge-duplicates,return=minimal'
+      },
+      payload: JSON.stringify(batch),
+      muteHttpExceptions: true
+    });
+
+    var code = res.getResponseCode();
+    if (code < 200 || code >= 300) {
+      // Loud on purpose. A silently discarded error here is exactly how the
+      // app's own notification inserts failed unnoticed for a week.
+      throw new Error('Supabase push to ' + table + ' failed (' + code + '): ' + res.getContentText());
+    }
+    sent += batch.length;
+  }
+  return sent;
+}
+
+/** yyyy-MM-dd in IST, from a Date or a sheet cell. */
+function toDateKey_(value) {
+  if (!value) return null;
+  var d = (value instanceof Date) ? value : new Date(value);
+  if (isNaN(d.getTime())) return null;
+  return Utilities.formatDate(d, 'Asia/Kolkata', 'yyyy-MM-dd');
+}
+
+/**
+ * Pushes DATA_SUBMISSION_LOG into form_submissions.
+ *
+ * Per (date, department, shift), not per form — the RAW tabs record that a
+ * department submitted for a shift, never which of its 3-6 daily forms that
+ * was. The app can therefore show an outstanding shift, not an outstanding
+ * form, until each form's own response sheet is wired up.
+ */
+function syncFormSubmissionsToSupabase() {
+  var ss = SpreadsheetApp.openById(DASH_ID);
+  var sh = ss.getSheetByName('DATA_SUBMISSION_LOG');
+  if (!sh || sh.getLastRow() < 2) {
+    Logger.log('ℹ️ form_submissions: nothing logged yet.');
+    return 0;
+  }
+
+  var data = sh.getRange(2, 1, sh.getLastRow() - 1, 7).getValues();
+  var rows = [];
+
+  data.forEach(function(r) {
+    var dateKey = toDateKey_(r[0]);
+    var dept = DEPT_TO_DB_DEPARTMENT[(r[1] || '').toString().trim()];
+    if (!dateKey || !dept) return;
+
+    var shift = (r[2] || '').toString().trim() || null;
+    var status = (r[5] || '').toString().trim().toUpperCase();
+    if (['ON TIME', 'LATE', 'MISSING'].indexOf(status) === -1) return;
+
+    rows.push({
+      row_key: dateKey + '|' + dept + '|' + (shift || ''),
+      date: dateKey,
+      department: dept,
+      shift: shift,
+      status: status,
+      delay_minutes: (r[6] === '' || r[6] === null) ? null : Number(r[6]),
+      entry_time: (r[4] || '').toString() || null,
+      supervisor_name: (r[3] || '').toString() || null
+    });
+  });
+
+  var sent = supabasePush_('form_submissions', rows);
+  Logger.log('✅ form_submissions: ' + sent + ' row(s) pushed.');
+  return sent;
+}
+
+/**
+ * Pushes the RAW production tabs into production_records.
+ *
+ * The three tabs that carry real production have three shapes:
+ *   Cutting  Date | Machine | Shift | VF_No | Qty
+ *   HT       Date | Furnace | Shift | Qty
+ *   Final    Date | Process | Shift | VF_No | Qty
+ * so `unit` takes column 2 whatever it is called, quantity is the last
+ * numeric column, and VF_No is only read where the tab has five columns.
+ *
+ * ⚠ The Shift column is not reliably a shift. Yash confirmed 12 Aug that
+ * Cutting rows hold the name of whoever is responsible for filling the form
+ * ('B.S. Todmal'), not a shift. normaliseShift_ returns null for those and the
+ * row is stored with a null shift rather than being dropped — the quantity is
+ * still real production.
+ */
+function syncProductionToSupabase() {
+  var ss = SpreadsheetApp.openById(DASH_ID);
+  var rows = [];
+
+  Object.keys(DEPT_TO_DB_DEPARTMENT).forEach(function(dept) {
+    var tabName = DEPT_TO_RAW_TAB[dept];
+    var sh = tabName ? ss.getSheetByName(tabName) : null;
+    if (!sh || sh.getLastRow() < 2) return;
+
+    var values = sh.getDataRange().getValues();
+    var width = values[0].length;
+
+    for (var i = 1; i < values.length; i++) {
+      var r = values[i];
+      var dateKey = toDateKey_(r[0]);
+      if (!dateKey) continue;
+
+      var unit = (r[1] || '').toString().trim() || null;
+      var shift = normaliseShift_(r[2]);
+      var vfNo = width >= 5 ? ((r[3] || '').toString().trim() || null) : null;
+      var qtyRaw = width >= 5 ? r[4] : r[3];
+      var qty = (qtyRaw === '' || qtyRaw === null || qtyRaw === undefined) ? null : Number(qtyRaw);
+      if (qty !== null && isNaN(qty)) qty = null;
+
+      rows.push({
+        row_key: [dateKey, DEPT_TO_DB_DEPARTMENT[dept], shift || '', unit || '', vfNo || ''].join('|'),
+        date: dateKey,
+        department: DEPT_TO_DB_DEPARTMENT[dept],
+        shift: shift,
+        unit: unit,
+        vf_no: vfNo,
+        qty: qty
+      });
+    }
+  });
+
+  // Two rows for the same machine, shift and VF number on one day collapse to
+  // one row_key; keep the last, which is the corrected value if someone edited
+  // the sheet.
+  var deduped = {};
+  rows.forEach(function(row) { deduped[row.row_key] = row; });
+  var unique = Object.keys(deduped).map(function(k) { return deduped[k]; });
+
+  var sent = supabasePush_('production_records', unique);
+  Logger.log('✅ production_records: ' + sent + ' row(s) pushed (' + rows.length + ' read).');
+  return sent;
+}
+
+/** Both syncs. This is what the trigger calls. */
+function syncOpsDashboardToSupabase() {
+  var forms = syncFormSubmissionsToSupabase();
+  var production = syncProductionToSupabase();
+  Logger.log('✅ Sync complete: ' + forms + ' submission row(s), ' + production + ' production row(s).');
+}
+
+/**
+ * Run this once from the editor after setting the two Script Properties. It
+ * pushes everything and reports what landed, so a credential or column
+ * mistake surfaces here rather than silently on a timer at 01:00.
+ */
+function testSupabaseSync() {
+  var props = PropertiesService.getScriptProperties();
+  if (!props.getProperty('SUPABASE_URL') || !props.getProperty('SUPABASE_SERVICE_ROLE_KEY')) {
+    throw new Error('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Project Settings → Script Properties, then run this again.');
+  }
+  syncOpsDashboardToSupabase();
+  Logger.log('✅ Supabase sync test passed. Check the app: manager → Reports, supervisor → Forms.');
 }
 
 // ── SELF-CHECK ────────────────────────────────────────────
