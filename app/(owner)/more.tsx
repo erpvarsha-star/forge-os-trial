@@ -1,6 +1,7 @@
 import React from 'react'
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native'
 import { useTranslation } from 'react-i18next'
+import { useRouter } from 'expo-router'
 import { useAuth } from '@/hooks/useAuth'
 import { useLanguage } from '@/hooks/useLanguage'
 import { Header } from '@/components/Header'
@@ -9,11 +10,12 @@ import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { UpdateAppLink } from '@/components/UpdateAppLink'
 import { removePushToken } from '@/lib/notifications'
-import { LogOut, Globe, Crown, ChevronRight } from 'lucide-react-native'
+import { LogOut, Globe, Crown, ChevronRight, Eye } from 'lucide-react-native'
 import { BRAND } from '@/components/theme'
 
 export default function OwnerMore() {
   const { t } = useTranslation()
+  const router = useRouter()
   const { employee, logout } = useAuth()
   const { language, toggleLanguage } = useLanguage(employee)
   if (!employee) return <LoadingScreen />
@@ -40,6 +42,13 @@ export default function OwnerMore() {
               <Text className="text-sm text-ink-500">{language === 'hi' ? 'हिंदी' : 'English'}</Text>
               <ChevronRight size={16} color="#B9C0CC" />
             </View>
+          </Card>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => router.push('/view-as')} className="mb-2 min-h-touch">
+          <Card className="flex-row items-center justify-between">
+            <View className="flex-row items-center gap-3"><Eye size={20} color={BRAND[600]} /><Text className="text-base text-ink-900">{t('viewAs.title')}</Text></View>
+            <ChevronRight size={18} color="#9CA3AF" />
           </Card>
         </TouchableOpacity>
 

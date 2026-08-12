@@ -133,6 +133,21 @@
     "factoryOsHint": "Opens the operations dashboard in your browser",
     "cannotOpenLink": "Could not open the link on this device."
   },
+  "viewAs": {
+    "title": "View as",
+    "subtitle": "Inspect the app as any role or department",
+    "banner": "Viewing as {{what}}",
+    "exit": "Exit",
+    "role": "Role",
+    "department": "Department",
+    "category": "Category",
+    "myOwn": "My own",
+    "apply": "Apply",
+    "reset": "Back to my own view",
+    "explainer": "This changes only what you see. Every request still uses your own login, so you cannot see anything you were not already allowed to see — and anything you approve is recorded as your approval, not theirs.",
+    "notAllowedTitle": "Not available",
+    "notAllowedBody": "View as is limited to owner, plant head and HR admin."
+  },
   "forms": {
     "tab": "Forms",
     "title": "Daily Forms",

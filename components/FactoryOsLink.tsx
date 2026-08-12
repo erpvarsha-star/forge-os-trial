@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Linking, Alert } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { ExternalLink, LayoutDashboard } from 'lucide-react-native'
 import { useAuth } from '@/hooks/useAuth'
+import { useEffectiveIdentity } from '@/hooks/useEffectiveIdentity'
 import { BRAND } from '@/components/theme'
 
 /**
@@ -27,9 +28,10 @@ const FACTORY_OS_URL = process.env.EXPO_PUBLIC_FACTORY_OS_URL
 export function FactoryOsLink() {
   const { t } = useTranslation()
   const { employee } = useAuth()
+  const { category } = useEffectiveIdentity()
 
   if (!employee) return null
-  if (employee.category !== 'staff') return null
+  if ((category ?? employee.category) !== 'staff') return null
   if (!FACTORY_OS_URL) return null
 
   const open = async () => {

@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { ProductionSummary } from '@/components/ProductionSummary'
+import { useEffectiveIdentity } from '@/hooks/useEffectiveIdentity'
 import { Users, CalendarCheck, Clock, Wrench, FileText } from 'lucide-react-native'
 import { BRAND, INK } from '@/components/theme'
 
@@ -38,6 +39,7 @@ interface ScoreRow {
 export default function ManagerReports() {
   const { t } = useTranslation()
   const { employee } = useAuth()
+  const { department: effectiveDepartment } = useEffectiveIdentity()
 
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -168,7 +170,7 @@ export default function ManagerReports() {
           </Text>
         </View>
 
-        <ProductionSummary department={employee.department} />
+        <ProductionSummary department={effectiveDepartment ?? employee.department} />
 
         {headcount === 0 ? (
           <Card>

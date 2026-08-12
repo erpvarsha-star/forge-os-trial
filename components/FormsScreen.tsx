@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, Linking, Alert, RefreshControl 
 import { useTranslation } from 'react-i18next'
 import { ClipboardList, ExternalLink, Clock } from 'lucide-react-native'
 import { useAuth } from '@/hooks/useAuth'
+import { useEffectiveIdentity } from '@/hooks/useEffectiveIdentity'
 import { Header } from '@/components/Header'
 import { Card } from '@/components/Card'
 import { EmptyState } from '@/components/EmptyState'
@@ -87,6 +88,7 @@ function formatHm(d: Date): string {
 export function FormsScreen() {
   const { t } = useTranslation()
   const { employee } = useAuth()
+  const { department } = useEffectiveIdentity()
   const [forms, setForms] = useState<FormLink[]>([])
   const [shifts, setShifts] = useState<ShiftWindow[]>([])
   const [submitted, setSubmitted] = useState<Record<string, FormSubmission['status']>>({})
@@ -103,7 +105,7 @@ export function FormsScreen() {
       supabase
         .from('form_links')
         .select('*')
-        .eq('department', employee.department)
+        .eq('department', department ?? employee.department)
         .eq('is_active', true)
         .order('sort_order', { ascending: true }),
       supabase
@@ -114,7 +116,7 @@ export function FormsScreen() {
       supabase
         .from('form_submissions')
         .select('shift, status')
-        .eq('department', employee.department)
+        .eq('department', department ?? employee.department)
         .eq('date', today),
     ])
 
@@ -135,7 +137,7 @@ export function FormsScreen() {
     setSubmitted(status)
 
     setIsLoading(false)
-  }, [employee])
+  }, [employee, department])
 
   useEffect(() => {
     load()
@@ -177,7 +179,7 @@ export function FormsScreen() {
           <View className="mb-3">
             <Text className="text-lg font-bold text-ink-900 tracking-tight">{t('forms.title')}</Text>
             <Text className="text-xs text-ink-500 mt-0.5">
-              {employee.department} · {t('forms.count', { count: forms.length })}
+              {department ?? employee.department} · {t('forms.count', { count: forms.length })}
             </Text>
 
             {shifts.length > 0 && (
@@ -242,7 +244,7 @@ export function FormsScreen() {
           <EmptyState
             icon={<ClipboardList size={40} color="#D1D5DB" />}
             title={t('forms.emptyTitle')}
-            message={t('forms.emptyMessage', { department: employee.department })}
+            message={t('forms.emptyMessage', { department: department ?? employee.department })}
           />
         }
       />

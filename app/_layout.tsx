@@ -13,6 +13,7 @@ import Animated, {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { BrandLogo } from '@/components/BrandLogo'
 import { UpdateBanner } from '@/components/UpdateBanner'
+import { ViewAsBanner } from '@/components/ViewAsBanner'
 import '@/i18n'
 
 // Kept short deliberately — this is a shift-floor app opened many times a
@@ -73,7 +74,11 @@ export default function RootLayout() {
           part of whichever screen happens to be showing. Renders nothing at
           all unless a newer release actually exists. */}
       <UpdateBanner />
+      {/* Mounted here, not inside a screen, so an admin can never navigate
+          away from the reminder that they are wearing someone else's hat. */}
+      <ViewAsBanner />
       <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="view-as" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(worker)" />
         <Stack.Screen name="(supervisor)" />
