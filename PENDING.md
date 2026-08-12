@@ -78,10 +78,14 @@ Found the real setup rather than asking. Live files:
    channel needing no Firebase, no FCM, and no Play Store — a working alternative
    to the Expo Push route that is currently blocked.
 
-### Data quality issue spotted
-In the Cutting table the `Shift` column holds a **person's name** ("B.S. Todmal"),
-not a shift, while HT/Final correctly hold "First/Second/Third/General Shift".
-Worth fixing at the form, or the importer must tolerate both.
+### Column mislabelled, but the data is deliberate — corrected 12 Aug
+The Cutting table's `Shift` column holds a **person's name** ("B.S. Todmal") where
+HT/Final hold "First/Second/Third/General Shift". Yash confirmed this is not bad
+data: it records **who is responsible for filling that form**. Todmal covers
+**Cutting AND HT**; **Ashok Sharma also covers Cutting**. So responsibility is
+many-to-many — one person can own several departments, and one department can have
+several responsible people. Any importer must read this column as a submitter, not
+a shift, and the model must not assume one-owner-per-department.
 
 ---
 
@@ -99,11 +103,10 @@ Worth fixing at the form, or the importer must tolerate both.
       Needs new tables for machine/furnace/process production (none of the three
       shapes fits `data_collection_submissions`).
 
-- [ ] **Telegram for notifications instead of Expo Push?**
-      Supervisors' Telegram Chat IDs are already collected weekly. A Telegram bot
-      would sidestep Firebase/FCM entirely for supervisor-level alerts. Cheaper and
-      faster than the Firebase route, but only reaches people who have Telegram —
-      fine for supervisors, unproven for ~90 shop-floor workers.
+- [x] **Notification channel — DECIDED 12 Aug.** In-app notification with a
+      **pending-forms count** is the primary channel; **Telegram is the final
+      reminder / escalation** after in-app has been ignored. Both, not either.
+      In-app count needs no Firebase. Telegram needs a bot token (see below).
 
 - [ ] **`scripts/MigrateToSupabase.gs` has never been installed.**
       Google Apps Script that syncs the Employee Master Google Sheet → Supabase.
@@ -113,6 +116,35 @@ Worth fixing at the form, or the importer must tolerate both.
 
 - [ ] **OTA silent updates (EAS Update)** — deferred by agreement. Needs
       `EXPO_TOKEN` above. Changes how the APK is built; recommend after the trial.
+
+---
+
+## 🎯 NEXT BUILD — form-compliance scoring + reminders (defined 12 Aug)
+
+**The score is about filling the form on time for your shift** — not production
+output. That is a different feature from anything currently built, and it replaces
+my earlier guess that scoring should track production quantity.
+
+What it needs:
+
+1. **Responsibility roster** — who must fill which department's form, per shift.
+   Many-to-many (Todmal → Cutting + HT; Ashok Sharma → Cutting). The dashboard's
+   first tab already captures this weekly (Department, Supervisor Name, Phone,
+   Telegram Chat ID, Week Start Sat → Week End Thu), which also solves the
+   long-standing "rotating supervisor" problem listed further down.
+2. **Expected-submission schedule** — one row per (responsible person, department,
+   shift, date) that is due.
+3. **Actual submissions** — imported from the Forms/Sheet, matched to the expected
+   row, with the submission timestamp.
+4. **On-time determination** — submitted before the shift's end
+   (S1 15:30, S2 23:30, S3 08:30 next day), using the 15-min grace already in the
+   shift master.
+5. **Scoring** — feeds `monthly_scores`. Replaces the removed production component
+   for supervisors with something they actually control.
+6. **In-app pending count** — a badge/count of forms due-but-not-submitted.
+7. **Telegram escalation** — final reminder only, after in-app is ignored.
+
+⚠ Open questions blocking the build are in the decisions section above.
 
 ---
 
