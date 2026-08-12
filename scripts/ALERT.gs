@@ -33,6 +33,49 @@ var SHIFT_CONFIG_DATA = {
   'Shift 3': { start: '23:30', end: '08:30', grace: 60, deadline: '09:30', reminder: 15 }
 };
 
+// ── FORM LINKS ────────────────────────────────────────────
+// Supervisors were being told to "upload NOW" with a literal
+// "[Google Form Link]" placeholder in place of the link (the reminder text
+// below used to hardcode that string). These are the defaults; the live
+// values are read from the FORM_LINKS tab so they can be corrected in the
+// sheet without touching this script.
+//
+// ⚠ UNVERIFIED: the Drive account holds many similarly-named copies of each
+// shop form. These IDs are the most recently modified form matching each
+// department, which is a guess, not a confirmation. Check the FORM_LINKS tab
+// and fix any row that points at the wrong form before relying on it.
+var FORM_LINKS_TAB = 'FORM_LINKS';
+
+var DEPT_FORM_URLS = {
+  'Cutting':           'https://docs.google.com/forms/d/1McrXNxk4ONInXZs0n49XcIKzBokTS7hm5sIvmKtxq9g/viewform',
+  'Forge':             'https://docs.google.com/forms/d/1apx3pWQ9C96NDbUqOaGqRS6w-Kxln7prDQpp0-CsOD4/viewform',
+  'Press':             'https://docs.google.com/forms/d/1iLnuviUMFSdJAuTtAplf1JdRf-RvaHDwqDG4TC5UVDs/viewform',
+  'Machine':           'https://docs.google.com/forms/d/1ziDAdP41suLvQeik5vxFyMdyuz07xNHwPSUWCPVbEOo/viewform',
+  'HT':                'https://docs.google.com/forms/d/1_uY2LszTjxvtgCNcW5QQu55zhZNI-fNCQQ1EHtllb1U/viewform',
+  'Final':             'https://docs.google.com/forms/d/1_Xx35Upx6bA7nHSt1FIqTKoWI5YyE-hl1w3a1y5QjN8/viewform',
+  'Electricity':       'https://docs.google.com/forms/d/1CmIHObgxnXto26703qLDrfsmN2SIC2NCtVJIPH-upUA/viewform',
+  'Oil':               'https://docs.google.com/forms/d/1xuj71eNOPGLt3fXzqjKwQ0CmwhPhdueEXeVqo1uzfJE/viewform',
+  'Staff Manpower':    '',
+  'Contract Manpower': 'https://docs.google.com/forms/d/1nnJU91_X2amQdQh7Dq0c-JGMJqVni_Z2bSDcjzp1-XE/viewform'
+};
+
+// ── COMPLIANCE SCORING ────────────────────────────────────
+// Yash, 12 Aug: "partial credit depending on delay every hour 10 percent
+// reduction." Submitting by the deadline (shift end + 60 min grace, already
+// encoded in SHIFT_CONFIG_DATA) scores full marks; every started hour past it
+// costs 10 points, reaching zero at 10 hours late.
+var SCORE_MAX_POINTS = 100;
+var SCORE_PENALTY_PER_HOUR = 10;
+
+// A (department, shift, date) with still no data this long after its deadline
+// is closed out as MISSING and scored zero, so the day can be totalled.
+var MISSING_CUTOFF_HOURS = 12;
+
+// How many days back each compliance sweep re-checks. Covers a shift whose
+// deadline falls on the following calendar day, plus a day of slack for
+// sweeps missed while the script was failing or quota-limited.
+var COMPLIANCE_LOOKBACK_DAYS = 2;
+
 // ============================================================
 // SECTION 1: SETUP — Run Once to Create/Update Tabs
 // ============================================================
@@ -42,6 +85,7 @@ function setupDynamicSupervisorTabs() {
   
   createDynamicSupervisorMap_(ss);
   createShiftConfigTab_(ss);
+  createFormLinksTab_(ss);
   createDataSubmissionLogTab_(ss);
   createWeeklyPerformanceTab_(ss);
   createFormResponsesTab_(ss);
@@ -385,20 +429,12 @@ function processSupervisorFormResponse() {
   sendTelegramAlert('✅ Supervisor added: ' + supervisor + ' for ' + department + ' (' + startStr + ' to ' + endStr + ')');
 }
 
-function setupFormTrigger() {
-  ScriptApp.getProjectTriggers().forEach(function(t) {
-    if (t.getHandlerFunction() === 'processSupervisorFormResponse') {
-      ScriptApp.deleteTrigger(t);
-    }
-  });
-  
-  ScriptApp.newTrigger('processSupervisorFormResponse')
-    .forSpreadsheet(DASH_ID)
-    .onFormSubmit()
-    .create();
-  
-  Logger.log('✅ Form submission trigger set up!');
-}
+// NOTE: an earlier definition of setupFormTrigger() lived here, wiring an
+// onFormSubmit trigger to processSupervisorFormResponse(). It was shadowed by
+// the second definition further down this file — Apps Script keeps the last
+// definition of a duplicated name — so it never ran and is removed. The live
+// one targets processFormSubmissions(); processSupervisorFormResponse() is now
+// unreferenced and kept only as a fallback.
 
 // ============================================================
 // SECTION 4: SHIFT DETECTION
@@ -427,32 +463,66 @@ function getShiftToCheck_() {
   return null;
 }
 
+/**
+ * Normalise whatever a RAW tab's third column holds into a shift name.
+ *
+ * The RAW tabs do not agree on what that column means:
+ *   HT        → 'First Shift' / 'Second Shift' / 'Third Shift'
+ *   Manpower  → '1st Staff' / '2nd Staff' / '3rd Staff' / 'General Staff'
+ *   Final     → 'General Shift'
+ *   Cutting   → a person's name ('B.S. Todmal'), i.e. who filled the form
+ *
+ * Returns 'Shift 1'/'Shift 2'/'Shift 3' when the value genuinely identifies a
+ * shift, and null when it does not — null means "this tab does not separate
+ * shifts", which the caller treats as: any row for that date counts.
+ */
+function normaliseShift_(value) {
+  var v = (value || '').toString().toLowerCase();
+  if (!v) return null;
+  if (/\bfirst\b|\b1st\b|\bshift\s*1\b|^s1$/.test(v))  return 'Shift 1';
+  if (/\bsecond\b|\b2nd\b|\bshift\s*2\b|^s2$/.test(v)) return 'Shift 2';
+  if (/\bthird\b|\b3rd\b|\bshift\s*3\b|^s3$/.test(v))  return 'Shift 3';
+  return null;
+}
+
+/**
+ * Has this department submitted data for this shift on this date?
+ *
+ * ⚠ FIXED 12 Aug 2026. The previous implementation parsed the RAW tab's first
+ * column as a timestamp and required `dt.getHours() >= 8 / 15 / 23`. Those
+ * columns hold a DATE ONLY ('4/1/2026'), so getHours() is always 0 and the
+ * test could never pass for any shift. The function therefore returned false
+ * for every department on every sweep, and ESCALATION_LOG shows exactly that:
+ * 29 of 37 sweeps between 5 and 12 Aug escalated all ten departments at once,
+ * the rest being the same sweep split over a minute boundary. Every reminder,
+ * DME alert and escalation sent so far has been a false positive, which is
+ * also why the supervisor column in that log is blank.
+ *
+ * Matching is now on the date plus the (unreliable) shift column, via
+ * normaliseShift_.
+ */
 function hasDataForShift_(dept, shift, date) {
   var rawTab = DEPT_TO_RAW_TAB[dept];
   if (!rawTab) return false;
   
   var ss = SpreadsheetApp.openById(DASH_ID);
   var sh = ss.getSheetByName(rawTab);
-  if (!sh || sh.getLastRow() < 3) return false;
+  if (!sh || sh.getLastRow() < 2) return false;
   
   var data = sh.getDataRange().getValues();
   var dateStr = Utilities.formatDate(date, 'Asia/Kolkata', 'yyyy-MM-dd');
-  var shiftHour = parseInt(shift.replace('Shift ', ''));
-  var shiftStartHour = [8, 15, 23][shiftHour - 1];
   
-  for (var i = 2; i < data.length; i++) {
+  for (var i = 1; i < data.length; i++) {
     var d = data[i][0];
     if (!d) continue;
     var dt = (d instanceof Date) ? d : new Date(d);
     if (isNaN(dt.getTime())) continue;
+    if (Utilities.formatDate(dt, 'Asia/Kolkata', 'yyyy-MM-dd') !== dateStr) continue;
     
-    var rowDateStr = Utilities.formatDate(dt, 'Asia/Kolkata', 'yyyy-MM-dd');
-    if (rowDateStr === dateStr) {
-      var hour = dt.getHours();
-      if (hour >= shiftStartHour) {
-        return true;
-      }
-    }
+    var rowShift = normaliseShift_(data[i][2]);
+    // null = this tab does not distinguish shifts, so a row for the date is
+    // the only evidence available and counts for the shift being checked.
+    if (rowShift === null || rowShift === shift) return true;
   }
   return false;
 }
@@ -483,6 +553,10 @@ function buildMissingListText_(missing) {
   missing.forEach(function(m) {
     var phoneText = m.phone ? ' | 📞 ' + m.phone : '';
     lines.push('  • ' + m.department + ' — 👤 ' + m.supervisor + phoneText);
+    // The DME chases these by hand; give them the form to forward rather than
+    // making them hunt for it per department.
+    var url = getFormUrlForDept_(m.department);
+    if (url) lines.push('    🔗 ' + url);
   });
   return lines.join('\n');
 }
@@ -593,7 +667,7 @@ function sendGentleReminder() {
     msg += '⏱️ Grace period ends at ' + getShiftDeadline_(shiftInfo.shift) + '\n\n';
     msg += '⚠️ YOUR DEPARTMENT PENDING:\n';
     msg += '  • ' + m.department + ' — 📋 Please upload NOW\n\n';
-    msg += '🔗 Upload: [Google Form Link]';
+    msg += buildFormLinkLine_(m.department);
     
     if (m.chatId && m.chatId !== '') {
       sendTelegramToChatId(m.chatId, msg);
@@ -748,7 +822,7 @@ function sendWeeklyPerformance() {
 function deployShiftTrackingTriggers() {
   ScriptApp.getProjectTriggers().forEach(function(t) {
     var func = t.getHandlerFunction();
-    if (['sendGentleReminder', 'sendDMEDeadlineAlert', 'sendFollowUpAlert', 'sendDailySummary', 'sendWeeklyPerformance'].indexOf(func) > -1) {
+    if (['sendGentleReminder', 'sendDMEDeadlineAlert', 'sendFollowUpAlert', 'sendDailySummary', 'sendWeeklyPerformance', 'recordShiftCompliance', 'rebuildWeeklyPerformance'].indexOf(func) > -1) {
       ScriptApp.deleteTrigger(t);
     }
   });
@@ -769,6 +843,13 @@ function deployShiftTrackingTriggers() {
   
   ScriptApp.newTrigger('sendWeeklyPerformance').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(9).nearMinute(0).create();
   
+  // Compliance scoring. The RAW tabs carry no submission timestamp (date only),
+  // so the sweep's own run time is the best available proxy for when data
+  // arrived. Every 15 minutes keeps that proxy well inside the one-hour
+  // buckets the 10%-per-hour penalty is measured in.
+  ScriptApp.newTrigger('recordShiftCompliance').timeBased().everyMinutes(15).create();
+  ScriptApp.newTrigger('rebuildWeeklyPerformance').timeBased().atHour(1).nearMinute(0).everyDays(1).create();
+  
   Logger.log('✅ All shift tracking triggers deployed successfully!');
 }
 
@@ -779,7 +860,7 @@ function deployShiftTrackingTriggers() {
 function verifyTabsPopulated() {
   var ss = SpreadsheetApp.openById(DASH_ID);
   
-  var tabs = ['SUPERVISOR_MAP', 'SHIFT_CONFIG', 'DATA_SUBMISSION_LOG', 'WEEKLY_PERFORMANCE', 'FORM_RESPONSES', 'ESCALATION_LOG'];
+  var tabs = ['SUPERVISOR_MAP', 'SHIFT_CONFIG', 'FORM_LINKS', 'DATA_SUBMISSION_LOG', 'WEEKLY_PERFORMANCE', 'FORM_RESPONSES', 'ESCALATION_LOG'];
   
   Logger.log('=== VERIFYING TABS ===');
   
@@ -824,23 +905,9 @@ function testAllFunctions() {
 // SECTION 8: MAIN DEPLOYMENT — RUN THIS
 // ============================================================
 
-function oneTimeSetup() {
-  Logger.log('🚀 STARTING ONE-TIME SETUP...');
-  
-  setupDynamicSupervisorTabs();
-  verifyTabsPopulated();
-  
-  Logger.log('');
-  Logger.log('✅ ONE-TIME SETUP COMPLETE!');
-  Logger.log('');
-  Logger.log('📋 NEXT STEPS:');
-  Logger.log('  1. Create Google Form (see instructions)');
-  Logger.log('  2. Link form to FORM_RESPONSES tab');
-  Logger.log('  3. Run: setupFormTrigger()');
-  Logger.log('  4. Share form link with DME');
-  Logger.log('  5. DME fills supervisor data');
-  Logger.log('  6. Run: deployShiftTrackingTriggers()');
-}
+// NOTE: an earlier definition of oneTimeSetup() lived here and was shadowed by
+// the one further down this file, for the same reason as setupFormTrigger()
+// above. Removed so the file has one setup entry point.
 // ============================================================
 // FORM RESPONSES 1 — PROCESSOR
 // ============================================================
@@ -1124,3 +1191,378 @@ function quickProcessForm() {
 // ============================================================
 // END OF Alert.gs
 // ============================================================
+// ============================================================
+// SECTION 9: FORM LINKS + COMPLIANCE SCORING  (added 12 Aug 2026)
+// ============================================================
+//
+// Two things this section adds:
+//
+//   1. A real Google Form link in the reminders. The gentle reminder used to
+//      end with the literal text "[Google Form Link]" — a placeholder that was
+//      never filled in — so supervisors were told to upload with no way to.
+//
+//   2. Compliance scoring. DATA_SUBMISSION_LOG and WEEKLY_PERFORMANCE were
+//      created with their headers ("Delay (mins)", "Points", "Score %") but
+//      nothing ever wrote a row to either. They are still empty in the live
+//      sheet. recordShiftCompliance() fills the first, rebuildWeeklyPerformance()
+//      rolls it up into the second.
+//
+// Scoring rule (Yash, 12 Aug): on time = full marks, then 10% off per hour of
+// delay. Delay is measured from the shift's deadline, which already includes
+// the 60-minute grace period.
+
+// ── FORM_LINKS TAB ────────────────────────────────────────
+
+/**
+ * Creates the FORM_LINKS tab and seeds it from DEPT_FORM_URLS.
+ *
+ * Unlike the other create*Tab_ helpers this deliberately does NOT clear an
+ * existing tab — the whole point is that whoever owns the forms can correct a
+ * wrong link in the sheet, and re-running setup must not wipe that. Only
+ * departments with no row yet are appended.
+ */
+function createFormLinksTab_(ss) {
+  var sh = ss.getSheetByName(FORM_LINKS_TAB);
+  var headers = ['Department', 'Form URL', 'Notes'];
+  
+  if (!sh) {
+    sh = ss.insertSheet(FORM_LINKS_TAB);
+    sh.getRange(1, 1, 1, headers.length).setValues([headers])
+      .setFontWeight('bold')
+      .setBackground('#1565C0')
+      .setFontColor('#FFFFFF');
+  }
+  
+  var existing = {};
+  if (sh.getLastRow() > 1) {
+    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+    rows.forEach(function(r) { existing[(r[0] || '').toString().trim()] = true; });
+  }
+  
+  var added = 0;
+  DEPARTMENTS.forEach(function(dept) {
+    if (existing[dept]) return;
+    var url = DEPT_FORM_URLS[dept] || '';
+    sh.appendRow([dept, url, url ? 'Auto-filled — CHECK this is the right form' : 'No form identified — paste the link here']);
+    added++;
+  });
+  
+  sh.autoResizeColumns(1, headers.length);
+  Logger.log('  ✅ ' + FORM_LINKS_TAB + ' ready (' + added + ' department(s) added)');
+}
+
+var _formUrlCache = null;
+
+/** Form URL for a department: FORM_LINKS tab first, code defaults as fallback. */
+function getFormUrlForDept_(dept) {
+  if (_formUrlCache === null) {
+    _formUrlCache = {};
+    var sh = SpreadsheetApp.openById(DASH_ID).getSheetByName(FORM_LINKS_TAB);
+    if (sh && sh.getLastRow() > 1) {
+      var data = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+      data.forEach(function(r) {
+        var d = (r[0] || '').toString().trim();
+        var u = (r[1] || '').toString().trim();
+        if (d && u) _formUrlCache[d] = u;
+      });
+    }
+  }
+  return _formUrlCache[dept] || DEPT_FORM_URLS[dept] || '';
+}
+
+/**
+ * The upload line for a reminder. When no link is configured, say so plainly
+ * rather than printing a placeholder that looks like a link — the failure that
+ * started this whole section.
+ */
+function buildFormLinkLine_(dept) {
+  var url = getFormUrlForDept_(dept);
+  if (url) return '🔗 Upload here: ' + url;
+  return '⚠️ No form link configured for ' + dept + ' — add it to the ' + FORM_LINKS_TAB + ' tab.';
+}
+
+// ── SHIFT DEADLINES AS REAL DATES ─────────────────────────
+
+function parseHm_(hm) {
+  var parts = (hm || '').split(':');
+  return { h: parseInt(parts[0], 10), m: parseInt(parts[1], 10) };
+}
+
+/**
+ * The deadline for a shift that STARTED on shiftDate, as a Date.
+ *
+ * A deadline earlier on the clock than the shift start belongs to the next
+ * calendar day: Shift 2 runs to 23:30 with a 00:30 deadline, and Shift 3
+ * starts at 23:30 with a 09:30 deadline the following morning. Shift 1
+ * (08:30 start, 16:30 deadline) stays on the same day.
+ */
+function getShiftDeadlineDateTime_(shift, shiftDate) {
+  var cfg = SHIFT_CONFIG_DATA[shift];
+  if (!cfg) return null;
+  
+  var start = parseHm_(cfg.start);
+  var dl = parseHm_(cfg.deadline);
+  
+  var d = new Date(shiftDate.getFullYear(), shiftDate.getMonth(), shiftDate.getDate(), dl.h, dl.m, 0, 0);
+  if (dl.h * 60 + dl.m < start.h * 60 + start.m) d.setDate(d.getDate() + 1);
+  return d;
+}
+
+/** On time = full marks; 10 points off per started hour late; floor of zero. */
+function scoreForDelay_(delayMins) {
+  if (delayMins <= 0) return SCORE_MAX_POINTS;
+  var hoursLate = Math.ceil(delayMins / 60);
+  return Math.max(0, SCORE_MAX_POINTS - (SCORE_PENALTY_PER_HOUR * hoursLate));
+}
+
+// ── COMPLIANCE SWEEP ──────────────────────────────────────
+
+/** Keys already present in DATA_SUBMISSION_LOG, so the sweep stays idempotent. */
+function loadComplianceKeys_(sh) {
+  var keys = {};
+  if (sh.getLastRow() < 2) return keys;
+  
+  var data = sh.getRange(2, 1, sh.getLastRow() - 1, 3).getValues();
+  data.forEach(function(r) {
+    var d = r[0];
+    if (!d) return;
+    var dt = (d instanceof Date) ? d : new Date(d);
+    if (isNaN(dt.getTime())) return;
+    var dateStr = Utilities.formatDate(dt, 'Asia/Kolkata', 'yyyy-MM-dd');
+    keys[dateStr + '|' + (r[1] || '') + '|' + (r[2] || '')] = true;
+  });
+  return keys;
+}
+
+/**
+ * Writes one DATA_SUBMISSION_LOG row per (date, department, shift) once its
+ * outcome is settled — either the data has appeared, or it is late enough to
+ * be called missing. Runs every 15 minutes.
+ *
+ * ⚠ Entry Time is the time this sweep first SAW the data, not the time the
+ * form was submitted. The RAW tabs record a date with no time of day, so the
+ * true submission moment is not recoverable from them. The 15-minute cadence
+ * keeps that approximation well inside the one-hour buckets the penalty uses,
+ * but a submission made minutes before a deadline can still land in the sweep
+ * just after it. If exact timing ever matters, the fix is to read the shop
+ * forms' own response timestamps rather than the RAW tabs.
+ */
+function recordShiftCompliance() {
+  var ss = SpreadsheetApp.openById(DASH_ID);
+  var sh = ss.getSheetByName('DATA_SUBMISSION_LOG');
+  if (!sh) {
+    Logger.log('❌ DATA_SUBMISSION_LOG not found — run setupDynamicSupervisorTabs() first.');
+    return;
+  }
+  
+  var now = new Date();
+  var logged = loadComplianceKeys_(sh);
+  var rows = [];
+  
+  for (var offset = COMPLIANCE_LOOKBACK_DAYS; offset >= 0; offset--) {
+    var shiftDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset);
+    var dateStr = Utilities.formatDate(shiftDate, 'Asia/Kolkata', 'yyyy-MM-dd');
+    
+    ['Shift 1', 'Shift 2', 'Shift 3'].forEach(function(shift) {
+      var deadline = getShiftDeadlineDateTime_(shift, shiftDate);
+      if (!deadline) return;
+      
+      DEPARTMENTS.forEach(function(dept) {
+        var key = dateStr + '|' + dept + '|' + shift;
+        if (logged[key]) return;
+        
+        var supervisor = getSupervisorForCurrentWeek_(dept);
+        var minutesPastDeadline = Math.round((now.getTime() - deadline.getTime()) / 60000);
+        
+        if (hasDataForShift_(dept, shift, shiftDate)) {
+          var delay = Math.max(0, minutesPastDeadline);
+          rows.push([
+            dateStr,
+            dept,
+            shift,
+            supervisor.name || 'Unknown',
+            Utilities.formatDate(now, 'Asia/Kolkata', 'HH:mm'),
+            delay === 0 ? 'ON TIME' : 'LATE',
+            delay,
+            scoreForDelay_(delay)
+          ]);
+          logged[key] = true;
+        } else if (minutesPastDeadline > MISSING_CUTOFF_HOURS * 60) {
+          rows.push([
+            dateStr,
+            dept,
+            shift,
+            supervisor.name || 'Unknown',
+            '',
+            'MISSING',
+            '',
+            0
+          ]);
+          logged[key] = true;
+        }
+        // Otherwise the shift is still open, or late but inside the cutoff —
+        // leave it unlogged so a later sweep can still record it as submitted.
+      });
+    });
+  }
+  
+  if (rows.length === 0) {
+    Logger.log('ℹ️ Compliance sweep: nothing new to record.');
+    return;
+  }
+  
+  sh.getRange(sh.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+  Logger.log('✅ Compliance sweep: ' + rows.length + ' row(s) written.');
+}
+
+// ── WEEKLY ROLL-UP ────────────────────────────────────────
+
+/**
+ * Monday of the week containing `date`, as yyyy-MM-dd.
+ *
+ * ⚠ The two halves of this system disagree about when a week starts. The live
+ * supervisor registration form writes "Week Start (Saturday)" / "Week End
+ * (Thursday)", while processFormSubmissions() below reads columns named
+ * "Week Start (Monday)" / "Week End (Sunday)" — which means it finds neither
+ * and returns early. Monday is used here because that is what the script has
+ * always assumed; if Saturday-to-Thursday is the real working week, change
+ * this and the column names together, not one of them.
+ */
+function weekStartFor_(date) {
+  var d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  var dow = d.getDay();              // 0 = Sunday
+  var back = (dow === 0) ? 6 : dow - 1;
+  d.setDate(d.getDate() - back);
+  return Utilities.formatDate(d, 'Asia/Kolkata', 'yyyy-MM-dd');
+}
+
+function performanceBand_(scorePct) {
+  if (scorePct >= 90) return '🟢 Excellent';
+  if (scorePct >= 75) return '🟡 Good';
+  if (scorePct >= 50) return '🟠 Needs improvement';
+  return '🔴 Poor';
+}
+
+/**
+ * Rebuilds WEEKLY_PERFORMANCE from DATA_SUBMISSION_LOG. Rebuilt rather than
+ * appended so a corrected log row is reflected on the next run.
+ */
+function rebuildWeeklyPerformance() {
+  var ss = SpreadsheetApp.openById(DASH_ID);
+  var log = ss.getSheetByName('DATA_SUBMISSION_LOG');
+  var out = ss.getSheetByName('WEEKLY_PERFORMANCE');
+  if (!log || !out) {
+    Logger.log('❌ DATA_SUBMISSION_LOG or WEEKLY_PERFORMANCE missing.');
+    return;
+  }
+  if (log.getLastRow() < 2) {
+    Logger.log('ℹ️ No submission rows to roll up yet.');
+    return;
+  }
+  
+  var data = log.getRange(2, 1, log.getLastRow() - 1, 8).getValues();
+  var groups = {};
+  
+  data.forEach(function(r) {
+    var d = r[0];
+    if (!d) return;
+    var dt = (d instanceof Date) ? d : new Date(d);
+    if (isNaN(dt.getTime())) return;
+    
+    var dept = (r[1] || '').toString().trim();
+    var supervisor = (r[3] || 'Unknown').toString().trim();
+    var status = (r[5] || '').toString().trim().toUpperCase();
+    var points = Number(r[7]) || 0;
+    var week = weekStartFor_(dt);
+    
+    var key = supervisor + '|' + dept + '|' + week;
+    if (!groups[key]) {
+      groups[key] = { supervisor: supervisor, dept: dept, week: week,
+                      total: 0, onTime: 0, late: 0, missing: 0, points: 0 };
+    }
+    var g = groups[key];
+    g.total++;
+    g.points += points;
+    if (status === 'ON TIME') g.onTime++;
+    else if (status === 'LATE') g.late++;
+    else g.missing++;
+  });
+  
+  var list = [];
+  Object.keys(groups).forEach(function(k) { list.push(groups[k]); });
+  
+  list.forEach(function(g) {
+    g.scorePct = g.total > 0 ? Math.round(g.points / g.total) : 0;
+  });
+  list.sort(function(a, b) {
+    if (b.scorePct !== a.scorePct) return b.scorePct - a.scorePct;
+    return b.onTime - a.onTime;
+  });
+  
+  var rows = list.map(function(g, i) {
+    return [i + 1, g.supervisor, g.dept, g.week, g.total, g.onTime, g.late,
+            g.missing, g.scorePct, g.points, performanceBand_(g.scorePct)];
+  });
+  
+  if (out.getLastRow() > 1) {
+    out.getRange(2, 1, out.getLastRow() - 1, out.getLastColumn()).clearContent();
+  }
+  if (rows.length > 0) {
+    out.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+  }
+  
+  Logger.log('✅ WEEKLY_PERFORMANCE rebuilt: ' + rows.length + ' row(s).');
+}
+
+// ── SELF-CHECK ────────────────────────────────────────────
+
+/**
+ * Run this after pasting the script. It exercises the pure logic — scoring
+ * curve, deadline rollovers, shift normalisation — without touching Telegram,
+ * and reports the form link configured for each department.
+ */
+function testComplianceScoring() {
+  var failures = [];
+  function check(label, actual, expected) {
+    if (String(actual) !== String(expected)) {
+      failures.push(label + ': got ' + actual + ', expected ' + expected);
+    }
+  }
+  
+  check('on time',        scoreForDelay_(0),   100);
+  check('1 min late',     scoreForDelay_(1),   90);
+  check('60 min late',    scoreForDelay_(60),  90);
+  check('61 min late',    scoreForDelay_(61),  80);
+  check('5 h late',       scoreForDelay_(300), 50);
+  check('10 h late',      scoreForDelay_(600), 0);
+  check('20 h late',      scoreForDelay_(1200), 0);
+  
+  var base = new Date(2026, 7, 12);          // 12 Aug 2026
+  function dl(shift) {
+    return Utilities.formatDate(getShiftDeadlineDateTime_(shift, base), 'Asia/Kolkata', 'yyyy-MM-dd HH:mm');
+  }
+  check('Shift 1 deadline', dl('Shift 1'), '2026-08-12 16:30');
+  check('Shift 2 deadline', dl('Shift 2'), '2026-08-13 00:30');
+  check('Shift 3 deadline', dl('Shift 3'), '2026-08-13 09:30');
+  
+  check('First Shift',   normaliseShift_('First Shift'),   'Shift 1');
+  check('2nd Staff',     normaliseShift_('2nd Staff'),     'Shift 2');
+  check('Third Shift',   normaliseShift_('Third Shift'),   'Shift 3');
+  check('General Shift', normaliseShift_('General Shift'), 'null');
+  check('person name',   normaliseShift_('B.S. Todmal'),   'null');
+  check('blank',         normaliseShift_(''),              'null');
+  
+  Logger.log('=== FORM LINKS ===');
+  DEPARTMENTS.forEach(function(dept) {
+    var url = getFormUrlForDept_(dept);
+    Logger.log('  ' + (url ? '✅' : '❌') + ' ' + dept + ': ' + (url || 'NOT CONFIGURED'));
+  });
+  
+  Logger.log('=== SELF-CHECK ===');
+  if (failures.length === 0) {
+    Logger.log('✅ All ' + 16 + ' logic checks passed.');
+  } else {
+    failures.forEach(function(f) { Logger.log('❌ ' + f); });
+    throw new Error(failures.length + ' self-check failure(s) — see log.');
+  }
+}
