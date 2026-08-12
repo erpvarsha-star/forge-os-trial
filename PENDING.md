@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 12 Aug 2026, after the forms tab + shift notification work.
+**Last updated:** 12 Aug 2026, after PATCH_13-15 were applied to the live database.
 
 ---
 
@@ -22,6 +22,20 @@ Gamma, Wix, Mem**.
 
 Corollary: **commit and push after every completed step.** Power and internet
 drop frequently at this site; work must never be lost mid-task.
+
+---
+
+## ✅ Database is fully migrated as of 12 Aug
+
+PATCH_13 (photo storage), PATCH_14 (form registry + the notifications columns)
+and PATCH_15 (ops sync landing tables) are all applied and confirmed by Yash.
+Nothing in `scripts/*.sql` is outstanding.
+
+**What that unblocks, and what it does not.** The tables now exist, so the app
+will not error — but `form_submissions` and `production_records` stay empty,
+and therefore the Forms tab's shift chips and the production panels stay blank,
+until the Apps Script sync actually runs. That needs the two Script Properties
+below. Empty tables and a broken sync look identical from the app.
 
 ---
 
@@ -225,10 +239,11 @@ minutes — which is what tells the app what is outstanding. Restore from commit
       mounted on manager → Reports (scoped to their shop, grouped by machine)
       and owner → KPI (all shops). Renders nothing until the sync has run, so
       it is safe to ship before Yash sets the Script Properties.
-- [ ] **Script Properties for the sync** — `SUPABASE_URL` and
-      `SUPABASE_SERVICE_ROLE_KEY` in the Apps Script editor, then run
-      `testSupabaseSync()` once. Until this is done both features above show
-      nothing. The service role key must never be pasted into chat.
+- [ ] **Script Properties for the sync — THE REMAINING BLOCKER for both
+      features above.** Apps Script editor → Project Settings → Script
+      Properties → `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, then run
+      `testSupabaseSync()` once. The SQL side is done; this is what actually
+      moves data. The service role key must never be pasted into chat.
 - [ ] Telegram escalation already exists in ALERT.gs and needs nothing new.
 
 ---
