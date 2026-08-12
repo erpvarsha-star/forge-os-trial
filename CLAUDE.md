@@ -7,6 +7,27 @@
 
 ---
 
+## Working rules
+
+**Prefer connectors, plugins and scripts over manual user steps.** Target
+split: Claude does ~85%; the user does authentication, approval, and running a
+script. If a human step is genuinely needed it should be a login, a
+click-to-approve, or pasting one script — never copying file contents,
+retyping values, or a multi-step console walkthrough. Before asking for
+anything manual, run `ListConnectors` and check whether a connector can do it.
+Connected and usable: Google Drive, Gmail, Google Calendar, Zapier, Notion,
+GitHub, Figma, Gamma, Wix, Mem.
+
+**Commit and push after every completed step.** Power and internet drop
+frequently at this site; a failure must never cost more than the step in
+progress.
+
+**Keep `PENDING.md` current** — it is the shared checklist of what is
+outstanding, blocked, or untested. Update it before the final push of any
+session.
+
+---
+
 ## Non-negotiable security rules
 
 - All secrets via environment variables — never hardcoded
