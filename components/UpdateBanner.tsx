@@ -2,16 +2,13 @@ import React, { useEffect, useState } from 'react'
 import { View, Text, TouchableOpacity, Linking } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import Constants from 'expo-constants'
 import { Download, X } from 'lucide-react-native'
+import { useAppVersion } from '@/hooks/useAppVersion'
 
-const RELEASE_API = 'https://api.github.com/repos/erpvarsha-star/forge-os-trial/releases/latest'
 const APK_DOWNLOAD_URL =
   'https://github.com/erpvarsha-star/forge-os-trial/releases/latest/download/app-release.apk'
 
-const LAST_CHECK_KEY = 'updateBanner.lastCheckAt'
-const DISMISSED_TAG_KEY = 'updateBanner.dismissedTag'
-const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
+const DISMISSED_BUILD_KEY = 'updateBanner.dismissedBuild'
 
 /**
  * "Update available" banner.
@@ -29,62 +26,31 @@ const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
  */
 export function UpdateBanner() {
   const { t } = useTranslation()
-  const [latestTag, setLatestTag] = useState<string | null>(null)
+  const { latestBuild, isUpdateAvailable } = useAppVersion()
+  const [dismissedBuild, setDismissedBuild] = useState<number | null>(null)
+  const [dismissLoaded, setDismissLoaded] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-
-    const check = async () => {
-      try {
-        const lastCheck = Number((await AsyncStorage.getItem(LAST_CHECK_KEY)) ?? 0)
-        if (Date.now() - lastCheck < CHECK_INTERVAL_MS) return
-
-        // Never let a version check block or slow the app on a bad shop-floor
-        // connection — bail out rather than hang.
-        const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), 8000)
-        const res = await fetch(RELEASE_API, {
-          headers: { Accept: 'application/vnd.github+json' },
-          signal: controller.signal,
-        })
-        clearTimeout(timeout)
-        if (!res.ok) return
-
-        const json = await res.json()
-        const tag: string | undefined = json?.tag_name
-        if (!tag || cancelled) return
-
-        await AsyncStorage.setItem(LAST_CHECK_KEY, String(Date.now()))
-
-        const dismissed = await AsyncStorage.getItem(DISMISSED_TAG_KEY)
-        if (dismissed === tag) return
-
-        const latestBuild = parseInt(tag.replace(/\D/g, ''), 10)
-        const installedBuild = Number(
-          Constants.expoConfig?.android?.versionCode ?? Constants.nativeBuildVersion ?? 0
-        )
-
-        // Only prompt when we can actually establish that the release is
-        // newer. If either number is unreadable, stay silent rather than
-        // nagging every launch with a possibly-wrong "update available".
-        if (Number.isFinite(latestBuild) && installedBuild > 0 && latestBuild > installedBuild) {
-          if (!cancelled) setLatestTag(tag)
-        }
-      } catch {
-        // Offline, rate-limited, DNS failure — all non-events. The banner
-        // simply does not appear.
-      }
-    }
-
-    check()
+    AsyncStorage.getItem(DISMISSED_BUILD_KEY)
+      .then(v => {
+        if (cancelled) return
+        setDismissedBuild(v ? Number(v) : null)
+        setDismissLoaded(true)
+      })
+      .catch(() => { if (!cancelled) setDismissLoaded(true) })
     return () => { cancelled = true }
   }, [])
 
-  if (!latestTag) return null
+  // Dismissal is per-build: hiding the banner for build 22 must not also hide
+  // it when build 23 ships.
+  const isDismissed = dismissedBuild !== null && latestBuild !== null && dismissedBuild >= latestBuild
+
+  if (!dismissLoaded || !isUpdateAvailable || isDismissed || latestBuild === null) return null
 
   const dismiss = async () => {
-    await AsyncStorage.setItem(DISMISSED_TAG_KEY, latestTag)
-    setLatestTag(null)
+    await AsyncStorage.setItem(DISMISSED_BUILD_KEY, String(latestBuild))
+    setDismissedBuild(latestBuild)
   }
 
   return (

@@ -122,7 +122,13 @@
     "notConnectedYet": "Not yet connected to live data",
     "quality": "Quality",
     "updateAvailable": "Update available",
-    "updateAvailableBody": "A newer version of Forge OS is ready to install."
+    "updateAvailableBody": "A newer version of Forge OS is ready to install.",
+    "versionBuild": "Version {{build}}",
+    "versionUnknown": "Version unknown",
+    "checkingForUpdates": "Checking for updates…",
+    "upToDate": "Up to date",
+    "updateCheckFailed": "Could not check for updates",
+    "new": "NEW"
   },
   "auth": {
     "loginTitle": "Welcome to Forge OS",

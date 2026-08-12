@@ -122,7 +122,13 @@
     "notConnectedYet": "अभी लाइव डेटा से जुड़ा नहीं है",
     "quality": "गुणवत्ता",
     "updateAvailable": "अपडेट उपलब्ध है",
-    "updateAvailableBody": "Forge OS का नया संस्करण इंस्टॉल के लिए तैयार है।"
+    "updateAvailableBody": "Forge OS का नया संस्करण इंस्टॉल के लिए तैयार है।",
+    "versionBuild": "संस्करण {{build}}",
+    "versionUnknown": "संस्करण अज्ञात",
+    "checkingForUpdates": "अपडेट जांचा जा रहा है…",
+    "upToDate": "नवीनतम संस्करण",
+    "updateCheckFailed": "अपडेट जांच नहीं हो सकी",
+    "new": "नया"
   },
   "auth": {
     "loginTitle": "Forge OS में आपका स्वागत है",
