@@ -3,6 +3,7 @@ import { View, Text, ScrollView } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/hooks/useAuth'
 import { Header } from '@/components/Header'
+import { ProductionSummary } from '@/components/ProductionSummary'
 import { FactoryOsLink } from '@/components/FactoryOsLink'
 import { Card } from '@/components/Card'
 import { LoadingScreen } from '@/components/LoadingScreen'
@@ -54,6 +55,10 @@ export default function PlantHeadDashboard() {
             </View>
           </Card>
         )}
+
+        {/* Plant-wide, so no department prop — every shop, side by side.
+            Renders nothing until the Operations Dashboard sync has run. */}
+        <ProductionSummary />
 
         <Card className="mb-4 items-center py-6">
           <View className="flex-row items-center gap-2 mb-1">
