@@ -37,18 +37,34 @@ function istNow(): Date {
   return new Date(utc.getTime() + 5.5 * 60 * 60 * 1000);
 }
 
-function nextMondayToSunday(from: Date): { start: string; end: string } {
-  const day = from.getUTCDay(); // 0 = Sunday
-  const daysUntilMonday = day === 0 ? 1 : 8 - day;
+/**
+ * The upcoming Saturday-through-Thursday work week.
+ *
+ * ⚠ CHANGED 13 Aug 2026. Confirmed with Yash: the real working week is
+ * Saturday to Thursday, Friday off — "unless we have urgent production,
+ * Friday is working; 90% of the time Friday is off." This used to compute
+ * Monday-to-Sunday, which was simply wrong; nothing about a working Friday
+ * needed a separate flag, since employee_shifts is already per-date and a
+ * working Friday is just a Friday HR assigned shifts for.
+ *
+ * Called on Thursdays (see the mode-inference at the bottom of this file),
+ * the last working day of the CURRENT week, to announce the NEXT week — so
+ * "next Saturday" here means the Saturday two days after a Thursday call,
+ * matching scripts/ALERT.gs's weekStartFor_(), which computes the same week
+ * boundary from the compliance side.
+ */
+function nextSaturdayToThursday(from: Date): { start: string; end: string } {
+  const day = from.getUTCDay(); // 0 = Sunday .. 6 = Saturday
+  const daysUntilSaturday = ((6 - day) % 7) || 7; // next Saturday, never today
   const start = new Date(from);
-  start.setUTCDate(from.getUTCDate() + daysUntilMonday);
+  start.setUTCDate(from.getUTCDate() + daysUntilSaturday);
   const end = new Date(start);
-  end.setUTCDate(start.getUTCDate() + 6);
+  end.setUTCDate(start.getUTCDate() + 5); // Sat -> Thu is 6 days inclusive
   return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
 }
 
 async function weeklyShiftNotify(db: ReturnType<typeof supabaseAdmin>) {
-  const { start, end } = nextMondayToSunday(istNow());
+  const { start, end } = nextSaturdayToThursday(istNow());
 
   const { data: assignments } = await db
     .from('employee_shifts')
