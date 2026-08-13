@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "770370492554",
+    "project_id": "gen-lang-client-0072991718",
+    "storage_bucket": "gen-lang-client-0072991718.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:770370492554:android:a1d3b346751da8c1cc3573",
+        "android_client_info": {
+          "package_name": "com.vfpl.forgeos"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "770370492554-cti7kkeu7pjaouesudbtkuiffho25m6f.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCHwyevgSaLw13QRF1la9X9jmVf26L0k8U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "770370492554-cti7kkeu7pjaouesudbtkuiffho25m6f.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

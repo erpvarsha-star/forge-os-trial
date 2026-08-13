@@ -116,7 +116,8 @@ session.
 
 - ✅ `app.json` → `extra.eas.projectId` = `832b3a3c-b4f7-4c27-9644-554ea6dc94b7` (provided by Yash 11 Aug). Not a secret — it is compiled into the APK.
 - ✅ `owner` set to `erp.varsha` so EAS resolves the project.
-- ⏳ **Android FCM credentials — NOT done, and push will not arrive without them.** Expo's push service relays to Firebase Cloud Messaging for Android. Required:
+- ✅ `google-services.json` in the repo root and referenced from `app.json` → `expo.android.googleServicesFile` (13 Aug). Firebase project `gen-lang-client-0072991718`, sender id `770370492554`, package `com.vfpl.forgeos` — verified to match before wiring.
+- ⏳ **FCM V1 service account key — STILL NOT DONE, and push will not arrive without it.** Expo's push service relays to Firebase Cloud Messaging for Android. Required:
   1. Firebase console → create/open a project → add an Android app with package `com.vfpl.forgeos`
   2. Download `google-services.json` into the repo root
   3. Add `"googleServicesFile": "./google-services.json"` under `expo.android` in `app.json`

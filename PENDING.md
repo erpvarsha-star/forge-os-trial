@@ -41,7 +41,15 @@ below. Empty tables and a broken sync look identical from the app.
 
 ## 🔴 Blocked on Yash — cannot proceed without you
 
-- [ ] **Firebase / FCM for Android push delivery.**
+- [ ] **Firebase / FCM — HALF DONE 13 Aug.** `google-services.json` is in and
+      wired into `app.json`; the remaining half is the FCM V1 service account
+      key, which only Yash can upload (it is a secret and must not pass through
+      chat): Firebase → Project Settings → Service accounts → Generate new
+      private key → upload at expo.dev → forge-os → Credentials → Android.
+      Push still reaches nobody until that lands, and then only for people who
+      REINSTALL, because the Firebase config is compiled in at build time.
+
+      Original note:
       `extra.eas.projectId` is set, but Expo relays Android push through
       Firebase and no Firebase project is configured.
       → Firebase console → add Android app, package `com.vfpl.forgeos` → download
