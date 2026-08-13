@@ -8,6 +8,11 @@ on:
     paths:
       - '.github/workflows/build-apk.yml'
       - 'app.json'
+      # Compiled into the APK by the Expo prebuild, so a change here must
+      # produce a new build. Without this, swapping the Firebase project
+      # changes nothing CI notices and the old config keeps shipping —
+      # silently, with push simply not working.
+      - 'google-services.json'
       - 'eas.json'
       - 'assets/**'
       - 'package.json'
