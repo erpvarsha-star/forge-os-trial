@@ -1,5 +1,16 @@
 name: Build Android APK
 
+# ⚠ KNOWN TRANSIENT FAILURE (first seen build #34, 13 Aug 2026): the
+# expo-modules-core Gradle config step fetches Android SDK/NDK manifests from
+# dl.google.com, and a runner-side network blip there fails as
+#   "NDK not configured. Download it with SDK manager."
+#   "Could not get unknown property 'release' for SoftwareComponent..."
+# Nothing in the failing commit touched Gradle, NDK, or any native config —
+# builds immediately before and after with unrelated changes succeeded. Not
+# our dependency versions; a re-run has fixed it every time so far. If this
+# recurs often, pin androidNdkVersion in app.json's expo.plugins config to
+# skip the manifest fetch, or add a retry step around the Gradle invocation.
+
 on:
   workflow_dispatch: {}
   push:
