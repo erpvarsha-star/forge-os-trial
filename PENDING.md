@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 12 Aug 2026, after the admin view-as and the plant dashboard.
+**Last updated:** 13 Aug 2026, after route guards, QR salt, reminder scope and the cron.
 
 ---
 
@@ -223,10 +223,10 @@ minutes — which is what tells the app what is outstanding. Restore from commit
       timings are for app notifications, not scoring. `shift-reminder` gained a
       `forms_due_reminder` mode firing 15 min before each deadline
       (16:30 / 00:30 / 09:30), deduped so one nudge goes out per shift.
-- [ ] **Cron entry for `forms_due_reminder`** — needs adding in the Supabase
-      dashboard: every 15 minutes, POST body `{"mode":"forms_due_reminder"}`.
-      Mode inference deliberately never picks this one, so without the cron
-      entry it never runs.
+- [ ] **Cron entry for `forms_due_reminder`** — now a SQL file rather than a
+      dashboard click: `scripts/PATCH_18_forms_reminder_cron_13Aug2026.sql`.
+      One blank to fill (the key) and run. Without it the reminder is built,
+      deployed and never fires.
 - [x] **Pending-forms status on the tab — BUILT 12 Aug.** Forms → Supabase went
       with option (a), the Apps Script push, as recommended. `syncOpsDashboardToSupabase()`
       in ALERT.gs pushes DATA_SUBMISSION_LOG into `form_submissions` every 15
@@ -294,10 +294,9 @@ had an accepted explanation.
 
 ## 🔵 Known gaps still in the code
 
-- [ ] **QR check-in secret** — `plant_config.qr_secret_salt` was never set.
-      PATCH_06 left it commented out deliberately (must not be committed to git).
-      Generate with `python3 -c "import secrets; print(secrets.token_hex(24))"`
-      and set it directly in the Supabase SQL Editor.
+- [ ] **QR check-in secret** — `scripts/PATCH_16_qr_salt_13Aug2026.sql`. Run
+      it; the salt is generated inside Postgres so nobody ever sees the value,
+      and it refuses to overwrite an existing one.
 - [x] **Alert copy in Hindi — VERIFIED DONE 12 Aug.** All 38 `Alert.alert()`
       calls already use `t()`. Audited properly with `scripts/check-i18n.mjs`:
       Hindi covers 100% of English, and one key used on two dashboards
