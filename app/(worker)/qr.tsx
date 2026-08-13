@@ -69,8 +69,21 @@ export default function QRScreen() {
 
     const today = new Date().toISOString().split('T')[0]
     const expectedQr = `${plant.id}-${today}-${plant.qr_secret_salt}`
-    // In production, verify SHA256 hash
-    // For demo, simple string check
+
+    // ⚠ DELIBERATE INTERIM GAP, DOCUMENTED 13 Aug 2026. The second condition
+    // accepts ANY scanned code that merely CONTAINS the plant code
+    // (plant.id, e.g. 'VFL-AKT') — which is public, printed on ID cards, and
+    // in this repository. That branch ignores qr_secret_salt entirely, so
+    // right now the geofence (100m radius, checked above) is the only real
+    // gate control; QR adds no security of its own.
+    //
+    // Not fixed here on purpose. app/(security)/gate-qr.tsx now exists to
+    // display the real, salted daily code — but nothing generates or prints
+    // a QR at the gate today, so removing this fallback before that screen is
+    // actually in daily use would lock out all 129 people at shift change.
+    // Once gate-qr.tsx is confirmed running at the gate, drop the
+    // `|| data.includes(plant.id)` half of this check and require an exact
+    // match against expectedQr.
     if (data !== expectedQr && !data.includes(plant.id)) {
       Alert.alert(t('common.error'), t('worker.invalidQr'))
       setIsLoading(false)

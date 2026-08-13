@@ -525,6 +525,11 @@
     "noVehicleEntriesToday": "No vehicle movement logged yet today",
     "logVehicleHint": "Record every vehicle entering or leaving the plant",
     "checkpointHint": "Confirm each employee you physically see enter the plant",
-    "eodHint": "Confirm inward and outward vehicle counts match at end of day"
+    "eodHint": "Confirm inward and outward vehicle counts match at end of day",
+    "gateQr": "Gate QR",
+    "todaysGateCode": "Today's Gate Code",
+    "qrHint": "Show this screen at the gate. It changes automatically every day at midnight.",
+    "qrNotConfigured": "No gate code available",
+    "qrNotConfiguredHint": "The plant QR secret has not been set up yet. Contact HR."
   }
 }
