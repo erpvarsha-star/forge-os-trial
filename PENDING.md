@@ -46,8 +46,12 @@ below. Empty tables and a broken sync look identical from the app.
       key, which only Yash can upload (it is a secret and must not pass through
       chat): Firebase → Project Settings → Service accounts → Generate new
       private key → upload at expo.dev → forge-os → Credentials → Android.
-      Push still reaches nobody until that lands, and then only for people who
-      REINSTALL, because the Firebase config is compiled in at build time.
+      SUPERSEDED 13 Aug — Expo is out of the push path. The server now sends
+      to FCM v1 directly (`supabase/functions/_shared/fcm.ts`), so no Expo
+      credentials and no keystore wizard are involved. What remains is one
+      paste: Supabase → Edge Functions → Secrets → `FCM_SERVICE_ACCOUNT_JSON`.
+      Reinstall is still required, because the Firebase config and the native
+      token request are compiled in at build time.
 
       Original note:
       `extra.eas.projectId` is set, but Expo relays Android push through

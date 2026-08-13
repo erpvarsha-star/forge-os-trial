@@ -1,4 +1,5 @@
 import type { supabaseAdmin } from './supabaseAdmin.ts';
+import { sendFcm } from './fcm.ts';
 
 export interface NotifyInput {
   employeeIds: string[];
@@ -53,17 +54,46 @@ export async function notifyEmployees(db: ReturnType<typeof supabaseAdmin>, inpu
     .select('token')
     .in('user_id', employeeIds);
 
-  const pushed = await sendExpoPush(
-    (tokens ?? []).map((t: { token: string }) => ({
-      to: t.token,
-      sound: 'default',
+  const all = (tokens ?? []).map((t: { token: string }) => t.token).filter(Boolean);
+
+  // Two kinds of token can be in this table, so route on shape rather than on
+  // a config flag that could disagree with reality:
+  //   ExponentPushToken[…]  — issued by getExpoPushTokenAsync, relayed by Expo
+  //   anything else         — a native FCM registration token, sent directly
+  //
+  // Devices registered before 13 Aug hold Expo tokens; devices on the build
+  // after it hold FCM ones. Both work, so the switch needs no flag day and no
+  // forced reinstall to avoid breaking the ones already out there.
+  const expoTokens = all.filter((t: string) => t.startsWith('ExponentPushToken') || t.startsWith('ExpoPushToken'));
+  const fcmTokens = all.filter((t: string) => !expoTokens.includes(t));
+
+  const expoSent = await sendExpoPush(
+    expoTokens.map((to: string) => ({
+      to,
+      sound: 'default' as const,
       title,
       body,
       data: { type, relatedEntityType, relatedEntityId },
     }))
   );
 
-  return { notified: rows.length, pushed };
+  const fcm = await sendFcm(
+    fcmTokens.map((token: string) => ({
+      token,
+      title,
+      body,
+      data: { type, relatedEntityType, relatedEntityId },
+    }))
+  );
+
+  // A token FCM rejects as unregistered belongs to an uninstalled app. Left in
+  // place it is retried on every notification forever, so it is cleared here.
+  if (fcm.stale.length > 0) {
+    await db.from('push_tokens').delete().in('token', fcm.stale);
+    console.log(`cleared ${fcm.stale.length} stale push token(s)`);
+  }
+
+  return { notified: rows.length, pushed: expoSent + fcm.sent };
 }
 
 /** Sends messages to the Expo push API in batches of 100 (Expo's per-request limit). */

@@ -117,7 +117,9 @@ session.
 - ✅ `app.json` → `extra.eas.projectId` = `832b3a3c-b4f7-4c27-9644-554ea6dc94b7` (provided by Yash 11 Aug). Not a secret — it is compiled into the APK.
 - ✅ `owner` set to `erp.varsha` so EAS resolves the project.
 - ✅ `google-services.json` in the repo root and referenced from `app.json` → `expo.android.googleServicesFile` (13 Aug). Firebase project `gen-lang-client-0072991718`, sender id `770370492554`, package `com.vfpl.forgeos` — verified to match before wiring.
-- ⏳ **FCM V1 service account key — STILL NOT DONE, and push will not arrive without it.** Expo's push service relays to Firebase Cloud Messaging for Android. Required:
+- ✅ **Expo removed from the push path entirely (13 Aug).** Expo's push service is only a relay to FCM, and using it meant completing a dashboard wizard that demands an Android upload keystore this project does not have (CI builds are signed with the debug keystore, never by EAS). The server now talks to FCM v1 directly — `supabase/functions/_shared/fcm.ts`, authenticating with a Firebase service account. No Expo credentials, no keystore, no wizard.
+- ⏳ **One secret still needed:** Supabase → Edge Functions → Secrets → `FCM_SERVICE_ACCOUNT_JSON`, pasting the whole service account JSON. Until it is set, in-app notifications work and push is skipped with a warning.
+- Old note, kept for context: Expo's push service relays to Firebase Cloud Messaging for Android. Required:
   1. Firebase console → create/open a project → add an Android app with package `com.vfpl.forgeos`
   2. Download `google-services.json` into the repo root
   3. Add `"googleServicesFile": "./google-services.json"` under `expo.android` in `app.json`

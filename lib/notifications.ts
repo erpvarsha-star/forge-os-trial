@@ -22,11 +22,17 @@ Notifications.setNotificationHandler({
  * 11 Aug, so this threw "No projectId found" for every employee and
  * push_tokens stayed permanently empty.
  *
- * The projectId is now set (app.json extra.eas.projectId), so token
- * registration can succeed. Android DELIVERY additionally requires FCM
- * credentials on the Expo project — see CLAUDE.md. Until those exist a token
- * may be issued but pushes will not arrive, which is exactly why this stays
- * non-throwing: an incomplete push setup must never block login.
+ * SINCE 13 AUG this asks Android for its NATIVE FCM token rather than an
+ * Expo one. Expo's push service is only a relay to FCM, and using it requires
+ * uploading credentials through a dashboard wizard that demands an Android
+ * upload keystore this project does not have — our APKs are built by GitHub
+ * Actions and signed with the debug keystore, never by EAS. Going straight to
+ * FCM removes that dependency entirely: the server sends via
+ * supabase/functions/_shared/fcm.ts using a Firebase service account.
+ *
+ * The Expo path is kept as a fallback for anything that is not Android, and
+ * the server still accepts both token shapes, so devices registered before
+ * this change keep working without a forced reinstall.
  */
 export async function registerForPushNotificationsAsync(userId: string) {
   try {
@@ -42,10 +48,9 @@ export async function registerForPushNotificationsAsync(userId: string) {
       return null
     }
 
-    const projectId =
-      Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId
-    const token = (await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined)).data
-
+    // The channel must exist BEFORE a notification arrives, or Android drops
+    // it silently. fcm.ts sends with channel_id 'default', so the two names
+    // have to agree — they are matched deliberately, not by luck.
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
         name: 'default',
@@ -54,6 +59,28 @@ export async function registerForPushNotificationsAsync(userId: string) {
         lightColor: '#E65C00',
       })
     }
+
+    let token: string | null = null
+
+    if (Platform.OS === 'android') {
+      // Native FCM registration token — what fcm.ts sends to directly.
+      try {
+        const device = await Notifications.getDevicePushTokenAsync()
+        token = typeof device.data === 'string' ? device.data : null
+      } catch (err) {
+        console.warn('native FCM token unavailable, falling back to Expo:', err)
+      }
+    }
+
+    // Fallback: Expo's relay. Still correct — the server routes by token shape
+    // — and the only path available on anything that is not Android.
+    if (!token) {
+      const projectId =
+        Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId
+      token = (await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined)).data
+    }
+
+    if (!token) return null
 
     // onConflict must name user_id: push_tokens' primary key is `id` (which
     // we never send), so the default conflict target never matches and the
@@ -95,29 +122,42 @@ export type NotificationType =
   | 'SCORE_UPDATED'
 
 /**
- * Sends an Expo push notification to every employee holding `role`, using
- * whatever device tokens they've registered in `push_tokens`. Used for
- * server-less alerts (e.g. fraud detection) where there's no backend
- * process to fan the notification out from.
+ * Alerts every employee holding `role` — used for client-triggered alerts
+ * such as fraud detection, where there is no backend process to fan out from.
+ *
+ * ⚠ REWRITTEN 13 AUG. This used to POST straight to Expo's push endpoint from
+ * the device. That silently stopped working the moment Android started
+ * registering native FCM tokens instead of Expo ones: Expo's API accepts the
+ * request, finds nothing it recognises, and returns success. A push path that
+ * reports success while delivering nothing is worse than one that fails.
+ *
+ * It also could not be fixed in place. Sending to FCM directly needs the
+ * Firebase service account, which is a secret and must never be shipped in an
+ * APK. So the send moves server-side: this now calls the send-push-notification
+ * edge function, which writes the in-app notification rows AND routes each
+ * token to Expo or FCM by shape.
+ *
+ * Still non-throwing. This is called from fraud paths during check-in, and a
+ * failed alert must never block an employee from clocking in.
  */
 export async function notifyEmployeesByRole(role: string, title: string, body: string, data?: Record<string, unknown>) {
   const { data: recipients } = await supabase.from('employees').select('id').eq('role', role).eq('is_active', true)
-  const recipientIds = (recipients ?? []).map((r: { id: string }) => r.id)
-  if (recipientIds.length === 0) return
-
-  const { data: tokens } = await supabase.from('push_tokens').select('token').in('user_id', recipientIds)
-  const messages = (tokens ?? [])
-    .filter((t: { token: string }) => !!t.token)
-    .map((t: { token: string }) => ({ to: t.token, sound: 'default', title, body, data: data ?? {} }))
-  if (messages.length === 0) return
+  const employeeIds = (recipients ?? []).map((r: { id: string }) => r.id)
+  if (employeeIds.length === 0) return
 
   try {
-    await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify(messages),
+    const { error } = await supabase.functions.invoke('send-push-notification', {
+      body: {
+        employeeIds,
+        type: (data?.type as string) ?? 'alert',
+        title,
+        body,
+        relatedEntityType: data?.relatedEntityType as string | undefined,
+        relatedEntityId: data?.relatedEntityId as string | undefined,
+      },
     })
+    if (error) console.error('notifyEmployeesByRole failed', error)
   } catch (err) {
-    console.error('notifyEmployeesByRole push failed', err)
+    console.error('notifyEmployeesByRole failed', err)
   }
 }
