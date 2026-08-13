@@ -372,8 +372,26 @@ Script Property, not two — every send function reads that same one).
   delivery path. `sendGentleReminder`'s loop is also now wrapped per
   department in `try`/`catch` so one bad send can never again silently
   swallow the rest of the batch.
-- Needs `deployShiftTrackingTriggers()` re-run to install the 5-minute
-  polling trigger.
+- **Token/chat-id — same inline-or-Script-Properties pattern as Supabase.**
+  `TELEGRAM_BOT_TOKEN_INLINE` and `OWNER_TELEGRAM_CHAT_ID_INLINE` at the top
+  of `scripts/ALERT.gs`, both blank in git for the same reason
+  `SUPABASE_SERVICE_ROLE_KEY_INLINE` is — a live secret committed once is in
+  the repository's history permanently. Script Properties win if set there
+  instead. Paste the token (and, optionally, your numeric chat id — not a
+  secret, just an account identifier) into the live copy only.
+- **"Too many triggers" — this script shares its Apps Script PROJECT with
+  Code.gs, the Operations Dashboard's own pull/alert script.** Code.gs runs
+  11 triggers of its own (6 `runDashboardPull` + 4 `checkShiftEnd_*` + 1
+  `refreshCache15min`); `deployShiftTrackingTriggers()` used to add 15 more,
+  26 total against Google's 20-per-project ceiling. Fixed by using fewer
+  triggers rather than touching Code.gs's: every alert function already
+  no-ops when there is nothing to do right now, so
+  `deployShiftTrackingTriggers()` now creates exactly 2 —
+  `runShiftAlerts15min_()` and `runDailyMaintenance_()` — each a thin,
+  try/catch-wrapped dispatcher over the individual functions that used to
+  have their own trigger. 2 + Code.gs's 11 = 13.
+- Needs `deployShiftTrackingTriggers()` re-run to pick up the 2-trigger
+  layout (it deletes the old per-function triggers first).
 
 ## Edge functions (6, all Deno)
 

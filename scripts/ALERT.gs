@@ -25,6 +25,23 @@ var DASH_ID = '1GHdhrRtOhQFshsAOCK4n3GiJp-6a03k8bn0V_M04wSY';
 var SUPABASE_URL_INLINE = 'https://odfwtdpvpfzdrznvurru.supabase.co';
 var SUPABASE_SERVICE_ROLE_KEY_INLINE = '';   // <-- paste the key between these quotes
 
+// Same pattern, same reason, for Telegram. TELEGRAM_BOT_TOKEN_INLINE is
+// blank in the copy of this file kept in git — a live bot token lets anyone
+// send messages as this bot and read anything sent to it, and once a secret
+// is committed it is in the repository's history permanently even after a
+// later commit removes it. Paste your token here in the LIVE Apps Script
+// copy only. Script Properties still win if TELEGRAM_BOT_TOKEN is set there
+// instead, so moving it out of the file later needs no code change.
+var TELEGRAM_BOT_TOKEN_INLINE = '';   // <-- paste the @Form_mgr_bot token between these quotes
+
+// The plant owner's numeric Telegram chat id. NOT a secret — it identifies
+// an account, not a credential, so it is fine to paste here directly or even
+// in chat. Leave blank and message the bot with "Yash Munot" or "owner"
+// instead (see processTelegramOnboarding below) and it fills this role via
+// the OWNER_TELEGRAM_CHAT_ID Script Property automatically — either source
+// works, Script Properties still wins if both are set.
+var OWNER_TELEGRAM_CHAT_ID_INLINE = '';   // <-- paste your numeric chat id between these quotes, or leave blank and message the bot instead
+
 // ── DEPARTMENT LIST ──────────────────────────────────────
 var DEPARTMENTS = [
   'Cutting', 'Forge', 'Press', 'Machine', 'HT', 'Final',
@@ -708,12 +725,23 @@ function buildMissingListText_(missing) {
   return lines.join('\n');
 }
 
+/** Script Properties win over the inline constants — same convention as
+ * getSupabaseCredentials_ above. Returns '' (not throwing) when nothing is
+ * set, since a missing Telegram token must never be fatal — every caller
+ * already treats an empty token as "log and skip". */
+function getTelegramBotToken_() {
+  return PropertiesService.getScriptProperties().getProperty('TELEGRAM_BOT_TOKEN') || TELEGRAM_BOT_TOKEN_INLINE;
+}
+function getOwnerTelegramChatId_() {
+  return PropertiesService.getScriptProperties().getProperty('OWNER_TELEGRAM_CHAT_ID') || OWNER_TELEGRAM_CHAT_ID_INLINE;
+}
+
 function sendTelegramToChatId(chatId, message) {
   if (!chatId || chatId === '') return;
   
-  var token = PropertiesService.getScriptProperties().getProperty('TELEGRAM_BOT_TOKEN');
+  var token = getTelegramBotToken_();
   if (!token) {
-    Logger.log('❌ TELEGRAM_BOT_TOKEN not set');
+    Logger.log('❌ No Telegram bot token. Paste it into TELEGRAM_BOT_TOKEN_INLINE at the top of this file, or set TELEGRAM_BOT_TOKEN in Script Properties.');
     return;
   }
   
@@ -767,9 +795,9 @@ function sendTelegramToChatId(chatId, message) {
  * when a specific supervisor has no chat ID yet.
  */
 function sendTelegramAlert(message) {
-  var ownerChatId = PropertiesService.getScriptProperties().getProperty('OWNER_TELEGRAM_CHAT_ID');
+  var ownerChatId = getOwnerTelegramChatId_();
   if (!ownerChatId) {
-    Logger.log('⚠️ OWNER_TELEGRAM_CHAT_ID not set — plant-wide alert not delivered. Message the bot with the owner\'s name to register it.');
+    Logger.log('⚠️ No owner chat id. Paste it into OWNER_TELEGRAM_CHAT_ID_INLINE, set the OWNER_TELEGRAM_CHAT_ID Script Property, or message the bot with the owner\'s name to register it automatically.');
     return;
   }
   sendTelegramToChatId(ownerChatId, message);
@@ -1012,49 +1040,82 @@ function sendWeeklyPerformance() {
 // SECTION 6: DEPLOY TRIGGERS
 // ============================================================
 
+/**
+ * ⚠ REWRITTEN 13 Aug 2026 — the previous version created 15 triggers. This
+ * script shares its Apps Script PROJECT (and therefore its trigger quota)
+ * with Code.gs, the Operations Dashboard's own pull/alert script, which
+ * already runs 11 of its own (6 runDashboardPull + 4 checkShiftEnd_* +
+ * refreshCache15min — see setDashboardTriggers/setShiftEndTriggers/
+ * setCacheTriggers there). 15 + 11 = 26, comfortably over Google's 20-
+ * trigger-per-project ceiling, which is exactly what "too many triggers"
+ * meant. Deleting this project's OTHER triggers was never the fix — Code.gs
+ * genuinely needs its 11, and deleting them would break the dashboard.
+ *
+ * The real fix is using fewer triggers on THIS side. Every alert function
+ * already no-ops safely when there is nothing to do right now —
+ * sendGentleReminder / sendDMEDeadlineAlert / sendFollowUpAlert all start by
+ * calling getShiftToCheck_() and return immediately if it is null, and
+ * getMissingDepartments_() just returns [] when nothing is missing. The
+ * separate PER-SHIFT trigger times that used to exist (09:15, 16:15, 00:15
+ * for the same function, three times) were a precision nicety, not something
+ * the code needed — calling the same function every 15 minutes and letting
+ * it decide whether "now" matters is functionally identical and costs one
+ * trigger instead of three.
+ *
+ * So this collapses to two entry points:
+ *   runShiftAlerts15min_()  — every 15 min — everything shift-boundary-shaped
+ *   runDailyMaintenance_()  — once daily   — everything end-of-day-shaped
+ * 2 triggers total, down from 15. Combined with Code.gs's 11, that is 13 —
+ * comfortable headroom, not sitting on the ceiling.
+ */
 function deployShiftTrackingTriggers() {
+  var ours = [
+    'sendGentleReminder', 'sendDMEDeadlineAlert', 'sendFollowUpAlert', 'sendDailySummary',
+    'sendWeeklyPerformance', 'recordShiftCompliance', 'rebuildWeeklyPerformance',
+    'syncOpsDashboardToSupabase', 'processTelegramOnboarding',
+    'runShiftAlerts15min_', 'runDailyMaintenance_'
+  ];
   ScriptApp.getProjectTriggers().forEach(function(t) {
-    var func = t.getHandlerFunction();
-    if (['sendGentleReminder', 'sendDMEDeadlineAlert', 'sendFollowUpAlert', 'sendDailySummary', 'sendWeeklyPerformance', 'recordShiftCompliance', 'rebuildWeeklyPerformance', 'syncOpsDashboardToSupabase',
-       'processTelegramOnboarding'].indexOf(func) > -1) {
-      ScriptApp.deleteTrigger(t);
-    }
+    if (ours.indexOf(t.getHandlerFunction()) > -1) ScriptApp.deleteTrigger(t);
   });
-  
-  ScriptApp.newTrigger('sendGentleReminder').timeBased().atHour(9).nearMinute(15).everyDays(1).create();
-  ScriptApp.newTrigger('sendGentleReminder').timeBased().atHour(16).nearMinute(15).everyDays(1).create();
-  ScriptApp.newTrigger('sendGentleReminder').timeBased().atHour(0).nearMinute(15).everyDays(1).create();
-  
-  ScriptApp.newTrigger('sendDMEDeadlineAlert').timeBased().atHour(9).nearMinute(30).everyDays(1).create();
-  ScriptApp.newTrigger('sendDMEDeadlineAlert').timeBased().atHour(16).nearMinute(30).everyDays(1).create();
-  ScriptApp.newTrigger('sendDMEDeadlineAlert').timeBased().atHour(0).nearMinute(30).everyDays(1).create();
-  
-  ScriptApp.newTrigger('sendFollowUpAlert').timeBased().atHour(10).nearMinute(0).everyDays(1).create();
-  ScriptApp.newTrigger('sendFollowUpAlert').timeBased().atHour(17).nearMinute(0).everyDays(1).create();
-  ScriptApp.newTrigger('sendFollowUpAlert').timeBased().atHour(1).nearMinute(0).everyDays(1).create();
-  
-  ScriptApp.newTrigger('sendDailySummary').timeBased().atHour(0).nearMinute(30).everyDays(1).create();
-  
-  ScriptApp.newTrigger('sendWeeklyPerformance').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(9).nearMinute(0).create();
-  
-  // Submission sweep. The RAW tabs carry no submission timestamp (date only),
-  // so the sweep's own run time is the best available proxy for when data
-  // arrived. Every 15 minutes keeps that proxy tight enough to be useful.
-  ScriptApp.newTrigger('recordShiftCompliance').timeBased().everyMinutes(15).create();
-  ScriptApp.newTrigger('rebuildWeeklyPerformance').timeBased().atHour(1).nearMinute(0).everyDays(1).create();
-  
-  // Push to Supabase right after each compliance sweep, so the app's Forms tab
-  // and the department production figures are never more than ~15 minutes
-  // behind the sheet. Skipped silently if the Script Properties are not set,
-  // so deploying triggers before configuring credentials is not a failure.
-  ScriptApp.newTrigger('syncOpsDashboardToSupabase').timeBased().everyMinutes(15).create();
-  
-  // Telegram onboarding — every 5 minutes. A supervisor who just messaged the
-  // bot should not have to wait a quarter hour to find out whether it worked.
-  // No-ops instantly if TELEGRAM_BOT_TOKEN is unset, same as the sync above.
-  ScriptApp.newTrigger('processTelegramOnboarding').timeBased().everyMinutes(5).create();
-  
-  Logger.log('✅ All shift tracking triggers deployed successfully!');
+
+  ScriptApp.newTrigger('runShiftAlerts15min_').timeBased().everyMinutes(15).create();
+  ScriptApp.newTrigger('runDailyMaintenance_').timeBased().atHour(0).nearMinute(30).everyDays(1).create();
+
+  Logger.log('✅ Shift tracking triggers deployed: 2 total (was 15). Code.gs\'s own 11 triggers are untouched.');
+}
+
+/**
+ * Every 15 minutes: everything that only matters near a shift boundary —
+ * the gentle reminder, the DME deadline alert, the follow-up escalation, the
+ * compliance sweep, the Supabase sync, and Telegram onboarding. Each call is
+ * wrapped individually so one failure can never swallow the rest of the
+ * batch, same reasoning as the per-department wrapping inside
+ * sendGentleReminder itself.
+ */
+function runShiftAlerts15min_() {
+  [sendGentleReminder, sendDMEDeadlineAlert, sendFollowUpAlert,
+   recordShiftCompliance, syncOpsDashboardToSupabase, processTelegramOnboarding
+  ].forEach(function(fn) {
+    try { fn(); } catch (err) { Logger.log('❌ runShiftAlerts15min_: ' + fn.name + ' failed: ' + err); }
+  });
+}
+
+/**
+ * Once daily at 00:30: the daily summary and the weekly rollup rebuild.
+ * sendWeeklyPerformance only fires on the Monday leg — checked here instead
+ * of with its own onWeekDay(MONDAY) trigger, matching what that trigger used
+ * to do, just without spending a trigger slot on it.
+ */
+function runDailyMaintenance_() {
+  [sendDailySummary, rebuildWeeklyPerformance].forEach(function(fn) {
+    try { fn(); } catch (err) { Logger.log('❌ runDailyMaintenance_: ' + fn.name + ' failed: ' + err); }
+  });
+  try {
+    if (Utilities.formatDate(new Date(), 'Asia/Kolkata', 'EEEE') === 'Monday') sendWeeklyPerformance();
+  } catch (err) {
+    Logger.log('❌ runDailyMaintenance_: sendWeeklyPerformance failed: ' + err);
+  }
 }
 
 // ============================================================
@@ -2059,9 +2120,9 @@ function setLastTelegramUpdateId_(id) {
  * unique match. Meant to run every few minutes via deployShiftTrackingTriggers().
  */
 function processTelegramOnboarding() {
-  var token = PropertiesService.getScriptProperties().getProperty('TELEGRAM_BOT_TOKEN');
+  var token = getTelegramBotToken_();
   if (!token) {
-    Logger.log('❌ TELEGRAM_BOT_TOKEN not set — nothing to poll.');
+    Logger.log('❌ No Telegram bot token — nothing to poll. Paste it into TELEGRAM_BOT_TOKEN_INLINE at the top of this file, or set TELEGRAM_BOT_TOKEN in Script Properties.');
     return;
   }
 

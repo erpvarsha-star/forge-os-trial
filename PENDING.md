@@ -300,6 +300,35 @@ minutes — which is what tells the app what is outstanding. Restore from commit
       delivers correctly once one is, and that a chat-id-less department no
       longer blocks the departments after it.
 
+- [x] **"Too many triggers" — found the real cause and fixed 13 Aug.** Not an
+      ALERT.gs bug on its own: this script shares its Apps Script PROJECT
+      (and therefore its 20-trigger-per-project quota) with `Code.gs`, the
+      Operations Dashboard's own pull/alert script, which Yash pasted in for
+      review. Code.gs already runs 11 triggers of its own (6 `runDashboardPull`
+      + 4 `checkShiftEnd_*` + 1 `refreshCache15min`). `deployShiftTrackingTriggers()`
+      used to create 15 more — 26 total, over Google's ceiling.
+      Every alert function already no-ops safely when there is nothing to do
+      right now (`getShiftToCheck_()` returns null outside a shift's window),
+      so the fix was fewer triggers, not different code: `deployShiftTrackingTriggers()`
+      now creates exactly 2 — `runShiftAlerts15min_()` (everything shift-
+      boundary-shaped, every 15 min) and `runDailyMaintenance_()` (everything
+      end-of-day-shaped, once daily). 2 + Code.gs's 11 = 13, comfortable
+      headroom rather than sitting on the ceiling. Verified in Node: exactly 2
+      triggers created, and the deletion pass — which only ever removes
+      ALERT.gs's own stale trigger names — never touches `runDashboardPull`,
+      `checkShiftEnd_*`, or `refreshCache15min`.
+
+- [x] **Telegram token — inline slot added 13 Aug, same pattern as Supabase's.**
+      `TELEGRAM_BOT_TOKEN_INLINE` and `OWNER_TELEGRAM_CHAT_ID_INLINE` at the top
+      of the file, both blank in git for the same reason `SUPABASE_SERVICE_ROLE_KEY_INLINE`
+      is: a live bot token lets anyone send as the bot and read everything sent
+      to it, and a secret committed once is in the repository's history
+      permanently even after a later commit removes it. Paste the token and
+      (optionally) your numeric chat id into the LIVE Apps Script copy only —
+      Script Properties still win if set there instead. Verified in Node: both
+      inline values are used when no Script Properties are set, and Script
+      Properties correctly override them when present.
+
 ---
 
 ## 🔴 In-app notifications have never worked — found and fixed 12 Aug
