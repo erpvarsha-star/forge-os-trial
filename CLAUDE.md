@@ -338,24 +338,40 @@ made `notifications_insert` require `is_management()`.
 
 ---
 
-## Telegram — dedicated bot recommended and being switched to (13 Aug 2026)
+## Telegram — dedicated bot, live (13 Aug 2026)
 
 Yash asked whether the individual supervisor DMs should reuse the existing
 bot or use a new one; recommended and agreed: **new bot**, dedicated purpose,
 clean token, no collision with anything else this account might do.
+**Created 13 Aug — @Form_mgr_bot.** Token goes in `TELEGRAM_BOT_TOKEN` (one
+Script Property, not two — every send function reads that same one).
 
-- `sendTelegramToChatId()` in `scripts/ALERT.gs` reads ONE Script Property,
-  `TELEGRAM_BOT_TOKEN` — switching bots means replacing that property's value
-  with the new bot's token, not adding a second one.
-- **Onboarding — built 13 Aug, was the real gap.** A numeric Telegram chat ID
-  is not something a person knows without messaging a bot first, so most
-  `SUPERVISOR_MAP` rows had it blank. `processTelegramOnboarding()` polls the
-  bot every 5 minutes; a supervisor messages their name, it's matched
-  (case-insensitive, exactly one hit required) against this week's
-  `SUPERVISOR_MAP` rows, and the chat ID is written in automatically.
-  Deliberately conservative — zero or multiple matches are logged and
-  skipped, never guessed, for the same "Todmal" name-variant reason documented
-  elsewhere in this file.
+- **Onboarding.** A numeric Telegram chat ID is not something a person knows
+  without messaging a bot first, so most `SUPERVISOR_MAP` rows had it blank.
+  `processTelegramOnboarding()` polls the bot every 5 minutes; a supervisor
+  messages their name, it's matched (case-insensitive, exactly one hit
+  required) against this week's `SUPERVISOR_MAP` rows, and the chat ID is
+  written in automatically. Deliberately conservative — zero or multiple
+  matches are logged and skipped, never guessed, for the same "Todmal"
+  name-variant reason documented elsewhere in this file. The owner uses the
+  identical flow: messaging the bot with "Yash Munot" (or "owner") sets
+  `OWNER_TELEGRAM_CHAT_ID` as a Script Property instead of writing a sheet row.
+- **`sendTelegramAlert()` did not exist — found and fixed 13 Aug.** It was
+  called from 7 places (the no-chat-id fallback in `sendGentleReminder`,
+  unconditionally from `sendDMEDeadlineAlert`/`sendFollowUpAlert`/
+  `sendDailySummary`, and 2 registration confirmations) and defined nowhere
+  in the file. Every call threw. Because Apps Script does not catch an
+  exception inside a `forEach` callback, the first department with no
+  registered chat ID — which, before onboarding existed, was every
+  department — killed every department scheduled AFTER it in that same
+  `sendGentleReminder` run too. The three report functions called it
+  unconditionally, so they have never delivered a single message, ever. Now
+  defined: delivers to `OWNER_TELEGRAM_CHAT_ID`. Those three already compose
+  a plant-wide, every-department report, which is what "send me the entire
+  report" turned out to mean — no new report format needed, just a working
+  delivery path. `sendGentleReminder`'s loop is also now wrapped per
+  department in `try`/`catch` so one bad send can never again silently
+  swallow the rest of the batch.
 - Needs `deployShiftTrackingTriggers()` re-run to install the 5-minute
   polling trigger.
 

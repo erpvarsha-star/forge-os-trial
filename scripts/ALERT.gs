@@ -739,6 +739,42 @@ function sendTelegramToChatId(chatId, message) {
   }
 }
 
+/**
+ * ⚠ ADDED 13 Aug 2026 — THIS FUNCTION DID NOT EXIST. It was called from seven
+ * places (sendGentleReminder's no-chat-id fallback, sendDMEDeadlineAlert,
+ * sendFollowUpAlert, sendDailySummary, and two supervisor-registration
+ * confirmations) and was never defined anywhere in this file. Every one of
+ * those calls threw ReferenceError: sendTelegramAlert is not defined.
+ *
+ * The blast radius was worse than "that one alert never sent." Apps Script
+ * does not catch an exception thrown inside a forEach callback — it kills the
+ * WHOLE function invocation. So in sendGentleReminder(), the moment the loop
+ * reached one department whose supervisor had no chat ID (which, before
+ * today, was every department — Telegram onboarding did not exist), the
+ * throw stopped every department AFTER it in that same run from being
+ * notified too, even ones with a perfectly good, already-registered chat ID.
+ * sendDMEDeadlineAlert/sendFollowUpAlert/sendDailySummary called it
+ * unconditionally, so those three have never delivered a single message,
+ * ever, to anyone.
+ *
+ * These three functions were already writing PLANT-WIDE reports — every
+ * missing department in one message — not a single supervisor's nudge. That
+ * is exactly "an entire report," so rather than build a new report format,
+ * this makes that existing content actually arrive, addressed to the plant
+ * owner. Individual per-department reminders are unaffected: sendGentleReminder
+ * already sends those straight to each supervisor's own chatId when one is on
+ * file — this function is only ever the plant-wide reports, or the fallback
+ * when a specific supervisor has no chat ID yet.
+ */
+function sendTelegramAlert(message) {
+  var ownerChatId = PropertiesService.getScriptProperties().getProperty('OWNER_TELEGRAM_CHAT_ID');
+  if (!ownerChatId) {
+    Logger.log('⚠️ OWNER_TELEGRAM_CHAT_ID not set — plant-wide alert not delivered. Message the bot with the owner\'s name to register it.');
+    return;
+  }
+  sendTelegramToChatId(ownerChatId, message);
+}
+
 function getShiftTiming_(shift) {
   var config = SHIFT_CONFIG_DATA[shift];
   return config ? config.start + ' – ' + config.end : 'Unknown';
@@ -808,18 +844,28 @@ function sendGentleReminder() {
   }
   
   missing.forEach(function(m) {
-    var msg = '⏰ REMINDER — ' + m.department + ' Data Due in 15 Minutes\n';
-    msg += '📅 ' + dateStr + ' | ⏰ ' + timeStr + '\n\n';
-    msg += '🔄 ' + shiftInfo.shift + ' (' + getShiftTiming_(shiftInfo.shift) + ')\n';
-    msg += '⏱️ Grace period ends at ' + getShiftDeadline_(shiftInfo.shift) + '\n\n';
-    msg += '⚠️ YOUR DEPARTMENT PENDING:\n';
-    msg += '  • ' + m.department + ' — 📋 Please upload NOW\n\n';
-    msg += buildFormLinkLine_(m.department);
-    
-    if (m.chatId && m.chatId !== '') {
-      sendTelegramToChatId(m.chatId, msg);
-    } else {
-      sendTelegramAlert(msg);
+    // Wrapped per-department, deliberately. One supervisor without a chat ID,
+    // or one failed network call, must never stop every department AFTER it
+    // in this same run from being notified — that is exactly the bug that
+    // sendTelegramAlert being undefined caused for months (see its comment).
+    try {
+      var msg = '⏰ REMINDER — ' + m.department + ' Data Due in 15 Minutes\n';
+      msg += '📅 ' + dateStr + ' | ⏰ ' + timeStr + '\n\n';
+      msg += '🔄 ' + shiftInfo.shift + ' (' + getShiftTiming_(shiftInfo.shift) + ')\n';
+      msg += '⏱️ Grace period ends at ' + getShiftDeadline_(shiftInfo.shift) + '\n\n';
+      msg += '⚠️ YOUR DEPARTMENT PENDING:\n';
+      msg += '  • ' + m.department + ' — 📋 Please upload NOW\n\n';
+      msg += buildFormLinkLine_(m.department);
+      
+      if (m.chatId && m.chatId !== '') {
+        sendTelegramToChatId(m.chatId, msg);
+      } else {
+        // No chat ID on file for this department's supervisor — tell the
+        // owner directly, rather than silently skipping the reminder.
+        sendTelegramAlert('⚠️ No Telegram registered for ' + m.department + ' (' + m.supervisor + ') — reminder not delivered. They need to message the bot with their name.');
+      }
+    } catch (err) {
+      Logger.log('❌ sendGentleReminder failed for ' + m.department + ': ' + err);
     }
     
     Utilities.sleep(500);
@@ -1985,6 +2031,16 @@ function testSupabaseSync() {
 // "Balasaheb Shivaji Todmal" name-variant problem already documented
 // elsewhere in this file is exactly why a wrong auto-match would be worse
 // than no match.
+//
+// THE OWNER USES THE SAME FLOW. Yash is not a rotating weekly supervisor, so
+// he has no SUPERVISOR_MAP row to match against — but "message the bot with
+// your name" is one instruction HR can give everyone, owner included, rather
+// than a special case to explain separately. A message matching any of
+// OWNER_NAME_TRIGGERS is checked FIRST, before the SUPERVISOR_MAP lookup, and
+// writes OWNER_TELEGRAM_CHAT_ID as a Script Property instead of a sheet row —
+// that is what sendTelegramAlert() reads to deliver the plant-wide DME /
+// follow-up / daily-summary reports.
+var OWNER_NAME_TRIGGERS = ['yash', 'yash munot', 'yash jinendra munot', 'owner', 'vfl1001'];
 
 /** The Telegram numeric user/chat id last confirmed processed, so the same
  * message is never matched twice. Stored in Script Properties, not a sheet
@@ -2041,6 +2097,14 @@ function processTelegramOnboarding() {
     if (!text || text.length < 3) return;   // bare "/start" with nothing to match on
 
     var chatId = String(msg.chat.id);
+
+    if (OWNER_NAME_TRIGGERS.indexOf(text.toLowerCase()) > -1) {
+      PropertiesService.getScriptProperties().setProperty('OWNER_TELEGRAM_CHAT_ID', chatId);
+      registered++;
+      sendTelegramToChatId(chatId, '✅ Registered as plant owner. You will receive the DME, follow-up and daily summary reports here.');
+      return;
+    }
+
     var match = matchSupervisorByName_(sh, text);
 
     if (match === 'none') {

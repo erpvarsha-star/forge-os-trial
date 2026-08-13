@@ -274,13 +274,31 @@ minutes — which is what tells the app what is outstanding. Restore from commit
       written in automatically — no more typing a Telegram numeric ID into the
       registration form by hand. Matching is deliberately conservative: exactly
       one name match required, or it's logged and skipped, never guessed.
-      **New bot recommended and agreed** — dedicated purpose, clean token,
-      no collision with anything else this account might be used for. Yash:
-      create it via @BotFather (see final message), then REPLACE the
-      `TELEGRAM_BOT_TOKEN` Script Property with the new token (one property,
-      not two — sendTelegramToChatId only reads that one).
-      Needs `deployShiftTrackingTriggers()` re-run to install the new
-      5-minute trigger.
+      Owner uses the SAME flow — message the bot with "Yash Munot" (or
+      "owner") and it sets `OWNER_TELEGRAM_CHAT_ID` instead of a sheet row.
+      **New bot created 13 Aug** — @Form_mgr_bot, token in `TELEGRAM_BOT_TOKEN`.
+
+- [x] **`sendTelegramAlert()` DID NOT EXIST — found and fixed 13 Aug.** Called
+      from 7 places (sendGentleReminder's fallback, sendDMEDeadlineAlert,
+      sendFollowUpAlert, sendDailySummary, 2 registration confirmations) and
+      defined nowhere. Every call threw `ReferenceError`. Worse than one
+      broken alert: Apps Script does not catch a throw inside a `forEach`
+      callback, so in `sendGentleReminder()` the first department with no
+      registered chat ID (which, before today, was every department) killed
+      every department AFTER it in that same run too — even ones with a
+      working chat ID. `sendDMEDeadlineAlert`/`sendFollowUpAlert`/
+      `sendDailySummary` called it unconditionally, so those three have never
+      delivered a single message, ever.
+      Fixed by defining it: it now delivers to `OWNER_TELEGRAM_CHAT_ID`. Those
+      three functions already compose a plant-wide, every-department report —
+      that's what "an entire report" was always going to be — so no new
+      report format was needed, just a working delivery path. Individual
+      per-supervisor reminders (`sendGentleReminder`) also hardened with a
+      per-department `try`/`catch` so this class of bug cannot recur.
+      Verified with isolated Node tests, not just the syntax check: confirmed
+      `sendTelegramAlert` no-ops (does not throw) with no owner registered,
+      delivers correctly once one is, and that a chat-id-less department no
+      longer blocks the departments after it.
 
 ---
 
