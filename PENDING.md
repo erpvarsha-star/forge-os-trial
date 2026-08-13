@@ -261,8 +261,35 @@ minutes — which is what tells the app what is outstanding. Restore from commit
       in ALERT.gs pushes DATA_SUBMISSION_LOG into `form_submissions` every 15
       minutes, and the tab shows a submitted/pending chip per shift.
       ⚠ **Per shift, not per form** — the RAW tabs record that a department
-      submitted for a shift, never which of its 3-6 daily forms it was. Per-form
-      ticking needs each form's own response sheet wired up; not started.
+      submitted for a shift, never which of its 3-6 daily forms it was.
+
+- [ ] **Per-form ticking — INVESTIGATED 13 Aug, safe first step built, feature
+      itself NOT started on purpose.** Confirmed the data exists: every
+      individual form has its own response spreadsheet with a clean
+      `Timestamp | Date | Supervisor Name | Shift` shape (checked VMC's daily
+      check sheet directly — real rows, real timestamps). But Drive also has
+      MULTIPLE copies of many of these forms — for VMC alone there are 4
+      similarly-titled files across different years. Guessing which is
+      current would silently point compliance data at a stale sheet with no
+      error, so I did not guess.
+      `scripts/resolveFormSheets.gs` — run this once, from any Apps Script
+      project with Drive access to these forms (not ALERT.gs's own project).
+      It asks Google Forms itself which spreadsheet each form is CURRENTLY
+      linked to (`FormApp.getDestinationId()` — authoritative, not a
+      filename guess), for all 24 forms in `DEPT_FORM_SEED`/PATCH_19, and
+      writes a `FORM_SHEET_MAP` tab: one row per form, `high` confidence when
+      exactly one live (non-"Copy of") form matched the title, `REVIEW` when
+      more than one did. Read-only against every form and the dashboard —
+      creates one new tab, nothing else.
+      Verified against the real ambiguity found for VMC (one genuine form +
+      two "Copy of" duplicates): correctly resolves to the real one. Also
+      tested a genuinely ambiguous case (two live forms sharing a title) and
+      confirmed it flags REVIEW rather than picking the more-recent one
+      silently — and a missing-form case, confirmed it reports NO MATCH
+      rather than crashing.
+      **Next step, yours:** run it, open every REVIEW row, confirm or correct
+      the pick. Only after that is the mapping trustworthy enough to build
+      the actual per-form schema and Forms tab UI on top of.
 - [x] **Department production on the dashboards — BUILT 12 Aug.**
       `production_records` (PATCH_15) + `components/ProductionSummary.tsx`,
       mounted on manager → Reports (scoped to their shop, grouped by machine)
