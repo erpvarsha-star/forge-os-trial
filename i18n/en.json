@@ -208,6 +208,7 @@
     "gpsCheckIn": "GPS Check-In",
     "gpsCheckOut": "GPS Check-Out",
     "outsidePlant": "You are outside plant area",
+    "mockLocationDetected": "A fake-location app was detected. Check-in blocked and reported.",
     "lateCheckIn": "You are late by {{minutes}} minutes",
     "lateReason": "Please provide reason for being late",
     "dailyChecklist": "Daily Checklist",

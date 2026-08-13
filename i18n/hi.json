@@ -208,6 +208,7 @@
     "gpsCheckIn": "GPS चेक-इन",
     "gpsCheckOut": "GPS चेक-आउट",
     "outsidePlant": "आप प्लांट से बाहर हैं",
+    "mockLocationDetected": "एक नकली-लोकेशन ऐप का पता चला। चेक-इन रोका गया और रिपोर्ट किया गया।",
     "lateCheckIn": "आप {{minutes}} मिनट देरी से हैं",
     "lateReason": "देरी का कारण बताएं",
     "dailyChecklist": "दैनिक चेकलिस्ट",

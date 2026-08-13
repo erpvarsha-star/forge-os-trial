@@ -407,6 +407,72 @@ had an accepted explanation.
 
 ---
 
+## 🔴 Fraud detection — found and fixed 13 Aug: two of three fraud types were invisible to the owner
+
+**`fraud-detector` (the edge function implementing GPS + bulk-confirmation
+fraud checks) was never invoked by anything in the app.** Deployed since the
+edge functions first shipped, called from nowhere — the same "deployed but
+never invoked" pattern already found three times this session for cron jobs.
+`worker/home.tsx` did its own client-only geofence check (blocks correctly,
+but a modified APK could skip it, and it never wrote a record anywhere) and
+computed a `mockLocationDetected` boolean that was stored on
+`attendance_records` but never acted on or surfaced anywhere.
+
+**Worse: even when called, both of `fraud-detector`'s actions wrote to the
+wrong table.** `fraud_alerts` (`type` CHECK 'mock_location'/'buddy_punching'/
+'bulk_confirm', `severity`, `status`) is the table every owner-facing surface
+reads — `owner/alerts.tsx`, `owner/kpi.tsx`'s open-alerts count,
+`dashboard/index.html`. `fraud_flags` is a different, narrower table
+FINAL_SCHEMA's own "SECTION O" comment reserves for the buddy-device check
+only (`worker/home.tsx`'s client-side same-device-different-employee check,
+which was already correct). `fraud-detector` wrote mock-location and
+bulk-confirmation flags into `fraud_flags` instead — so even a hypothetical
+caller would have raised alerts nobody could ever see. Only `bulk_confirm`
+alerts were ever visible, because `supervisor/team.tsx` has its own
+parallel, correct, client-side implementation that writes directly to
+`fraud_alerts` (works today, but its in-memory counter resets on remount and
+it has no monthly escalation tiers).
+
+**Fixed:**
+- `handleGpsCheck` now writes `mock_location` alerts to `fraud_alerts`
+  (human-readable description, `severity:'high'`, `status:'open'`) and
+  notifies plant_head + owner. Being merely outside the geofence still blocks
+  the check-in but no longer writes any row — matches the schema's own type
+  CHECK, which has no slot for "outside radius" as a distinct alert type;
+  that's not fraud on its own.
+- `handleBulkConfirmationCheck` now writes to `fraud_alerts` too, and its
+  monthly-count query for the 2-flags/3-flags escalation tiers reads from
+  `fraud_alerts` filtered on `type='bulk_confirm'`, so if this action is ever
+  wired up, escalation will actually work.
+- `worker/home.tsx` now calls `fraud-detector`'s `gps_check` action on every
+  check-in (new i18n key `worker.mockLocationDetected`, EN+HI). Fails open on
+  a network error — the client-side geofence check above it still blocks
+  obvious cases even offline, and a plant with patchy signal must never lose
+  a legitimate check-in because the fraud check itself was unreachable.
+- `supervisor/team.tsx`'s bulk-confirm path was deliberately **left alone** —
+  it already writes to the right table with the right shape and is the only
+  thing making bulk-confirm alerts visible today. Rewiring it to call the
+  edge function (to get the escalation tiers and a check that survives a
+  remount) is real future work, not done now because it changes tested,
+  working behavior with no device available here to verify against.
+- Verified with an isolated Node/tsx harness mocking the Supabase query
+  builder (mirrors the resolveFormSheets.gs verification pattern from
+  earlier today): 16/16 checks pass — mock-location blocks + alerts
+  correctly, plain outside-geofence blocks but raises no alert, inside-
+  geofence-no-mock allows cleanly, bulk-confirm-over-threshold alerts with a
+  readable description and correct first-month count, under-threshold does
+  nothing. `npx tsc --noEmit` and `expo export --platform web` (2892
+  modules) both clean. The full headless-Chromium render check could not be
+  completed — the sandbox container restarted mid-run — but this is a small,
+  additive change to an already-verified screen (worker/home.tsx), and the
+  bundler step that catches real syntax/type breakage passed.
+
+**Still not done, and not urgent:** wiring `supervisor/team.tsx` to the edge
+function for real monthly escalation tiers (2nd flag → HR Admin, 3rd+ →
+Owner + Plant Head), which today never fire.
+
+---
+
 ## 🔵 Known gaps still in the code
 
 - [x] **QR check-in secret — CONFIRMED SET 13 Aug.** `is_set=true, length=48`.

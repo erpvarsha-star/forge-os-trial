@@ -399,7 +399,7 @@ Script Property, not two — every send function reads that same one).
 | Function | Purpose | Cron |
 |---|---|---|
 | `nightly-scoring` | Composite monthly score for all members/supervisors/managers | Nightly 22:00 IST |
-| `fraud-detector` | GPS + bulk-confirmation fraud checks | Called by app on check-in/supervisor confirm |
+| `fraud-detector` | GPS + bulk-confirmation fraud checks | Called by app on check-in only (13 Aug — was deployed but never invoked by anything before that; see PENDING.md). Bulk-confirmation is still handled entirely client-side in `supervisor/team.tsx`, not via this function |
 | `mrm-reminder` | Ensure MRM rows exist; remind managers 8th-10th; escalate to plant_head | Daily |
 | `shift-reminder` | Weekly shift notify (Thursday) + daily check-in reminder (hourly) + `forms_due_reminder`, which nudges a department's supervisors/managers 15 min before each shift's form deadline | Thursday + hourly + every 15 min (`{"mode":"forms_due_reminder"}`, needs its own cron entry — mode inference never picks it) |
 | `five-s-challenge-generator` | Generate daily 5S challenge via Gemini | Daily |

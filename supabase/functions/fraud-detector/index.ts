@@ -2,17 +2,34 @@
  * fraud-detector
  *
  * Implements Workflow 11 (Fraud Detection) from the Master System Definition.
- * Called by the app at two points:
  *
- * 1. After every Checkpoint 1 GPS+QR check-in — `{ "action": "gps_check", ... }`
- *    - Rejects check-in outright if outside the 100m geofence (not just a
- *      warning) and flags mock-location apps if the client detected one.
+ * 1. `{ "action": "gps_check", ... }` — called from `worker/home.tsx` on every
+ *    check-in (added 13 Aug; this function was deployed but never invoked by
+ *    anything before that). Client-side geofence math already blocks an
+ *    obviously-outside check-in even offline, but never wrote a record
+ *    anywhere — this is the only place that logs a `fraud_alerts` row for a
+ *    detected mock-location app, and it's the one check a modified client
+ *    can't silently skip. Rejects the check-in outright on either mock
+ *    location or outside-geofence, but only mock location raises a
+ *    management alert — being far from the plant on its own isn't fraud.
  *
- * 2. After every Checkpoint 3 supervisor confirmation on the Team tab —
- *    `{ "action": "bulk_confirmation_check", ... }`
- *    - Flags a supervisor who confirms more than 10 employees within 90
- *      seconds, and escalates based on how many flags they've accumulated
- *      this month (2 = notify HR Admin, 3+ = red alert to Owner + Plant Head).
+ * 2. `{ "action": "bulk_confirmation_check", ... }` — NOT currently called by
+ *    anything. `supervisor/team.tsx` has its own parallel, in-memory
+ *    implementation of the same >10-in-90-seconds rule (see the comment
+ *    there) that already writes to `fraud_alerts` correctly, but resets on
+ *    remount and has no month-based escalation tiers. This action exists so
+ *    that gap can be closed later by having team.tsx call here instead of
+ *    duplicating the check client-side — not done now because it hasn't been
+ *    tested against a real device pattern of confirmations. Escalates based
+ *    on how many `fraud_alerts` this supervisor has this month (2 = notify
+ *    HR Admin, 3+ = red alert to Owner + Plant Head) — tiers that never fire
+ *    today because this path is unused.
+ *
+ * Both actions write to `fraud_alerts` (not `fraud_flags` — found and fixed
+ * 13 Aug. `fraud_flags` is reserved for the buddy-device check only per
+ * FINAL_SCHEMA's own "SECTION O" comment; writing here made mock-location and
+ * bulk-confirm fraud invisible on every owner-facing screen, since
+ * alerts.tsx/kpi.tsx/dashboard/index.html all read `fraud_alerts` only).
  */
 
 import { handleOptions, jsonResponse } from '../_shared/cors.ts';
@@ -50,17 +67,28 @@ async function handleGpsCheck(db: ReturnType<typeof supabaseAdmin>, body: GpsChe
   const mockLocation = Boolean(body.mockLocationDetected);
   const blocked = outsideGeofence || mockLocation;
 
+  // Only mock_location is a fraud_alerts type the schema recognises (CHECK:
+  // mock_location/buddy_punching/bulk_confirm) — an employee who is simply
+  // too far from the plant isn't fraud on its own, so outsideGeofence blocks
+  // the check-in below but doesn't raise a management alert for it.
   if (mockLocation) {
-    await db.from('fraud_flags').insert({
-      flag_type: 'mock_location',
+    const { data: emp } = await db.from('employees').select('name').eq('id', body.employeeId).single();
+
+    await db.from('fraud_alerts').insert({
+      type: 'mock_location',
       employee_id: body.employeeId,
-      description: JSON.stringify({ lat: body.lat, lng: body.lng, distance_meters: distance }),
+      description: `${emp?.name ?? 'An employee'}'s check-in was flagged for a mock-location app (${Math.round(distance)}m from plant)`,
+      severity: 'high',
+      status: 'open',
     });
-  } else if (outsideGeofence) {
-    await db.from('fraud_flags').insert({
-      flag_type: 'gps_outside_radius',
-      employee_id: body.employeeId,
-      description: JSON.stringify({ lat: body.lat, lng: body.lng, distance_meters: distance, geofence_meters: geofenceMeters }),
+
+    const managementIds = await getManagementIds(db, ['plant_head', 'owner']);
+    await notifyEmployees(db, {
+      employeeIds: managementIds,
+      type: 'fraud_alert',
+      title: 'Mock location detected',
+      body: `${emp?.name ?? 'An employee'}'s check-in was flagged for a mock-location app`,
+      relatedEntityType: 'fraud_alerts',
     });
   }
 
@@ -90,17 +118,25 @@ async function handleBulkConfirmationCheck(db: ReturnType<typeof supabaseAdmin>,
     return jsonResponse({ flagged: false, count });
   }
 
-  await db.from('fraud_flags').insert({
-    flag_type: 'bulk_confirmation',
-    employee_id: body.supervisorId,
-    description: JSON.stringify({ last_employee_id: body.employeeId, confirmations_count: count, seconds_elapsed: threshold.seconds, shift_date: body.shiftDate }),
-  });
-
   const { data: supervisor } = await db
     .from('employees')
     .select('name')
     .eq('id', body.supervisorId)
     .single();
+
+  // fraud_alerts, not fraud_flags — this is the type CHECK ('mock_location',
+  // 'buddy_punching', 'bulk_confirm') recognises, and the table every
+  // owner-facing screen (alerts.tsx, kpi.tsx, dashboard/index.html) actually
+  // reads. fraud_flags is reserved for the buddy-device check only (see the
+  // "SECTION O" comment in FINAL_SCHEMA) — writing bulk-confirm flags there
+  // made them invisible everywhere management looks for them.
+  await db.from('fraud_alerts').insert({
+    type: 'bulk_confirm',
+    employee_id: body.supervisorId,
+    description: `${supervisor?.name ?? 'A supervisor'} confirmed ${count} workers in ${threshold.seconds} seconds`,
+    severity: 'high',
+    status: 'open',
+  });
 
   const plantHeadIds = await getManagementIds(db, ['plant_head']);
   await notifyEmployees(db, {
@@ -108,16 +144,17 @@ async function handleBulkConfirmationCheck(db: ReturnType<typeof supabaseAdmin>,
     type: 'fraud_alert',
     title: 'Fraud alert',
     body: `${supervisor?.name ?? 'A supervisor'} confirmed ${count} workers in ${threshold.seconds} seconds`,
-    relatedEntityType: 'fraud_flags',
+    relatedEntityType: 'fraud_alerts',
   });
 
-  // Escalation tiers based on this supervisor's flag count this month.
+  // Escalation tiers based on this supervisor's bulk-confirm alert count this month.
   const monthStart = new Date(body.shiftDate);
   monthStart.setDate(1);
   const { count: monthFlagCount } = await db
-    .from('fraud_flags')
+    .from('fraud_alerts')
     .select('id', { count: 'exact', head: true })
     .eq('employee_id', body.supervisorId)
+    .eq('type', 'bulk_confirm')
     .gte('created_at', monthStart.toISOString());
 
   const flagsThisMonth = monthFlagCount ?? 0;
@@ -129,7 +166,7 @@ async function handleBulkConfirmationCheck(db: ReturnType<typeof supabaseAdmin>,
       type: 'fraud_alert_escalation',
       title: '2nd fraud flag this month',
       body: `${supervisor?.name ?? 'A supervisor'} has 2 fraud flags this month — review recommended`,
-      relatedEntityType: 'fraud_flags',
+      relatedEntityType: 'fraud_alerts',
     });
   } else if (flagsThisMonth >= 3) {
     const ownerAndPlantHeadIds = await getManagementIds(db, ['owner', 'plant_head']);
@@ -138,7 +175,7 @@ async function handleBulkConfirmationCheck(db: ReturnType<typeof supabaseAdmin>,
       type: 'fraud_alert_red',
       title: 'Red alert — repeat fraud flags',
       body: `${supervisor?.name ?? 'A supervisor'} has ${flagsThisMonth} fraud flags this month — HR Admin review mandatory`,
-      relatedEntityType: 'fraud_flags',
+      relatedEntityType: 'fraud_alerts',
     });
   }
 

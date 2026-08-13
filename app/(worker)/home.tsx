@@ -97,6 +97,23 @@ export default function WorkerHome() {
     const mockDetected = !providerStatus.gpsAvailable
     const deviceId = await getDeviceId()
 
+    // Mock-location apps are checked server-side too — the fraud-detector
+    // edge function logs a fraud_alerts row management actually sees (the
+    // isInsideGeofence check above never wrote one, and a modified APK could
+    // skip it entirely, so this is the real enforcement point for mock
+    // location). Fail open on a network error: the plant's connectivity is
+    // patchy and a fraud check that can't be reached must never block a
+    // legitimate check-in that already passed the geofence test above.
+    const { data: fraudCheck, error: fraudCheckError } = await supabase.functions.invoke('fraud-detector', {
+      body: { action: 'gps_check', employeeId: employee.id, lat: location.coords.latitude, lng: location.coords.longitude, mockLocationDetected: mockDetected },
+    })
+
+    if (!fraudCheckError && fraudCheck?.allowed === false && fraudCheck?.reason === 'mock_location_detected') {
+      Alert.alert(t('common.warning'), t('worker.mockLocationDetected'))
+      setIsLoading(false)
+      return
+    }
+
     const todayStr = new Date().toISOString().split('T')[0]
     const { data: buddyCheck } = await supabase
       .from('attendance_records')
