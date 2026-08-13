@@ -221,6 +221,7 @@ assigns shifts for, same as any other day; a Friday off is one with none.
 | `PATCH_17_reminder_scope_13Aug2026.sql` | Flags which of the 24 form_links rows are chased on the shift timer: 18 production forms YES, 6 non-production (overtime, dispatch, 57F4) NO. All 24 stay visible in the Forms tab either way | ✅ Applied 13 Aug — `18 true / 6 false` confirmed |
 | `PATCH_18_forms_reminder_cron_13Aug2026.sql` | Schedules `forms_due_reminder` via pg_cron + pg_net, every 15 minutes. Without this the mode is deployed but never invoked — day-of-week inference never picks it | ✅ Applied 13 Aug — job active |
 | `PATCH_19_dept_expansion_13Aug2026.sql` | Maintenance (4 daily forms: check sheet + 2 electricity + oil), Human Resource (2 manpower forms, As & When Required), VMC Shop (1 daily form) — all real published forms, verified against the live registry sheet via Drive before writing, not guessed | ⏳ Not yet run |
+| `PATCH_20_missing_crons_13Aug2026.sql` | Schedules `nightly-scoring`, `mrm-reminder`, `five-s-challenge-generator` and shift-reminder's default (no-body) mode — found via re-audit 13 Aug that none of the four had a `cron.schedule()` anywhere in this repo, the same "deployed but never invoked" pattern already found 3 times this session. All four confirmed idempotent before scheduling. ⚠ Check Dashboard → Cron first in case one was configured there instead | ⏳ Not yet run |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee | ♾️ On demand |
 
 **Total employees confirmed live: 129** (120 original + 4 PATCH_08 + 5 PATCH_09).
@@ -402,7 +403,7 @@ Script Property, not two — every send function reads that same one).
 | `mrm-reminder` | Ensure MRM rows exist; remind managers 8th-10th; escalate to plant_head | Daily |
 | `shift-reminder` | Weekly shift notify (Thursday) + daily check-in reminder (hourly) + `forms_due_reminder`, which nudges a department's supervisors/managers 15 min before each shift's form deadline | Thursday + hourly + every 15 min (`{"mode":"forms_due_reminder"}`, needs its own cron entry — mode inference never picks it) |
 | `five-s-challenge-generator` | Generate daily 5S challenge via Gemini | Daily |
-| `send-push-notification` | HTTP dispatcher — write notification row + Expo push | On-demand |
+| `send-push-notification` | HTTP dispatcher — write notification row + push (FCM v1 direct for Android, Expo relay for anything else — see `_shared/fcm.ts` and `_shared/push.ts`) | On-demand |
 
 **Shared helpers** (`supabase/functions/_shared/`):
 - `push.ts` — `notifyEmployees()` inserts `notifications` rows (`user_id` column) + Expo push batch. ⚠ It also writes `related_entity_type` / `related_entity_id`, which existed only in the OLD schema until PATCH_14 added them — before that every insert was rejected by PostgREST and the error was discarded, so no server-side notification ever reached anyone. It now throws on insert failure.
@@ -412,27 +413,42 @@ Script Property, not two — every send function reads that same one).
 
 ---
 
-## Known RLS issues (not yet fixed — need careful migration)
+## RLS — all known holes closed (PATCH_12, confirmed 11 Aug)
 
-1. `employees` INSERT: `OR auth.role() = 'authenticated'` makes it trivially true — any logged-in user can create an employee row
-2. `notifications` INSERT: `with check (true)` — any user can write to any user's notifications
-3. `fraud_alerts` and `fraud_flags` INSERT: any authenticated user can insert
-4. `attendance_records` write: supervisors not scoped to their own team
-5. `leave_requests` UPDATE: supervisors not scoped to their own team
-6. `mrm_reviews` SELECT: readable by all authenticated users (should be manager+ only)
-7. No DELETE policies on any table (intentional for audit trail)
+This section used to list 6 open holes. **Stale — found while re-auditing
+13 Aug.** All 6 were closed by `PATCH_12_rls_hardening_11Aug2026.sql`, which
+has been applied and confirmed by Yash since 11 Aug (see the patches table
+above). Keeping the record of what was fixed, since it explains why several
+policies look stricter than a first read of FINAL_SCHEMA suggests:
+
+1. `employees` INSERT — was `is_management() OR auth.role() = 'authenticated'`
+   (the second branch made it trivially true for any signed-in user); now
+   `is_management()` only.
+2. `notifications` INSERT — was `with check (true)`; now `is_management()`
+   only, plus a UPDATE policy scoped to `user_id = current_employee_id()` so
+   the bell can be cleared.
+3. `fraud_alerts` / `fraud_flags` INSERT — were unscoped for any authenticated
+   user; now scoped to the reporting employee.
+4. `attendance_records` write — now scoped to a supervisor's own team.
+5. `leave_requests` UPDATE — now scoped to a supervisor's own team.
+6. `mrm_reviews` SELECT — was readable by every authenticated user; now
+   manager-and-above only.
+
+No DELETE policies on any table remains intentional — audit trail.
 
 ---
 
-## Known screen-level issues (pending fixes)
+## Screen-level issues — none open (found stale while re-auditing 13 Aug)
 
-| Screen | Issue |
-|---|---|
-| ~~`worker/home.tsx`~~ | ✅ Fixed 12 Aug. `Constants.deviceId` has not existed in Expo for years, so the buddy-device fraud check compared a fresh `sessionId` on every launch and could never match — no buddy flag was ever raised. Now `lib/deviceId.ts`, persisted per install. `.single()` → `.maybeSingle()` on the two optional lookups |
-| `worker/5s.tsx` | Camera `takePhoto()` uses placeholder URL — not wired to expo-camera |
-| `worker/observation.tsx` | Camera not wired |
-| `supervisor/casual-workers.tsx` | Upsert conflict key uses `date` — check if `CasualWorkersRow` matches FINAL_SCHEMA |
-| All screens | No auth guard in individual route layouts — only `app/index.tsx` routes by role |
+Every row this table used to list is fixed. Kept as a record, not a to-do:
+
+| Screen | Was | Status |
+|---|---|---|
+| `worker/home.tsx` | `Constants.deviceId` doesn't exist in Expo SDK 51 — buddy-device fraud check compared a fresh `sessionId` every launch, could never match | ✅ Fixed 12 Aug — `lib/deviceId.ts`, persisted per install |
+| `worker/5s.tsx` | Camera `takePhoto()` wrote a hardcoded placeholder URL | ✅ Wired to `PhotoCapture` — verified in code, not just claimed |
+| `worker/observation.tsx` | Camera not wired | ✅ Same `PhotoCapture` component wired in |
+| `supervisor/casual-workers.tsx` | Upsert conflict key `supervisor_id,date` — unverified against schema | ✅ Verified 13 Aug — matches `unique (supervisor_id, date)` in FINAL_SCHEMA exactly |
+| All screens | No auth guard in individual route layouts | ✅ Fixed 13 Aug — `components/RoleGate.tsx` on all seven groups |
 
 ---
 
