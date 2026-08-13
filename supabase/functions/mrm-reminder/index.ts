@@ -8,8 +8,22 @@
  * Step 2: from the 8th of the month, sends a daily reminder to each
  *         department's Manager(s) for every department still "pending".
  * Step 3: if it's the 10th at/after 17:00 IST and a department is still
- *         "pending", auto-escalates — sets `escalated_at` and notifies the
- *         Plant Head: "[Dept] MRM overdue".
+ *         "pending", escalates — notifies the Plant Head: "[Dept] MRM
+ *         overdue". De-duplicated by checking `notifications` for an
+ *         existing `mrm_overdue` row keyed on this review's id before
+ *         sending another one, so a still-pending department is escalated
+ *         once, not re-notified on every subsequent run.
+ *
+ * ⚠ CORRECTED 13 Aug: this docstring used to say the escalation "sets
+ * `escalated_at`" on the mrm_reviews row. There is no `escalated_at` column
+ * on `mrm_reviews` in FINAL_SCHEMA (it exists only on unrelated tables in
+ * the old, ignored `supabase/migrations/20260803090000_initial_schema.sql`)
+ * and the code never attempted to write one — so every run past the due
+ * date re-sent the Plant Head an "MRM overdue" notification for the same
+ * department, forever, with no way to tell "already escalated" from
+ * "escalate again". Fixed by de-duplicating against `notifications`
+ * instead of adding a column, the same pattern `forms_due_reminder` (below,
+ * in shift-reminder) already uses — no schema change needed.
  */
 
 import { handleOptions, jsonResponse } from '../_shared/cors.ts';
@@ -86,21 +100,34 @@ Deno.serve(async (req: Request) => {
       }
 
       if (isEscalationTime) {
-        const { data: plantHeadIds } = await db
-          .from('employees')
+        // De-dup against notifications rather than an escalated_at column
+        // (mrm_reviews has none — see the docstring above). review.id is
+        // already unique per department/month/year, so it alone is a safe
+        // key: at most one 'mrm_overdue' notification per review, ever.
+        const { data: alreadyEscalated } = await db
+          .from('notifications')
           .select('id')
-          .eq('role', 'plant_head')
-          .eq('is_active', true);
+          .eq('type', 'mrm_overdue')
+          .eq('related_entity_id', review.id)
+          .limit(1);
 
-        await notifyEmployees(db, {
-          employeeIds: (plantHeadIds ?? []).map((e: { id: string }) => e.id),
-          type: 'mrm_overdue',
-          title: 'MRM overdue',
-          body: `${deptName} MRM overdue`,
-          relatedEntityType: 'mrm_reviews',
-          relatedEntityId: review.id,
-        });
-        escalatedDepartments += 1;
+        if (!alreadyEscalated || alreadyEscalated.length === 0) {
+          const { data: plantHeadIds } = await db
+            .from('employees')
+            .select('id')
+            .eq('role', 'plant_head')
+            .eq('is_active', true);
+
+          await notifyEmployees(db, {
+            employeeIds: (plantHeadIds ?? []).map((e: { id: string }) => e.id),
+            type: 'mrm_overdue',
+            title: 'MRM overdue',
+            body: `${deptName} MRM overdue`,
+            relatedEntityType: 'mrm_reviews',
+            relatedEntityId: review.id,
+          });
+          escalatedDepartments += 1;
+        }
       }
     }
 

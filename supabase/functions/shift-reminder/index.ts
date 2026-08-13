@@ -10,9 +10,9 @@
  *    active employee still missing a shift assignment for that week.
  *
  * 2. `daily_checkin_reminder` (schedule: hourly) — for every shift starting
- *    within the next 30 minutes (per plant_config.shift_start_times),
- *    reminds the assigned employee to check in, feeding the late-detection
- *    flow in Workflow 1.
+ *    within the next 30 minutes (per plant_config.form_shift_schedule —
+ *    see the note on that key below), reminds the assigned employee to
+ *    check in, feeding the late-detection flow in Workflow 1.
  *
  * 3. `forms_due_reminder` (schedule: every 15 minutes) — raises an in-app
  *    notification shortly before each shift's Google Form deadline, per Yash
@@ -83,11 +83,17 @@ async function weeklyShiftNotify(db: ReturnType<typeof supabaseAdmin>) {
     });
   }
 
+  // Everyone except the owner is expected to have a shift assignment.
+  // ⚠ FIXED 13 Aug: this used to also exclude role 'ai_agent' — a role value
+  // that only exists in the old, ignored initial_schema.sql. FINAL_SCHEMA's
+  // employees.role CHECK constraint has no 'ai_agent' option, so no row can
+  // ever have it; the exclusion was a harmless no-op, but it's exactly the
+  // kind of stale reference to the old schema CLAUDE.md says to avoid.
   const { data: activeEmployees } = await db
     .from('employees')
     .select('id')
     .eq('is_active', true)
-    .not('role', 'in', '(owner,ai_agent)');
+    .neq('role', 'owner');
 
   const missing = (activeEmployees ?? [])
     .map((e: { id: string }) => e.id)
@@ -111,31 +117,61 @@ async function weeklyShiftNotify(db: ReturnType<typeof supabaseAdmin>) {
   return { weekStart: start, weekEnd: end, notified: employeesWithShift.size, missing: missing.length };
 }
 
+interface ShiftWindow {
+  shift: string;
+  start: string;
+  end: string;
+  deadline: string;
+}
+
+interface FormShiftSchedule {
+  lead_minutes: number;
+  shifts: ShiftWindow[];
+}
+
+/**
+ * ⚠ FOUND AND FIXED 13 Aug. This used to read a separate plant_config key,
+ * 'shift_start_times', with a hardcoded fallback of
+ * {morning:'06:00', evening:'14:00', night:'22:00', general:'09:00'}. Those
+ * exact values are the seed from the OLD, ignored
+ * supabase/migrations/20260803090000_initial_schema.sql — FINAL_SCHEMA never
+ * carried that plant_config row forward, and no patch has ever inserted a
+ * 'shift_start_times' key under FINAL_SCHEMA either. So in the real,
+ * deployed database this getPlantConfig() call always missed and silently
+ * fell back to those stale 06:00/14:00/22:00/09:00 values — which don't
+ * match this plant's real shifts (08:30 / 15:30 / 23:30, per
+ * plant_config.form_shift_schedule, seeded and live since PATCH_14). Every
+ * real `shifts.start_time` this was ever compared against would read
+ * "08:30" etc., never "06:00", so `dueStartTimes` could never contain a
+ * value that matched anything — this reminder has never fired for anyone.
+ * Fixed by reading form_shift_schedule (the one shift-timing source that IS
+ * actually seeded under FINAL_SCHEMA) instead of maintaining a second,
+ * never-seeded config key in parallel.
+ */
 async function dailyCheckinReminder(db: ReturnType<typeof supabaseAdmin>) {
   const now = istNow();
   const today = now.toISOString().slice(0, 10);
-  const shiftTimes = await getPlantConfig(db, 'shift_start_times', {
-    morning: '06:00',
-    evening: '14:00',
-    night: '22:00',
-    general: '09:00',
+  const schedule = await getPlantConfig<FormShiftSchedule>(db, 'form_shift_schedule', {
+    lead_minutes: 15,
+    shifts: [],
   });
 
   const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
 
-  // Find shift names whose start_time falls within the next 30 minutes.
-  const dueTimes = Object.entries(shiftTimes).filter(([, time]) => {
-    const [h, m] = (time as string).split(':').map(Number);
+  // Shifts whose start time falls within the next 30 minutes.
+  const dueShifts = (schedule.shifts ?? []).filter((s) => {
+    const [h, m] = (s.start ?? '').split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return false;
     const diff = h * 60 + m - nowMinutes;
     return diff >= 0 && diff <= 30;
   });
 
-  if (dueTimes.length === 0) {
+  if (dueShifts.length === 0) {
     return { today, remindedShiftTypes: [], notified: 0 };
   }
 
-  const dueShiftTypes = dueTimes.map(([shiftType]) => shiftType);
-  const dueStartTimes = dueTimes.map(([, time]) => time as string);
+  const dueShiftNames = dueShifts.map((s) => s.shift);
+  const dueStartTimes = dueShifts.map((s) => s.start);
 
   // employee_shifts joined with shifts master — filter by shift start_time
   const { data: assignments } = await db
@@ -160,19 +196,7 @@ async function dailyCheckinReminder(db: ReturnType<typeof supabaseAdmin>) {
     });
   }
 
-  return { today, remindedShiftTypes: dueShiftTypes, notified: employeeIds.length };
-}
-
-interface ShiftWindow {
-  shift: string;
-  start: string;
-  end: string;
-  deadline: string;
-}
-
-interface FormShiftSchedule {
-  lead_minutes: number;
-  shifts: ShiftWindow[];
+  return { today, remindedShiftTypes: dueShiftNames, notified: employeeIds.length };
 }
 
 /**

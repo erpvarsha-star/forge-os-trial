@@ -473,6 +473,107 @@ Owner + Plant Head), which today never fire.
 
 ---
 
+## 🔴 mrm-reminder / shift-reminder — audited 13 Aug: two real bugs found and fixed, one dead reference cleaned up
+
+Line-by-line pass over the two edge functions that hadn't had one yet
+(`nightly-scoring` and `fraud-detector` already did — see above). Both are
+already known to be "deployed but never invoked" (PATCH_18/PATCH_20 exist to
+fix that, neither run yet) — that part isn't new. What's new is what turned
+up reading the logic itself against FINAL_SCHEMA and against what actually
+gets seeded into `plant_config`.
+
+**1. `mrm-reminder`'s escalation had no de-dup, and never could — the column
+its own docstring said it wrote doesn't exist.** The docstring claimed step 3
+"sets `escalated_at`" on the `mrm_reviews` row once a department is
+overdue. There is no `escalated_at` column on `mrm_reviews` in FINAL_SCHEMA —
+it exists only on unrelated tables in the old, ignored
+`supabase/migrations/20260803090000_initial_schema.sql`, and the code never
+actually attempted to write one. So every run past the 10th re-sent the Plant
+Head an "MRM overdue" notification for the same still-pending department,
+forever, once a day, with no way for the code to tell "already escalated"
+from "escalate again." Fixed by de-duplicating against `notifications`
+instead — checking for an existing `mrm_overdue` row keyed on the review's
+own id (already unique per department/month/year) before sending another —
+the same pattern `forms_due_reminder` already uses for its own dedup, so no
+schema change was needed.
+
+**2. That fix exposed a second, smaller bug: PATCH_20's single 09:00 IST
+daily cron could never trigger the "10th at/after 17:00" branch the code
+itself promises.** `isEscalationTime = dayOfMonth > dueDay || (dayOfMonth ===
+dueDay && hour >= 17)`. With only one invocation a day, at 09:00, the
+same-day-at-17:00 half of that condition is unreachable — 09:00 is always
+before 17:00 — so the earliest the code could ever actually observe "past
+due" was the 11th's 09:00 run, a full day later than documented. Fixed in
+`scripts/PATCH_20_missing_crons_13Aug2026.sql` (not yet run — see below) by
+adding a fifth cron job, `mrm-reminder-escalation`, pinned to day-of-month 10
+at 17:00 IST only (`30 11 10 * *`), so that branch has an actual invocation
+to fire on. Safe to run alongside the 09:00 job on the same day precisely
+*because* of fix #1 above — without the dedup, this second run would have
+double-escalated every department that went overdue on the 10th.
+
+**3. `shift-reminder`'s `daily_checkin_reminder` mode has never fired for
+anyone — the config key it read was never seeded under FINAL_SCHEMA, and its
+hardcoded fallback doesn't match any real shift.** It read
+`plant_config.shift_start_times` with a fallback of `{morning:'06:00',
+evening:'14:00', night:'22:00', general:'09:00'}`. Those exact values are the
+seed from the OLD, ignored `initial_schema.sql` — FINAL_SCHEMA never carried
+that `plant_config` row forward, and no patch has ever inserted a
+`shift_start_times` key under FINAL_SCHEMA either. So in the real, deployed
+database `getPlantConfig()` always missed and silently fell back to those
+stale values — which don't match this plant's real shifts (08:30 / 15:30 /
+23:30, per `plant_config.form_shift_schedule`, seeded and live since
+PATCH_14). Every real `employee_shifts.shift.start_time` this got compared
+against would read `"08:30"` etc., never `"06:00"`, so the match could never
+succeed — this reminder has been silently doing nothing since it was
+written. Fixed by reading `form_shift_schedule` (the one shift-timing source
+that actually is seeded under FINAL_SCHEMA — the same one
+`forms_due_reminder` already reads) instead of maintaining a second,
+never-seeded config key in parallel.
+⚠ **Not fully closed even after this fix**: the `shifts` table itself has no
+seed data anywhere in `scripts/*.sql`, and `app/(hr-admin)/shifts.tsx` only
+*assigns* an existing shift to an employee — there is no screen or script
+that *creates* a row in `shifts`. Until some `shifts` row exists with
+`start_time` values matching `form_shift_schedule` (`08:30`/`15:30`/`23:30`),
+`employee_shifts` cannot be populated at all (FK: `shift_id not null
+references shifts(id)`) and this reminder still has nothing to match against
+in practice. That gap is outside this fix's scope — it needs either a seed
+script or a "create shift" flow, a real product decision, not a bug fix — but
+it's the reason this reminder, while now correct, may still show `notified:
+0` until it exists.
+
+**4. Minor cleanup, not a functional bug:** `weeklyShiftNotify`'s "who should
+have a shift" query excluded roles `('owner','ai_agent')`. `ai_agent` is not
+a value FINAL_SCHEMA's `employees.role` CHECK constraint permits — it only
+exists in the old, ignored schema — so no row could ever match it and the
+exclusion was a harmless no-op. Still exactly the kind of stale reference to
+the old schema CLAUDE.md's "What Claude must NEVER do" section warns about,
+so simplified to `.neq('role', 'owner')`.
+
+**`send-push-notification`** was also checked (lower priority — funnels
+through the already-audited `_shared/push.ts`). No bugs found: it's
+correctly invoked (`lib/notifications.ts`'s `notifyEmployeesByRole`, called
+from `supervisor/team.tsx`'s bulk-confirm path), and every table/column it
+touches (`employees.id`, `employees.emp_code`) matches FINAL_SCHEMA.
+
+**Verified:** isolated Node/tsx harness (same technique as the fraud-detector
+audit — mocked Supabase query builder, mocked `_shared/cors.ts` /
+`supabaseAdmin.ts` / `push.ts`) exercising both fixed functions directly:
+24/24 checks pass, covering — before-the-reminder-window (step 1 still
+upserts, no notifications), in-window reminder with no escalation, exact-due-
+day before 17:00 (not yet escalation), exact-due-day at 17:00 first
+escalation (sends), a day later already-escalated (does NOT re-send, daily
+manager reminder still does), `nextSaturdayToThursday` date math sanity, and
+`dailyCheckinReminder` correctly matching a real 08:30 shift 15 minutes out
+while leaving an unrelated Shift 3 employee alone. Two of those checks were
+also run against an unmodified copy of the pre-fix code to confirm they
+actually catch the bugs (both reproduce: the escalation double-fires, the
+check-in reminder never fires) rather than passing regardless. `npx tsc
+--noEmit -p .` clean. No `app/`/`hooks/`/`lib/` files were touched, so
+`expo export --platform web` wasn't re-run (out of this change's blast
+radius).
+
+---
+
 ## 🔵 Known gaps still in the code
 
 - [x] **QR check-in secret — CONFIRMED SET 13 Aug.** `is_set=true, length=48`.
@@ -508,6 +609,16 @@ Owner + Plant Head), which today never fire.
 - [ ] **Shakeel Sayyad** — confirmed a real employee, still has no `emp_code`,
       so cannot be provisioned a login.
 - [ ] **VFL1527 phone** — deliberately NULL, correct number still unknown.
+- [ ] **`shifts` table has no seed data and no creation flow** — found 13 Aug
+      while fixing `shift-reminder`'s `daily_checkin_reminder` mode (see
+      above). No `scripts/*.sql` file seeds `shifts`, and
+      `app/(hr-admin)/shifts.tsx` only lets HR assign an *existing* shift to
+      an employee — there's no screen or script that creates one. Until a
+      `shifts` row exists with `start_time` matching
+      `plant_config.form_shift_schedule` (`08:30`/`15:30`/`23:30`),
+      `employee_shifts` can't be populated (FK constraint) and shift-based
+      reminders have nothing real to match against. Needs a decision: seed
+      the three known shifts directly, or build a "create shift" screen.
 
 ---
 
