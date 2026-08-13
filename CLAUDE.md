@@ -167,9 +167,28 @@ session.
 
 ## plant_config (key-value table)
 
-Keys: `plant_code`, `plant_name`, `plant_lat`, `plant_lng`, `geofence_radius_meters`, `qr_secret_salt`  
+Keys: `plant_code`, `plant_name`, `plant_lat`, `plant_lng`, `geofence_radius_meters`, `qr_secret_salt`, `form_shift_schedule` (PATCH_14)  
 **GPS set to 19.836079, 75.236261 (confirmed by Yash, 09 Aug 2026). Geofence = 100 m.**  
-QR salt: PATCH_06 has a commented-out UPDATE — Yash must generate his own secret (`python3 -c "import secrets; print(secrets.token_hex(24))"`) and run it directly in Supabase SQL Editor. Never commit this value to git.
+QR salt: set by PATCH_16, generated inside Postgres with pgcrypto — nobody ever sees the value, including Claude. Confirmed set 13 Aug (`is_set=true, length=48`). ⚠ Having a real salt does not by itself secure QR check-in — see the note in `app/(worker)/qr.tsx` and "Work week" below.
+
+---
+
+## Work week — Saturday to Thursday, Friday off (confirmed 13 Aug 2026)
+
+Yash: "week starts Saturday - friday is weekly off unless we have urgent
+production friday is working. 90% of times friday is off."
+
+Fixed on both ends that used to disagree or guess:
+- `scripts/ALERT.gs` `weekStartFor_()` now computes Saturday (was Monday —
+  a placeholder the script had "always assumed," per its own prior comment).
+- `supabase/functions/shift-reminder`'s `weeklyShiftNotify()` window is now
+  Saturday-Thursday (was Monday-Sunday — this is real app code that HR's
+  shift-assignment notifications depend on, and it was simply wrong, not a
+  guess anyone had flagged before).
+
+No schema change needed for the Friday exception itself. `employee_shifts` is
+already per-date, so a working Friday (urgent production) is just a Friday HR
+assigns shifts for, same as any other day; a Friday off is one with none.
 
 ---
 
@@ -198,6 +217,10 @@ QR salt: PATCH_06 has a commented-out UPDATE — Yash must generate his own secr
 | `PATCH_14_form_registry_12Aug2026.sql` | `form_links` table + 24 daily forms seeded from Yash's registry sheet (keyed to `employees.department` spellings, not ALERT.gs's), `plant_config.form_shift_schedule` for the deadline times, and the missing `notifications.related_entity_type` / `related_entity_id` columns that had been making every server-side notification insert fail silently | ✅ Applied 12 Aug |
 | `PATCH_15_ops_sync_12Aug2026.sql` | `form_submissions` + `production_records` — landing tables for the Operations Dashboard sync. Select-only RLS; writes come from Apps Script with the service role | ✅ Applied 12 Aug |
 | `COMBINED_DEPLOY_13to15_12Aug2026.sql` | PATCH_13 + 14 + 15 concatenated. Supersedes `COMBINED_DEPLOY_13to14` and `COMBINED_DEPLOY_13` (both deleted; contents are inside this one) | ✅ Ran 12 Aug — 13+14 via the combined file, 15 on its own |
+| `PATCH_16_qr_salt_13Aug2026.sql` | Generates `plant_config.qr_secret_salt` inside Postgres (pgcrypto) — nobody, including Claude, ever sees the value. First version matched the wrong placeholder list and silently no-op'd; fixed to match on shape (48 hex chars) instead | ✅ Confirmed set 13 Aug — `is_set=true, length=48` |
+| `PATCH_17_reminder_scope_13Aug2026.sql` | Flags which of the 24 form_links rows are chased on the shift timer: 18 production forms YES, 6 non-production (overtime, dispatch, 57F4) NO. All 24 stay visible in the Forms tab either way | ✅ Applied 13 Aug — `18 true / 6 false` confirmed |
+| `PATCH_18_forms_reminder_cron_13Aug2026.sql` | Schedules `forms_due_reminder` via pg_cron + pg_net, every 15 minutes. Without this the mode is deployed but never invoked — day-of-week inference never picks it | ✅ Applied 13 Aug — job active |
+| `PATCH_19_dept_expansion_13Aug2026.sql` | Maintenance (4 daily forms: check sheet + 2 electricity + oil), Human Resource (2 manpower forms, As & When Required), VMC Shop (1 daily form) — all real published forms, verified against the live registry sheet via Drive before writing, not guessed | ⏳ Not yet run |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee | ♾️ On demand |
 
 **Total employees confirmed live: 129** (120 original + 4 PATCH_08 + 5 PATCH_09).
@@ -267,7 +290,8 @@ app/
 └── (security)/
     ├── dashboard.tsx      — vehicle log (inward/outward)
     ├── team.tsx           — checkpoint 2 attendance confirmation
-    └── eod-lock.tsx       — EOD vehicle count reconciliation
+    ├── eod-lock.tsx       — EOD vehicle count reconciliation
+    └── gate-qr.tsx        — today's salted gate QR, for display at the gate (PATCH_16 + 13 Aug)
 ```
 
 ---
@@ -313,6 +337,27 @@ form submissions, and month-to-date production.
 made `notifications_insert` require `is_management()`.
 
 ---
+
+## Telegram — dedicated bot recommended and being switched to (13 Aug 2026)
+
+Yash asked whether the individual supervisor DMs should reuse the existing
+bot or use a new one; recommended and agreed: **new bot**, dedicated purpose,
+clean token, no collision with anything else this account might do.
+
+- `sendTelegramToChatId()` in `scripts/ALERT.gs` reads ONE Script Property,
+  `TELEGRAM_BOT_TOKEN` — switching bots means replacing that property's value
+  with the new bot's token, not adding a second one.
+- **Onboarding — built 13 Aug, was the real gap.** A numeric Telegram chat ID
+  is not something a person knows without messaging a bot first, so most
+  `SUPERVISOR_MAP` rows had it blank. `processTelegramOnboarding()` polls the
+  bot every 5 minutes; a supervisor messages their name, it's matched
+  (case-insensitive, exactly one hit required) against this week's
+  `SUPERVISOR_MAP` rows, and the chat ID is written in automatically.
+  Deliberately conservative — zero or multiple matches are logged and
+  skipped, never guessed, for the same "Todmal" name-variant reason documented
+  elsewhere in this file.
+- Needs `deployShiftTrackingTriggers()` re-run to install the 5-minute
+  polling trigger.
 
 ## Edge functions (6, all Deno)
 

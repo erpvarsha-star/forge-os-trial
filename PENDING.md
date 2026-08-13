@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 13 Aug 2026, after route guards, QR salt, reminder scope and the cron.
+**Last updated:** 13 Aug 2026, after Maintenance/HR/VMC department expansion, the Saturday week-start fix, the gate-QR screen and Telegram onboarding.
 
 ---
 
@@ -203,18 +203,30 @@ minutes — which is what tells the app what is outstanding. Restore from commit
       side), and `send_in_reminder = false` in the `form_links` table (app
       side). Say which forms should not be chased per shift and I will set
       both, or set them yourself — nothing needs a redeploy.
-- [ ] **Four ALERT.gs departments are absent from the registry**: Electricity,
-      Oil, Staff Manpower, Contract Manpower. The registry instead has Die Shop,
-      VMC Shop, Maintenance, Quality, Store, Purchase, HR, Admin, Design,
-      Marketing and Accounts. Which of those should the shift alerts cover?
-- [ ] **Week start is inconsistent, and it breaks supervisor import.** The live
-      registration form writes `Week Start (Saturday)` / `Week End (Thursday)`;
-      `processFormSubmissions()` looks for `Week Start (Monday)` /
-      `Week End (Sunday)`, finds neither, logs "missing columns" and returns.
-      So that importer has never added anyone. `SUPERVISOR_MAP` does have rows,
-      so they are getting in another way — confirm which week convention is
-      real and I will align both ends. Left as-is deliberately rather than
-      guessing.
+- [x] **RESOLVED 13 Aug — verified against the live registry, not guessed.**
+      Electricity + Oil are Maintenance-department forms (4 real Daily forms:
+      check sheet + 2 electricity forms + oil). Both manpower forms are listed
+      under Security AND HR Dept in the registry (same 2 forms, different
+      responsible people) — marked "As & When Required" by the registry
+      itself, not Daily. `PATCH_19_dept_expansion_13Aug2026.sql` seeds all of
+      it into `form_links`; ALERT.gs's `DEPT_RESPONSIBILITY_FALLBACK` routes
+      compliance-supervisor lookups for the 4 pseudo-departments to
+      Maintenance / Security / HR. Also added: VMC Shop's real "VMC Daily
+      check sheet" form — this is the VMC per-shift output tracking asked
+      for. ⚠ VMC has no RAW tab on the dashboard yet (checked — genuinely
+      absent), so it gets the form + reminder but not on-time/late/missing
+      compliance tracking until one exists.
+- [x] **RESOLVED 13 Aug.** Yash: the work week is Saturday-to-Thursday,
+      Friday off, "unless we have urgent production Friday is working — 90% of
+      the time Friday is off." Matches the live form exactly. Fixed on both
+      ends: `weekStartFor_()` in ALERT.gs now computes Saturday (was Monday),
+      and `shift-reminder`'s weekly notify window is now Saturday-Thursday
+      (was Monday-Sunday — this one is real app code, not just the dashboard
+      script, and was simply wrong before). The prefix-match column fix from
+      12 Aug already made `processFormSubmissions()` work with the Saturday
+      header regardless. No schema change needed for the Friday exception
+      itself — `employee_shifts` is already per-date, so a working Friday is
+      just a Friday HR assigns shifts for.
 - [x] **Phone numbers — CLOSED 12 Aug.** Yash: "you dont need phone numbers."
       Not asked for again.
 
@@ -256,7 +268,19 @@ minutes — which is what tells the app what is outstanding. Restore from commit
       Properties → `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, then run
       `testSupabaseSync()` once. The SQL side is done; this is what actually
       moves data. The service role key must never be pasted into chat.
-- [ ] Telegram escalation already exists in ALERT.gs and needs nothing new.
+- [x] **Telegram onboarding — BUILT 13 Aug.** `processTelegramOnboarding()`
+      in ALERT.gs polls the bot every 5 minutes; a supervisor messages their
+      name, it's matched against this week's SUPERVISOR_MAP and the chat ID is
+      written in automatically — no more typing a Telegram numeric ID into the
+      registration form by hand. Matching is deliberately conservative: exactly
+      one name match required, or it's logged and skipped, never guessed.
+      **New bot recommended and agreed** — dedicated purpose, clean token,
+      no collision with anything else this account might be used for. Yash:
+      create it via @BotFather (see final message), then REPLACE the
+      `TELEGRAM_BOT_TOKEN` Script Property with the new token (one property,
+      not two — sendTelegramToChatId only reads that one).
+      Needs `deployShiftTrackingTriggers()` re-run to install the new
+      5-minute trigger.
 
 ---
 
@@ -306,9 +330,19 @@ had an accepted explanation.
 
 ## 🔵 Known gaps still in the code
 
-- [ ] **QR check-in secret** — `scripts/PATCH_16_qr_salt_13Aug2026.sql`. Run
-      it; the salt is generated inside Postgres so nobody ever sees the value,
-      and it refuses to overwrite an existing one.
+- [x] **QR check-in secret — CONFIRMED SET 13 Aug.** `is_set=true, length=48`.
+- [x] **QR gate mechanism — DECIDED 13 Aug ("a+c").** Build the real display
+      (a) while accepting the current loose check as an interim gap (c), not
+      removing it until (a) is proven in daily use. `app/(security)/gate-qr.tsx`
+      now shows the real salted daily code on the guard's phone (new
+      `react-native-qrcode-svg` dependency, no native module — just SVG,
+      matching `react-native-svg` already in the project). `worker/home.tsx`'s
+      loose match (accepts anything merely containing the plant code, ignoring
+      the salt) is UNCHANGED and now explicitly documented in code as
+      deliberate, not forgotten — removing it before gate-qr.tsx is actually in
+      use at the gate would lock out all 129 people at shift change. Next step:
+      confirm gate-qr.tsx is working at the gate, then drop the loose branch in
+      qr.tsx.
 - [x] **Alert copy in Hindi — VERIFIED DONE 12 Aug.** All 38 `Alert.alert()`
       calls already use `t()`. Audited properly with `scripts/check-i18n.mjs`:
       Hindi covers 100% of English, and one key used on two dashboards

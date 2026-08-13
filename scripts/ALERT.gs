@@ -60,7 +60,50 @@ var DEPT_TO_DB_DEPARTMENT = {
   'Press':   'Press Shop',
   'Machine': 'Machine Shop',
   'HT':      'Heat Treatment',
-  'Final':   'Final Shop'
+  'Final':   'Final Shop',
+
+  // Added 13 Aug — for FORM-SUBMISSION compliance sync only (see
+  // NON_PRODUCTION_DEPTS below). Without these two, recordShiftCompliance()
+  // logs Electricity/Oil rows to DATA_SUBMISSION_LOG same as any other
+  // department, but syncFormSubmissionsToSupabase() silently drops them —
+  // 'dept' resolves to undefined, the row fails its own `if (!dept) return`
+  // guard, and the app's Forms tab never lights up their submitted/pending
+  // chip even though the sheet-side compliance record is correct.
+  'Electricity': 'Maintenance',
+  'Oil':         'Maintenance'
+};
+
+// syncProductionToSupabase() also iterates Object.keys(DEPT_TO_DB_DEPARTMENT)
+// — that is fine for the six shop departments, whose RAW tabs are all
+// Date|Unit|Shift|[VF_No]|Qty. RAW_ELECTRICITY holds kWh meter readings and
+// RAW_OIL holds litres consumed; neither is a parts-produced quantity, and
+// summing them into production_records.qty would silently corrupt the
+// production dashboard's totals. This list is what keeps them out of that
+// loop while still letting them through the (differently-shaped, qty-blind)
+// form-submission compliance sync above.
+var NON_PRODUCTION_DEPTS = { 'Electricity': true, 'Oil': true };
+
+// ── RESPONSIBILITY FALLBACK (13 Aug 2026) ─────────────────
+// Electricity, Oil, Staff Manpower and Contract Manpower are compliance-
+// tracked departments (their RAW tabs are real — RAW_ELECTRICITY,
+// RAW_OIL, RAW_MANPOWER_STAFF, RAW_MANPOWER_CONTRACT all exist with real
+// rows), but nobody has ever registered a supervisor under those LITERAL
+// names in the weekly form — because they are not real departments, they
+// are sub-responsibilities of real ones. Confirmed against the live
+// registry sheet 13 Aug: electricity + oil sit under Maintenance; both
+// manpower forms are listed under Security AND under HR Dept (same two
+// forms, different responsible people for each).
+//
+// getSupervisorForCurrentWeek_ tries the literal name first — so if
+// someone ever DOES register under 'Electricity' verbatim, that still
+// wins — and only falls back to these when that lookup finds nothing.
+// Multiple department names are tried in order; the first with an active
+// registration for the current week is used.
+var DEPT_RESPONSIBILITY_FALLBACK = {
+  'Electricity': ['Maintenance'],
+  'Oil': ['Maintenance'],
+  'Staff Manpower': ['Security', 'HR'],
+  'Contract Manpower': ['Security', 'HR']
 };
 
 // ── SHIFT CONFIG ──────────────────────────────────────────
@@ -112,10 +155,28 @@ var DEPT_FORM_SEED = [
   ['Final', 'Final Shop Planning', 'Daily', 'Jakir Munshi Chaudhari Subhash Shivanand Thorat Ashok Kumar', 'https://docs.google.com/forms/d/e/1FAIpQLSff5rk2BDx-2ky64_rrVUXlrxdgqI4mvHL-Kcf5eBhHa8nA2w/viewform', 'YES'],
   ['Final', '57F4 Inward Form', 'Daily', 'Jakir Munshi Chaudhari Subhash Shivanand Thorat Ashok Kumar', 'https://docs.google.com/forms/d/e/1FAIpQLSdHaCr9PfjKFv_nRIQGy_0uBo6SmoXfJe06ZNWW5-zBONkA-w/viewform', 'NO'],
   ['Final', '57F4 Outward Form', 'Daily', 'Jakir Munshi Chaudhari Subhash Shivanand Thorat Ashok Kumar', 'https://docs.google.com/forms/d/e/1FAIpQLSdfReEVbGGGNC6CwIPDq53syvvkomXj2gfIWNBQehjozUD1DA/viewform', 'NO'],
-  ['Electricity', '', '', '', '', 'NO'],
-  ['Oil', '', '', '', '', 'NO'],
-  ['Staff Manpower', '', '', '', '', 'NO'],
-  ['Contract Manpower', '', '', '', '', 'NO']
+  // Electricity/Oil verified 13 Aug against the live registry sheet — both
+  // are genuinely Maintenance-department forms (see DEPT_RESPONSIBILITY_FALLBACK
+  // below), reused here under their own literal DEPARTMENTS key so the
+  // Telegram nudge for 'Electricity'/'Oil' compliance carries a real link
+  // instead of the old blank/NO placeholder.
+  ['Electricity', 'VFPL Electricity Consumable Form', 'Daily',
+   'Atul Bhata Patil, Dharmendra Prabhu Mahto, Shaikh Majeed, Devendrakumar Jagdish Singh, Nanasaheb Dinkar Shinde, Shivaji Suresh Jaypure, Sunil Ramakant Saha, Vijay Rangnath Sonawane, Sandip Tryambak Landage, Manoj Anantrao Wagh',
+   'https://docs.google.com/forms/d/e/1FAIpQLScB6QrOCHmWeAKzZP76eWPISlt_tnr5z7aBROTHK614gfd31A/viewform', 'YES'],
+  ['Electricity', 'VFL 24Hrs Electricity Consumable Form', 'Daily',
+   'Atul Bhata Patil, Dharmendra Prabhu Mahto, Shaikh Majeed, Devendrakumar Jagdish Singh, Nanasaheb Dinkar Shinde, Shivaji Suresh Jaypure, Sunil Ramakant Saha, Vijay Rangnath Sonawane, Sandip Tryambak Landage, Manoj Anantrao Wagh',
+   'https://docs.google.com/forms/d/e/1FAIpQLScr2JYBV9yFN5WZj99dhc2mTV--1_-Y8pIeMT8Bmf6t9qR7RQ/viewform', 'YES'],
+  ['Oil', 'VFL Oil Consumable', 'Daily',
+   'Atul Bhata Patil, Dharmendra Prabhu Mahto, Shaikh Majeed, Devendrakumar Jagdish Singh, Nanasaheb Dinkar Shinde, Shivaji Suresh Jaypure, Sunil Ramakant Saha, Vijay Rangnath Sonawane, Sandip Tryambak Landage, Manoj Anantrao Wagh',
+   'https://docs.google.com/forms/d/e/1FAIpQLSfyrYgWEhyBjy8GxwvaaDOk5Uc5doDYZ0SeSE2uUoU9ujNUkA/viewform', 'YES'],
+  // Both marked "As & When Required" by the registry itself, not Daily — kept
+  // NO (not chased on the shift timer) to match, same as the app side.
+  ['Staff Manpower', 'Daily Manpower Form', 'As & When Required',
+   'Shrawan Rewant Singh (Security) / Milind Ambadas Barhate, Pallavi Vishnu Khade, Mayuri Sardar Rathod (HR)',
+   'https://docs.google.com/forms/d/e/1FAIpQLSflyxcQjVEdv2OXgflXhKVH1VWhBUEMhC7KhUUUtdb4pHQNyw/viewform', 'NO'],
+  ['Contract Manpower', 'Daily Contractual Manpower Form', 'As & When Required',
+   'Shrawan Rewant Singh (Security) / Milind Ambadas Barhate, Pallavi Vishnu Khade, Mayuri Sardar Rathod (HR)',
+   'https://docs.google.com/forms/d/e/1FAIpQLSfecNumIXRV7Xej_n-4N7k0K702I9WHjiT6F_naEqT5JnFS0g/viewform', 'NO']
 ];
 
 // ── SUBMISSION TRACKING (NOT SCORING) ─────────────────────
@@ -357,28 +418,48 @@ function createEscalationLogTab_(ss) {
  * Get supervisor for a department based on current week
  */
 function getSupervisorForCurrentWeek_(dept) {
+  var direct = lookupSupervisorForWeek_(dept);
+  if (direct) return direct;
+
+  var fallbacks = DEPT_RESPONSIBILITY_FALLBACK[dept];
+  if (fallbacks) {
+    for (var f = 0; f < fallbacks.length; f++) {
+      var viaFallback = lookupSupervisorForWeek_(fallbacks[f]);
+      if (viaFallback) return viaFallback;
+    }
+  }
+
+  return { name: 'Unknown', phone: '', chatId: '' };
+}
+
+/** The actual SUPERVISOR_MAP scan, extracted so getSupervisorForCurrentWeek_
+ * can try the literal department name and then its real-department fallback
+ * without duplicating this loop. Returns null (not the 'Unknown' object) on
+ * no match, so the caller can tell "found nothing" apart from "found Unknown"
+ * and keep trying fallbacks. */
+function lookupSupervisorForWeek_(dept) {
   var ss = SpreadsheetApp.openById(DASH_ID);
   var sh = ss.getSheetByName('SUPERVISOR_MAP');
-  if (!sh) return { name: 'Unknown', phone: '', chatId: '' };
-  
+  if (!sh) return null;
+
   var data = sh.getDataRange().getValues();
   var today = new Date();
   var todayStr = Utilities.formatDate(today, 'Asia/Kolkata', 'yyyy-MM-dd');
-  
+
   for (var i = 1; i < data.length; i++) {
     var rowDept = (data[i][0] || '').toString().trim();
     if (rowDept !== dept) continue;
-    
+
     var weekStart = data[i][4];
     var weekEnd = data[i][5];
     var active = (data[i][6] || '').toString().trim().toUpperCase();
-    
+
     if (active !== 'YES') continue;
     if (!weekStart || !weekEnd) continue;
-    
+
     var startStr = Utilities.formatDate(new Date(weekStart), 'Asia/Kolkata', 'yyyy-MM-dd');
     var endStr = Utilities.formatDate(new Date(weekEnd), 'Asia/Kolkata', 'yyyy-MM-dd');
-    
+
     if (todayStr >= startStr && todayStr <= endStr) {
       return {
         name: data[i][1] || 'Unknown',
@@ -389,8 +470,8 @@ function getSupervisorForCurrentWeek_(dept) {
       };
     }
   }
-  
-  return { name: 'Unknown', phone: '', chatId: '' };
+
+  return null;
 }
 
 /**
@@ -888,7 +969,8 @@ function sendWeeklyPerformance() {
 function deployShiftTrackingTriggers() {
   ScriptApp.getProjectTriggers().forEach(function(t) {
     var func = t.getHandlerFunction();
-    if (['sendGentleReminder', 'sendDMEDeadlineAlert', 'sendFollowUpAlert', 'sendDailySummary', 'sendWeeklyPerformance', 'recordShiftCompliance', 'rebuildWeeklyPerformance', 'syncOpsDashboardToSupabase'].indexOf(func) > -1) {
+    if (['sendGentleReminder', 'sendDMEDeadlineAlert', 'sendFollowUpAlert', 'sendDailySummary', 'sendWeeklyPerformance', 'recordShiftCompliance', 'rebuildWeeklyPerformance', 'syncOpsDashboardToSupabase',
+       'processTelegramOnboarding'].indexOf(func) > -1) {
       ScriptApp.deleteTrigger(t);
     }
   });
@@ -920,6 +1002,11 @@ function deployShiftTrackingTriggers() {
   // behind the sheet. Skipped silently if the Script Properties are not set,
   // so deploying triggers before configuring credentials is not a failure.
   ScriptApp.newTrigger('syncOpsDashboardToSupabase').timeBased().everyMinutes(15).create();
+  
+  // Telegram onboarding — every 5 minutes. A supervisor who just messaged the
+  // bot should not have to wait a quarter hour to find out whether it worked.
+  // No-ops instantly if TELEGRAM_BOT_TOKEN is unset, same as the sync above.
+  ScriptApp.newTrigger('processTelegramOnboarding').timeBased().everyMinutes(5).create();
   
   Logger.log('✅ All shift tracking triggers deployed successfully!');
 }
@@ -1541,20 +1628,28 @@ function recordShiftCompliance() {
 // ── WEEKLY ROLL-UP ────────────────────────────────────────
 
 /**
- * Monday of the week containing `date`, as yyyy-MM-dd.
+ * Saturday of the week containing `date`, as yyyy-MM-dd.
  *
- * ⚠ The two halves of this system disagree about when a week starts. The live
- * supervisor registration form writes "Week Start (Saturday)" / "Week End
- * (Thursday)", while processFormSubmissions() below reads columns named
- * "Week Start (Monday)" / "Week End (Sunday)" — which means it finds neither
- * and returns early. Monday is used here because that is what the script has
- * always assumed; if Saturday-to-Thursday is the real working week, change
- * this and the column names together, not one of them.
+ * ⚠ CONFIRMED 13 Aug 2026 (Yash): the real working week is Saturday through
+ * Thursday, with Friday as the weekly off — "unless we have urgent
+ * production, Friday is working; 90% of the time Friday is off." That matches
+ * the live registration form exactly ("Week Start (Saturday)" / "Week End
+ * (Thursday)"), which the PREVIOUS version of this function disagreed with —
+ * it computed Monday, on the grounds that "that is what the script has always
+ * assumed," with a note to fix it once the real week was known. It is now
+ * known, so this computes Saturday.
+ *
+ * Nothing else needed to change for the Friday exception itself: shift
+ * assignment (employee_shifts) is already per-date, so a working Friday is
+ * just a Friday HR assigns shifts for, same as any other day, and a day off
+ * is a Friday with none. There is no separate "is this Friday working" flag
+ * to maintain.
  */
 function weekStartFor_(date) {
   var d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  var dow = d.getDay();              // 0 = Sunday
-  var back = (dow === 0) ? 6 : dow - 1;
+  var dow = d.getDay();               // 0 = Sunday
+  // Days to step back to reach the most recent Saturday (dow 6).
+  var back = (dow + 1) % 7;
   d.setDate(d.getDate() - back);
   return Utilities.formatDate(d, 'Asia/Kolkata', 'yyyy-MM-dd');
 }
@@ -1795,6 +1890,8 @@ function syncProductionToSupabase() {
   var rows = [];
 
   Object.keys(DEPT_TO_DB_DEPARTMENT).forEach(function(dept) {
+    if (NON_PRODUCTION_DEPTS[dept]) return;   // kWh / litres, not parts — see the note above.
+
     var tabName = DEPT_TO_RAW_TAB[dept];
     var sh = tabName ? ss.getSheetByName(tabName) : null;
     if (!sh || sh.getLastRow() < 2) return;
@@ -1856,6 +1953,148 @@ function testSupabaseSync() {
   Logger.log('✅ Supabase sync test passed. Check the app: manager → Reports, supervisor → Forms.');
 }
 
+
+// ============================================================
+// TELEGRAM ONBOARDING (13 Aug 2026)
+// ============================================================
+//
+// Several SUPERVISOR_MAP rows have a blank Telegram Chat ID, because a
+// numeric chat ID is not something a person knows off the top of their
+// head — you only get it by messaging a bot and having the bot tell you.
+// The weekly registration form asks for it anyway, so most people leave it
+// blank or guess wrong.
+//
+// This closes that gap without changing the registration form: a supervisor
+// messages the bot with their name, the bot's replies are polled here every
+// few minutes, and a name match against the CURRENT WEEK's SUPERVISOR_MAP
+// rows writes the chat ID in directly — no typing a long number into a form.
+//
+// ⚠ SETUP, ONCE. Project Settings → Script Properties → add
+//     TELEGRAM_BOT_TOKEN   the token from @BotFather for the bot supervisors
+//                          will message (this project's chat token, shared
+//                          with sendTelegramToChatId above — send FROM one
+//                          bot, register FOR the same one).
+// Then message the bot from your OWN phone once and run
+// processTelegramOnboarding() manually to confirm it can read updates before
+// putting it on a timer.
+//
+// ⚠ MATCHING IS DELIBERATELY CONSERVATIVE. A message is only accepted when
+// it matches EXACTLY ONE currently-active SUPERVISOR_MAP row by name
+// (case-insensitive substring, either direction). Zero matches or more than
+// one are logged and skipped rather than guessed — the "B.S. Todmal" vs
+// "Balasaheb Shivaji Todmal" name-variant problem already documented
+// elsewhere in this file is exactly why a wrong auto-match would be worse
+// than no match.
+
+/** The Telegram numeric user/chat id last confirmed processed, so the same
+ * message is never matched twice. Stored in Script Properties, not a sheet
+ * cell, since it is bookkeeping for this function alone. */
+function getLastTelegramUpdateId_() {
+  var v = PropertiesService.getScriptProperties().getProperty('TELEGRAM_LAST_UPDATE_ID');
+  return v ? parseInt(v, 10) : 0;
+}
+function setLastTelegramUpdateId_(id) {
+  PropertiesService.getScriptProperties().setProperty('TELEGRAM_LAST_UPDATE_ID', String(id));
+}
+
+/**
+ * Polls Telegram for new messages and matches each sender's name against
+ * this week's SUPERVISOR_MAP rows, writing their chat_id (column D) in on a
+ * unique match. Meant to run every few minutes via deployShiftTrackingTriggers().
+ */
+function processTelegramOnboarding() {
+  var token = PropertiesService.getScriptProperties().getProperty('TELEGRAM_BOT_TOKEN');
+  if (!token) {
+    Logger.log('❌ TELEGRAM_BOT_TOKEN not set — nothing to poll.');
+    return;
+  }
+
+  var lastId = getLastTelegramUpdateId_();
+  var res = UrlFetchApp.fetch(
+    'https://api.telegram.org/bot' + token + '/getUpdates?offset=' + (lastId + 1) + '&timeout=0',
+    { muteHttpExceptions: true }
+  );
+  var body = JSON.parse(res.getContentText());
+  if (!body.ok) {
+    Logger.log('❌ getUpdates failed: ' + res.getContentText());
+    return;
+  }
+
+  var updates = body.result || [];
+  if (updates.length === 0) {
+    Logger.log('ℹ️ Telegram onboarding: no new messages.');
+    return;
+  }
+
+  var ss = SpreadsheetApp.openById(DASH_ID);
+  var sh = ss.getSheetByName('SUPERVISOR_MAP');
+  var registered = 0;
+  var unmatched = [];
+
+  updates.forEach(function(update) {
+    setLastTelegramUpdateId_(update.update_id);
+
+    var msg = update.message;
+    if (!msg || !msg.text || !msg.chat) return;
+
+    var text = msg.text.replace(/^\/start\s*/i, '').trim();
+    if (!text || text.length < 3) return;   // bare "/start" with nothing to match on
+
+    var chatId = String(msg.chat.id);
+    var match = matchSupervisorByName_(sh, text);
+
+    if (match === 'none') {
+      unmatched.push(text);
+      sendTelegramToChatId(chatId,
+        'Could not find "' + text + '" in this week\'s supervisor list. ' +
+        'Check the spelling matches what you registered with, or ask HR.');
+    } else if (match === 'ambiguous') {
+      unmatched.push(text + ' (ambiguous)');
+      sendTelegramToChatId(chatId,
+        'More than one supervisor matches "' + text + '" this week — ask HR to set your Chat ID manually.');
+    } else {
+      match.range.setValue(chatId);
+      registered++;
+      sendTelegramToChatId(chatId, '✅ Registered. You will receive shift alerts here from now on.');
+    }
+  });
+
+  Logger.log('✅ Telegram onboarding: ' + registered + ' registered, ' + unmatched.length + ' unmatched (' + unmatched.join(', ') + ').');
+}
+
+/** Returns 'none', 'ambiguous', or { range } — the Chat ID cell to write, for
+ * exactly one currently-active SUPERVISOR_MAP row whose name contains, or is
+ * contained by, the given text (case-insensitive). */
+function matchSupervisorByName_(sh, text) {
+  if (!sh) return 'none';
+
+  var data = sh.getDataRange().getValues();
+  var today = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyyy-MM-dd');
+  var needle = text.toLowerCase();
+  var hits = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var active = (data[i][6] || '').toString().trim().toUpperCase();
+    if (active !== 'YES') continue;
+
+    var weekStart = data[i][4], weekEnd = data[i][5];
+    if (!weekStart || !weekEnd) continue;
+    var startStr = Utilities.formatDate(new Date(weekStart), 'Asia/Kolkata', 'yyyy-MM-dd');
+    var endStr = Utilities.formatDate(new Date(weekEnd), 'Asia/Kolkata', 'yyyy-MM-dd');
+    if (today < startStr || today > endStr) continue;
+
+    var name = (data[i][1] || '').toString().trim().toLowerCase();
+    if (!name) continue;
+    if (name.indexOf(needle) === -1 && needle.indexOf(name) === -1) continue;
+
+    hits.push(i + 1);   // 1-indexed sheet row
+  }
+
+  if (hits.length === 0) return 'none';
+  if (hits.length > 1) return 'ambiguous';
+  return { range: sh.getRange(hits[0], 4) };   // column D = Telegram Chat ID
+}
+
 // ── SELF-CHECK ────────────────────────────────────────────
 
 /**
@@ -1882,6 +2121,13 @@ function testComplianceScoring() {
   check('Shift 2 deadline', dl('Shift 2'), '2026-08-13 00:30');
   check('Shift 3 deadline', dl('Shift 3'), '2026-08-13 09:30');
   
+  // weekStartFor_: Saturday of the containing week, for every day of the week.
+  // 8 Aug 2026 is a Saturday; 14 Aug 2026 is the following Friday.
+  check('week start (Sat itself)', weekStartFor_(new Date(2026, 7, 8)),  '2026-08-08');
+  check('week start (Sun)',        weekStartFor_(new Date(2026, 7, 9)),  '2026-08-08');
+  check('week start (Wed)',        weekStartFor_(new Date(2026, 7, 12)), '2026-08-08');
+  check('week start (Fri)',        weekStartFor_(new Date(2026, 7, 14)), '2026-08-08');
+  
   check('First Shift',   normaliseShift_('First Shift'),   'Shift 1');
   check('2nd Staff',     normaliseShift_('2nd Staff'),     'Shift 2');
   check('Third Shift',   normaliseShift_('Third Shift'),   'Shift 3');
@@ -1902,7 +2148,7 @@ function testComplianceScoring() {
   
   Logger.log('=== SELF-CHECK ===');
   if (failures.length === 0) {
-    Logger.log('✅ All 9 logic checks passed.');
+    Logger.log('✅ All 13 logic checks passed.');
   } else {
     failures.forEach(function(f) { Logger.log('❌ ' + f); });
     throw new Error(failures.length + ' self-check failure(s) — see log.');
