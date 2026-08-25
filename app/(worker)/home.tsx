@@ -10,7 +10,7 @@ import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { LoadingScreen } from '@/components/LoadingScreen'
-import { getCurrentLocation, getPlantConfig, isInsideGeofence } from '@/lib/location'
+import { getCurrentLocation, getPlantConfig, isInsideGeofence, getPlantLocations, isInsideAnyGeofence } from '@/lib/location'
 import { supabase } from '@/lib/supabase'
 import { getDeviceId } from '@/lib/deviceId'
 import { EmployeeShift } from '@/types'
@@ -78,13 +78,21 @@ export default function WorkerHome() {
       return
     }
 
-    const inside = isInsideGeofence(
-      location.coords.latitude,
-      location.coords.longitude,
-      plant.latitude,
-      plant.longitude,
-      plant.geofence_radius_meters
-    )
+    // PATCH_21 — multi-point geofence (11 named campus locations). Falls
+    // back to the single-point plant_config check when plant_locations is
+    // empty (PATCH_22 not yet run, or the table doesn't exist yet), so this
+    // is safe to ship ahead of the seed data.
+    const plantLocations = await getPlantLocations()
+    const inside =
+      plantLocations.length > 0
+        ? isInsideAnyGeofence(location.coords.latitude, location.coords.longitude, plantLocations)
+        : isInsideGeofence(
+            location.coords.latitude,
+            location.coords.longitude,
+            plant.latitude,
+            plant.longitude,
+            plant.geofence_radius_meters
+          )
 
     if (!inside) {
       Alert.alert(t('common.warning'), t('worker.outsidePlant'))

@@ -173,6 +173,14 @@ QR salt: set by PATCH_16, generated inside Postgres with pgcrypto — nobody eve
 
 ---
 
+## plant_locations — multi-point geofence (PATCH_21, 13 Aug 2026)
+
+`plant_locations` (`name`, `latitude`, `longitude`, `radius_meters`, `is_active`) supersedes the single-point `plant_config` geofence check-in-validity-wise, once seeded. Check-in is valid within radius of ANY row — the campus is one contiguous site (11 named locations: Plant location, Office 1st Floor, Machine/Die/VMC/Press/HT/Forge/Cutting/Final shops, Raw Material), not tied to the employee's own department.
+
+`worker/home.tsx` and `fraud-detector`'s `gps_check` both read `plant_locations` first and fall back to the old single-point `plant_config` geofence when it's empty or doesn't exist — **PATCH_21 (table only, 0 rows) is safe to run any time; behaviour is unchanged until PATCH_22 (the seed) also runs.** PATCH_22 is a template with all 11 names and placeholder `(0, 0)` coordinates — real values are still needed from Yash (source: https://docs.google.com/spreadsheets/d/1900lODxTxhKV-oFccKpgcs_MgXD2zx3qCNFEki15iTk, Google Maps links this sandbox's network egress proxy cannot resolve). See PENDING.md.
+
+---
+
 ## Work week — Saturday to Thursday, Friday off (confirmed 13 Aug 2026)
 
 Yash: "week starts Saturday - friday is weekly off unless we have urgent
@@ -222,6 +230,8 @@ assigns shifts for, same as any other day; a Friday off is one with none.
 | `PATCH_18_forms_reminder_cron_13Aug2026.sql` | Schedules `forms_due_reminder` via pg_cron + pg_net, every 15 minutes. Without this the mode is deployed but never invoked — day-of-week inference never picks it | ✅ Applied 13 Aug — job active |
 | `PATCH_19_dept_expansion_13Aug2026.sql` | Maintenance (4 daily forms: check sheet + 2 electricity + oil), Human Resource (2 manpower forms, As & When Required), VMC Shop (1 daily form) — all real published forms, verified against the live registry sheet via Drive before writing, not guessed | ⏳ Not yet run |
 | `PATCH_20_missing_crons_13Aug2026.sql` | Schedules `nightly-scoring`, `mrm-reminder`, `five-s-challenge-generator` and shift-reminder's default (no-body) mode — found via re-audit 13 Aug that none of the four had a `cron.schedule()` anywhere in this repo, the same "deployed but never invoked" pattern already found 3 times this session. All four confirmed idempotent before scheduling. Also now adds a fifth job, `mrm-reminder-escalation`, pinned to the 10th at 17:00 IST only — found during the mrm-reminder/shift-reminder audit that the single 09:00 daily run could never observe the code's own "10th at/after 17:00" escalation condition (09:00 is always before 17:00), so escalation was silently a day later than documented; see PENDING.md. ⚠ Check Dashboard → Cron first in case one was configured there instead | ⏳ Not yet run |
+| `PATCH_21_plant_locations_13Aug2026.sql` | Creates `plant_locations` (multi-point geofence table), 0 rows. Safe to run any time — check-in behaviour is unchanged until PATCH_22 also runs | ⏳ Not yet run |
+| `PATCH_22_plant_locations_seed_PENDING_COORDINATES.sql` | Seeds the 11 named campus locations — every lat/lng is a deliberate `(0,0)` placeholder, **not runnable as-is**. Needs real coordinates from Yash (see PENDING.md) filled in first | ⏳ Blocked on Yash |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee | ♾️ On demand |
 
 **Total employees confirmed live: 129** (120 original + 4 PATCH_08 + 5 PATCH_09).

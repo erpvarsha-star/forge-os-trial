@@ -58,12 +58,38 @@ async function getManagementIds(db: ReturnType<typeof supabaseAdmin>, roles: str
 }
 
 async function handleGpsCheck(db: ReturnType<typeof supabaseAdmin>, body: GpsCheckBody) {
-  const plantLat = await getPlantConfig(db, 'plant_lat', 19.8383935925407);
-  const plantLng = await getPlantConfig(db, 'plant_lng', 75.23638998304483);
-  const geofenceMeters = await getPlantConfig(db, 'geofence_radius_meters', 100);
+  // PATCH_21 — multi-point geofence (11 named campus locations: shops, the
+  // office, the raw material yard — the campus is one contiguous site, so
+  // any one of them counts). Falls back to the single-point plant_config
+  // geofence when plant_locations is empty (PATCH_22 not yet run with real
+  // coordinates) or doesn't exist yet, so this is safe to deploy ahead of
+  // the seed data — behaviour is unchanged until that patch runs.
+  const { data: locations } = await db
+    .from('plant_locations')
+    .select('latitude, longitude, radius_meters')
+    .eq('is_active', true);
 
-  const distance = distanceMeters(body.lat, body.lng, plantLat, plantLng);
-  const outsideGeofence = distance > geofenceMeters;
+  let distance: number;
+  let outsideGeofence: boolean;
+  let geofenceMeters: number;
+
+  if (locations && locations.length > 0) {
+    const candidates = (locations as { latitude: number; longitude: number; radius_meters: number }[]).map((loc) => ({
+      distance: distanceMeters(body.lat, body.lng, loc.latitude, loc.longitude),
+      radius: loc.radius_meters,
+    }));
+    const nearest = candidates.reduce((a, b) => (b.distance < a.distance ? b : a));
+    distance = nearest.distance;
+    geofenceMeters = nearest.radius;
+    outsideGeofence = !candidates.some((c) => c.distance <= c.radius);
+  } else {
+    const plantLat = await getPlantConfig(db, 'plant_lat', 19.8383935925407);
+    const plantLng = await getPlantConfig(db, 'plant_lng', 75.23638998304483);
+    geofenceMeters = await getPlantConfig(db, 'geofence_radius_meters', 100);
+    distance = distanceMeters(body.lat, body.lng, plantLat, plantLng);
+    outsideGeofence = distance > geofenceMeters;
+  }
+
   const mockLocation = Boolean(body.mockLocationDetected);
   const blocked = outsideGeofence || mockLocation;
 

@@ -41,6 +41,35 @@ below. Empty tables and a broken sync look identical from the app.
 
 ## 🔴 Blocked on Yash — cannot proceed without you
 
+- [ ] **Multi-point geofence — code done, waiting on real coordinates.**
+      Yash shared a sheet of 11 campus locations (Plant location, Office 1st
+      Floor, and 9 named shops incl. Raw Material) as Google Maps links:
+      https://docs.google.com/spreadsheets/d/1900lODxTxhKV-oFccKpgcs_MgXD2zx3qCNFEki15iTk
+      Decision (13 Aug): multi-point, any-match — a check-in succeeds if the
+      employee is within radius of ANY of the 11 points, not tied to their
+      own department (the campus is one contiguous site; the old single
+      center point + 100m was missing far shops like the Raw Material yard).
+      **Could not resolve the coordinates myself** — this sandbox's network
+      egress proxy blocks every Google Maps domain
+      (`maps.app.goo.gl`, `google.com/maps`), and guessing GPS coordinates
+      for something that gates physical plant access was not an option.
+      `scripts/PATCH_21_plant_locations_13Aug2026.sql` creates the
+      `plant_locations` table (safe to run now — 0 rows, so check-in
+      behaviour is unchanged until seeded).
+      `scripts/PATCH_22_plant_locations_seed_PENDING_COORDINATES.sql` is a
+      ready-to-fill template with all 11 names — every lat/lng is a
+      deliberate placeholder (`0, 0`) so it can't be run by accident.
+      **What I need from you:** open each Maps link, long-press the pin to
+      read the decimal coordinates (or check the sheet if you add a Lat/Lng
+      column), and send them to me or fill them into PATCH_22 yourself. Once
+      real coordinates land, run PATCH_21 then PATCH_22 in the SQL Editor —
+      `worker/home.tsx` and `fraud-detector` both already read
+      `plant_locations` and switch over automatically the moment it has
+      rows; no further app changes needed. Verified the fallback logic (21
+      isolated checks): multi-point matching, no-match blocking, and the
+      empty/missing-table fallback to the existing single-point
+      `plant_config` geofence all behave correctly.
+
 - [ ] **Firebase / FCM — HALF DONE 13 Aug.** `google-services.json` is in and
       wired into `app.json`; the remaining half is the FCM V1 service account
       key, which only Yash can upload (it is a secret and must not pass through

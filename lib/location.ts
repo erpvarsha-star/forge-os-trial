@@ -69,3 +69,37 @@ export function isInsideGeofence(
   const distance = R * c
   return distance <= radiusMeters
 }
+
+export interface PlantLocation {
+  id: string
+  name: string
+  latitude: number
+  longitude: number
+  radius_meters: number
+}
+
+// PATCH_21 — multi-point geofencing (11 named campus locations: shops, the
+// office, the raw material yard). The campus is one contiguous site, so a
+// check-in is valid near ANY of these points, not tied to the employee's own
+// department. Returns [] until PATCH_22 is run with real coordinates
+// (Google Maps links resolved outside the app — see PENDING.md), and every
+// caller falls back to the single-point plant_config geofence when this is
+// empty, so an unrun PATCH_22 changes nothing about current check-in
+// behaviour.
+export async function getPlantLocations(): Promise<PlantLocation[]> {
+  const { data, error } = await supabase
+    .from('plant_locations')
+    .select('id, name, latitude, longitude, radius_meters')
+    .eq('is_active', true)
+
+  if (error || !data) return []
+  return data as PlantLocation[]
+}
+
+export function isInsideAnyGeofence(
+  userLat: number,
+  userLng: number,
+  locations: PlantLocation[]
+): boolean {
+  return locations.some((loc) => isInsideGeofence(userLat, userLng, loc.latitude, loc.longitude, loc.radius_meters))
+}
