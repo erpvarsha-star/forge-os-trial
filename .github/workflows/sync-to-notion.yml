@@ -30,7 +30,12 @@ jobs:
       - name: Detect changed files
         id: changes
         run: |
-          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git show --stat --name-only HEAD | tail -n +4)
+          # tr '\n' ' ' collapses multiline output to a single space-separated line
+          # so the GITHUB_OUTPUT assignment stays on one line (required format)
+          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | tr '\n' ' ')
+          if [ -z "$CHANGED" ]; then
+            CHANGED=$(git show --name-only --format="" HEAD | tr '\n' ' ')
+          fi
           echo "changed=$CHANGED" >> $GITHUB_OUTPUT
           echo "Changed files: $CHANGED"
 
