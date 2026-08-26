@@ -1,0 +1,53 @@
+name: Sync to Notion Brain
+
+on:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+    paths:
+      - 'CLAUDE.md'
+      - 'PENDING.md'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # need parent commit to detect changes
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Detect changed files
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git show --stat --name-only HEAD | tail -n +4)
+          echo "changed=$CHANGED" >> $GITHUB_OUTPUT
+          echo "Changed files: $CHANGED"
+
+      - name: Sync CLAUDE.md → Notion
+        if: contains(steps.changes.outputs.changed, 'CLAUDE.md')
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        run: |
+          python scripts/sync_notion.py \
+            --file CLAUDE.md \
+            --page 3c8c4f944b9381948341f0f3a2115e29
+
+      - name: Sync PENDING.md → Notion
+        if: contains(steps.changes.outputs.changed, 'PENDING.md')
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        run: |
+          python scripts/sync_notion.py \
+            --file PENDING.md \
+            --page 3c8c4f944b9381359724f847a92ca86d
