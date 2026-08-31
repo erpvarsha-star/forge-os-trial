@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 13 Aug 2026, after Maintenance/HR/VMC department expansion, the Saturday week-start fix, the gate-QR screen and Telegram onboarding.
+**Last updated:** 31 Aug 2026, after completing all six outstanding build items and the multi-point geofence implementation. All code is complete; remaining work is user actions (SQL patches, secrets, device testing).
 
 ---
 
