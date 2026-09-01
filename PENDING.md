@@ -3,7 +3,70 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 13 Aug 2026, after Maintenance/HR/VMC department expansion, the Saturday week-start fix, the gate-QR screen and Telegram onboarding.
+**Last updated:** 01 Sep 2026, after the quotation-archive rebuild and the customer outreach tracker.
+
+---
+
+## 🔴 Sales / quotation archive — rebuilt 01 Sep after a fabricated sheet
+
+**A sheet published earlier that day ("VFL Quotations — Drive Quotations
+2022-2023 Archive") contained invented figures** — built from memory of a prior
+session instead of from the files. Checked against source, Four Star BRACKET
+read ₹326.89 / die ₹584,880 / S460N-S500 where the sheet claimed
+"897-923" / "240000" / "8620". Part descriptions were invented too (real:
+Tragen *Wheel Cap*, LAPL *Yoke*, EKA *Front Knuckle Joint*). Quoting a
+customer from it would have been ~3x wrong on price.
+
+- Withdrawn, not deleted — renamed **"⚠️ WITHDRAWN — DO NOT USE"** so the link
+  shows a retraction rather than 404ing.
+- Rebuilt: **VFL Quotation Master — Verified from Source**
+  (`1kkxeFB103PVO4tyzXyON8EjuwV-aZ6PeC_9Fv0hFxL0`). 11 parts, every field read
+  field-by-field from the file. Blank where the source is blank.
+- **VFL Outreach Tracker — LIVE + RECONNECT**
+  (`1LNCN9RoJpzKb20v5LXW6c-CDwnhvr5NBftJQQVT_xBE`). 32 named customers, tiered.
+  COLD is deliberately empty — no prospect names were invented.
+
+### What the real files showed
+- **SACPL = Sanjeev Auto.** Not obvious from filenames. 5 parts quoted,
+  **144,080 pcs/yr** — the largest account in the archive. Differential Wheel
+  alone is 80,000/yr @ ₹1,046.14.
+- **SFS Group is the highest volume: 25,000/MONTH** @ ₹1,219 (Sector Shaft,
+  Feb-2024, Mr. Ajay Jadhav). Also the most recent quote in the archive.
+- **ZFI: 12 quotes in 12 months.**
+- **RM rate is NOT uniform** — ₹70.50–91.49/kg across three basis dates
+  (Jul-22 / Oct-22 / Jul-23). Any "all quotes were priced at X" claim is wrong.
+- **The corporate deck lists ZF India, Sanjeev, Four Star, Hendrickson, Indo
+  Schöttle, Ferrabyrne and NR Industries as approved Tier 1 partners** — so 7
+  of the "reconnect" names are existing approved suppliers with unconverted
+  quotes, not cold-ish prospects. Warmer conversation than assumed.
+- Source-data defect, recorded as-is not silently fixed: Four Star Diff Case
+  0159 shows finish wt **367.000 kg** against 4.050 kg input.
+
+### ⏳ Blocked on Yash
+- [ ] **~39 of ~50 quotation files still unextracted.** The Drive connector
+      parses `.xlsx` but rejects legacy `.xls` ("unsupported mime type"), and
+      most of the archive is `.xls`. That is why WIPRO (17 parts), ZFI's 12,
+      Trelleborg's 5, Hendrickson, VARROC and others show *"Filename-level
+      only"* in the tracker rather than invented numbers.
+      **Fix is one paste:** `scripts/convertQuotationXlsToSheets.gs` →
+      script.google.com → new project → paste → Services (+) → Drive API v2 →
+      Run. Converts in place, originals untouched, inherits folder permissions
+      (no public link-sharing of pricing), idempotent so a re-run resumes.
+      `DriveApp.makeCopy()` was tried first and does NOT convert — a copy of an
+      `.xls` stays `.xls`; only `Drive.Files.copy()` with mimeType
+      GOOGLE_SHEETS does, hence the advanced Drive service.
+- [ ] **Corporate deck is not shareable.** `Varsha_Forgings_Presentation nEW.pdf`
+      (`1VXAlq8qBKgUCj3wDEGnJdbmjEbuLQRvI`, 1 Aug 2026) has **owner-only**
+      permission — a customer clicking the link gets access-denied. Set to
+      "anyone with the link" before any outreach. Content itself was read
+      end-to-end and is current (cites 2025 award, 2024 EV supply); no edits
+      needed.
+
+### 🔵 Six live RFQs are waiting on us, not on them
+From Gmail, all 2026, none yet answered: **Tata Auto Components**
+(1,34,400/yr, since 13 Mar — largest), **Jayashree Polymers** (60,000/yr),
+**OHDAE**, **Weber Hydraulik**, **Kailash Vahn**, **Kejetherm** (this one is
+blocked on *their* material confirmation). Details and contacts in the tracker.
 
 ---
 
