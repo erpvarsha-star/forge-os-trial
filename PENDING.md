@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 31 Aug 2026, after shifts seed (PATCH_23) and Create Shift flow in HR Admin.
+**Last updated:** 1 Sep 2026, after bulk-confirm wiring in supervisor/team.tsx.
 
 ---
 
@@ -494,9 +494,14 @@ it has no monthly escalation tiers).
   additive change to an already-verified screen (worker/home.tsx), and the
   bundler step that catches real syntax/type breakage passed.
 
-**Still not done, and not urgent:** wiring `supervisor/team.tsx` to the edge
-function for real monthly escalation tiers (2nd flag → HR Admin, 3rd+ →
-Owner + Plant Head), which today never fire.
+**Done (1 Sep 2026):** `supervisor/team.tsx` now wires to the edge function.
+The in-memory sliding-window check (reset on remount, no escalation tiers) is
+replaced with a simple `confirmCount` ref. After `FRAUD_CONFIRMATION_THRESHOLD`
+(10) confirmations, it fire-and-forgets `fraud-detector`'s
+`bulk_confirmation_check` action — server-side, persists across remounts, and
+the 2-flags/3-flags monthly escalation tiers (HR Admin / Owner + Plant Head)
+now actually fire. The call is fail-open: a network error is swallowed so the
+supervisor's workflow is never blocked.
 
 ---
 

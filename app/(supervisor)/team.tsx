@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { View, Text, FlatList, TouchableOpacity, Alert } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/hooks/useAuth'
@@ -6,15 +6,14 @@ import { Header } from '@/components/Header'
 import { Card } from '@/components/Card'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
-import { notifyEmployeesByRole } from '@/lib/notifications'
 import { Employee, AttendanceRecord } from '@/types'
 import { User, Users, CheckCircle2 } from 'lucide-react-native'
 import { BRAND, INK } from '@/components/theme'
 
-// Workflow 11 (Fraud Detection): more than 10 confirmations in 90 seconds by
-// the same supervisor is treated as bulk/buddy confirmation and flagged.
+// Threshold matches fraud-detector's plant_config default (10 confirmations in
+// 90 seconds). We only call the edge function once we're above this — no point
+// hitting the server on the 1st of 10 confirmations.
 const FRAUD_CONFIRMATION_THRESHOLD = 10
-const FRAUD_WINDOW_MS = 90 * 1000
 
 export default function SupervisorTeam() {
   const { t } = useTranslation()
@@ -23,10 +22,10 @@ export default function SupervisorTeam() {
   const [isLoading, setIsLoading] = useState(true)
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
-  // In-memory sliding window of this supervisor's confirmation timestamps —
-  // resets on remount, which matches "confirmations in this session".
-  const confirmationTimestamps = useRef<number[]>([])
-  const fraudFlaggedThisBurst = useRef(false)
+  // Lightweight counter — resets on remount but that's fine: the server-side
+  // check reads DB records (checkpoint3_confirmed_by), so a remount just means
+  // the threshold call fires later than optimal in that session, never earlier.
+  const confirmCount = useRef(0)
 
   useEffect(() => { fetchTeam() }, [employee])
 
@@ -42,34 +41,6 @@ export default function SupervisorTeam() {
     setIsLoading(false)
   }
 
-  const checkBulkConfirmationFraud = useCallback(async () => {
-    const now = Date.now()
-    const recent = confirmationTimestamps.current.filter(ts => now - ts <= FRAUD_WINDOW_MS)
-    confirmationTimestamps.current = recent
-
-    if (recent.length <= FRAUD_CONFIRMATION_THRESHOLD) {
-      fraudFlaggedThisBurst.current = false
-      return
-    }
-    if (fraudFlaggedThisBurst.current || !employee) return
-    fraudFlaggedThisBurst.current = true
-
-    const seconds = Math.round((now - recent[0]) / 1000)
-    await supabase.from('fraud_alerts').insert({
-      type: 'bulk_confirm',
-      employee_id: employee.id,
-      description: `${employee.name} confirmed ${recent.length} team members in ${seconds} seconds`,
-      severity: 'high',
-      status: 'open',
-    })
-
-    await notifyEmployeesByRole(
-      'plant_head',
-      t('supervisor.bulkConfirmTitle'),
-      t('supervisor.bulkConfirmBody', { name: employee.name, count: recent.length, seconds })
-    )
-  }, [employee, t])
-
   const confirmAttendance = async (member: Employee, status: 'P' | 'A') => {
     if (!employee) return
     setConfirmingId(member.id)
@@ -84,8 +55,21 @@ export default function SupervisorTeam() {
     if (error) { Alert.alert(t('common.error'), t('common.somethingWentWrong')); return }
 
     setTeam(prev => prev.map(m => (m.id === member.id ? { ...m, attendance: { ...(m.attendance as AttendanceRecord), status } as AttendanceRecord } : m)))
-    confirmationTimestamps.current.push(Date.now())
-    checkBulkConfirmationFraud()
+
+    confirmCount.current += 1
+    if (confirmCount.current > FRAUD_CONFIRMATION_THRESHOLD) {
+      // Fire-and-forget: the edge function checks DB records directly, so a
+      // remount won't reset the server-side count. Fail open — if the call
+      // fails, the confirmation already happened and the supervisor's workflow
+      // must not be blocked by a fraud-check network error.
+      supabase.functions
+        .invoke('fraud-detector', {
+          body: { action: 'bulk_confirmation_check', supervisorId: employee.id, employeeId: member.id, shiftDate: today },
+        })
+        .catch(() => {
+          // intentionally silent — fraud check failure must never block the UI
+        })
+    }
   }
 
   const statusDot = (status?: string) => {
