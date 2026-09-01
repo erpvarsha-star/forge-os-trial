@@ -26,6 +26,38 @@ progress.
 outstanding, blocked, or untested. Update it before the final push of any
 session.
 
+**Notion Brain sync is automatic on push** — `.github/workflows/sync-to-notion.yml`
+syncs `CLAUDE.md` and `PENDING.md` to the Notion Brain on every push to `main`
+or `claude/**` branches. The GitHub Actions secret `NOTION_TOKEN` must be set
+(see Notion Sync Setup below). In any session that modifies `CLAUDE.md` or
+`PENDING.md`, also update the relevant hand-crafted Notion Brain subpages via
+Notion MCP if the change is structural (new patch, new screen, role change) —
+the auto-sync covers raw content; the Brain subpages carry curated summaries.
+
+**Notion Brain page IDs** (for MCP updates):
+- VFPL Master Brain hub: `3c8c4f944b9381fa9d40c89f0c278491`
+- Forge OS Brain hub: `3c8c4f944b938193bcb5f7b3e721f5c2`
+- Audit Gaps & Issues: `3c8c4f944b9381fcbf91f90e7e18b14c`
+- Glossary: `3c8c4f944b9381f6ac62c2842c52c4de`
+- File Map: `3c8c4f944b9381349582e158c8362c23`
+- CLAUDE.md Live Sync: `3c8c4f944b9381948341f0f3a2115e29`
+- PENDING.md Live Sync: `3c8c4f944b9381359724f847a92ca86d`
+- Working with Claude: `3c8c4f944b93817a81d7d89b88f94317`
+
+---
+
+## Notion Sync Setup (one-time, if not done)
+
+1. Go to https://www.notion.so/profile/integrations → **New integration** →
+   name it "Forge OS Sync" → Internal → Submit
+2. Copy the **Internal Integration Token**
+3. In GitHub: `forge-os-trial` → Settings → Secrets → Actions →
+   **New secret** → name `NOTION_TOKEN` → paste token
+4. In Notion: open each Brain page → `...` menu → **Connections** → add
+   "Forge OS Sync". Do this for Master Brain, Forge OS Brain, and both Live
+   Sync pages — child pages inherit the connection automatically.
+5. Push any change to `CLAUDE.md` or `PENDING.md` to trigger the first sync.
+
 ---
 
 ## Non-negotiable security rules
