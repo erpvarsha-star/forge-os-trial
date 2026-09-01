@@ -233,8 +233,8 @@ assigns shifts for, same as any other day; a Friday off is one with none.
 | `PATCH_21_plant_locations_13Aug2026.sql` | Creates `plant_locations` (multi-point geofence table), 0 rows. Safe to run any time — check-in behaviour is unchanged until PATCH_22 also runs | ⏳ Not yet run |
 | `PATCH_22_plant_locations_seed_13Aug2026.sql` | Seeds 12 campus locations (11 from Yash's sheet + "Store") with real coordinates, received 13 Aug | ⏳ Not yet run |
 | `COMBINED_DEPLOY_21to22_13Aug2026.sql` | PATCH_21 + PATCH_22 concatenated (generated, cannot drift) — run this one file | ⏳ Not yet run |
-| `PATCH_23_shifts_seed_31Aug2026.sql` | Seeds Shift 1/2/3 (08:30/15:30/23:30) into `shifts` table; also adds `UNIQUE (name)` constraint. Unblocks HR shift assignment and `shift-reminder` daily check-in mode | ⏳ Not yet run |
-| `COMBINED_DEPLOY_19to23_31Aug2026.sql` | PATCH_19+20+21+22+23 in one file — **use this instead of the five individual files** | ⏳ Not yet run |
+| `PATCH_23_shifts_seed_31Aug2026.sql` | Seeds Shift 1/2/3 (08:30/15:30/23:30) into `shifts` table; also adds `UNIQUE (name)` constraint. Unblocks HR shift assignment and `shift-reminder` daily check-in mode | ✅ Applied 1 Sep — shifts confirmed live |
+| `COMBINED_DEPLOY_19to23_31Aug2026.sql` | PATCH_19+20+21+22+23 in one file — **use this instead of the five individual files** | ⏳ Confirm with Yash whether full combined file ran (PATCH_23 confirmed; PATCH_19–22 status unknown) |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee | ♾️ On demand |
 
 **Total employees confirmed live: 129** (120 original + 4 PATCH_08 + 5 PATCH_09).

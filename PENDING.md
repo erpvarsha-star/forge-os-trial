@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 1 Sep 2026, after bulk-confirm wiring in supervisor/team.tsx.
+**Last updated:** 1 Sep 2026, after Yash confirmed shifts live in DB.
 
 ---
 
@@ -649,9 +649,9 @@ radius).
       the existing Assign Shift modal — HR can add new shifts in-app without a
       SQL file. When `shifts` is empty the empty-state card shows a direct
       "Create Shift" button so the first-launch flow is obvious.
-      ⚠ **Blocked on Yash:** run `COMBINED_DEPLOY_19to23_31Aug2026.sql` in the
-      SQL Editor — until then the app still shows the empty-state card (because
-      `shifts` is empty in the live DB).
+      ✅ **Shifts live as of 1 Sep 2026** — Yash confirmed 3 rows in `shifts`
+      (Shift 1/2/3 with 08:30/15:30/23:30). HR can now assign shifts in-app
+      and `shift-reminder` daily check-in mode will match real shift times.
 
 ---
 
