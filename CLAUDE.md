@@ -518,3 +518,116 @@ Verification beyond "the Gradle command exited 0": `npx expo export --platform w
 eas build --platform android --profile preview
 # or: expo.dev → erp.varsha → forge-os → Builds → New Build
 ```
+
+---
+
+## Multi-LLM collaboration
+
+This project is worked on by multiple AI assistants (Claude, ChatGPT, Gemini, Kimi, DeepSeek, etc.).
+`CLAUDE.md` (this file) and `PENDING.md` are the **single source of truth** for all of them.
+
+### The contract every AI must honour
+
+1. **Read both files at the start of every session** — before touching any code.
+2. **Update `PENDING.md` before the final push** — mark completed items ✅, add new blockers, update "Last updated" date.
+3. **Update `CLAUDE.md`** when a permanent fact changes: a patch is applied, a decision is made, a bug is confirmed fixed, new employees added.
+4. **Commit and push after every completed step** — power and internet drop frequently; never lose more than one step.
+5. **Never hardcode secrets** — all keys via environment variables; `.env` is gitignored.
+6. **Always use `types/index.ts` column names** — never `types/database.ts` (old schema). Forbidden column names: `shift_date`, `full_name`, `employee_code`, `department_id`, `reporting_manager_id`, `salary_structure`.
+7. **Never bypass RLS** — every DB operation through Supabase RLS from the client.
+8. **Never use `DROP SCHEMA public CASCADE`** — per-table DROP only.
+
+### System prompt / custom instructions for each AI
+
+Paste this at the start of each session (replace `[AI NAME]` with the actual assistant):
+
+---
+
+**For ChatGPT (Project Instructions or first message):**
+```
+You are a coding assistant working on Forge OS — a React Native + Supabase HR app
+for Varsha Forgings Pvt Ltd, Aurangabad (129 employees, bilingual EN/HI).
+
+Repo: https://github.com/erpvarsha-star/forge-os-trial
+Working branch: claude/forge-os-backend-setup-7woj4t
+
+MANDATORY FIRST STEP: Read these two files before doing anything:
+- CLAUDE.md — master project context (stack, schema, patches, decisions, rules)
+- PENDING.md — live task checklist (what's done, blocked, outstanding)
+
+Rules (non-negotiable):
+- types/index.ts is the authoritative type source — never types/database.ts
+- All secrets via environment variables, never hardcoded
+- Every DB operation through Supabase RLS — never bypass
+- Never use DROP SCHEMA public CASCADE
+- Commit + push after every completed step
+- Before ending the session: update PENDING.md (mark done items ✅, add blockers),
+  update CLAUDE.md if any permanent fact changed, commit and push both files
+```
+
+---
+
+**For Gemini (System instructions or Gem configuration):**
+```
+Project: Forge OS — React Native attendance + HR app, Varsha Forgings Pvt Ltd
+GitHub repo: erpvarsha-star/forge-os-trial (branch: claude/forge-os-backend-setup-7woj4t)
+
+Before any coding task, fetch and read:
+1. CLAUDE.md — architecture, Supabase schema (FINAL_SCHEMA), all patches applied,
+   role/employee data, security rules, decisions made
+2. PENDING.md — what is done, blocked, and still outstanding
+
+Column names: always use types/index.ts (FINAL_SCHEMA). Never use types/database.ts.
+Forbidden names: shift_date, full_name, employee_code, department_id,
+reporting_manager_id, salary_structure.
+
+End of session: update PENDING.md + CLAUDE.md with what changed, commit and push.
+Secrets never in code. RLS never bypassed. No DROP SCHEMA CASCADE.
+```
+
+---
+
+**For Kimi (System prompt):**
+```
+You are working on Forge OS — a bilingual (EN/HI) React Native + Expo Router (SDK 51)
+attendance and HR system for a manufacturing plant in Aurangabad, India.
+
+Repository: erpvarsha-star/forge-os-trial on GitHub
+Branch: claude/forge-os-backend-setup-7woj4t
+
+ALWAYS start by reading CLAUDE.md and PENDING.md from the repo root.
+CLAUDE.md is the master context — schema, patches, architecture, rules.
+PENDING.md is the live checklist — what's done and what's next.
+
+Hard rules:
+- Use types/index.ts for all DB types (FINAL_SCHEMA). Never types/database.ts.
+- No hardcoded secrets. No DROP SCHEMA CASCADE. No RLS bypass.
+- Commit and push after every step. Update both files before ending any session.
+```
+
+---
+
+**For DeepSeek (System prompt or first message):**
+```
+Forge OS coding assistant. React Native + Expo SDK 51 + Supabase + NativeWind v4.
+Company: Varsha Forgings Pvt Ltd. Repo: erpvarsha-star/forge-os-trial.
+Branch: claude/forge-os-backend-setup-7woj4t.
+
+Step 1 (mandatory): read CLAUDE.md and PENDING.md from the repo before anything else.
+CLAUDE.md = authoritative project facts. PENDING.md = current task status.
+
+Type source: types/index.ts only. Column names from FINAL_SCHEMA only.
+Never: types/database.ts, hardcoded secrets, DROP SCHEMA CASCADE, RLS bypass.
+After each session: update PENDING.md and CLAUDE.md, commit and push.
+```
+
+---
+
+### Session handoff checklist (any AI, any session)
+
+Before ending a session, verify:
+- [ ] All completed tasks marked ✅ in PENDING.md
+- [ ] New blockers or Yash-pending items added to PENDING.md
+- [ ] "Last updated" line in PENDING.md updated to today's date and what changed
+- [ ] CLAUDE.md updated if any patch was applied, decision made, or permanent fact changed
+- [ ] Both files committed and pushed to the working branch
