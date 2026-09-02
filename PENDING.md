@@ -636,16 +636,14 @@ radius).
 - [ ] **Shakeel Sayyad** — confirmed a real employee, still has no `emp_code`,
       so cannot be provisioned a login.
 - [ ] **VFL1527 phone** — deliberately NULL, correct number still unknown.
-- [ ] **`shifts` table has no seed data and no creation flow** — found 13 Aug
-      while fixing `shift-reminder`'s `daily_checkin_reminder` mode (see
-      above). No `scripts/*.sql` file seeds `shifts`, and
-      `app/(hr-admin)/shifts.tsx` only lets HR assign an *existing* shift to
-      an employee — there's no screen or script that creates one. Until a
-      `shifts` row exists with `start_time` matching
-      `plant_config.form_shift_schedule` (`08:30`/`15:30`/`23:30`),
-      `employee_shifts` can't be populated (FK constraint) and shift-based
-      reminders have nothing real to match against. Needs a decision: seed
-      the three known shifts directly, or build a "create shift" screen.
+- [ ] **`shifts` table seed — READY TO RUN (02 Sep 2026).**
+      `PATCH_23_shifts_seed_02Sep2026.sql` seeds the three standard shifts
+      (Day 08:30, Evening 15:30, Night 23:30). Safe to run any time — idempotent.
+      Without this, `employee_shifts` stays empty (FK constraint) and
+      `shift-reminder`'s `daily_checkin_reminder` has no start_time rows to
+      match. Run it via Supabase SQL Editor, same as prior patches.
+      `app/(hr-admin)/shifts.tsx` will then be able to assign shifts to
+      employees from these three rows.
 
 ---
 
