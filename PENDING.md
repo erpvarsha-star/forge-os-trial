@@ -42,19 +42,23 @@ customer from it would have been ~3x wrong on price.
 - Source-data defect, recorded as-is not silently fixed: Four Star Diff Case
   0159 shows finish wt **367.000 kg** against 4.050 kg input.
 
-### ⏳ Blocked on Yash
-- [ ] **~39 of ~50 quotation files still unextracted.** The Drive connector
-      parses `.xlsx` but rejects legacy `.xls` ("unsupported mime type"), and
-      most of the archive is `.xls`. That is why WIPRO (17 parts), ZFI's 12,
-      Trelleborg's 5, Hendrickson, VARROC and others show *"Filename-level
-      only"* in the tracker rather than invented numbers.
-      **Fix is one paste:** `scripts/convertQuotationXlsToSheets.gs` →
-      script.google.com → new project → paste → Services (+) → Drive API v2 →
-      Run. Converts in place, originals untouched, inherits folder permissions
-      (no public link-sharing of pricing), idempotent so a re-run resumes.
-      `DriveApp.makeCopy()` was tried first and does NOT convert — a copy of an
-      `.xls` stays `.xls`; only `Drive.Files.copy()` with mimeType
-      GOOGLE_SHEETS does, hence the advanced Drive service.
+### ⏳ Blocked on Yash (quota extraction conversion)
+
+**THE PATH FORWARD IS CLEAR.** The `.xls` ↔ `.xlsx` conversion blocker is solved:
+
+- [ ] **Run the conversion script (one paste, one click).** 
+  1. Go to https://script.google.com → **New project**
+  2. Paste the entire contents of `scripts/convertQuotationXlsToSheets.gs` over `Code.gs`
+  3. Click **Services** (+) → **Drive API** → v2 → **Add**
+  4. Click **Run** → **convertQuotationXlsToSheets** → authorize
+  5. Watch the log. It will print one line per converted file (no public sharing; inherits folder permissions).
+  6. **Safe to re-run** if it times out — skips already-converted files, resumes from failure.
+  
+  Once this runs, all 39+ `.xls` files will have a `[GSHEET]` twin in Google Sheets format. Then:
+  - Claude can read them via the Drive connector (supports `.xlsx` natively)
+  - The Quotation Master can be completed: all 50+ files → one CSV with unit cost / die cost / part no / RM rate / etc.
+  - The Outreach Tracker references will change from "Filename-level only" to real numbers (WIPRO 17 parts, ZFI 12, Trelleborg 5, etc.)
+
 - [ ] **Corporate deck is not shareable.** `Varsha_Forgings_Presentation nEW.pdf`
       (`1VXAlq8qBKgUCj3wDEGnJdbmjEbuLQRvI`, 1 Aug 2026) has **owner-only**
       permission — a customer clicking the link gets access-denied. Set to
