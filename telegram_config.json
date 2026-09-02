@@ -1,0 +1,10 @@
+{
+  "_comment": "Paste the bot token into ALERT.gs TELEGRAM_BOT_TOKEN_INLINE or Script Properties. NEVER commit a real token to git.",
+  "bot_username": "@Form_mgr_bot",
+  "bot_name": "ForgeOS Forms Manager",
+  "token_location": "Apps Script → Project Settings → Script Properties → TELEGRAM_BOT_TOKEN",
+  "onboarding_instructions": "Each supervisor messages the bot with their full name. Bot auto-matches and registers their chat_id. Owner messages 'Yash Munot' or 'owner'.",
+  "token_format": "1234567890:ABCdefGHIjklMNOpqrSTUvwxYZ",
+  "created": "2026-08-13",
+  "bot_created_via": "@BotFather"
+}
