@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 1 Sep 2026, after Yash confirmed shifts live in DB.
+**Last updated:** 2 Sep 2026 — Gemini/Forge OS integration architecture decided and documented in CLAUDE.md.
 
 ---
 
@@ -36,6 +36,30 @@ will not error — but `form_submissions` and `production_records` stay empty,
 and therefore the Forms tab's shift chips and the production panels stay blank,
 until the Apps Script sync actually runs. That needs the two Script Properties
 below. Empty tables and a broken sync look identical from the app.
+
+---
+
+## ✅ Architecture decisions — 2 Sep 2026
+
+- [x] **Attendance system of record — Forge OS wins.** Gemini was planning a
+      manual muster feed (`tbl_Attendance_Muster`). Decision: that table must
+      NOT be built. `attendance_records` in Supabase is the single system of
+      record. Gemini reads it (service role, read-only) if it needs attendance
+      data for Google Workspace reports.
+
+- [x] **AppSheet stays for shop-floor production data entry.** Works offline,
+      Gemini has already built significant infrastructure there, and the
+      AppSheet → Apps Script → Supabase sync (`production_records`,
+      `form_submissions`) is the right architecture. Data flow is one-way only:
+      Workspace → Supabase. Never sync back.
+
+- [x] **Claude is the Supabase schema architect.** Gemini proposes what it
+      needs; Claude writes the patch; Yash runs it. Gemini never creates or
+      alters Supabase tables directly.
+
+- [x] **Gemini instructions written and locked in CLAUDE.md** — see the new
+      "Gemini / Google Workspace integration architecture" section. Paste the
+      instructions block verbatim at the start of each Gemini session.
 
 ---
 

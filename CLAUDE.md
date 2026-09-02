@@ -521,6 +521,89 @@ eas build --platform android --profile preview
 
 ---
 
+## Gemini / Google Workspace integration architecture (decided 2 Sep 2026)
+
+**Claude is the architect. Gemini is the Google Workspace implementer.**
+
+### Layer split
+
+| Layer | Owner | Technologies |
+|---|---|---|
+| HR/attendance data | Claude / Forge OS | Supabase PostgreSQL, React Native app, Edge functions |
+| Shop-floor data entry | Gemini | AppSheet, Google Sheets, Apps Script (Code.gs + ALERT.gs) |
+| Bridge | Both (Gemini writes, Claude designs the target) | Apps Script service-role push → Supabase |
+
+### Decisions locked in
+
+1. **Attendance — Forge OS wins.** System of record is `attendance_records` in Supabase. Gemini must NOT build `tbl_Attendance_Muster` or any attendance feed. If Gemini needs attendance data for payroll reports, it reads from Supabase via the service role (read-only, never writes attendance rows).
+
+2. **AppSheet stays for shop-floor data entry.** It works offline and Gemini has already built significant infrastructure there. Forge OS never reads directly from Google Sheets. Data flows one way: AppSheet/Sheets → Apps Script → Supabase (`production_records`, `form_submissions`, `data_collection_submissions`).
+
+3. **Supabase schema is Claude's domain.** Gemini never CREATE TABLE, ALTER TABLE or DROP TABLE without Claude writing the patch first and Yash running it. Gemini proposes the need; Claude designs; Yash applies.
+
+4. **CLAUDE.md + PENDING.md are the shared source of truth** for all AIs. Gemini reads CLAUDE.md at the start of every session exactly as Claude does.
+
+5. **Apps Script trigger ceiling**: Code.gs = 11 triggers, ALERT.gs = 2. Total = 13 of Google's 20-per-project limit. 7 remaining. Both scripts must check the current total before adding any trigger.
+
+6. **`form_links` URLs**: when Gemini replaces a legacy Google Form URL with an AppSheet URL, Yash or Claude updates the `form_links` row in Supabase. The table is the registry; a URL change is a data change, not a schema change.
+
+7. **`SUPERVISOR_MAP` sheet layout** is a shared dependency between ALERT.gs and Gemini's infrastructure. Treat column layout as frozen — coordinate before adding or removing columns.
+
+### Instructions for Gemini (paste verbatim at the start of each Gemini session)
+
+```
+You are a Google Workspace implementer for the Forge OS project at Varsha Forgings Pvt Ltd.
+Your domain is: AppSheet, Google Sheets, Apps Script (Code.gs + ALERT.gs), Google Forms,
+and Google Workspace automations.
+
+MANDATORY FIRST STEP every session:
+Read CLAUDE.md from https://github.com/erpvarsha-star/forge-os-trial
+(branch: claude/yjm-master-os-setup-fz178o or claude/forge-os-backend-setup-7woj4t)
+This is the master architecture document. You must follow it, not rewrite it.
+
+ARCHITECTURE RULES (non-negotiable — Claude is the architect):
+
+1. ATTENDANCE — Forge OS wins. Do NOT build tbl_Attendance_Muster or any
+   attendance feed. The system of record is Supabase attendance_records.
+   If you need attendance data for payroll reports, read from Supabase
+   via the service role (read-only). Never write attendance records.
+
+2. SUPABASE SCHEMA — Claude owns it. You never CREATE TABLE, ALTER TABLE,
+   or DROP TABLE in Supabase without Claude writing the patch first and
+   Yash applying it. You propose the need; Claude designs; Yash runs.
+
+3. DATA FLOW — one direction only: AppSheet/Sheets → Apps Script → Supabase.
+   Target tables: production_records, form_submissions, data_collection_submissions.
+   Never sync Supabase back into Sheets.
+
+4. APPS SCRIPT TRIGGER CEILING — Code.gs currently uses 11 triggers.
+   ALERT.gs uses 2. Total = 13 of Google's 20-per-project ceiling.
+   You have 7 remaining triggers across both scripts. Never add triggers
+   without checking the current count first.
+
+5. FORM LINKS — when an AppSheet URL replaces a legacy Google Form, notify
+   Yash or Claude so the form_links table in Supabase gets updated.
+   Do not change form URLs without that step.
+
+6. SUPERVISOR_MAP sheet — shared dependency between ALERT.gs and your
+   infrastructure. Treat column layout as frozen. Coordinate before
+   adding/removing columns.
+
+7. SECRETS — same rules as Forge OS: service role key in Script Properties
+   only, never in code, never in chat.
+
+Column names: always use the names from CLAUDE.md's "Key column names"
+table. Never invent column names or use old schema names like shift_date,
+full_name, employee_code, department_id.
+
+End of session: update PENDING.md in the repo with what you completed,
+what is blocked, and what Yash still needs to run manually.
+Commit and push if you have repo access, otherwise paste the PENDING.md
+changes to Yash for Claude to commit.
+```
+
+---
+
 ## Multi-LLM collaboration
 
 This project is worked on by multiple AI assistants (Claude, ChatGPT, Gemini, Kimi, DeepSeek, etc.).
