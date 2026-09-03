@@ -7,6 +7,27 @@ push. `[x]` only when verified, not merely written.
 
 ---
 
+## 🎯 CRITICAL PATH — Three things Yash must do (highest impact first)
+
+1. **Apps Script conversion for quotation files** (unmasks 39+ customer quotes)
+   - Go to https://script.google.com → New project
+   - Paste `scripts/convertQuotationXlsToSheets.gs` over Code.gs
+   - Services (+) → Drive API v2 → Add
+   - Run → convertQuotationXlsToSheets
+   - **Impact**: Unlocks Task #2 (quotation extraction), enables full Outreach Tracker with real numbers, unblocks Tier 2-3 customer reconnect outreach with accurate pricing
+
+2. **Firebase / FCM service account for push notifications** (unblocks push, currently no field notifications reach phones)
+   - Firebase → Project Settings → Service Accounts → Generate new private key → download JSON
+   - Supabase → Edge Functions → Secrets → paste `FCM_SERVICE_ACCOUNT_JSON` (do not paste in chat — use Supabase UI directly)
+   - **Impact**: Enables push reminders (forms_due_reminder, shift checkins, fraud alerts) for all 129 employees. App currently logs in fine, but no push reaches phones.
+
+3. **Apps Script properties for Operations Dashboard sync** (unblocks forms data reaching the app)
+   - Apps Script editor → Project Settings → Script Properties
+   - Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, then run `testSupabaseSync()` once
+   - **Impact**: Forms tab shows pending submissions per shift, production dashboard populates, nightly cascading notifications work
+
+---
+
 ## 🔴 Sales / quotation archive — rebuilt 01 Sep after a fabricated sheet
 
 **A sheet published earlier that day ("VFL Quotations — Drive Quotations
