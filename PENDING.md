@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 01 Sep 2026, after the quotation-archive rebuild and the customer outreach tracker.
+**Last updated:** 04 Sep 2026, after adding PATCH_23 (shifts seed) to unblock shift-based reminders.
 
 ---
 
@@ -705,16 +705,12 @@ radius).
 - [ ] **Shakeel Sayyad** — confirmed a real employee, still has no `emp_code`,
       so cannot be provisioned a login.
 - [ ] **VFL1527 phone** — deliberately NULL, correct number still unknown.
-- [ ] **`shifts` table has no seed data and no creation flow** — found 13 Aug
-      while fixing `shift-reminder`'s `daily_checkin_reminder` mode (see
-      above). No `scripts/*.sql` file seeds `shifts`, and
-      `app/(hr-admin)/shifts.tsx` only lets HR assign an *existing* shift to
-      an employee — there's no screen or script that creates one. Until a
-      `shifts` row exists with `start_time` matching
-      `plant_config.form_shift_schedule` (`08:30`/`15:30`/`23:30`),
-      `employee_shifts` can't be populated (FK constraint) and shift-based
-      reminders have nothing real to match against. Needs a decision: seed
-      the three known shifts directly, or build a "create shift" screen.
+- [x] **Shifts table seed created 04 Sep** — PATCH_23 (`scripts/PATCH_23_shifts_seed_04Sep2026.sql`)
+      seeds the three production shifts (Shift 1: 08:30-15:30, Shift 2: 15:30-23:30, Shift 3: 23:30-08:30)
+      so HR can assign existing shifts via `app/(hr-admin)/shifts.tsx` and shift-based reminders
+      (`shift-reminder`'s `dailyCheckinReminder` mode) can match against real data. Once run,
+      `employee_shifts` can be populated and `shift-reminder`'s 15-minute check-in nudge will fire.
+      **Ready to run whenever Yash chooses** — no blocker on this one.
 
 ---
 
