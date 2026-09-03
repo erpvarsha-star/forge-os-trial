@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 2 Sep 2026 — Gemini/Forge OS integration architecture decided and documented in CLAUDE.md.
+**Last updated:** 3 Sep 2026 — Multi-project parallel build initiated (Die Design ML, Power OS, VF SEO agents running); Forge OS activation runbook written and pushed.
 
 ---
 
@@ -699,3 +699,33 @@ radius).
 - [x] In-app update banner + build number on the update row
 - [x] EAS `projectId` set (push token registration unblocked; delivery still needs FCM)
 - [x] `HR_reset_pin.sql` utility for role testing
+- [x] **Activation runbook written — 03 Sep 2026.** `CODE_ForgeOS_Runbook_03SEP2026.md`
+      in repo root. Covers: SQL patches, FCM secret, ALERT.gs setup, APK distribution,
+      employee onboarding, monitoring, SPARK integration reference.
+
+---
+
+## 🔵 Multi-project build — started 03 Sep 2026
+
+Three parallel agents running. Results expected within the hour.
+
+- **Die Design ML Engine (#15b)** — Agent creating new GitHub repo with Python skeleton:
+  ezdxf DXF parser, python-occ reconstruction stub, XGBoost predictor, FastAPI endpoint.
+  BLOCKED on DXF training files (WAITING YASH).
+
+- **YJM Power OS (#20)** — Agent adding repo `yashmunot-sudo/YJM-POWER-`, reading SPARK's
+  dossier from Drive, auditing competing builds, fixing /api/tasks schema mismatch.
+  V8 migration (Cloudflare Workers + Turso + Capacitor) held pending Yash GO.
+
+- **VF Website Technical SEO (#24)** — Agent finding VF website repo, reading WORK's SEO
+  audit from Drive, implementing technical fixes (OG tags, sitemap, robots.txt, structured data).
+  Content changes held — WORK owns copy.
+
+### Projects still blocked / waiting Yash
+- **#21 n8n/Zapier webhooks** — need error logs from automation platform
+- **#22 OEM TorqueRods** — waiting SQL Server credential rotation
+- **#23 Personal Website** — waiting professional photos + DNS access
+- **#14 Travel OS** — waiting approach decision (4 build attempts, no canonical)
+- **#11 ERP Migration** — BLOCKED on ERPNext server
+- **#29 Personal Portfolio** — WAITING GO for alpha engine
+- **#12 VFPL HR repos** — repo audit (5 repos, identify canonical) queued for Phase 2
