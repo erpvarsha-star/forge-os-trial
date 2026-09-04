@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 31 Aug 2026, after completing all six outstanding build items and the multi-point geofence implementation. All code is complete; remaining work is user actions (SQL patches, secrets, device testing).
+**Last updated:** 3 Sep 2026 — VF Website SEO (#24) complete: 28 pages updated live on varshaforgings.com via Wix API; runbook written.
 
 ---
 
@@ -36,6 +36,30 @@ will not error — but `form_submissions` and `production_records` stay empty,
 and therefore the Forms tab's shift chips and the production panels stay blank,
 until the Apps Script sync actually runs. That needs the two Script Properties
 below. Empty tables and a broken sync look identical from the app.
+
+---
+
+## ✅ Architecture decisions — 2 Sep 2026
+
+- [x] **Attendance system of record — Forge OS wins.** Gemini was planning a
+      manual muster feed (`tbl_Attendance_Muster`). Decision: that table must
+      NOT be built. `attendance_records` in Supabase is the single system of
+      record. Gemini reads it (service role, read-only) if it needs attendance
+      data for Google Workspace reports.
+
+- [x] **AppSheet stays for shop-floor production data entry.** Works offline,
+      Gemini has already built significant infrastructure there, and the
+      AppSheet → Apps Script → Supabase sync (`production_records`,
+      `form_submissions`) is the right architecture. Data flow is one-way only:
+      Workspace → Supabase. Never sync back.
+
+- [x] **Claude is the Supabase schema architect.** Gemini proposes what it
+      needs; Claude writes the patch; Yash runs it. Gemini never creates or
+      alters Supabase tables directly.
+
+- [x] **Gemini instructions written and locked in CLAUDE.md** — see the new
+      "Gemini / Google Workspace integration architecture" section. Paste the
+      instructions block verbatim at the start of each Gemini session.
 
 ---
 
@@ -494,9 +518,14 @@ it has no monthly escalation tiers).
   additive change to an already-verified screen (worker/home.tsx), and the
   bundler step that catches real syntax/type breakage passed.
 
-**Still not done, and not urgent:** wiring `supervisor/team.tsx` to the edge
-function for real monthly escalation tiers (2nd flag → HR Admin, 3rd+ →
-Owner + Plant Head), which today never fire.
+**Done (1 Sep 2026):** `supervisor/team.tsx` now wires to the edge function.
+The in-memory sliding-window check (reset on remount, no escalation tiers) is
+replaced with a simple `confirmCount` ref. After `FRAUD_CONFIRMATION_THRESHOLD`
+(10) confirmations, it fire-and-forgets `fraud-detector`'s
+`bulk_confirmation_check` action — server-side, persists across remounts, and
+the 2-flags/3-flags monthly escalation tiers (HR Admin / Owner + Plant Head)
+now actually fire. The call is fail-open: a network error is swallowed so the
+supervisor's workflow is never blocked.
 
 ---
 
@@ -636,16 +665,17 @@ radius).
 - [ ] **Shakeel Sayyad** — confirmed a real employee, still has no `emp_code`,
       so cannot be provisioned a login.
 - [ ] **VFL1527 phone** — deliberately NULL, correct number still unknown.
-- [ ] **`shifts` table has no seed data and no creation flow** — found 13 Aug
-      while fixing `shift-reminder`'s `daily_checkin_reminder` mode (see
-      above). No `scripts/*.sql` file seeds `shifts`, and
-      `app/(hr-admin)/shifts.tsx` only lets HR assign an *existing* shift to
-      an employee — there's no screen or script that creates one. Until a
-      `shifts` row exists with `start_time` matching
-      `plant_config.form_shift_schedule` (`08:30`/`15:30`/`23:30`),
-      `employee_shifts` can't be populated (FK constraint) and shift-based
-      reminders have nothing real to match against. Needs a decision: seed
-      the three known shifts directly, or build a "create shift" screen.
+- [x] **`shifts` table — FIXED 31 Aug 2026.** Both halves done: (a) SQL seed
+      (`PATCH_23_shifts_seed_31Aug2026.sql`, included in
+      `COMBINED_DEPLOY_19to23_31Aug2026.sql`) inserts Shift 1/2/3 with the real
+      08:30/15:30/23:30 times, idempotent via `ON CONFLICT (name) DO NOTHING`;
+      (b) `app/(hr-admin)/shifts.tsx` now has a Create Shift modal alongside
+      the existing Assign Shift modal — HR can add new shifts in-app without a
+      SQL file. When `shifts` is empty the empty-state card shows a direct
+      "Create Shift" button so the first-launch flow is obvious.
+      ✅ **Shifts live as of 1 Sep 2026** — Yash confirmed 3 rows in `shifts`
+      (Shift 1/2/3 with 08:30/15:30/23:30). HR can now assign shifts in-app
+      and `shift-reminder` daily check-in mode will match real shift times.
 
 ---
 
@@ -669,3 +699,35 @@ radius).
 - [x] In-app update banner + build number on the update row
 - [x] EAS `projectId` set (push token registration unblocked; delivery still needs FCM)
 - [x] `HR_reset_pin.sql` utility for role testing
+- [x] **Activation runbook written — 03 Sep 2026.** `CODE_ForgeOS_Runbook_03SEP2026.md`
+      in repo root. Covers: SQL patches, FCM secret, ALERT.gs setup, APK distribution,
+      employee onboarding, monitoring, SPARK integration reference.
+
+---
+
+## 🔵 Multi-project build — started 03 Sep 2026
+
+Three parallel agents running. Results expected within the hour.
+
+- **Die Design ML Engine (#15b)** — Agent creating new GitHub repo with Python skeleton:
+  ezdxf DXF parser, python-occ reconstruction stub, XGBoost predictor, FastAPI endpoint.
+  BLOCKED on DXF training files (WAITING YASH).
+
+- **YJM Power OS (#20)** — Agent adding repo `yashmunot-sudo/YJM-POWER-`, reading SPARK's
+  dossier from Drive, auditing competing builds, fixing /api/tasks schema mismatch.
+  V8 migration (Cloudflare Workers + Turso + Capacitor) held pending Yash GO.
+
+- **VF Website Technical SEO (#24)** — ✅ COMPLETE 3 Sep 2026. 28 pages updated live on
+  varshaforgings.com via Wix SEO API (keyword-rich titles + homepage description). JSON-LD/GSC
+  already covered by SPARK (no duplicates added). Summary: `CODE_VFWebsite_SEO_03SEP2026.md`.
+  **Blocked on Yash:** (a) og:image URL for all 46 pages, (b) `/tool-manufactring` slug typo fix
+  in Wix Editor. WORK owns alt text and body copy fixes.
+
+### Projects still blocked / waiting Yash
+- **#21 n8n/Zapier webhooks** — need error logs from automation platform
+- **#22 OEM TorqueRods** — waiting SQL Server credential rotation
+- **#23 Personal Website** — waiting professional photos + DNS access
+- **#14 Travel OS** — waiting approach decision (4 build attempts, no canonical)
+- **#11 ERP Migration** — BLOCKED on ERPNext server
+- **#29 Personal Portfolio** — WAITING GO for alpha engine
+- **#12 VFPL HR repos** — repo audit (5 repos, identify canonical) queued for Phase 2

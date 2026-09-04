@@ -456,7 +456,13 @@
     "outstanding": "Outstanding",
     "supervisorField": "Supervisor",
     "employeeLabel": "Employee",
-    "shiftAssigned": "Shift assigned"
+    "shiftAssigned": "Shift assigned",
+    "createShift": "Create Shift",
+    "shiftName": "Shift Name",
+    "startTime": "Start Time (HH:MM)",
+    "endTime": "End Time (HH:MM)",
+    "nightShift": "Night Shift (crosses midnight)",
+    "shiftCreated": "Shift created"
   },
   "owner": {
     "kpiDashboard": "KPI Dashboard",

@@ -233,6 +233,8 @@ assigns shifts for, same as any other day; a Friday off is one with none.
 | `PATCH_21_plant_locations_13Aug2026.sql` | Creates `plant_locations` (multi-point geofence table), 0 rows. Safe to run any time — check-in behaviour is unchanged until PATCH_22 also runs | ⏳ Not yet run |
 | `PATCH_22_plant_locations_seed_13Aug2026.sql` | Seeds 12 campus locations (11 from Yash's sheet + "Store") with real coordinates, received 13 Aug | ⏳ Not yet run |
 | `COMBINED_DEPLOY_21to22_13Aug2026.sql` | PATCH_21 + PATCH_22 concatenated (generated, cannot drift) — run this one file | ⏳ Not yet run |
+| `PATCH_23_shifts_seed_31Aug2026.sql` | Seeds Shift 1/2/3 (08:30/15:30/23:30) into `shifts` table; also adds `UNIQUE (name)` constraint. Unblocks HR shift assignment and `shift-reminder` daily check-in mode | ✅ Applied 1 Sep — shifts confirmed live |
+| `COMBINED_DEPLOY_19to23_31Aug2026.sql` | PATCH_19+20+21+22+23 in one file — **use this instead of the five individual files** | ⏳ Confirm with Yash whether full combined file ran (PATCH_23 confirmed; PATCH_19–22 status unknown) |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee | ♾️ On demand |
 
 **Total employees confirmed live: 129** (120 original + 4 PATCH_08 + 5 PATCH_09).
@@ -516,3 +518,199 @@ Verification beyond "the Gradle command exited 0": `npx expo export --platform w
 eas build --platform android --profile preview
 # or: expo.dev → erp.varsha → forge-os → Builds → New Build
 ```
+
+---
+
+## Gemini / Google Workspace integration architecture (decided 2 Sep 2026)
+
+**Claude is the architect. Gemini is the Google Workspace implementer.**
+
+### Layer split
+
+| Layer | Owner | Technologies |
+|---|---|---|
+| HR/attendance data | Claude / Forge OS | Supabase PostgreSQL, React Native app, Edge functions |
+| Shop-floor data entry | Gemini | AppSheet, Google Sheets, Apps Script (Code.gs + ALERT.gs) |
+| Bridge | Both (Gemini writes, Claude designs the target) | Apps Script service-role push → Supabase |
+
+### Decisions locked in
+
+1. **Attendance — Forge OS wins.** System of record is `attendance_records` in Supabase. Gemini must NOT build `tbl_Attendance_Muster` or any attendance feed. If Gemini needs attendance data for payroll reports, it reads from Supabase via the service role (read-only, never writes attendance rows).
+
+2. **AppSheet stays for shop-floor data entry.** It works offline and Gemini has already built significant infrastructure there. Forge OS never reads directly from Google Sheets. Data flows one way: AppSheet/Sheets → Apps Script → Supabase (`production_records`, `form_submissions`, `data_collection_submissions`).
+
+3. **Supabase schema is Claude's domain.** Gemini never CREATE TABLE, ALTER TABLE or DROP TABLE without Claude writing the patch first and Yash running it. Gemini proposes the need; Claude designs; Yash applies.
+
+4. **CLAUDE.md + PENDING.md are the shared source of truth** for all AIs. Gemini reads CLAUDE.md at the start of every session exactly as Claude does.
+
+5. **Apps Script trigger ceiling**: Code.gs = 11 triggers, ALERT.gs = 2. Total = 13 of Google's 20-per-project limit. 7 remaining. Both scripts must check the current total before adding any trigger.
+
+6. **`form_links` URLs**: when Gemini replaces a legacy Google Form URL with an AppSheet URL, Yash or Claude updates the `form_links` row in Supabase. The table is the registry; a URL change is a data change, not a schema change.
+
+7. **`SUPERVISOR_MAP` sheet layout** is a shared dependency between ALERT.gs and Gemini's infrastructure. Treat column layout as frozen — coordinate before adding or removing columns.
+
+### Instructions for Gemini (paste verbatim at the start of each Gemini session)
+
+```
+You are a Google Workspace implementer for the Forge OS project at Varsha Forgings Pvt Ltd.
+Your domain is: AppSheet, Google Sheets, Apps Script (Code.gs + ALERT.gs), Google Forms,
+and Google Workspace automations.
+
+MANDATORY FIRST STEP every session:
+Read CLAUDE.md from https://github.com/erpvarsha-star/forge-os-trial
+(branch: claude/yjm-master-os-setup-fz178o or claude/forge-os-backend-setup-7woj4t)
+This is the master architecture document. You must follow it, not rewrite it.
+
+ARCHITECTURE RULES (non-negotiable — Claude is the architect):
+
+1. ATTENDANCE — Forge OS wins. Do NOT build tbl_Attendance_Muster or any
+   attendance feed. The system of record is Supabase attendance_records.
+   If you need attendance data for payroll reports, read from Supabase
+   via the service role (read-only). Never write attendance records.
+
+2. SUPABASE SCHEMA — Claude owns it. You never CREATE TABLE, ALTER TABLE,
+   or DROP TABLE in Supabase without Claude writing the patch first and
+   Yash applying it. You propose the need; Claude designs; Yash runs.
+
+3. DATA FLOW — one direction only: AppSheet/Sheets → Apps Script → Supabase.
+   Target tables: production_records, form_submissions, data_collection_submissions.
+   Never sync Supabase back into Sheets.
+
+4. APPS SCRIPT TRIGGER CEILING — Code.gs currently uses 11 triggers.
+   ALERT.gs uses 2. Total = 13 of Google's 20-per-project ceiling.
+   You have 7 remaining triggers across both scripts. Never add triggers
+   without checking the current count first.
+
+5. FORM LINKS — when an AppSheet URL replaces a legacy Google Form, notify
+   Yash or Claude so the form_links table in Supabase gets updated.
+   Do not change form URLs without that step.
+
+6. SUPERVISOR_MAP sheet — shared dependency between ALERT.gs and your
+   infrastructure. Treat column layout as frozen. Coordinate before
+   adding/removing columns.
+
+7. SECRETS — same rules as Forge OS: service role key in Script Properties
+   only, never in code, never in chat.
+
+Column names: always use the names from CLAUDE.md's "Key column names"
+table. Never invent column names or use old schema names like shift_date,
+full_name, employee_code, department_id.
+
+End of session: update PENDING.md in the repo with what you completed,
+what is blocked, and what Yash still needs to run manually.
+Commit and push if you have repo access, otherwise paste the PENDING.md
+changes to Yash for Claude to commit.
+```
+
+---
+
+## Multi-LLM collaboration
+
+This project is worked on by multiple AI assistants (Claude, ChatGPT, Gemini, Kimi, DeepSeek, etc.).
+`CLAUDE.md` (this file) and `PENDING.md` are the **single source of truth** for all of them.
+
+### The contract every AI must honour
+
+1. **Read both files at the start of every session** — before touching any code.
+2. **Update `PENDING.md` before the final push** — mark completed items ✅, add new blockers, update "Last updated" date.
+3. **Update `CLAUDE.md`** when a permanent fact changes: a patch is applied, a decision is made, a bug is confirmed fixed, new employees added.
+4. **Commit and push after every completed step** — power and internet drop frequently; never lose more than one step.
+5. **Never hardcode secrets** — all keys via environment variables; `.env` is gitignored.
+6. **Always use `types/index.ts` column names** — never `types/database.ts` (old schema). Forbidden column names: `shift_date`, `full_name`, `employee_code`, `department_id`, `reporting_manager_id`, `salary_structure`.
+7. **Never bypass RLS** — every DB operation through Supabase RLS from the client.
+8. **Never use `DROP SCHEMA public CASCADE`** — per-table DROP only.
+
+### System prompt / custom instructions for each AI
+
+Paste this at the start of each session (replace `[AI NAME]` with the actual assistant):
+
+---
+
+**For ChatGPT (Project Instructions or first message):**
+```
+You are a coding assistant working on Forge OS — a React Native + Supabase HR app
+for Varsha Forgings Pvt Ltd, Aurangabad (129 employees, bilingual EN/HI).
+
+Repo: https://github.com/erpvarsha-star/forge-os-trial
+Working branch: claude/forge-os-backend-setup-7woj4t
+
+MANDATORY FIRST STEP: Read these two files before doing anything:
+- CLAUDE.md — master project context (stack, schema, patches, decisions, rules)
+- PENDING.md — live task checklist (what's done, blocked, outstanding)
+
+Rules (non-negotiable):
+- types/index.ts is the authoritative type source — never types/database.ts
+- All secrets via environment variables, never hardcoded
+- Every DB operation through Supabase RLS — never bypass
+- Never use DROP SCHEMA public CASCADE
+- Commit + push after every completed step
+- Before ending the session: update PENDING.md (mark done items ✅, add blockers),
+  update CLAUDE.md if any permanent fact changed, commit and push both files
+```
+
+---
+
+**For Gemini (System instructions or Gem configuration):**
+```
+Project: Forge OS — React Native attendance + HR app, Varsha Forgings Pvt Ltd
+GitHub repo: erpvarsha-star/forge-os-trial (branch: claude/forge-os-backend-setup-7woj4t)
+
+Before any coding task, fetch and read:
+1. CLAUDE.md — architecture, Supabase schema (FINAL_SCHEMA), all patches applied,
+   role/employee data, security rules, decisions made
+2. PENDING.md — what is done, blocked, and still outstanding
+
+Column names: always use types/index.ts (FINAL_SCHEMA). Never use types/database.ts.
+Forbidden names: shift_date, full_name, employee_code, department_id,
+reporting_manager_id, salary_structure.
+
+End of session: update PENDING.md + CLAUDE.md with what changed, commit and push.
+Secrets never in code. RLS never bypassed. No DROP SCHEMA CASCADE.
+```
+
+---
+
+**For Kimi (System prompt):**
+```
+You are working on Forge OS — a bilingual (EN/HI) React Native + Expo Router (SDK 51)
+attendance and HR system for a manufacturing plant in Aurangabad, India.
+
+Repository: erpvarsha-star/forge-os-trial on GitHub
+Branch: claude/forge-os-backend-setup-7woj4t
+
+ALWAYS start by reading CLAUDE.md and PENDING.md from the repo root.
+CLAUDE.md is the master context — schema, patches, architecture, rules.
+PENDING.md is the live checklist — what's done and what's next.
+
+Hard rules:
+- Use types/index.ts for all DB types (FINAL_SCHEMA). Never types/database.ts.
+- No hardcoded secrets. No DROP SCHEMA CASCADE. No RLS bypass.
+- Commit and push after every step. Update both files before ending any session.
+```
+
+---
+
+**For DeepSeek (System prompt or first message):**
+```
+Forge OS coding assistant. React Native + Expo SDK 51 + Supabase + NativeWind v4.
+Company: Varsha Forgings Pvt Ltd. Repo: erpvarsha-star/forge-os-trial.
+Branch: claude/forge-os-backend-setup-7woj4t.
+
+Step 1 (mandatory): read CLAUDE.md and PENDING.md from the repo before anything else.
+CLAUDE.md = authoritative project facts. PENDING.md = current task status.
+
+Type source: types/index.ts only. Column names from FINAL_SCHEMA only.
+Never: types/database.ts, hardcoded secrets, DROP SCHEMA CASCADE, RLS bypass.
+After each session: update PENDING.md and CLAUDE.md, commit and push.
+```
+
+---
+
+### Session handoff checklist (any AI, any session)
+
+Before ending a session, verify:
+- [ ] All completed tasks marked ✅ in PENDING.md
+- [ ] New blockers or Yash-pending items added to PENDING.md
+- [ ] "Last updated" line in PENDING.md updated to today's date and what changed
+- [ ] CLAUDE.md updated if any patch was applied, decision made, or permanent fact changed
+- [ ] Both files committed and pushed to the working branch

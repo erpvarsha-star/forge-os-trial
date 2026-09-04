@@ -456,7 +456,13 @@
     "outstanding": "बकाया",
     "supervisorField": "सुपरवाइजर",
     "employeeLabel": "कर्मचारी",
-    "shiftAssigned": "शिफ्ट सौंपी गई"
+    "shiftAssigned": "शिफ्ट सौंपी गई",
+    "createShift": "शिफ्ट बनाएं",
+    "shiftName": "शिफ्ट का नाम",
+    "startTime": "प्रारंभ समय (HH:MM)",
+    "endTime": "समाप्ति समय (HH:MM)",
+    "nightShift": "नाइट शिफ्ट (आधी रात के बाद)",
+    "shiftCreated": "शिफ्ट बनाई गई"
   },
   "owner": {
     "kpiDashboard": "KPI डैशबोर्ड",
