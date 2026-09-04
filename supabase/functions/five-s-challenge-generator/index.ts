@@ -38,7 +38,7 @@ async function generateChallengeFromGemini(): Promise<GeminiChallenge> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: PROMPT }] }],
-        generationConfig: { maxOutputTokens: 200 },
+        generationConfig: { maxOutputTokens: 200, responseMimeType: 'application/json' },
       }),
     }
   );
