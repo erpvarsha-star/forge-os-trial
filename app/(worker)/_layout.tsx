@@ -51,6 +51,14 @@ export default function WorkerLayout() {
             tabBarIcon: ({ color }) => <MoreHorizontal size={22} color={color} />,
           }}
         />
+        {/* Hidden screens — navigated to programmatically, not shown in tab bar */}
+        <Tabs.Screen name="advance" options={{ href: null }} />
+        <Tabs.Screen name="payslip" options={{ href: null }} />
+        <Tabs.Screen name="5s" options={{ href: null }} />
+        <Tabs.Screen name="observation" options={{ href: null }} />
+        <Tabs.Screen name="notifications" options={{ href: null }} />
+        <Tabs.Screen name="qr" options={{ href: null }} />
+        <Tabs.Screen name="profile" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )

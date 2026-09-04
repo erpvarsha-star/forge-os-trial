@@ -14,6 +14,7 @@ export default function ManagerLayout() {
         <Tabs.Screen name="reports" options={{ title: t('common.reports'), tabBarIcon: ({ color }) => <FileText size={22} color={color} /> }} />
         <Tabs.Screen name="forms" options={{ title: t('forms.tab'), tabBarIcon: ({ color }) => <ClipboardCheck size={22} color={color} /> }} />
         <Tabs.Screen name="more" options={{ title: t('common.more'), tabBarIcon: ({ color }) => <MoreHorizontal size={22} color={color} /> }} />
+        <Tabs.Screen name="mrm" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )

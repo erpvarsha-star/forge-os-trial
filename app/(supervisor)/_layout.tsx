@@ -14,6 +14,9 @@ export default function SupervisorLayout() {
         <Tabs.Screen name="approvals" options={{ title: t('common.approvals'), tabBarIcon: ({ color }) => <CheckCircle size={22} color={color} /> }} />
         <Tabs.Screen name="forms" options={{ title: t('forms.tab'), tabBarIcon: ({ color }) => <ClipboardCheck size={22} color={color} /> }} />
         <Tabs.Screen name="more" options={{ title: t('common.more'), tabBarIcon: ({ color }) => <MoreHorizontal size={22} color={color} /> }} />
+        <Tabs.Screen name="shift-report" options={{ href: null }} />
+        <Tabs.Screen name="casual-workers" options={{ href: null }} />
+        <Tabs.Screen name="5s-verify" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )
