@@ -1900,7 +1900,7 @@ function supabasePush_(table, rows) {
   var sent = 0;
   for (var i = 0; i < rows.length; i += SUPABASE_PUSH_BATCH) {
     var batch = rows.slice(i, i + SUPABASE_PUSH_BATCH);
-    var res = UrlFetchApp.fetch(baseUrl.replace(/\/$/, '') + '/rest/v1/' + table, {
+    var res = UrlFetchApp.fetch(baseUrl.replace(/\/$/, '') + '/rest/v1/' + table + '?on_conflict=row_key', {
       method: 'post',
       contentType: 'application/json',
       headers: {
