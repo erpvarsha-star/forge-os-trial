@@ -730,10 +730,10 @@ function buildMissingListText_(missing) {
  * set, since a missing Telegram token must never be fatal — every caller
  * already treats an empty token as "log and skip". */
 function getTelegramBotToken_() {
-  return PropertiesService.getScriptProperties().getProperty('TELEGRAM_BOT_TOKEN') || TELEGRAM_BOT_TOKEN_INLINE;
+  return TELEGRAM_BOT_TOKEN_INLINE || PropertiesService.getScriptProperties().getProperty('TELEGRAM_BOT_TOKEN');
 }
 function getOwnerTelegramChatId_() {
-  return PropertiesService.getScriptProperties().getProperty('OWNER_TELEGRAM_CHAT_ID') || OWNER_TELEGRAM_CHAT_ID_INLINE;
+  return OWNER_TELEGRAM_CHAT_ID_INLINE || PropertiesService.getScriptProperties().getProperty('OWNER_TELEGRAM_CHAT_ID');
 }
 
 function sendTelegramToChatId(chatId, message) {
