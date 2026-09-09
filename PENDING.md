@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 31 Aug 2026, after completing all six outstanding build items and the multi-point geofence implementation. All code is complete; remaining work is user actions (SQL patches, secrets, device testing).
+**Last updated:** 09 Sep 2026. COMBINED_DEPLOY_19to23 run by Yash (confirms PATCH_19–23 applied, multi-point geofence live, crons scheduled, shifts seeded). ALERT.gs pasted into Apps Script. PR check-in triggers stopped.
 
 ---
 
@@ -41,32 +41,9 @@ below. Empty tables and a broken sync look identical from the app.
 
 ## 🔴 Blocked on Yash — cannot proceed without you
 
-- [ ] **Multi-point geofence — coordinates received 13 Aug, ready to run.**
-      Yash sent a CSV with all 12 campus points already resolved to
-      coordinates (11 from the original sheet + "Store", a 12th point
-      included in the CSV) — the sandbox itself still cannot reach any
-      Google Maps domain (confirmed again: a direct `curl` through the
-      configured proxy gets a 403 at the proxy itself, not just from the
-      fetch tool — this is a hard network policy, not something retrying
-      or a different tool will get around), so getting the numbers from
-      Yash directly was the only path, not a workaround.
-      **Run `scripts/COMBINED_DEPLOY_21to22_13Aug2026.sql`** in the SQL
-      Editor — one file, creates `plant_locations` and seeds all 12 rows.
-      `worker/home.tsx` and `fraud-detector` already read this table and
-      switch over automatically; no further app changes needed.
-      Sanity-checked the coordinates before writing them in (not pasted
-      blind): every point is within 131m of "Plant location" — Machine shop
-      is the farthest, at 131.3m, meaning it sat just outside the OLD
-      single-point 100m geofence. That's a real, concrete case this fixes,
-      not just a theoretical one. One oddity to flag: "Cutting shop" and
-      "Final Shop" arrived with byte-identical coordinates
-      (19.836111, 75.236750) — seeded as given since it's harmless (both
-      still work fine as independent points in the "any match" set), but
-      worth a glance in case that's a copy-paste slip in the source sheet
-      rather than two genuinely co-located areas.
-      Verified with 21 isolated logic checks (multi-point matching,
-      no-match blocking, empty-table fallback to the old single-point
-      `plant_config` geofence) plus a clean `tsc` and `expo export`.
+- [x] **Multi-point geofence — ✅ APPLIED 09 Sep (via COMBINED_DEPLOY_19to23).**
+      `plant_locations` table created and 12 campus points seeded.
+      `worker/home.tsx` and `fraud-detector` automatically use it.
 
 - [ ] **Firebase / FCM — HALF DONE 13 Aug.** `google-services.json` is in and
       wired into `app.json`; the remaining half is the FCM V1 service account
@@ -189,10 +166,9 @@ a shift, and the model must not assume one-owner-per-department.
 The Apps Script running on the Operations Dashboard is now checked in at
 `scripts/ALERT.gs` (baseline commit `1e5283e`, fixes `eb70e8f`).
 
-**⚠ ACTION FOR YASH — paste the fixed `scripts/ALERT.gs` over ALERT.gs in the
-Apps Script editor, then run `testComplianceScoring()`, then
-`setupDynamicSupervisorTabs()`, then `deployShiftTrackingTriggers()`.**
-That is one paste and three menu clicks; nothing needs retyping.
+**✅ ALERT.gs pasted 09 Sep.** Still needed: run `testComplianceScoring()`, then
+`setupDynamicSupervisorTabs()`, then `deployShiftTrackingTriggers()` from the
+Apps Script editor (three menu clicks — Functions menu → run each once).
 
 | # | Defect | Status |
 |---|---|---|
