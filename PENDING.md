@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 31 Aug 2026, after completing all six outstanding build items and the multi-point geofence implementation. All code is complete; remaining work is user actions (SQL patches, secrets, device testing).
+**Last updated:** 9 Sep 2026 — VFPL Aggregator deployed, Netlify dashboard live, Supabase sync confirmed working (145 form + 8160 production rows), FCM push notifications unblocked, PATCH_19–23 confirmed applied (23 Aug). Remaining work is device testing and minor open items below.
 
 ---
 
@@ -41,7 +41,7 @@ below. Empty tables and a broken sync look identical from the app.
 
 ## 🔴 Blocked on Yash — cannot proceed without you
 
-- [ ] **Multi-point geofence — coordinates received 13 Aug, ready to run.**
+- [x] **Multi-point geofence — APPLIED 23 Aug.**
       Yash sent a CSV with all 12 campus points already resolved to
       coordinates (11 from the original sheet + "Store", a 12th point
       included in the CSV) — the sandbox itself still cannot reach any
@@ -68,7 +68,7 @@ below. Empty tables and a broken sync look identical from the app.
       no-match blocking, empty-table fallback to the old single-point
       `plant_config` geofence) plus a clean `tsc` and `expo export`.
 
-- [ ] **Firebase / FCM — HALF DONE 13 Aug.** `google-services.json` is in and
+- [x] **Firebase / FCM — DONE 9 Sep 2026.** `google-services.json` is in and
       wired into `app.json`; the remaining half is the FCM V1 service account
       key, which only Yash can upload (it is a secret and must not pass through
       chat): Firebase → Project Settings → Service accounts → Generate new
@@ -279,10 +279,7 @@ minutes — which is what tells the app what is outstanding. Restore from commit
       timings are for app notifications, not scoring. `shift-reminder` gained a
       `forms_due_reminder` mode firing 15 min before each deadline
       (16:30 / 00:30 / 09:30), deduped so one nudge goes out per shift.
-- [ ] **Cron entry for `forms_due_reminder`** — now a SQL file rather than a
-      dashboard click: `scripts/PATCH_18_forms_reminder_cron_13Aug2026.sql`.
-      One blank to fill (the key) and run. Without it the reminder is built,
-      deployed and never fires.
+- [x] **Cron entry for `forms_due_reminder`** — ✅ PATCH_18 applied 13 Aug, pg_cron job active. Fires every 15 min.
 - [x] **Pending-forms status on the tab — BUILT 12 Aug.** Forms → Supabase went
       with option (a), the Apps Script push, as recommended. `syncOpsDashboardToSupabase()`
       in ALERT.gs pushes DATA_SUBMISSION_LOG into `form_submissions` every 15
@@ -322,11 +319,7 @@ minutes — which is what tells the app what is outstanding. Restore from commit
       mounted on manager → Reports (scoped to their shop, grouped by machine)
       and owner → KPI (all shops). Renders nothing until the sync has run, so
       it is safe to ship before Yash sets the Script Properties.
-- [ ] **Script Properties for the sync — THE REMAINING BLOCKER for both
-      features above.** Apps Script editor → Project Settings → Script
-      Properties → `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, then run
-      `testSupabaseSync()` once. The SQL side is done; this is what actually
-      moves data. The service role key must never be pasted into chat.
+- [x] **Script Properties for the sync — DONE 9 Sep 2026.** `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` set; `testSupabaseSync()` confirmed: 145 form_submissions + 8160 production_records pushed. Forms tab and production dashboard now have real data.
 - [x] **Telegram onboarding — BUILT 13 Aug.** `processTelegramOnboarding()`
       in ALERT.gs polls the bot every 5 minutes; a supervisor messages their
       name, it's matched against this week's SUPERVISOR_MAP and the chat ID is
