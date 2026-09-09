@@ -90,11 +90,9 @@ below. Empty tables and a broken sync look identical from the app.
       → upload that to expo.dev → forge-os → Credentials → Android.
       *Until this is done, no push notification reaches any phone.*
 
-- [ ] **Revoke the Expo token pasted in chat** (`9HDy_…`) and add a fresh one to
-      GitHub → Settings → Secrets and variables → Actions as `EXPO_TOKEN`.
-      Needed only for OTA auto-updates, not for push.
+- [x] **Revoke the Expo token pasted in chat** (`9HDy_…`) — ✅ Revoked and fresh token added 9 Sep.
 
-- [ ] **Rotate the Expo account password** — it was shared in chat.
+- [x] **Rotate the Expo account password** — ✅ Rotated 9 Sep.
 
 ---
 
