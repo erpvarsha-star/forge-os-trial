@@ -228,11 +228,11 @@ assigns shifts for, same as any other day; a Friday off is one with none.
 | `PATCH_16_qr_salt_13Aug2026.sql` | Generates `plant_config.qr_secret_salt` inside Postgres (pgcrypto) — nobody, including Claude, ever sees the value. First version matched the wrong placeholder list and silently no-op'd; fixed to match on shape (48 hex chars) instead | ✅ Confirmed set 13 Aug — `is_set=true, length=48` |
 | `PATCH_17_reminder_scope_13Aug2026.sql` | Flags which of the 24 form_links rows are chased on the shift timer: 18 production forms YES, 6 non-production (overtime, dispatch, 57F4) NO. All 24 stay visible in the Forms tab either way | ✅ Applied 13 Aug — `18 true / 6 false` confirmed |
 | `PATCH_18_forms_reminder_cron_13Aug2026.sql` | Schedules `forms_due_reminder` via pg_cron + pg_net, every 15 minutes. Without this the mode is deployed but never invoked — day-of-week inference never picks it | ✅ Applied 13 Aug — job active |
-| `PATCH_19_dept_expansion_13Aug2026.sql` | Maintenance (4 daily forms: check sheet + 2 electricity + oil), Human Resource (2 manpower forms, As & When Required), VMC Shop (1 daily form) — all real published forms, verified against the live registry sheet via Drive before writing, not guessed | ⏳ Not yet run |
-| `PATCH_20_missing_crons_13Aug2026.sql` | Schedules `nightly-scoring`, `mrm-reminder`, `five-s-challenge-generator` and shift-reminder's default (no-body) mode — found via re-audit 13 Aug that none of the four had a `cron.schedule()` anywhere in this repo, the same "deployed but never invoked" pattern already found 3 times this session. All four confirmed idempotent before scheduling. Also now adds a fifth job, `mrm-reminder-escalation`, pinned to the 10th at 17:00 IST only — found during the mrm-reminder/shift-reminder audit that the single 09:00 daily run could never observe the code's own "10th at/after 17:00" escalation condition (09:00 is always before 17:00), so escalation was silently a day later than documented; see PENDING.md. ⚠ Check Dashboard → Cron first in case one was configured there instead | ⏳ Not yet run |
-| `PATCH_21_plant_locations_13Aug2026.sql` | Creates `plant_locations` (multi-point geofence table), 0 rows. Safe to run any time — check-in behaviour is unchanged until PATCH_22 also runs | ⏳ Not yet run |
-| `PATCH_22_plant_locations_seed_13Aug2026.sql` | Seeds 12 campus locations (11 from Yash's sheet + "Store") with real coordinates, received 13 Aug | ⏳ Not yet run |
-| `COMBINED_DEPLOY_21to22_13Aug2026.sql` | PATCH_21 + PATCH_22 concatenated (generated, cannot drift) — run this one file | ⏳ Not yet run |
+| `PATCH_19_dept_expansion_13Aug2026.sql` | Maintenance (4 daily forms: check sheet + 2 electricity + oil), Human Resource (2 manpower forms, As & When Required), VMC Shop (1 daily form) — all real published forms, verified against the live registry sheet via Drive before writing, not guessed | ✅ Applied 23 Aug |
+| `PATCH_20_missing_crons_13Aug2026.sql` | Schedules `nightly-scoring`, `mrm-reminder`, `five-s-challenge-generator` and shift-reminder's default (no-body) mode — found via re-audit 13 Aug that none of the four had a `cron.schedule()` anywhere in this repo, the same "deployed but never invoked" pattern already found 3 times this session. All four confirmed idempotent before scheduling. Also now adds a fifth job, `mrm-reminder-escalation`, pinned to the 10th at 17:00 IST only — found during the mrm-reminder/shift-reminder audit that the single 09:00 daily run could never observe the code's own "10th at/after 17:00" escalation condition (09:00 is always before 17:00), so escalation was silently a day later than documented; see PENDING.md. ⚠ Check Dashboard → Cron first in case one was configured there instead | ✅ Applied 23 Aug |
+| `PATCH_21_plant_locations_13Aug2026.sql` | Creates `plant_locations` (multi-point geofence table), 0 rows. Safe to run any time — check-in behaviour is unchanged until PATCH_22 also runs | ✅ Applied 23 Aug |
+| `PATCH_22_plant_locations_seed_13Aug2026.sql` | Seeds 12 campus locations (11 from Yash's sheet + "Store") with real coordinates, received 13 Aug | ✅ Applied 23 Aug |
+| `COMBINED_DEPLOY_21to22_13Aug2026.sql` | PATCH_21 + PATCH_22 concatenated (generated, cannot drift) — run this one file | ✅ Applied 23 Aug |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee | ♾️ On demand |
 
 **Total employees confirmed live: 129** (120 original + 4 PATCH_08 + 5 PATCH_09).
@@ -475,11 +475,13 @@ Every row this table used to list is fixed. Kept as a record, not a to-do:
 
 ## Pending from Yash (owner)
 
-0. **SQL — ALL APPLIED as of 12 Aug.** FINAL_SCHEMA, the seeds, PATCH_01 through PATCH_15 and every combined file have been run and confirmed by Yash. Nothing in `scripts/*.sql` is outstanding. Do not re-run any of them.
+0. **SQL — ALL APPLIED as of 23 Aug.** FINAL_SCHEMA, the seeds, PATCH_01 through PATCH_22 and every combined file have been run and confirmed by Yash. Nothing in `scripts/*.sql` is outstanding. Do not re-run any of them.
 
-   Still needed, in the Supabase dashboard: a cron entry for `shift-reminder` every 15 minutes with body `{"mode":"forms_due_reminder"}`. Without it the shift form reminders never fire.
+   **Supabase sync is live (9 Sep 2026).** Script Properties (`SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`) set in the Apps Script editor; `testSupabaseSync()` confirmed: 145 form_submissions + 8160 production_records pushed. Forms tab and production dashboard now have real data.
 
-   And in the Apps Script editor, after pasting `scripts/ALERT.gs`: Project Settings → Script Properties → add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, then run `testSupabaseSync()` once. Without those two properties the dashboard→app sync never runs, so the Forms tab cannot show what is outstanding and department production stays empty. **The service role key must never be pasted into chat.**
+   **FCM push confirmed (9 Sep 2026).** `FCM_SERVICE_ACCOUNT_JSON` set in Supabase → Edge Functions → Secrets. Android push is now live for employees who have reinstalled after `google-services.json` was wired in.
+
+   **forms_due_reminder cron active.** PATCH_18 applied 13 Aug — pg_cron job fires every 15 minutes. No further dashboard action needed.
 
 1. **Worker → supervisor mapping** — CLOSED 10 Aug (Yash: "that will happen in the app") — this is an in-app assignment flow, not a DB patch task
 2. **Rotating supervisor update** — CLOSED 10 Aug (Yash: rotations are decided every Friday by HR/IR, cannot be provided in advance) — the weekly `supervisor_id` UPDATE is HR/IR's own task going forward, not tracked here
