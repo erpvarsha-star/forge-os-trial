@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { View, Text, ScrollView, Modal, Alert } from 'react-native'
+import { View, Text, ScrollView, Modal, Alert, Switch } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/hooks/useAuth'
 import { Header } from '@/components/Header'
@@ -13,27 +13,75 @@ import { Calendar, Plus, Clock } from 'lucide-react-native'
 import { TouchableOpacity } from 'react-native'
 import { BRAND, INK } from '@/components/theme'
 
+type ModalMode = 'menu' | 'create' | 'assign'
+
 export default function ShiftsScreen() {
   const { t } = useTranslation()
   const { employee } = useAuth()
   const [shifts, setShifts] = useState<Shift[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
-  const [showModal, setShowModal] = useState(false)
+  const [modalMode, setModalMode] = useState<ModalMode | null>(null)
+
+  // assign state
   const [selectedShift, setSelectedShift] = useState('')
   const [selectedEmployee, setSelectedEmployee] = useState('')
   const [selectedDate, setSelectedDate] = useState('')
+
+  // create state
+  const [newName, setNewName] = useState('')
+  const [newStart, setNewStart] = useState('')
+  const [newEnd, setNewEnd] = useState('')
+  const [newNight, setNewNight] = useState(false)
+
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => { fetchData() }, [employee])
 
   const fetchData = async () => {
     const [{ data: sData }, { data: eData }] = await Promise.all([
-      supabase.from('shifts').select('*'),
-      supabase.from('employees').select('id, name, emp_code').eq('is_active', true),
+      supabase.from('shifts').select('*').order('start_time'),
+      supabase.from('employees').select('id, name, emp_code').eq('is_active', true).order('name'),
     ])
     if (sData) setShifts(sData as Shift[])
     if (eData) setEmployees(eData as Employee[])
     setIsLoading(false)
+  }
+
+  const openMenu = () => {
+    if (shifts.length === 0) {
+      setModalMode('create')
+    } else {
+      setModalMode('menu')
+    }
+  }
+
+  const createShift = async () => {
+    if (!newName.trim() || !newStart.trim() || !newEnd.trim()) {
+      Alert.alert(t('common.error'), t('common.required'))
+      return
+    }
+    const timeRe = /^\d{2}:\d{2}$/
+    if (!timeRe.test(newStart) || !timeRe.test(newEnd)) {
+      Alert.alert(t('common.error'), t('hrAdmin.startTime'))
+      return
+    }
+    const { error } = await supabase.from('shifts').insert({
+      name: newName.trim(),
+      start_time: newStart.trim(),
+      end_time: newEnd.trim(),
+      is_night_shift: newNight,
+    })
+    if (error) {
+      Alert.alert(t('common.error'), error.message)
+      return
+    }
+    setNewName('')
+    setNewStart('')
+    setNewEnd('')
+    setNewNight(false)
+    setModalMode(null)
+    Alert.alert(t('common.success'), t('hrAdmin.shiftCreated'))
+    fetchData()
   }
 
   const assignShift = async () => {
@@ -41,12 +89,19 @@ export default function ShiftsScreen() {
       Alert.alert(t('common.error'), t('common.required'))
       return
     }
-    await supabase.from('employee_shifts').insert({
+    const { error } = await supabase.from('employee_shifts').insert({
       employee_id: selectedEmployee,
       shift_id: selectedShift,
       date: selectedDate,
     })
-    setShowModal(false)
+    if (error) {
+      Alert.alert(t('common.error'), error.message)
+      return
+    }
+    setSelectedShift('')
+    setSelectedEmployee('')
+    setSelectedDate('')
+    setModalMode(null)
     Alert.alert(t('common.success'), t('hrAdmin.shiftAssigned'))
   }
 
@@ -60,7 +115,7 @@ export default function ShiftsScreen() {
         <View className="flex-row justify-between items-center mb-5">
           <Text className="text-2xl font-bold text-ink-900 tracking-tight">{t('hrAdmin.shiftPlanning')}</Text>
           <TouchableOpacity
-            onPress={() => setShowModal(true)}
+            onPress={openMenu}
             className="w-11 h-11 rounded-full bg-brand-600 items-center justify-center shadow-card"
             accessibilityRole="button"
             accessibilityLabel={t('hrAdmin.assignShift')}
@@ -73,15 +128,21 @@ export default function ShiftsScreen() {
           <Card className="items-center py-10">
             <Calendar size={32} color={INK[300]} />
             <Text className="text-sm text-ink-500 mt-3 text-center">{t('hrAdmin.noShiftsYet')}</Text>
+            <Button title="hrAdmin.createShift" onPress={() => setModalMode('create')} className="mt-4" />
           </Card>
         ) : (
           shifts.map(shift => (
             <Card key={shift.id} className="mb-3">
               <View className="flex-row items-center gap-3">
-                <View className="w-10 h-10 rounded-full bg-brand-50 items-center justify-center"><Clock size={18} color={BRAND[600]} /></View>
-                <View>
+                <View className="w-10 h-10 rounded-full bg-brand-50 items-center justify-center">
+                  <Clock size={18} color={BRAND[600]} />
+                </View>
+                <View className="flex-1">
                   <Text className="text-sm font-bold text-ink-900">{shift.name}</Text>
-                  <Text className="text-xs text-ink-500 font-mono mt-0.5">{shift.start_time} - {shift.end_time}</Text>
+                  <Text className="text-xs text-ink-500 font-mono mt-0.5">{shift.start_time} – {shift.end_time}</Text>
+                  {shift.is_night_shift && (
+                    <Text className="text-xs text-amber-600 mt-0.5">{t('hrAdmin.nightShift')}</Text>
+                  )}
                 </View>
               </View>
             </Card>
@@ -89,7 +150,38 @@ export default function ShiftsScreen() {
         )}
       </ScrollView>
 
-      <Modal visible={showModal} transparent animationType="slide">
+      {/* Menu modal — choose create or assign */}
+      <Modal visible={modalMode === 'menu'} transparent animationType="slide">
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className="bg-white rounded-t-2xl p-6">
+            <Text className="text-lg font-bold text-ink-900 mb-4">{t('hrAdmin.shiftPlanning')}</Text>
+            <Button title="hrAdmin.createShift" onPress={() => setModalMode('create')} className="mb-3" />
+            <Button title="hrAdmin.assignShift" onPress={() => setModalMode('assign')} className="mb-3" variant="secondary" />
+            <Button title="common.cancel" onPress={() => setModalMode(null)} variant="ghost" />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Create shift modal */}
+      <Modal visible={modalMode === 'create'} transparent animationType="slide">
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className="bg-white rounded-t-2xl p-6">
+            <Text className="text-lg font-bold text-ink-900 mb-4">{t('hrAdmin.createShift')}</Text>
+            <Input label={t('hrAdmin.shiftName')} value={newName} onChangeText={setNewName} placeholder="e.g. Shift 1" className="mb-3" />
+            <Input label={t('hrAdmin.startTime')} value={newStart} onChangeText={setNewStart} placeholder="08:30" className="mb-3" keyboardType="numeric" />
+            <Input label={t('hrAdmin.endTime')} value={newEnd} onChangeText={setNewEnd} placeholder="15:30" className="mb-3" keyboardType="numeric" />
+            <View className="flex-row items-center justify-between mb-5">
+              <Text className="text-sm text-ink-700">{t('hrAdmin.nightShift')}</Text>
+              <Switch value={newNight} onValueChange={setNewNight} trackColor={{ true: BRAND[600] }} />
+            </View>
+            <Button title="common.save" onPress={createShift} className="mb-2" />
+            <Button title="common.cancel" onPress={() => setModalMode(null)} variant="ghost" />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Assign shift modal */}
+      <Modal visible={modalMode === 'assign'} transparent animationType="slide">
         <View className="flex-1 bg-black/50 justify-end">
           <View className="bg-white rounded-t-2xl p-6">
             <Text className="text-lg font-bold text-ink-900 mb-4">{t('hrAdmin.assignShift')}</Text>
@@ -111,7 +203,7 @@ export default function ShiftsScreen() {
             </ScrollView>
             <Input label={t('common.date')} value={selectedDate} onChangeText={setSelectedDate} placeholder="YYYY-MM-DD" className="mb-4" />
             <Button title="common.save" onPress={assignShift} className="mb-2" />
-            <Button title="common.cancel" onPress={() => setShowModal(false)} variant="ghost" />
+            <Button title="common.cancel" onPress={() => setModalMode(null)} variant="ghost" />
           </View>
         </View>
       </Modal>
