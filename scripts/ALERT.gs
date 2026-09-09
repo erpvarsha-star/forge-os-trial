@@ -1971,8 +1971,16 @@ function syncFormSubmissionsToSupabase() {
     });
   });
 
-  var sent = supabasePush_('form_submissions', rows);
-  Logger.log('✅ form_submissions: ' + sent + ' row(s) pushed.');
+  // De-duplicate within the batch — same (date, dept, shift) appears more than
+  // once when DATA_SUBMISSION_LOG has been re-logged or corrected; Postgres
+  // cannot merge-duplicate two rows inside a single INSERT, only against
+  // existing rows, so duplicates within the batch must be collapsed here first.
+  var deduped = {};
+  rows.forEach(function(row) { deduped[row.row_key] = row; });
+  var unique = Object.keys(deduped).map(function(k) { return deduped[k]; });
+
+  var sent = supabasePush_('form_submissions', unique);
+  Logger.log('✅ form_submissions: ' + sent + ' row(s) pushed (' + rows.length + ' read, ' + (rows.length - unique.length) + ' duplicates removed).');
   return sent;
 }
 
