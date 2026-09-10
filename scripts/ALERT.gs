@@ -1291,7 +1291,8 @@ function processFormSubmissions() {
   // 'Week Start (Monday)' and a bare 'Week Start' all resolve. The other five
   // columns still need an exact match, because a loose match there could bind
   // the wrong column.
-  var PREFIX_MATCHED = { 'Week Start': true, 'Week End': true };
+  // 'Phone' prefix-matched so the form's 'Phone Number' header resolves too.
+  var PREFIX_MATCHED = { 'Week Start': true, 'Week End': true, 'Phone': true };
   
   expectedCols.forEach(function(colName) {
     for (var i = 0; i < headers.length; i++) {
