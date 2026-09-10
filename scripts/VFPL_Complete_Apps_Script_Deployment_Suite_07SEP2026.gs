@@ -3,6 +3,28 @@
  * VFPL COMPLETE APPS SCRIPT DEPLOYMENT SUITE (07-SEP-2026)
  * Author: SPARK (Google Workspace AI Specialist)
  * Patched & extended: 09-Sep-2026 — added Dashboard Cache Layer (Sections A–E)
+ * Patched again: 10-Sep-2026 — Plant Ops / Energy / Collections rewritten
+ *   against the REAL current sheets (verified live via Drive, not guessed —
+ *   see PENDING.md). All three source sheets have moved to a consolidated
+ *   AppSheet-style log; the old readers only worked for 2 of 6 plant_ops
+ *   departments and returned null for collections/energy. Every new path is
+ *   additive — it is tried ONLY after the original tab/column lookup finds
+ *   nothing, so cutting/press (which still work) are untouched:
+ *     - plant_ops.forge/machine/ht/final_: their tbl_*_Production tabs do
+ *       not exist anywhere in Drive (confirmed by search) — now fall back to
+ *       the shared "Production_Log" tab, filtered by its Shop column.
+ *     - energy: real tabs are "Electricity_Meters" (kWh in Consumption_kWh,
+ *       col I) and "Fuel_Log" (Volume_Liters, col H, filtered to Fuel_Type
+ *       containing "oil" so vehicle diesel isn't counted as furnace oil).
+ *       Old Electricity/Oil tab names kept as the first, faster path in case
+ *       they're ever added.
+ *     - collections: no tab named "Outstanding Balances & Dispatch Locks"
+ *       exists in the Collections sheet. The per-customer current/locked
+ *       split needs that tab (or wherever the real aging data lives) and is
+ *       NOT guessed here. Falls back instead to the Collections sheet's own
+ *       "DASHBOARD" tab, which DOES exist and has real totals — exposed as
+ *       new fields total_outstanding / customers_overdue, with
+ *       current_overdue/locked_overdue left null and a `note` explaining why.
  * Target User: Yash J. Munot, CEO & Director — Varsha Forgings Pvt. Ltd.
  * ============================================================================
  * THIS SUITE PROVIDES THE 4 EXACT MISSING AUTOMATION ENGINES FOR YOUR WORKBOOKS:
@@ -54,7 +76,10 @@ var CACHE_HDR_ADDR  = 'A1';
 // ── Source sheet IDs (read-only from the cache layer) ────────────────────────
 var PLANT_OPS_ID    = '1iFbjSC3OSLFouPuHCYUfduRUBQ5IXdEIjCLCdRXTOCU';  // VFPL_Domain_PlantOperations_2026-27
 var COLLECTIONS_ID  = '1B7eI55FXwdPaSRX9MoZVLB9bx2sWdCBUBZlsLQiF7q0';  // VFPL Collections Engine
-var ENERGY_ID       = '1H2kHVeBNZnCuCeYesh6ZoXM3scf5tC3WANWGhayg8Xc';  // VFPL_Domain_Utilities_2026-27
+// NOTE (10-Sep patch): this sheet's real title, confirmed via Drive, is
+// "VFPL_Domain_UtilitiesManpower_2026-27" — the old "..._Utilities_2026-27"
+// comment below was stale (ID is correct and unchanged, only the name was wrong).
+var ENERGY_ID       = '1H2kHVeBNZnCuCeYesh6ZoXM3scf5tC3WANWGhayg8Xc';  // VFPL_Domain_UtilitiesManpower_2026-27
 
 // ── Trigger ───────────────────────────────────────────────────────────────────
 var TRIGGER_FN       = 'cacheOperationalData';
@@ -85,17 +110,85 @@ var PLANT_OPS_TABS = {
   final_  : 'tbl_Final_Production'
 };
 
+// ── Plant Ops fallback (10-Sep patch) ─────────────────────────────────────────
+// Confirmed via Drive: none of the 4 missing tbl_*_Production tabs exist
+// anywhere (a search for the literal tab names only found this script, not a
+// spreadsheet). Production now lives in one consolidated tab, "Production_Log",
+// with all shops mixed together and a "Shop" text column. Used ONLY when a
+// department's own tbl_*_Production tab (above) is not found.
+var PRODUCTION_LOG_TAB = 'Production_Log';
+
+// Production_Log column indices (0-based), from its header row:
+// Record_ID, Timestamp, Date, Shift, Shop, Supervisor_ID, Supervisor_Name,
+// Operator_ID, Operator_Name, Machine_ID, Machine_Name, Route_Card_QR, VF_No,
+// Customer, Material_Grade, Standard_Cut_Weight_kg, Actual_Cut_Weight_kg,
+// Forge_Output_Weight_kg, Net_Forging_Weight_kg, Rejection_Qty, ...
+var PLOG_COL_DATE   = 2;
+var PLOG_COL_SHIFT  = 3;
+var PLOG_COL_SHOP   = 4;
+var PLOG_COL_REJECT = 19;
+// No single "pieces" column exists in Production_Log — each row is one
+// production event/piece, so a shop's row count IS its piece count (matches
+// how AppSheet logs this kind of data). Weight uses whichever of these four
+// weight columns is first non-zero, since which one applies depends on the
+// shop's stage in the process (cutting vs forging vs finishing):
+var PLOG_WEIGHT_COLS = [18, 17, 16, 15]; // Net_Forging, Forge_Output, Actual_Cut, Standard_Cut
+
+// Maps a plant_ops dept key to the Shop-column text value(s) it should match
+// (case-insensitive, trimmed). Extend this if a shop's real spelling differs.
+var SHOP_ALIASES = {
+  cutting : ['cutting'],
+  forge   : ['forge', 'forging'],
+  press   : ['press'],
+  machine : ['machine', 'machining'],
+  ht      : ['ht', 'heat treatment', 'heat-treatment'],
+  final_  : ['final', 'finishing']
+};
+
 // ── Collections tab (confirmed from Spark Module 3 source) ───────────────────
 // Tab: "Outstanding Balances & Dispatch Locks"
 // col[0] = customer, col[2] = overdueAmt (INR), col[3] = overdueDays
 // CURRENT_OVERDUE = sum of col[2] for all rows where overdueDays > 0
+// ⚠ 10-Sep patch: this tab does NOT currently exist in the Collections sheet
+// (confirmed — not guessed). Kept as the primary, more-detailed path in case
+// it's created later; COLLECTIONS_DASHBOARD_TAB below is the real fallback.
 var COLLECTIONS_TAB      = 'Outstanding Balances & Dispatch Locks';
 var COL_CUST_OVERDUEAMT  = 2;   // column C — INR overdue amount
 var COL_CUST_OVERDUEDAYS = 3;   // column D — overdue age in days
 
+// ── Collections fallback (10-Sep patch) ───────────────────────────────────────
+// This tab DOES exist and has real numbers (verified live): a simple
+// label-in-col-A / value-in-col-B sheet. It has no per-customer current/
+// locked split — only sheet-wide totals — so it can't populate
+// current_overdue/locked_overdue; it populates total_outstanding /
+// customers_overdue instead. See readCollections_() for how the two paths combine.
+var COLLECTIONS_DASHBOARD_TAB          = 'DASHBOARD';
+var COLLECTIONS_DASHBOARD_LABEL_TOTAL  = 'Total Outstanding (₹)';
+var COLLECTIONS_DASHBOARD_LABEL_COUNT  = 'Customers with Overdue';
+
 // ── Energy tabs ───────────────────────────────────────────────────────────────
+// Original simple-log tab names, tried first (fastest path if ever created):
 var ENERGY_ELEC_TABS = ['Electricity', 'ELECTRICITY', 'RAW_ELECTRICITY', 'Elec'];
 var ENERGY_OIL_TABS  = ['Oil', 'OIL', 'RAW_OIL', 'Oil Consumable'];
+
+// ── Energy fallback (10-Sep patch) ────────────────────────────────────────────
+// Real tabs, confirmed via Drive. Electricity_Meters logs per-meter readings;
+// Fuel_Log is a VEHICLE/equipment fuel log (has Odometer_Reading,
+// Efficiency_km_per_L — fields that only make sense for vehicles), so it is
+// filtered to rows whose Fuel_Type contains "oil" rather than summed whole —
+// summing everything would silently mix in vehicle diesel as "furnace oil".
+// If Fuel_Type never contains "oil", oil_liters comes back null with a note
+// rather than a guessed number — confirm with whoever owns AppSheet entry
+// whether furnace/HT oil is logged here at all (see PENDING.md).
+var ENERGY_ELEC_METERS_TAB   = 'Electricity_Meters';
+var ELEC_COL_DATE            = 2;  // column C
+var ELEC_COL_CONSUMPTION_KWH = 8;  // column I — Consumption_kWh
+
+var ENERGY_FUEL_LOG_TAB  = 'Fuel_Log';
+var FUEL_COL_DATE        = 2;  // column C
+var FUEL_COL_TYPE        = 4;  // column E — Fuel_Type
+var FUEL_COL_VOLUME_L    = 7;  // column H — Volume_Liters
+var FUEL_OIL_MATCH_RE    = /oil/i;
 
 
 // ============================================================================
@@ -187,22 +280,97 @@ function readPlantOps_(today) {
   try { ss = SpreadsheetApp.openById(PLANT_OPS_ID); }
   catch (e) { return { error: 'cannot open Plant Ops sheet: ' + e }; }
 
+  // Shared Production_Log fallback tab — opened once, reused for whichever
+  // departments don't have their own tbl_*_Production tab.
+  var plogSheet = null;
+  try { plogSheet = ss.getSheetByName(PRODUCTION_LOG_TAB); }
+  catch (e) { Logger.log('readPlantOps_: could not open fallback tab: ' + e); }
+
   var result = {};
   Object.keys(PLANT_OPS_TABS).forEach(function (key) {
     var tabName  = PLANT_OPS_TABS[key];
     var isCutting = (key === 'cutting');
     try {
       var sh = ss.getSheetByName(tabName);
-      if (!sh) { Logger.log('readPlantOps_: tab "' + tabName + '" not found'); return; }
-      result[key] = isCutting
-        ? readCuttingTabPatched_(sh, today)
-        : readProductionTab_(sh, today);
+      if (sh) {
+        result[key] = isCutting
+          ? readCuttingTabPatched_(sh, today)
+          : readProductionTab_(sh, today);
+        return;
+      }
+
+      Logger.log('readPlantOps_: tab "' + tabName + '" not found — trying Production_Log fallback for "' + key + '"');
+      if (!plogSheet) {
+        result[key] = { error: 'tab "' + tabName + '" not found and no "' + PRODUCTION_LOG_TAB + '" fallback tab either' };
+        return;
+      }
+      result[key] = readProductionLogForShop_(plogSheet, key, today);
     } catch (e) {
       Logger.log('readPlantOps_[' + tabName + '] ERROR: ' + e);
       result[key] = { error: String(e) };
     }
   });
   return result;
+}
+
+/**
+ * readProductionLogForShop_(sheet, deptKey, today)
+ *
+ * Fallback for departments whose own tbl_*_Production tab does not exist.
+ * Reads the shared "Production_Log" tab, keeps only rows whose Shop column
+ * matches this department (see SHOP_ALIASES) AND whose Date is today.
+ *
+ * Production_Log has no dedicated "pieces" column — one row is one
+ * production event, so a matching row count doubles as today_pieces (same
+ * semantics tbl_*_Production's COL_QTY was already producing, just counted
+ * differently). Rows with an unparseable Date are skipped and counted in
+ * rows_skipped_invalid, the same defensive pattern as the Cutting corruption
+ * patch above, since this AppSheet log has shown similar bad-import rows.
+ */
+function readProductionLogForShop_(sheet, deptKey, today) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return emptyDeptResult_();
+
+  var aliases = (SHOP_ALIASES[deptKey] || []).map(function (a) { return a.toLowerCase(); });
+  var cols = Math.max(sheet.getLastColumn(), 20);
+  var data = sheet.getRange(2, 1, lastRow - 1, cols).getValues();
+
+  var stats = emptyDeptResult_();
+  stats.rows_skipped_invalid = 0;
+  stats.source = 'fallback:' + PRODUCTION_LOG_TAB;
+
+  data.forEach(function (row) {
+    var shop = String(row[PLOG_COL_SHOP] || '').trim().toLowerCase();
+    if (aliases.indexOf(shop) === -1) return; // different department's row
+
+    var d = formatDate_(row[PLOG_COL_DATE]);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || d !== today) {
+      stats.rows_skipped_invalid++;
+      return;
+    }
+
+    stats.rows_read++;
+    stats.today_pieces++;
+    stats.today_jobs++;
+
+    var weight = 0;
+    for (var i = 0; i < PLOG_WEIGHT_COLS.length; i++) {
+      weight = safeNumber_(row[PLOG_WEIGHT_COLS[i]]);
+      if (weight > 0) break;
+    }
+    stats.today_weight_kg += weight;
+
+    var rejected = safeNumber_(row[PLOG_COL_REJECT]);
+    stats.today_rejected_qty = (stats.today_rejected_qty || 0) + rejected;
+
+    var shift = String(row[PLOG_COL_SHIFT] || '').trim() || 'Unknown';
+    if (!stats.shifts[shift]) stats.shifts[shift] = { pieces: 0, weight_kg: 0, jobs: 0 };
+    stats.shifts[shift].pieces++;
+    stats.shifts[shift].weight_kg += weight;
+    stats.shifts[shift].jobs++;
+  });
+
+  return stats;
 }
 
 /**
@@ -343,7 +511,7 @@ function readCollections_() {
     }
   }
 
-  // ── Fallback: named range ─────────────────────────────────────────────────
+  // ── Fallback 1: named range ────────────────────────────────────────────────
   try {
     var nr = ss.getRangeByName('CURRENT_OVERDUE');
     if (nr) {
@@ -355,8 +523,64 @@ function readCollections_() {
     Logger.log('readCollections_: named range lookup failed — ' + nrErr);
   }
 
+  // ── Fallback 2 (10-Sep patch): DASHBOARD tab's sheet-wide totals ──────────
+  // Confirmed to exist with real numbers, but this is a LABEL/VALUE summary
+  // sheet, not a per-customer list — it cannot produce current_overdue /
+  // locked_overdue (that split needs the per-customer aging tab, which does
+  // not exist yet; see PENDING.md). Those two stay null on purpose rather
+  // than being guessed from total_outstanding.
+  var dashResult = readCollectionsDashboardTotals_(ss);
+  if (dashResult) return dashResult;
+
   Logger.log('readCollections_: no data found');
-  return { current_overdue: null, currency: 'INR', source: 'not_found' };
+  return {
+    current_overdue : null,
+    currency        : 'INR',
+    source          : 'not_found',
+    note            : 'No "' + COLLECTIONS_TAB + '" tab, no CURRENT_OVERDUE named range, and no "' +
+                       COLLECTIONS_DASHBOARD_TAB + '" tab found either.'
+  };
+}
+
+/**
+ * readCollectionsDashboardTotals_(ss) → object|null
+ * Reads the Collections sheet's "DASHBOARD" tab — a simple label-in-col-A,
+ * value-in-col-B summary (confirmed live: "Total Outstanding (₹)" and
+ * "Customers with Overdue" rows exist with real numbers). Returns null (not
+ * an error object) if the tab or the expected labels aren't found, so the
+ * caller can fall through to the final not_found response.
+ */
+function readCollectionsDashboardTotals_(ss) {
+  var sh = ss.getSheetByName(COLLECTIONS_DASHBOARD_TAB);
+  if (!sh) return null;
+
+  var lastRow = sh.getLastRow();
+  if (lastRow < 1) return null;
+  var data = sh.getRange(1, 1, lastRow, 2).getValues();
+
+  var totalOutstanding  = null;
+  var customersOverdue  = null;
+  data.forEach(function (row) {
+    var label = String(row[0] || '').trim();
+    if (label === COLLECTIONS_DASHBOARD_LABEL_TOTAL) totalOutstanding = safeNumber_(row[1]);
+    if (label === COLLECTIONS_DASHBOARD_LABEL_COUNT)  customersOverdue = safeNumber_(row[1]);
+  });
+
+  if (totalOutstanding === null && customersOverdue === null) return null;
+
+  Logger.log('readCollections_: DASHBOARD fallback → total_outstanding=' + totalOutstanding +
+    ' customers_overdue=' + customersOverdue);
+  return {
+    current_overdue    : null,
+    locked_overdue      : null,
+    locked_accounts     : null,
+    total_outstanding   : totalOutstanding,
+    customers_overdue   : customersOverdue,
+    currency            : 'INR',
+    source              : 'tab:' + COLLECTIONS_DASHBOARD_TAB,
+    note                : 'Sheet-wide total only — no current/locked split available. ' +
+                           'The "' + COLLECTIONS_TAB + '" tab (which would provide it) does not exist yet.'
+  };
 }
 
 // ── Energy ────────────────────────────────────────────────────────────────────
@@ -365,9 +589,20 @@ function readEnergy_(today) {
   var ss;
   try { ss = SpreadsheetApp.openById(ENERGY_ID); }
   catch (e) { return { error: 'cannot open Energy sheet: ' + e }; }
+
+  // Legacy simple-tab path first (Electricity/Oil) — kept in case those ever
+  // get created; both currently return null since neither tab exists.
+  var elecKwh = readEnergyTab_(ss, ENERGY_ELEC_TABS, today, 'elec');
+  var oilL    = readEnergyTab_(ss, ENERGY_OIL_TABS,  today, 'oil');
+
+  // 10-Sep patch: fall back to the real AppSheet tabs when the legacy ones
+  // aren't found.
+  if (elecKwh === null) elecKwh = readElectricityMeters_(ss, today);
+  if (oilL === null)    oilL    = readFuelLogOil_(ss, today);
+
   return {
-    electricity_kwh : readEnergyTab_(ss, ENERGY_ELEC_TABS, today, 'elec'),
-    oil_liters      : readEnergyTab_(ss, ENERGY_OIL_TABS,  today, 'oil'),
+    electricity_kwh : elecKwh,
+    oil_liters      : oilL,
     period          : 'today'
   };
 }
@@ -386,6 +621,66 @@ function readEnergyTab_(ss, tabNames, today, label) {
   }
   Logger.log('readEnergyTab_[' + label + ']: no matching tab');
   return null;
+}
+
+/**
+ * readElectricityMeters_(ss, today) → number|null
+ * Sums Consumption_kWh (col I) across every meter/location/shift row logged
+ * today in "Electricity_Meters". Returns 0 if the tab exists but has no rows
+ * for today (including the common case of no data at all yet), null only if
+ * the tab itself is missing.
+ */
+function readElectricityMeters_(ss, today) {
+  var sh = ss.getSheetByName(ENERGY_ELEC_METERS_TAB);
+  if (!sh) { Logger.log('readElectricityMeters_: tab "' + ENERGY_ELEC_METERS_TAB + '" not found'); return null; }
+
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return 0;
+  var cols = Math.max(sh.getLastColumn(), ELEC_COL_CONSUMPTION_KWH + 1);
+  var data = sh.getRange(2, 1, lastRow - 1, cols).getValues();
+
+  var total = 0;
+  data.forEach(function (row) {
+    if (formatDate_(row[ELEC_COL_DATE]) === today) total += safeNumber_(row[ELEC_COL_CONSUMPTION_KWH]);
+  });
+  Logger.log('readElectricityMeters_: ' + total + ' kWh');
+  return total;
+}
+
+/**
+ * readFuelLogOil_(ss, today) → number|null
+ * Fuel_Log mixes vehicle fuel (Odometer_Reading, Efficiency_km_per_L are
+ * vehicle-only fields) with, presumably, furnace/HT oil — the two are told
+ * apart only by Fuel_Type. Sums Volume_Liters (col H) for today's rows whose
+ * Fuel_Type matches /oil/i. If the tab has data for today but none of it is
+ * tagged "oil", returns 0 with a log line (not null) — the tab exists and IS
+ * being read correctly, there's just no oil entry today, which is different
+ * from the tab not existing at all.
+ */
+function readFuelLogOil_(ss, today) {
+  var sh = ss.getSheetByName(ENERGY_FUEL_LOG_TAB);
+  if (!sh) { Logger.log('readFuelLogOil_: tab "' + ENERGY_FUEL_LOG_TAB + '" not found'); return null; }
+
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return 0;
+  var cols = Math.max(sh.getLastColumn(), FUEL_COL_VOLUME_L + 1);
+  var data = sh.getRange(2, 1, lastRow - 1, cols).getValues();
+
+  var total = 0;
+  var sawAnyOilTag = false;
+  data.forEach(function (row) {
+    if (formatDate_(row[FUEL_COL_DATE]) !== today) return;
+    var fuelType = String(row[FUEL_COL_TYPE] || '');
+    if (FUEL_OIL_MATCH_RE.test(fuelType)) {
+      sawAnyOilTag = true;
+      total += safeNumber_(row[FUEL_COL_VOLUME_L]);
+    }
+  });
+  if (!sawAnyOilTag) {
+    Logger.log('readFuelLogOil_: no rows tagged "oil" in Fuel_Type today — confirm furnace/HT oil is logged in this tab at all');
+  }
+  Logger.log('readFuelLogOil_: ' + total + ' L');
+  return total;
 }
 
 
@@ -727,12 +1022,49 @@ function safeNumber_(v) {
 //   "energy": { "electricity_kwh": 487.5, "oil_liters": 14.2, "period": "today" }
 // }
 //
+// AS OF THE 10-SEP PATCH, WITH THE REAL SHEETS' CURRENT (EMPTY) DATA, THE
+// LIVE PAYLOAD ACTUALLY LOOKS LIKE THIS INSTEAD — collections falls back to
+// DASHBOARD totals (real numbers), energy falls back to the AppSheet tabs
+// (currently 0 — both are empty), and forge/machine/ht/final_ fall back to
+// Production_Log (currently 0 too, or non-zero once real rows are entered
+// with a matching Shop + today's date):
+// {
+//   "plant_ops": {
+//     "cutting": { "today_pieces": 312, ... },   // unchanged, own tab
+//     "forge":   { "today_pieces": 0, "source": "fallback:Production_Log", ... },
+//     "press":   { "today_pieces": 240, ... },   // unchanged, own tab
+//     "machine": { "today_pieces": 0, "source": "fallback:Production_Log", ... },
+//     "ht":      { "today_pieces": 0, "source": "fallback:Production_Log", ... },
+//     "final_":  { "today_pieces": 0, "source": "fallback:Production_Log", ... }
+//   },
+//   "collections": {
+//     "current_overdue": null, "locked_overdue": null, "locked_accounts": null,
+//     "total_outstanding": 23304493, "customers_overdue": 17,
+//     "source": "tab:DASHBOARD",
+//     "note": "Sheet-wide total only — no current/locked split available..."
+//   },
+//   "energy": { "electricity_kwh": 0, "oil_liters": 0, "period": "today" }
+// }
+//
 // TROUBLESHOOTING:
 //   "You do not have permission" → run cacheOperationalData() in the editor
 //     (not doGet) and re-authorise scopes
 //   A2 empty → run testFullCache() and check Logs for errors
-//   current_overdue is null → confirm tab name is exactly
-//     "Outstanding Balances & Dispatch Locks" in the Collections sheet
+//   collections.current_overdue is null but total_outstanding has a number →
+//     working as designed — the per-customer aging tab ("Outstanding
+//     Balances & Dispatch Locks") doesn't exist yet. Create it (customer in
+//     col A, overdue amount in col C, overdue days in col D) to get the split.
+//   collections has NEITHER current_overdue NOR total_outstanding → the
+//     "DASHBOARD" tab's row labels changed; confirm they still read exactly
+//     "Total Outstanding (₹)" and "Customers with Overdue" in column A.
+//   energy.oil_liters is 0 but Fuel_Log has rows → check the Fuel_Type
+//     column actually contains the word "oil" somewhere (case-insensitive);
+//     if furnace/HT oil is logged under a different word entirely, update
+//     FUEL_OIL_MATCH_RE.
+//   plant_ops.forge/machine/ht/final_ stuck at 0 with real data entered →
+//     confirm Production_Log's Shop column text matches an entry in
+//     SHOP_ALIASES (case-insensitive) and rows_skipped_invalid isn't
+//     swallowing them — a non-today or unparseable Date skips the row.
 //   rows_skipped_corrupted is 0 when it should be ~23 → confirm COL_JOB_CARD=2
 //     (column C, 0-based) is correct for tbl_Cutting_Production
 //   doGet >150 ms → check trigger is running: Apps Script → Triggers (clock icon)
