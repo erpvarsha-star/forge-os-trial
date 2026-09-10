@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 9 Sep 2026 — VFPL Aggregator deployed, Netlify dashboard live, Supabase sync confirmed working (145 form + 8160 production rows), FCM push notifications unblocked, PATCH_19–23 confirmed applied (23 Aug). Remaining work is device testing and minor open items below.
+**Last updated:** 10 Sep 2026 — DME Telegram routing added (Amit Bhagvan Shirsath / VFL5434 now receives all 4 plant-wide reports); VMC Shop added to ALERT.gs tracking (RAW_VMC tab created manually in the sheet); 2-trigger layout deployed (13 triggers total, under the 20-per-project ceiling). Amit has messaged @Form_mgr_bot — DME_TELEGRAM_CHAT_ID Script Property is set. Remaining supervisors still need to onboard.
 
 ---
 
@@ -263,6 +263,11 @@ minutes — which is what tells the app what is outstanding. Restore from commit
       instead ("no Telegram registered for X"), not a group. Lower stakes
       regardless, now that the in-app Forms tab is a second route needing no
       chat ID at all.
+      **✅ Amit Bhagvan Shirsath (VFL5434, DME) — registered 10 Sep 2026.**
+      `DME_TELEGRAM_CHAT_ID` Script Property set automatically via
+      `processTelegramOnboarding()`. Receives all 4 plant-wide Telegram
+      reports (deadline, follow-up, daily summary, weekly performance).
+      Remaining: all per-department supervisors listed in SUPERVISOR_MAP.
 
 ### Still open on the app side
 
