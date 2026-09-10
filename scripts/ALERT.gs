@@ -1136,6 +1136,9 @@ function runShiftAlerts15min_() {
   });
 }
 
+/** Public wrapper — visible in the Apps Script dropdown for manual testing. */
+function runShiftAlertsNow() { runShiftAlerts15min_(); }
+
 /**
  * Once daily at 00:30: the daily summary and the weekly rollup rebuild.
  * sendWeeklyPerformance only fires on the Monday leg — checked here instead
