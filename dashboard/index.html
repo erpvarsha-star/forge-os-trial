@@ -758,8 +758,11 @@ async function start() {
    path just hides this one card rather than surfacing an error. */
 async function loadProductionData() {
   const card = $('prodDataCard');
-  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL === '__APPS_SCRIPT_URL__') {
-    card.hidden = true; // not wired yet — see APPS_SCRIPT_URL above
+  const urlOk = APPS_SCRIPT_URL &&
+                APPS_SCRIPT_URL !== '__APPS_SCRIPT_URL__' &&
+                APPS_SCRIPT_URL.startsWith('https://script.google.com/macros/s/');
+  if (!urlOk) {
+    card.hidden = true; // not wired or malformed URL — see APPS_SCRIPT_URL above
     return;
   }
   card.hidden = false;

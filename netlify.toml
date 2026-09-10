@@ -18,6 +18,12 @@
   publish = "dashboard"
   command = "if [ -n \"$APPS_SCRIPT_URL\" ]; then sed -i \"s#__APPS_SCRIPT_URL__#$APPS_SCRIPT_URL#g\" dashboard/index.html && echo \"APPS_SCRIPT_URL wired into dashboard/index.html\"; else echo \"APPS_SCRIPT_URL not set — deploying with the production data panel hidden\"; fi"
 
+[build.environment]
+  # Netlify auto-detects package.json and runs npm install before the build command.
+  # react-native-screens has a broken postinstall ('bob build && husky install') that
+  # always fails outside its own repo. --ignore-scripts skips all postinstall hooks.
+  NPM_FLAGS = "--ignore-scripts"
+
 [[headers]]
   for = "/*"
   [headers.values]
