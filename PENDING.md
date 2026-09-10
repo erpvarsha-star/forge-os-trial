@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 9 Sep 2026 — VFPL Aggregator deployed, Netlify dashboard live, Supabase sync confirmed working (145 form + 8160 production rows), FCM push notifications unblocked, PATCH_19–23 confirmed applied (23 Aug). Remaining work is device testing and minor open items below.
+**Last updated:** 10 Sep 2026 — Fixed `processFormSubmissions()`: form's "Phone Number" column never matched the expected "Phone" exact-match (prefix-match fix, commit 1c9d450). SUPERVISOR_MAP has been empty because of this bug since the script was written — no supervisor has ever been imported from Form Responses 1. Action: paste updated ALERT.gs → run `processFormSubmissions()` (backfill 159+ rows) → run `setupFormTrigger()` (auto-trigger for future). Supervisor Telegram Chat IDs confirmed from CSV: 15 supervisors have real IDs, 5 have no Telegram (0 or blank). resolveFormSheets.gs run result: 6/28 matched, 22 NO MATCH — `listAllFormsInDrive()` diagnostic needed to get real form names.
 
 ---
 
@@ -40,6 +40,24 @@ below. Empty tables and a broken sync look identical from the app.
 ---
 
 ## 🔴 Blocked on Yash — cannot proceed without you
+
+- [x] **Netlify dashboard deploy + production panel — committed 10 Sep 2026.**
+      Added `netlify.toml` (static deploy config) and a Production & collections
+      card to `dashboard/index.html` that fetches the Apps Script aggregator
+      (`VFPL_Complete_Apps_Script_Deployment_Suite_07SEP2026.gs` doGet endpoint)
+      after sign-in — today's pieces per department, current overdue receivables,
+      electricity/oil energy. Fails safe: hides itself if the URL is unset or the
+      fetch fails, never blocks any Supabase-backed section.
+      **Still open:**
+      1. **Connect Netlify site to this GitHub repo** (Netlify → Site config →
+         Build & deploy → Link repository) so pushes deploy automatically.
+      2. **Set `APPS_SCRIPT_URL` env var** on the Netlify site (Site config →
+         Environment variables → add `APPS_SCRIPT_URL = <your exec URL>`) then
+         trigger a redeploy — the build command swaps the placeholder in.
+         Until set, the production panel stays hidden; all other sections work.
+      3. **Fix Collections/Energy sheet tab names** — currently returning `null`
+         (`source: "not_found"`) per the Apps Script troubleshooting notes. Also
+         check why forge/machine/ht/final aren't showing in `plant_ops`.
 
 - [x] **Multi-point geofence — APPLIED 23 Aug.**
       Yash sent a CSV with all 12 campus points already resolved to
@@ -255,15 +273,19 @@ minutes — which is what tells the app what is outstanding. Restore from commit
 - [x] **Phone numbers — CLOSED 12 Aug.** Yash: "you dont need phone numbers."
       Not asked for again.
 
-- [ ] **Several `SUPERVISOR_MAP` rows still have a blank Telegram Chat ID**
-      (e.g. Pravin Sonavane, Machine). The onboarding flow (13 Aug) is the fix
-      — they message @Form_mgr_bot with their name and it fills in
-      automatically — but nobody has done it yet. *Correction to what this
+- [ ] **Supervisors onboard to @Form_mgr_bot** — Telegram working (10 Sep).
+      Draft sent to DME/HR to circulate. Each supervisor messages @Form_mgr_bot
+      with their exact name; bot auto-fills their Chat ID in SUPERVISOR_MAP. *Correction to what this
       line said before: there is no group-chat fallback.* When a supervisor
       has no chat ID, `sendGentleReminder` now tells the OWNER directly
       instead ("no Telegram registered for X"), not a group. Lower stakes
       regardless, now that the in-app Forms tab is a second route needing no
       chat ID at all.
+      **✅ Amit Bhagvan Shirsath (VFL5434, DME) — registered 10 Sep 2026.**
+      `DME_TELEGRAM_CHAT_ID` Script Property set automatically via
+      `processTelegramOnboarding()`. Receives all 4 plant-wide Telegram
+      reports (deadline, follow-up, daily summary, weekly performance).
+      Remaining: all per-department supervisors listed in SUPERVISOR_MAP.
 
 ### Still open on the app side
 
@@ -285,33 +307,27 @@ minutes — which is what tells the app what is outstanding. Restore from commit
       ⚠ **Per shift, not per form** — the RAW tabs record that a department
       submitted for a shift, never which of its 3-6 daily forms it was.
 
-- [ ] **Per-form ticking — INVESTIGATED 13 Aug, safe first step built, feature
-      itself NOT started on purpose.** Confirmed the data exists: every
-      individual form has its own response spreadsheet with a clean
-      `Timestamp | Date | Supervisor Name | Shift` shape (checked VMC's daily
-      check sheet directly — real rows, real timestamps). But Drive also has
-      MULTIPLE copies of many of these forms — for VMC alone there are 4
-      similarly-titled files across different years. Guessing which is
-      current would silently point compliance data at a stale sheet with no
-      error, so I did not guess.
-      `scripts/resolveFormSheets.gs` — run this once, from any Apps Script
-      project with Drive access to these forms (not ALERT.gs's own project).
-      It asks Google Forms itself which spreadsheet each form is CURRENTLY
-      linked to (`FormApp.getDestinationId()` — authoritative, not a
-      filename guess), for all 24 forms in `DEPT_FORM_SEED`/PATCH_19, and
-      writes a `FORM_SHEET_MAP` tab: one row per form, `high` confidence when
-      exactly one live (non-"Copy of") form matched the title, `REVIEW` when
-      more than one did. Read-only against every form and the dashboard —
-      creates one new tab, nothing else.
-      Verified against the real ambiguity found for VMC (one genuine form +
-      two "Copy of" duplicates): correctly resolves to the real one. Also
-      tested a genuinely ambiguous case (two live forms sharing a title) and
-      confirmed it flags REVIEW rather than picking the more-recent one
-      silently — and a missing-form case, confirmed it reports NO MATCH
-      rather than crashing.
-      **Next step, yours:** run it, open every REVIEW row, confirm or correct
-      the pick. Only after that is the mapping trustworthy enough to build
-      the actual per-form schema and Forms tab UI on top of.
+- [ ] **Per-form ticking — `resolveFormSheets.gs` run 10 Sep, 22 of 28 forms
+      returned NO MATCH.** The script does an exact-title search (`title = "…"`
+      in Drive). A NO MATCH means the form's real title in Drive differs from
+      what `FORM_NAMES_TO_RESOLVE` has — even one extra character, year suffix,
+      or case difference fails it. Only 6 forms matched.
+      **Next step:** run `listAllFormsInDrive()` in the Apps Script editor (any
+      project with Drive access) to see every Google Form's real name, then
+      update `FORM_NAMES_TO_RESOLVE` in `scripts/resolveFormSheets.gs` with the
+      exact titles, and re-run `resolveFormSheets()`.
+      ```javascript
+      function listAllFormsInDrive() {
+        var it = DriveApp.searchFiles(
+          'mimeType = "application/vnd.google-apps.form" and trashed = false');
+        var rows = [];
+        while (it.hasNext()) { var f = it.next(); rows.push(f.getName()); }
+        rows.sort();
+        Logger.log(rows.length + ' forms found:\n' + rows.join('\n'));
+      }
+      ```
+      Paste that into Apps Script → Run → check the Execution Log. The names
+      there are the exact strings to put in `FORM_NAMES_TO_RESOLVE`.
 - [x] **Department production on the dashboards — BUILT 12 Aug.**
       `production_records` (PATCH_15) + `components/ProductionSummary.tsx`,
       mounted on manager → Reports (scoped to their shop, grouped by machine)

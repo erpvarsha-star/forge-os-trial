@@ -32,3 +32,6 @@ yarn-error.*
 
 # TypeScript
 *.tsbuildinfo
+
+# Netlify CLI local site-link state (machine-local, not a secret, not shared)
+.netlify/

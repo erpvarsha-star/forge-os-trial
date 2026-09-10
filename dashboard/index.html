@@ -195,6 +195,15 @@
 
   <div class="grid kpis" id="kpis"></div>
 
+  <div class="card" id="prodDataCard" style="margin-bottom:14px" hidden>
+    <div class="row" style="margin-bottom:12px">
+      <h2 style="margin:0">Production &amp; collections</h2>
+      <div class="spacer"></div>
+      <span class="dim" id="prodDataAsOf"></span>
+    </div>
+    <div id="prodDataBody"><div class="empty">Production data loading…</div></div>
+  </div>
+
   <div class="grid cols-2">
     <div class="card">
       <h2>Attendance — last 30 days</h2>
@@ -263,6 +272,13 @@
    ============================================================ */
 const SUPABASE_URL = 'https://odfwtdpvpfzdrznvurru.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_fBg7fdYlGBGvDrvGVjJumQ_qzN4hJSf';
+
+/* Apps Script aggregator (production/collections/energy cache) — set by Netlify at
+   deploy time (see netlify.toml, which substitutes the APPS_SCRIPT_URL environment
+   variable into this placeholder as part of the publish step). Left as the literal
+   placeholder, the panel below simply stays hidden — this file still opens and
+   works standalone with no build step, exactly as before. */
+const APPS_SCRIPT_URL = '__APPS_SCRIPT_URL__';
 
 /* Roles the dashboard is built for. Not a security boundary — RLS is. This
    only decides whether to show the page or a clear "not for you" message. */
@@ -730,6 +746,76 @@ async function start() {
     return;
   }
   await loadAll();
+  loadProductionData(); // independent source (Apps Script cache) — never blocks the Supabase-backed sections above
+}
+
+/* ---------- PRODUCTION DATA (Apps Script cache) ----------
+   Separate from every Supabase-backed section above: this comes from
+   VFPL_Complete_Apps_Script_Deployment_Suite_07SEP2026.gs's doGet() endpoint,
+   a pre-aggregated JSON snapshot of production/collections/energy pulled from
+   the Operations Dashboard Sheets. Kept isolated on purpose — a bad response
+   here must never break sign-in or any Supabase-backed card, so every failure
+   path just hides this one card rather than surfacing an error. */
+async function loadProductionData() {
+  const card = $('prodDataCard');
+  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL === '__APPS_SCRIPT_URL__') {
+    card.hidden = true; // not wired yet — see APPS_SCRIPT_URL above
+    return;
+  }
+  card.hidden = false;
+  $('prodDataBody').innerHTML = '<div class="empty">Production data loading…</div>';
+  try {
+    const res = await fetch(APPS_SCRIPT_URL);
+    const text = await res.text();
+    let payload; try { payload = text ? JSON.parse(text) : null; } catch { payload = null; }
+    if (!res.ok || !payload) throw new Error('HTTP ' + res.status);
+    if (payload.error) throw new Error(payload.error);
+    renderProductionData(payload);
+  } catch (e) {
+    console.warn('Production data fetch failed:', e);
+    card.hidden = true;
+  }
+}
+
+const deptLabel = (key) => key.replace(/_+$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+const inr = (n) => (n == null || isNaN(n)) ? '—' : '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+function renderProductionData(payload) {
+  const ops = payload.plant_ops || {};
+  const deptCards = Object.keys(ops).map(key => {
+    const d = ops[key] || {};
+    const errored = !!d.error;
+    return `<div class="card kpi ${errored ? 'bad' : ''}">
+      <div class="label">${esc(deptLabel(key))}</div>
+      <div class="value">${errored ? '—' : (d.today_pieces ?? 0).toLocaleString()}</div>
+      <div class="sub">${errored ? 'sync error' : 'pieces today'}</div>
+    </div>`;
+  }).join('');
+
+  const collections = payload.collections || {};
+  const energy = payload.energy || {};
+
+  $('prodDataBody').innerHTML = `<div class="grid kpis">
+    ${deptCards || '<div class="empty">No department data in this snapshot.</div>'}
+    <div class="card kpi ${(collections.current_overdue ?? 0) > 0 ? 'warn' : 'good'}">
+      <div class="label">Overdue receivables</div>
+      <div class="value">${inr(collections.current_overdue)}</div>
+      <div class="sub">${collections.locked_overdue != null ? inr(collections.locked_overdue) + ' locked' : 'current, all depts'}</div>
+    </div>
+    <div class="card kpi">
+      <div class="label">Energy today</div>
+      <div class="value">${energy.electricity_kwh != null ? Number(energy.electricity_kwh).toLocaleString('en-IN') + ' kWh' : '—'}</div>
+      <div class="sub">${energy.oil_liters != null ? energy.oil_liters + ' L oil' : 'electricity'}</div>
+    </div>
+  </div>`;
+
+  // The aggregator's own timestamp field is "ts" (UTC ISO), not "cached_at" —
+  // both are read here in case an older/newer deployment of the script differs.
+  const stamp = payload.ts || payload.cached_at;
+  $('prodDataAsOf').textContent = stamp
+    ? 'cache as of ' + new Date(new Date(stamp).getTime() + 5.5 * 3600 * 1000)
+        .toISOString().slice(0, 16).replace('T', ' ') + ' IST'
+    : '';
 }
 
 $('refreshBtn').onclick = async () => {

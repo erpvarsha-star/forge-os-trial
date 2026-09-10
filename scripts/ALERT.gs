@@ -42,10 +42,17 @@ var TELEGRAM_BOT_TOKEN_INLINE = '';   // <-- paste the @Form_mgr_bot token betwe
 // works, Script Properties still wins if both are set.
 var OWNER_TELEGRAM_CHAT_ID_INLINE = '';   // <-- paste your numeric chat id between these quotes, or leave blank and message the bot instead
 
+// Amit Bhagvan Shirsath (VFL5434) — the DME who receives all production-deadline
+// alerts. NOT a secret — same note as OWNER_TELEGRAM_CHAT_ID_INLINE above.
+// Leave blank and have Amit message @Form_mgr_bot with "Amit Bhagvan Shirsath"
+// (or "amit" / "vfl5434") — processTelegramOnboarding() fills it in via the
+// DME_TELEGRAM_CHAT_ID Script Property automatically.
+var DME_CHAT_ID_INLINE = '';   // <-- paste Amit's numeric Telegram chat id, or leave blank and let him message the bot
+
 // ── DEPARTMENT LIST ──────────────────────────────────────
 var DEPARTMENTS = [
   'Cutting', 'Forge', 'Press', 'Machine', 'HT', 'Final',
-  'Electricity', 'Oil', 'Staff Manpower', 'Contract Manpower'
+  'Electricity', 'Oil', 'Staff Manpower', 'Contract Manpower', 'VMC Shop'
 ];
 
 // ── RAW TAB MAPPING ──────────────────────────────────────
@@ -59,7 +66,8 @@ var DEPT_TO_RAW_TAB = {
   'Electricity': 'RAW_ELECTRICITY',
   'Oil': 'RAW_OIL',
   'Staff Manpower': 'RAW_MANPOWER_STAFF',
-  'Contract Manpower': 'RAW_MANPOWER_CONTRACT'
+  'Contract Manpower': 'RAW_MANPOWER_CONTRACT',
+  'VMC Shop': 'RAW_VMC'
 };
 
 // ── DEPARTMENT NAME MAPPING (dashboard -> app database) ───
@@ -193,7 +201,13 @@ var DEPT_FORM_SEED = [
    'https://docs.google.com/forms/d/e/1FAIpQLSflyxcQjVEdv2OXgflXhKVH1VWhBUEMhC7KhUUUtdb4pHQNyw/viewform', 'NO'],
   ['Contract Manpower', 'Daily Contractual Manpower Form', 'As & When Required',
    'Shrawan Rewant Singh (Security) / Milind Ambadas Barhate, Pallavi Vishnu Khade, Mayuri Sardar Rathod (HR)',
-   'https://docs.google.com/forms/d/e/1FAIpQLSfecNumIXRV7Xej_n-4N7k0K702I9WHjiT6F_naEqT5JnFS0g/viewform', 'NO']
+   'https://docs.google.com/forms/d/e/1FAIpQLSfecNumIXRV7Xej_n-4N7k0K702I9WHjiT6F_naEqT5JnFS0g/viewform', 'NO'],
+  // VMC Shop — added PATCH_19 (applied 23 Aug 2026). send_in_reminder=YES to
+  // match the DB form_links row (send_in_reminder=true). RAW_VMC tab is
+  // created by setupDynamicSupervisorTabs() on the next re-run.
+  ['VMC Shop', 'VMC Daily check sheet', 'Daily',
+   'Abhimanyu Kakde, Amol Rakhmaji Ambhore, Sayed Uzaif Ali Syed Altaf Ali',
+   'https://docs.google.com/forms/d/e/1FAIpQLSdCv3PnoYHJy5H-y60hjwQTR4dBvC9mfKNNFiYMnFiZSD4pRw/viewform', 'YES']
 ];
 
 // ── SUBMISSION TRACKING (NOT SCORING) ─────────────────────
@@ -736,6 +750,23 @@ function getOwnerTelegramChatId_() {
   return OWNER_TELEGRAM_CHAT_ID_INLINE || PropertiesService.getScriptProperties().getProperty('OWNER_TELEGRAM_CHAT_ID');
 }
 
+function getDmeChatId_() {
+  return DME_CHAT_ID_INLINE || PropertiesService.getScriptProperties().getProperty('DME_TELEGRAM_CHAT_ID');
+}
+
+/**
+ * Sends a Telegram message to the DME (Amit) only.
+ * No-ops silently if Amit has not yet messaged the bot to register.
+ */
+function sendDmeTelegramAlert_(message) {
+  var dmeId = getDmeChatId_();
+  if (!dmeId) {
+    Logger.log('⚠️ No DME chat id. Amit needs to message @Form_mgr_bot with "Amit Bhagvan Shirsath" to register, or paste his chat id into DME_CHAT_ID_INLINE / set DME_TELEGRAM_CHAT_ID in Script Properties.');
+    return;
+  }
+  sendTelegramToChatId(dmeId, message);
+}
+
 function sendTelegramToChatId(chatId, message) {
   if (!chatId || chatId === '') return;
   
@@ -930,13 +961,14 @@ function sendDMEDeadlineAlert() {
   msg += '  ✅ Call supervisors above immediately\n';
   msg += '  ✅ Follow-up at ' + getShiftDeadline_(shiftInfo.shift) + ' + 30 min\n\n';
   msg += '🔗 Dashboard: ' + ScriptApp.getService().getUrl();
-  
+
   sendTelegramAlert(msg);
-  
+  sendDmeTelegramAlert_(msg);
+
   missing.forEach(function(m) {
     logEscalation_(m.department, shiftInfo.shift, m.supervisor, 'LOW');
   });
-  
+
   Logger.log('📨 DME deadline alert sent for ' + shiftInfo.shift);
 }
 
@@ -980,13 +1012,14 @@ function sendFollowUpAlert() {
   msg += '  ✅ Escalate to Plant Head if not resolved\n';
   msg += '  ✅ This will appear in today\'s 12:30 AM summary\n\n';
   msg += '🔗 Dashboard: ' + ScriptApp.getService().getUrl();
-  
+
   sendTelegramAlert(msg);
-  
+  sendDmeTelegramAlert_(msg);
+
   stillMissing.forEach(function(m) {
     logEscalation_(m.department, shiftInfo.shift, m.supervisor, 'MEDIUM');
   });
-  
+
   Logger.log('📨 Follow-up alert sent for ' + shiftInfo.shift);
 }
 
@@ -1022,6 +1055,7 @@ function sendDailySummary() {
   msg += '\n\n🔗 Dashboard: ' + ScriptApp.getService().getUrl();
   
   sendTelegramAlert(msg);
+  sendDmeTelegramAlert_(msg);
   Logger.log('📨 Daily summary sent for ' + dateStr + ' (' + totalMissing + ' missing)');
 }
 
@@ -1031,8 +1065,9 @@ function sendWeeklyPerformance() {
   msg += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
   msg += '📋 Check WEEKLY_PERFORMANCE tab for detailed scores.\n\n';
   msg += '🔗 Dashboard: ' + ScriptApp.getService().getUrl();
-  
+
   sendTelegramAlert(msg);
+  sendDmeTelegramAlert_(msg);
   Logger.log('📨 Weekly performance sent');
 }
 
@@ -1100,6 +1135,9 @@ function runShiftAlerts15min_() {
     try { fn(); } catch (err) { Logger.log('❌ runShiftAlerts15min_: ' + fn.name + ' failed: ' + err); }
   });
 }
+
+/** Public wrapper — visible in the Apps Script dropdown for manual testing. */
+function runShiftAlertsNow() { runShiftAlerts15min_(); }
 
 /**
  * Once daily at 00:30: the daily summary and the weekly rollup rebuild.
@@ -1256,7 +1294,8 @@ function processFormSubmissions() {
   // 'Week Start (Monday)' and a bare 'Week Start' all resolve. The other five
   // columns still need an exact match, because a loose match there could bind
   // the wrong column.
-  var PREFIX_MATCHED = { 'Week Start': true, 'Week End': true };
+  // 'Phone' prefix-matched so the form's 'Phone Number' header resolves too.
+  var PREFIX_MATCHED = { 'Week Start': true, 'Week End': true, 'Phone': true };
   
   expectedCols.forEach(function(colName) {
     for (var i = 0; i < headers.length; i++) {
@@ -2111,6 +2150,10 @@ function testSupabaseSync() {
 // follow-up / daily-summary reports.
 var OWNER_NAME_TRIGGERS = ['yash', 'yash munot', 'yash jinendra munot', 'owner', 'vfl1001'];
 
+// Amit Bhagvan Shirsath (VFL5434) — DME. Same matching logic as owner: checked
+// before the supervisor roster lookup, writes DME_TELEGRAM_CHAT_ID Script Property.
+var DME_NAME_TRIGGERS = ['amit', 'amit shirsath', 'amit bhagvan shirsath', 'vfl5434'];
+
 /** The Telegram numeric user/chat id last confirmed processed, so the same
  * message is never matched twice. Stored in Script Properties, not a sheet
  * cell, since it is bookkeeping for this function alone. */
@@ -2171,6 +2214,13 @@ function processTelegramOnboarding() {
       PropertiesService.getScriptProperties().setProperty('OWNER_TELEGRAM_CHAT_ID', chatId);
       registered++;
       sendTelegramToChatId(chatId, '✅ Registered as plant owner. You will receive the DME, follow-up and daily summary reports here.');
+      return;
+    }
+
+    if (DME_NAME_TRIGGERS.indexOf(text.toLowerCase()) > -1) {
+      PropertiesService.getScriptProperties().setProperty('DME_TELEGRAM_CHAT_ID', chatId);
+      registered++;
+      sendTelegramToChatId(chatId, '✅ Registered as DME. You will receive shift deadline alerts, follow-up escalations, and the daily summary here.');
       return;
     }
 

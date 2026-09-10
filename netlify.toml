@@ -1,0 +1,26 @@
+## Forge OS — Plant Dashboard (dashboard/index.html) — Netlify static deploy
+##
+## This is a single self-contained HTML file with NO framework and NO build
+## step by design (see the comment at the top of dashboard/index.html) — it
+## has to keep working as a plain double-click-to-open file too. The only job
+## of this Netlify build is to swap the __APPS_SCRIPT_URL__ placeholder for
+## the real Apps Script Web App URL, read from the APPS_SCRIPT_URL
+## environment variable, so the deployed copy doesn't need a rebuild every
+## time that URL changes.
+##
+## To wire it up: Netlify → Site configuration → Environment variables →
+## add APPS_SCRIPT_URL = https://script.google.com/macros/s/<DEPLOYMENT_ID>/exec
+## then trigger a redeploy. Until that variable is set, the placeholder is
+## left as-is and the dashboard's production/collections/energy card simply
+## stays hidden — every other section works exactly as before.
+
+[build]
+  publish = "dashboard"
+  command = "if [ -n \"$APPS_SCRIPT_URL\" ]; then sed -i \"s#__APPS_SCRIPT_URL__#$APPS_SCRIPT_URL#g\" dashboard/index.html && echo \"APPS_SCRIPT_URL wired into dashboard/index.html\"; else echo \"APPS_SCRIPT_URL not set — deploying with the production data panel hidden\"; fi"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
