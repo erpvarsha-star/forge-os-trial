@@ -41,6 +41,24 @@ below. Empty tables and a broken sync look identical from the app.
 
 ## 🔴 Blocked on Yash — cannot proceed without you
 
+- [x] **Netlify dashboard deploy + production panel — committed 10 Sep 2026.**
+      Added `netlify.toml` (static deploy config) and a Production & collections
+      card to `dashboard/index.html` that fetches the Apps Script aggregator
+      (`VFPL_Complete_Apps_Script_Deployment_Suite_07SEP2026.gs` doGet endpoint)
+      after sign-in — today's pieces per department, current overdue receivables,
+      electricity/oil energy. Fails safe: hides itself if the URL is unset or the
+      fetch fails, never blocks any Supabase-backed section.
+      **Still open:**
+      1. **Connect Netlify site to this GitHub repo** (Netlify → Site config →
+         Build & deploy → Link repository) so pushes deploy automatically.
+      2. **Set `APPS_SCRIPT_URL` env var** on the Netlify site (Site config →
+         Environment variables → add `APPS_SCRIPT_URL = <your exec URL>`) then
+         trigger a redeploy — the build command swaps the placeholder in.
+         Until set, the production panel stays hidden; all other sections work.
+      3. **Fix Collections/Energy sheet tab names** — currently returning `null`
+         (`source: "not_found"`) per the Apps Script troubleshooting notes. Also
+         check why forge/machine/ht/final aren't showing in `plant_ops`.
+
 - [x] **Multi-point geofence — APPLIED 23 Aug.**
       Yash sent a CSV with all 12 campus points already resolved to
       coordinates (11 from the original sheet + "Store", a 12th point
