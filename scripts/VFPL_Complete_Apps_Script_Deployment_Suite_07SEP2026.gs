@@ -76,10 +76,9 @@ var CACHE_HDR_ADDR  = 'A1';
 // ── Source sheet IDs (read-only from the cache layer) ────────────────────────
 var PLANT_OPS_ID    = '1iFbjSC3OSLFouPuHCYUfduRUBQ5IXdEIjCLCdRXTOCU';  // VFPL_Domain_PlantOperations_2026-27
 var COLLECTIONS_ID  = '1B7eI55FXwdPaSRX9MoZVLB9bx2sWdCBUBZlsLQiF7q0';  // VFPL Collections Engine
-// NOTE (10-Sep patch): this sheet's real title, confirmed via Drive, is
-// "VFPL_Domain_UtilitiesManpower_2026-27" — the old "..._Utilities_2026-27"
-// comment below was stale (ID is correct and unchanged, only the name was wrong).
-var ENERGY_ID       = '1H2kHVeBNZnCuCeYesh6ZoXM3scf5tC3WANWGhayg8Xc';  // VFPL_Domain_UtilitiesManpower_2026-27
+// 10-Sep fix: real sheet confirmed via Drive share link from Yash.
+// Title: "VFL electricity and oil Consumption Report 2026-2027"
+var ENERGY_ID       = '1nUvf-UWjBSbSWnZTNph-gRUbjzuguGlidpYBKshKUNQ';
 
 // ── Trigger ───────────────────────────────────────────────────────────────────
 var TRIGGER_FN       = 'cacheOperationalData';
@@ -180,15 +179,14 @@ var ENERGY_OIL_TABS  = ['Oil', 'OIL', 'RAW_OIL', 'Oil Consumable'];
 // If Fuel_Type never contains "oil", oil_liters comes back null with a note
 // rather than a guessed number — confirm with whoever owns AppSheet entry
 // whether furnace/HT oil is logged here at all (see PENDING.md).
-var ENERGY_ELEC_METERS_TAB   = 'Electricity_Meters';
-var ELEC_COL_DATE            = 2;  // column C
-var ELEC_COL_CONSUMPTION_KWH = 8;  // column I — Consumption_kWh
-
-var ENERGY_FUEL_LOG_TAB  = 'Fuel_Log';
-var FUEL_COL_DATE        = 2;  // column C
-var FUEL_COL_TYPE        = 4;  // column E — Fuel_Type
-var FUEL_COL_VOLUME_L    = 7;  // column H — Volume_Liters
-var FUEL_OIL_MATCH_RE    = /oil/i;
+// 10-Sep fix: real sheet has a "Dashboard" tab with pre-summed daily totals.
+// Row 2 = date headers ("01-Sep", "02-Sep"…); col A/B = category/shift labels.
+// Row 9  = "Total Cons. Unit" for 1 Main MSEB Meter (electricity kWh/day).
+// Row 101 = "Total Consumation" = Forge + HT oil combined (litres/day).
+var ENERGY_DASHBOARD_TAB  = 'Dashboard';
+var ENERGY_HEADER_ROW     = 2;    // row that holds "01-Sep", "02-Sep"…
+var ENERGY_ELEC_TOTAL_ROW = 9;    // electricity daily total row
+var ENERGY_OIL_TOTAL_ROW  = 101;  // oil daily total row
 
 
 // ============================================================================
@@ -590,15 +588,16 @@ function readEnergy_(today) {
   try { ss = SpreadsheetApp.openById(ENERGY_ID); }
   catch (e) { return { error: 'cannot open Energy sheet: ' + e }; }
 
-  // Legacy simple-tab path first (Electricity/Oil) — kept in case those ever
-  // get created; both currently return null since neither tab exists.
+  // Try legacy named tabs first (kept in case they are ever created)
   var elecKwh = readEnergyTab_(ss, ENERGY_ELEC_TABS, today, 'elec');
   var oilL    = readEnergyTab_(ss, ENERGY_OIL_TABS,  today, 'oil');
 
-  // 10-Sep patch: fall back to the real AppSheet tabs when the legacy ones
-  // aren't found.
-  if (elecKwh === null) elecKwh = readElectricityMeters_(ss, today);
-  if (oilL === null)    oilL    = readFuelLogOil_(ss, today);
+  // 10-Sep fix: fall back to real Dashboard tab (confirmed structure via Drive)
+  if (elecKwh === null || oilL === null) {
+    var dash = readEnergyFromDashboard_(ss, today);
+    if (elecKwh === null) elecKwh = dash.elec_kwh;
+    if (oilL === null)    oilL    = dash.oil_l;
+  }
 
   return {
     electricity_kwh : elecKwh,
@@ -624,63 +623,40 @@ function readEnergyTab_(ss, tabNames, today, label) {
 }
 
 /**
- * readElectricityMeters_(ss, today) → number|null
- * Sums Consumption_kWh (col I) across every meter/location/shift row logged
- * today in "Electricity_Meters". Returns 0 if the tab exists but has no rows
- * for today (including the common case of no data at all yet), null only if
- * the tab itself is missing.
+ * readEnergyFromDashboard_(ss, today) → { elec_kwh, oil_l }
+ * Reads the pre-summed daily totals from the "Dashboard" tab.
+ * Row 2: date headers in "DD-Mon" format (e.g. "10-Sep").
+ * Row 9:  Total Cons. Unit — 1 Main MSEB Meter (electricity kWh).
+ * Row 101: Total Consumation — Forge + HT oil combined (litres).
  */
-function readElectricityMeters_(ss, today) {
-  var sh = ss.getSheetByName(ENERGY_ELEC_METERS_TAB);
-  if (!sh) { Logger.log('readElectricityMeters_: tab "' + ENERGY_ELEC_METERS_TAB + '" not found'); return null; }
-
-  var lastRow = sh.getLastRow();
-  if (lastRow < 2) return 0;
-  var cols = Math.max(sh.getLastColumn(), ELEC_COL_CONSUMPTION_KWH + 1);
-  var data = sh.getRange(2, 1, lastRow - 1, cols).getValues();
-
-  var total = 0;
-  data.forEach(function (row) {
-    if (formatDate_(row[ELEC_COL_DATE]) === today) total += safeNumber_(row[ELEC_COL_CONSUMPTION_KWH]);
-  });
-  Logger.log('readElectricityMeters_: ' + total + ' kWh');
-  return total;
-}
-
-/**
- * readFuelLogOil_(ss, today) → number|null
- * Fuel_Log mixes vehicle fuel (Odometer_Reading, Efficiency_km_per_L are
- * vehicle-only fields) with, presumably, furnace/HT oil — the two are told
- * apart only by Fuel_Type. Sums Volume_Liters (col H) for today's rows whose
- * Fuel_Type matches /oil/i. If the tab has data for today but none of it is
- * tagged "oil", returns 0 with a log line (not null) — the tab exists and IS
- * being read correctly, there's just no oil entry today, which is different
- * from the tab not existing at all.
- */
-function readFuelLogOil_(ss, today) {
-  var sh = ss.getSheetByName(ENERGY_FUEL_LOG_TAB);
-  if (!sh) { Logger.log('readFuelLogOil_: tab "' + ENERGY_FUEL_LOG_TAB + '" not found'); return null; }
-
-  var lastRow = sh.getLastRow();
-  if (lastRow < 2) return 0;
-  var cols = Math.max(sh.getLastColumn(), FUEL_COL_VOLUME_L + 1);
-  var data = sh.getRange(2, 1, lastRow - 1, cols).getValues();
-
-  var total = 0;
-  var sawAnyOilTag = false;
-  data.forEach(function (row) {
-    if (formatDate_(row[FUEL_COL_DATE]) !== today) return;
-    var fuelType = String(row[FUEL_COL_TYPE] || '');
-    if (FUEL_OIL_MATCH_RE.test(fuelType)) {
-      sawAnyOilTag = true;
-      total += safeNumber_(row[FUEL_COL_VOLUME_L]);
-    }
-  });
-  if (!sawAnyOilTag) {
-    Logger.log('readFuelLogOil_: no rows tagged "oil" in Fuel_Type today — confirm furnace/HT oil is logged in this tab at all');
+function readEnergyFromDashboard_(ss, today) {
+  var sh = ss.getSheetByName(ENERGY_DASHBOARD_TAB);
+  if (!sh) {
+    Logger.log('readEnergyFromDashboard_: tab "' + ENERGY_DASHBOARD_TAB + '" not found');
+    return { elec_kwh: null, oil_l: null };
   }
-  Logger.log('readFuelLogOil_: ' + total + ' L');
-  return total;
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var d   = Utilities.parseDate(today, 'Asia/Kolkata', 'yyyy-MM-dd');
+  var dd  = Utilities.formatDate(d, 'Asia/Kolkata', 'dd');
+  var mon = months[d.getMonth()];
+  var label = dd + '-' + mon;  // e.g. "10-Sep"
+  var lastCol   = sh.getLastColumn();
+  var headerRow = sh.getRange(ENERGY_HEADER_ROW, 1, 1, lastCol).getValues()[0];
+  var col = -1;
+  for (var i = 0; i < headerRow.length; i++) {
+    if (String(headerRow[i]).trim() === label) { col = i + 1; break; }
+  }
+  if (col === -1) {
+    Logger.log('readEnergyFromDashboard_: date "' + label + '" not found in header row');
+    return { elec_kwh: null, oil_l: null };
+  }
+  var elec = sh.getRange(ENERGY_ELEC_TOTAL_ROW, col).getValue();
+  var oil  = sh.getRange(ENERGY_OIL_TOTAL_ROW,  col).getValue();
+  Logger.log('readEnergyFromDashboard_[' + label + ']: elec=' + elec + ' kWh, oil=' + oil + ' L');
+  return {
+    elec_kwh: (typeof elec === 'number' && elec > 0) ? elec : null,
+    oil_l:    (typeof oil  === 'number' && oil  > 0) ? oil  : null
+  };
 }
 
 
