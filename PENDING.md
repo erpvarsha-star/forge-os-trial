@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 10 Sep 2026 — DME Telegram routing added (Amit Bhagvan Shirsath / VFL5434 now receives all 4 plant-wide reports); VMC Shop added to ALERT.gs tracking (RAW_VMC tab created manually in the sheet); 2-trigger layout deployed (13 triggers total, under the 20-per-project ceiling). Amit has messaged @Form_mgr_bot — DME_TELEGRAM_CHAT_ID Script Property is set. Remaining supervisors still need to onboard.
+**Last updated:** 10 Sep 2026 — Fixed `processFormSubmissions()`: form's "Phone Number" column never matched the expected "Phone" exact-match (prefix-match fix, commit 1c9d450). SUPERVISOR_MAP has been empty because of this bug since the script was written — no supervisor has ever been imported from Form Responses 1. Action: paste updated ALERT.gs → run `processFormSubmissions()` (backfill 159+ rows) → run `setupFormTrigger()` (auto-trigger for future). Supervisor Telegram Chat IDs confirmed from CSV: 15 supervisors have real IDs, 5 have no Telegram (0 or blank). resolveFormSheets.gs run result: 6/28 matched, 22 NO MATCH — `listAllFormsInDrive()` diagnostic needed to get real form names.
 
 ---
 
@@ -289,33 +289,27 @@ minutes — which is what tells the app what is outstanding. Restore from commit
       ⚠ **Per shift, not per form** — the RAW tabs record that a department
       submitted for a shift, never which of its 3-6 daily forms it was.
 
-- [ ] **Per-form ticking — INVESTIGATED 13 Aug, safe first step built, feature
-      itself NOT started on purpose.** Confirmed the data exists: every
-      individual form has its own response spreadsheet with a clean
-      `Timestamp | Date | Supervisor Name | Shift` shape (checked VMC's daily
-      check sheet directly — real rows, real timestamps). But Drive also has
-      MULTIPLE copies of many of these forms — for VMC alone there are 4
-      similarly-titled files across different years. Guessing which is
-      current would silently point compliance data at a stale sheet with no
-      error, so I did not guess.
-      `scripts/resolveFormSheets.gs` — run this once, from any Apps Script
-      project with Drive access to these forms (not ALERT.gs's own project).
-      It asks Google Forms itself which spreadsheet each form is CURRENTLY
-      linked to (`FormApp.getDestinationId()` — authoritative, not a
-      filename guess), for all 24 forms in `DEPT_FORM_SEED`/PATCH_19, and
-      writes a `FORM_SHEET_MAP` tab: one row per form, `high` confidence when
-      exactly one live (non-"Copy of") form matched the title, `REVIEW` when
-      more than one did. Read-only against every form and the dashboard —
-      creates one new tab, nothing else.
-      Verified against the real ambiguity found for VMC (one genuine form +
-      two "Copy of" duplicates): correctly resolves to the real one. Also
-      tested a genuinely ambiguous case (two live forms sharing a title) and
-      confirmed it flags REVIEW rather than picking the more-recent one
-      silently — and a missing-form case, confirmed it reports NO MATCH
-      rather than crashing.
-      **Next step, yours:** run it, open every REVIEW row, confirm or correct
-      the pick. Only after that is the mapping trustworthy enough to build
-      the actual per-form schema and Forms tab UI on top of.
+- [ ] **Per-form ticking — `resolveFormSheets.gs` run 10 Sep, 22 of 28 forms
+      returned NO MATCH.** The script does an exact-title search (`title = "…"`
+      in Drive). A NO MATCH means the form's real title in Drive differs from
+      what `FORM_NAMES_TO_RESOLVE` has — even one extra character, year suffix,
+      or case difference fails it. Only 6 forms matched.
+      **Next step:** run `listAllFormsInDrive()` in the Apps Script editor (any
+      project with Drive access) to see every Google Form's real name, then
+      update `FORM_NAMES_TO_RESOLVE` in `scripts/resolveFormSheets.gs` with the
+      exact titles, and re-run `resolveFormSheets()`.
+      ```javascript
+      function listAllFormsInDrive() {
+        var it = DriveApp.searchFiles(
+          'mimeType = "application/vnd.google-apps.form" and trashed = false');
+        var rows = [];
+        while (it.hasNext()) { var f = it.next(); rows.push(f.getName()); }
+        rows.sort();
+        Logger.log(rows.length + ' forms found:\n' + rows.join('\n'));
+      }
+      ```
+      Paste that into Apps Script → Run → check the Execution Log. The names
+      there are the exact strings to put in `FORM_NAMES_TO_RESOLVE`.
 - [x] **Department production on the dashboards — BUILT 12 Aug.**
       `production_records` (PATCH_15) + `components/ProductionSummary.tsx`,
       mounted on manager → Reports (scoped to their shop, grouped by machine)
