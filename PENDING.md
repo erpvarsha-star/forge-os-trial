@@ -255,10 +255,9 @@ minutes — which is what tells the app what is outstanding. Restore from commit
 - [x] **Phone numbers — CLOSED 12 Aug.** Yash: "you dont need phone numbers."
       Not asked for again.
 
-- [ ] **Several `SUPERVISOR_MAP` rows still have a blank Telegram Chat ID**
-      (e.g. Pravin Sonavane, Machine). The onboarding flow (13 Aug) is the fix
-      — they message @Form_mgr_bot with their name and it fills in
-      automatically — but nobody has done it yet. *Correction to what this
+- [ ] **Supervisors onboard to @Form_mgr_bot** — Telegram working (10 Sep).
+      Draft sent to DME/HR to circulate. Each supervisor messages @Form_mgr_bot
+      with their exact name; bot auto-fills their Chat ID in SUPERVISOR_MAP. *Correction to what this
       line said before: there is no group-chat fallback.* When a supervisor
       has no chat ID, `sendGentleReminder` now tells the OWNER directly
       instead ("no Telegram registered for X"), not a group. Lower stakes
