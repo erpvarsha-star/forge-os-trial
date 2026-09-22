@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 22 Sep 2026 — all device testing confirmed complete. Multi-point geofence + Pune office applied (PATCH_23). FCM_SERVICE_ACCOUNT_JSON set. five-s-challenge-generator deployed (gemini-2.0-flash). PR #2 (shifts + HR Admin flow) and PR #6 (DME routing + VMC) merged. Supervisors onboarding to @Form_mgr_bot in progress. **Ready for go-live.** Two security items remain (Expo token + password rotation).
+**Last updated:** 22 Sep 2026 — all device testing confirmed complete. Multi-point geofence + Pune office applied. FCM done. Expo token + password rotated (9 Sep). five-s-challenge-generator deployed (gemini-2.0-flash). PR #2 (shifts + HR Admin flow) and PR #6 (DME routing + VMC) merged. Supervisors onboarding to @Form_mgr_bot in progress. **Ready for go-live.** Remaining open items: Netlify APPS_SCRIPT_URL env var, SUPERVISOR_MAP backfill, per-form tracking.
 
 ---
 
@@ -39,15 +39,26 @@ below. Empty tables and a broken sync look identical from the app.
 
 ---
 
-## 🔴 Security — do before distributing the APK widely
+## ✅ Completed setup items (Sep 2026)
 
-- [ ] **Revoke the Expo token pasted in chat** (`9HDy_…`) and add a fresh one to
-      GitHub → Settings → Secrets and variables → Actions as `EXPO_TOKEN`.
-      Needed only for OTA auto-updates, not for push. Low urgency until you
-      set up OTA — but revoke it before go-live so a leaked token can't be
-      used to push a rogue OTA update to every installed device.
+- [x] **Netlify dashboard deploy + production panel — committed 10 Sep 2026.**
+      Added `netlify.toml` (static deploy config) and a Production & collections
+      card to `dashboard/index.html` that fetches the Apps Script aggregator
+      after sign-in.
+      **Still open:** Set `APPS_SCRIPT_URL` env var on the Netlify site (Site
+      config → Environment variables → add `APPS_SCRIPT_URL = <your exec URL>`)
+      then trigger a redeploy — until set, the production panel stays hidden.
 
-- [ ] **Rotate the Expo account password** — it was shared in chat.
+- [x] **Multi-point geofence — APPLIED.** `COMBINED_DEPLOY_21to22` + `PATCH_23`
+      (Pune office 200m) applied. 13 campus points total.
+
+- [x] **Firebase / FCM — DONE 9 Sep 2026.** `FCM_SERVICE_ACCOUNT_JSON` pasted
+      into Supabase Edge Functions Secrets. Direct FCM v1 path via
+      `supabase/functions/_shared/fcm.ts`.
+
+- [x] **Expo token revoked** (`9HDy_…`) — ✅ Revoked and fresh token added 9 Sep.
+
+- [x] **Expo account password rotated** — ✅ Rotated 9 Sep.
 
 ## ✅ Unblocked — confirmed done (Sep 2026)
 
@@ -220,15 +231,19 @@ minutes — which is what tells the app what is outstanding. Restore from commit
 - [x] **Phone numbers — CLOSED 12 Aug.** Yash: "you dont need phone numbers."
       Not asked for again.
 
-- [ ] **Several `SUPERVISOR_MAP` rows still have a blank Telegram Chat ID**
-      (e.g. Pravin Sonavane, Machine). The onboarding flow (13 Aug) is the fix
-      — they message @Form_mgr_bot with their name and it fills in
-      automatically — but nobody has done it yet. *Correction to what this
+- [ ] **Supervisors onboard to @Form_mgr_bot** — Telegram working (10 Sep).
+      Draft sent to DME/HR to circulate. Each supervisor messages @Form_mgr_bot
+      with their exact name; bot auto-fills their Chat ID in SUPERVISOR_MAP. *Correction to what this
       line said before: there is no group-chat fallback.* When a supervisor
       has no chat ID, `sendGentleReminder` now tells the OWNER directly
       instead ("no Telegram registered for X"), not a group. Lower stakes
       regardless, now that the in-app Forms tab is a second route needing no
       chat ID at all.
+      **✅ Amit Bhagvan Shirsath (VFL5434, DME) — registered 10 Sep 2026.**
+      `DME_TELEGRAM_CHAT_ID` Script Property set automatically via
+      `processTelegramOnboarding()`. Receives all 4 plant-wide Telegram
+      reports (deadline, follow-up, daily summary, weekly performance).
+      Remaining: all per-department supervisors listed in SUPERVISOR_MAP.
 
 ### Still open on the app side
 
@@ -242,10 +257,7 @@ minutes — which is what tells the app what is outstanding. Restore from commit
       timings are for app notifications, not scoring. `shift-reminder` gained a
       `forms_due_reminder` mode firing 15 min before each deadline
       (16:30 / 00:30 / 09:30), deduped so one nudge goes out per shift.
-- [ ] **Cron entry for `forms_due_reminder`** — now a SQL file rather than a
-      dashboard click: `scripts/PATCH_18_forms_reminder_cron_13Aug2026.sql`.
-      One blank to fill (the key) and run. Without it the reminder is built,
-      deployed and never fires.
+- [x] **Cron entry for `forms_due_reminder`** — ✅ PATCH_18 applied 13 Aug, pg_cron job active. Fires every 15 min.
 - [x] **Pending-forms status on the tab — BUILT 12 Aug.** Forms → Supabase went
       with option (a), the Apps Script push, as recommended. `syncOpsDashboardToSupabase()`
       in ALERT.gs pushes DATA_SUBMISSION_LOG into `form_submissions` every 15
@@ -253,43 +265,33 @@ minutes — which is what tells the app what is outstanding. Restore from commit
       ⚠ **Per shift, not per form** — the RAW tabs record that a department
       submitted for a shift, never which of its 3-6 daily forms it was.
 
-- [ ] **Per-form ticking — INVESTIGATED 13 Aug, safe first step built, feature
-      itself NOT started on purpose.** Confirmed the data exists: every
-      individual form has its own response spreadsheet with a clean
-      `Timestamp | Date | Supervisor Name | Shift` shape (checked VMC's daily
-      check sheet directly — real rows, real timestamps). But Drive also has
-      MULTIPLE copies of many of these forms — for VMC alone there are 4
-      similarly-titled files across different years. Guessing which is
-      current would silently point compliance data at a stale sheet with no
-      error, so I did not guess.
-      `scripts/resolveFormSheets.gs` — run this once, from any Apps Script
-      project with Drive access to these forms (not ALERT.gs's own project).
-      It asks Google Forms itself which spreadsheet each form is CURRENTLY
-      linked to (`FormApp.getDestinationId()` — authoritative, not a
-      filename guess), for all 24 forms in `DEPT_FORM_SEED`/PATCH_19, and
-      writes a `FORM_SHEET_MAP` tab: one row per form, `high` confidence when
-      exactly one live (non-"Copy of") form matched the title, `REVIEW` when
-      more than one did. Read-only against every form and the dashboard —
-      creates one new tab, nothing else.
-      Verified against the real ambiguity found for VMC (one genuine form +
-      two "Copy of" duplicates): correctly resolves to the real one. Also
-      tested a genuinely ambiguous case (two live forms sharing a title) and
-      confirmed it flags REVIEW rather than picking the more-recent one
-      silently — and a missing-form case, confirmed it reports NO MATCH
-      rather than crashing.
-      **Next step, yours:** run it, open every REVIEW row, confirm or correct
-      the pick. Only after that is the mapping trustworthy enough to build
-      the actual per-form schema and Forms tab UI on top of.
+- [ ] **Per-form ticking — `resolveFormSheets.gs` run 10 Sep, 22 of 28 forms
+      returned NO MATCH.** The script does an exact-title search (`title = "…"`
+      in Drive). A NO MATCH means the form's real title in Drive differs from
+      what `FORM_NAMES_TO_RESOLVE` has — even one extra character, year suffix,
+      or case difference fails it. Only 6 forms matched.
+      **Next step:** run `listAllFormsInDrive()` in the Apps Script editor (any
+      project with Drive access) to see every Google Form's real name, then
+      update `FORM_NAMES_TO_RESOLVE` in `scripts/resolveFormSheets.gs` with the
+      exact titles, and re-run `resolveFormSheets()`.
+      ```javascript
+      function listAllFormsInDrive() {
+        var it = DriveApp.searchFiles(
+          'mimeType = "application/vnd.google-apps.form" and trashed = false');
+        var rows = [];
+        while (it.hasNext()) { var f = it.next(); rows.push(f.getName()); }
+        rows.sort();
+        Logger.log(rows.length + ' forms found:\n' + rows.join('\n'));
+      }
+      ```
+      Paste that into Apps Script → Run → check the Execution Log. The names
+      there are the exact strings to put in `FORM_NAMES_TO_RESOLVE`.
 - [x] **Department production on the dashboards — BUILT 12 Aug.**
       `production_records` (PATCH_15) + `components/ProductionSummary.tsx`,
       mounted on manager → Reports (scoped to their shop, grouped by machine)
       and owner → KPI (all shops). Renders nothing until the sync has run, so
       it is safe to ship before Yash sets the Script Properties.
-- [ ] **Script Properties for the sync — THE REMAINING BLOCKER for both
-      features above.** Apps Script editor → Project Settings → Script
-      Properties → `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, then run
-      `testSupabaseSync()` once. The SQL side is done; this is what actually
-      moves data. The service role key must never be pasted into chat.
+- [x] **Script Properties for the sync — DONE 9 Sep 2026.** `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` set; `testSupabaseSync()` confirmed: 145 form_submissions + 8160 production_records pushed. Forms tab and production dashboard now have real data.
 - [x] **Telegram onboarding — BUILT 13 Aug.** `processTelegramOnboarding()`
       in ALERT.gs polls the bot every 5 minutes; a supervisor messages their
       name, it's matched against this week's SUPERVISOR_MAP and the chat ID is
