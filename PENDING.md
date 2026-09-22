@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 22 Sep 2026 — all device testing confirmed complete. Multi-point geofence + Pune office applied. FCM done. Expo token + password rotated (9 Sep). five-s-challenge-generator deployed (gemini-2.0-flash). PR #2 (shifts + HR Admin flow) and PR #6 (DME routing + VMC) merged. Supervisors onboarding to @Form_mgr_bot in progress. **Ready for go-live.** Remaining open items: Netlify APPS_SCRIPT_URL env var, SUPERVISOR_MAP backfill, per-form tracking.
+**Last updated:** 22 Sep 2026 — PATCH_24 (leave_balances) + PATCH_25 (payroll_records Aug 2026) written and pushed. Workers: real EL/CL/SL and net-pay from salary slip generator. Staff: leave_balances seeded 0/0/0 pending HR update; payroll_records not seeded (no staff salary data in Drive). **Run both patches in Supabase SQL Editor to unblock Leave and Payslip screens.** Remaining open items: Netlify APPS_SCRIPT_URL env var, SUPERVISOR_MAP backfill, per-form tracking, staff leave/payroll data from Pallavi.
 
 ---
 
@@ -611,6 +611,20 @@ radius).
       `employee_shifts` can't be populated (FK constraint) and shift-based
       reminders have nothing real to match against. Needs a decision: seed
       the three known shifts directly, or build a "create shift" screen.
+
+---
+
+## ⏳ SQL to run — PATCH_24 + PATCH_25 (22 Sep 2026)
+
+Both files are in `scripts/`. Run them in Supabase SQL Editor in order.
+
+| File | Purpose | Status |
+|---|---|---|
+| `PATCH_24_leave_balances_22Sep2026.sql` | Seeds `leave_balances` for all 129 employees: 19 active VFL4xxx workers get real EL/CL/SL values; all others get 0/0/0 (HR must update staff). | ⏳ Run in SQL Editor |
+| `PATCH_25_payroll_records_22Sep2026.sql` | Seeds `payroll_records` for Aug 2026 — 19 active VFL4xxx workers only. `net_pay` = payable salary. Staff payroll not seeded (no data in Drive). | ⏳ Run in SQL Editor |
+
+**After running both:** Leave screen for VFL4008 (Dnyaneshwar) should show EL=12; payslip should show ₹36,655.
+Staff leave screens will show 0/0/0 until Pallavi provides the leave balance sheet.
 
 ---
 
