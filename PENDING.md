@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 31 Aug 2026, after completing all six outstanding build items and the multi-point geofence implementation. All code is complete; remaining work is user actions (SQL patches, secrets, device testing).
+**Last updated:** 22 Sep 2026 — all device testing confirmed complete. Multi-point geofence + Pune office applied (PATCH_23). FCM_SERVICE_ACCOUNT_JSON set. five-s-challenge-generator deployed (gemini-2.0-flash). PR #2 (shifts + HR Admin flow) and PR #6 (DME routing + VMC) merged. Supervisors onboarding to @Form_mgr_bot in progress. **Ready for go-live.** Two security items remain (Expo token + password rotation).
 
 ---
 
@@ -39,62 +39,25 @@ below. Empty tables and a broken sync look identical from the app.
 
 ---
 
-## 🔴 Blocked on Yash — cannot proceed without you
-
-- [ ] **Multi-point geofence — coordinates received 13 Aug, ready to run.**
-      Yash sent a CSV with all 12 campus points already resolved to
-      coordinates (11 from the original sheet + "Store", a 12th point
-      included in the CSV) — the sandbox itself still cannot reach any
-      Google Maps domain (confirmed again: a direct `curl` through the
-      configured proxy gets a 403 at the proxy itself, not just from the
-      fetch tool — this is a hard network policy, not something retrying
-      or a different tool will get around), so getting the numbers from
-      Yash directly was the only path, not a workaround.
-      **Run `scripts/COMBINED_DEPLOY_21to22_13Aug2026.sql`** in the SQL
-      Editor — one file, creates `plant_locations` and seeds all 12 rows.
-      `worker/home.tsx` and `fraud-detector` already read this table and
-      switch over automatically; no further app changes needed.
-      Sanity-checked the coordinates before writing them in (not pasted
-      blind): every point is within 131m of "Plant location" — Machine shop
-      is the farthest, at 131.3m, meaning it sat just outside the OLD
-      single-point 100m geofence. That's a real, concrete case this fixes,
-      not just a theoretical one. One oddity to flag: "Cutting shop" and
-      "Final Shop" arrived with byte-identical coordinates
-      (19.836111, 75.236750) — seeded as given since it's harmless (both
-      still work fine as independent points in the "any match" set), but
-      worth a glance in case that's a copy-paste slip in the source sheet
-      rather than two genuinely co-located areas.
-      Verified with 21 isolated logic checks (multi-point matching,
-      no-match blocking, empty-table fallback to the old single-point
-      `plant_config` geofence) plus a clean `tsc` and `expo export`.
-
-- [ ] **Firebase / FCM — HALF DONE 13 Aug.** `google-services.json` is in and
-      wired into `app.json`; the remaining half is the FCM V1 service account
-      key, which only Yash can upload (it is a secret and must not pass through
-      chat): Firebase → Project Settings → Service accounts → Generate new
-      private key → upload at expo.dev → forge-os → Credentials → Android.
-      SUPERSEDED 13 Aug — Expo is out of the push path. The server now sends
-      to FCM v1 directly (`supabase/functions/_shared/fcm.ts`), so no Expo
-      credentials and no keystore wizard are involved. What remains is one
-      paste: Supabase → Edge Functions → Secrets → `FCM_SERVICE_ACCOUNT_JSON`.
-      Reinstall is still required, because the Firebase config and the native
-      token request are compiled in at build time.
-
-      Original note:
-      `extra.eas.projectId` is set, but Expo relays Android push through
-      Firebase and no Firebase project is configured.
-      → Firebase console → add Android app, package `com.vfpl.forgeos` → download
-      `google-services.json` → **drop it in Google Drive and tell me the filename**
-      (I can read Drive directly — no need to paste contents).
-      → Then Firebase → Project Settings → Service accounts → Generate private key
-      → upload that to expo.dev → forge-os → Credentials → Android.
-      *Until this is done, no push notification reaches any phone.*
+## 🔴 Security — do before distributing the APK widely
 
 - [ ] **Revoke the Expo token pasted in chat** (`9HDy_…`) and add a fresh one to
       GitHub → Settings → Secrets and variables → Actions as `EXPO_TOKEN`.
-      Needed only for OTA auto-updates, not for push.
+      Needed only for OTA auto-updates, not for push. Low urgency until you
+      set up OTA — but revoke it before go-live so a leaked token can't be
+      used to push a rogue OTA update to every installed device.
 
 - [ ] **Rotate the Expo account password** — it was shared in chat.
+
+## ✅ Unblocked — confirmed done (Sep 2026)
+
+- [x] Multi-point geofence: COMBINED_DEPLOY_21to22 + PATCH_23 (Pune 200m) applied
+- [x] FCM_SERVICE_ACCOUNT_JSON pasted into Supabase Edge Function Secrets
+- [x] five-s-challenge-generator deployed with gemini-2.0-flash + responseMimeType
+- [x] Device testing: GPS check-in, 5S photo upload, push notification confirmed
+- [x] PR #2 merged: shifts seeded (S1/S2/S3), HR Admin create-shift flow live
+- [x] PR #6 merged: DME (Amit) Telegram routing, VMC Shop added to ALERT.gs
+- [x] Supervisors onboarding to @Form_mgr_bot (in progress — Amit confirmed, others ongoing)
 
 ---
 
