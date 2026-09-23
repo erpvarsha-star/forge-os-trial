@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 23 Sep 2026 — PATCH_24/25/26 all deployed via Supabase MCP (leave_balances 129 rows + payroll_records 55 rows for Aug 2026 confirmed). PATCH_27 created (shifts seed — already present from PR #2, kept as safety net). Netlify connector live — awaiting APPS_SCRIPT_URL from Yash to unblock production panel. Remaining open items: APPS_SCRIPT_URL, SUPERVISOR_MAP backfill, per-form tracking.
+**Last updated:** 23 Sep 2026 (session 2) — ALERT.gs updated to v4 (23 Sep 2026): hourly trigger, Phase 2 recipient routing, health watchdog, Cutting 2-shift config, DME Telegram. form_links table verified against v4 DEPT_FORM_SEED (31 rows, all correct — no changes needed). Manager layout reduced to 5 tabs (team tab hidden, accessible via "View Team →" link on dashboard). APK build 40 will trigger on push. Remaining open: APPS_SCRIPT_URL, supervisor Telegram onboarding, per-form tracking. Action for Yash: paste updated `scripts/ALERT.gs` into the live Apps Script editor, then run `deployShiftTrackingTriggers()` to install the new hourly trigger (replaces old 15-min triggers).
 
 ---
 

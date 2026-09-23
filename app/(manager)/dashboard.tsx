@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react'
-import { View, Text, ScrollView } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native'
 import { useTranslation } from 'react-i18next'
+import { useRouter } from 'expo-router'
 import { useAuth } from '@/hooks/useAuth'
 import { Header } from '@/components/Header'
 import { FactoryOsLink } from '@/components/FactoryOsLink'
 import { Card } from '@/components/Card'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
-import { Trophy } from 'lucide-react-native'
+import { Trophy, ChevronRight } from 'lucide-react-native'
 import { INK } from '@/components/theme'
 
 export default function ManagerDashboard() {
   const { t } = useTranslation()
   const { employee } = useAuth()
+  const router = useRouter()
   const [attendancePct, setAttendancePct] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -47,6 +49,14 @@ export default function ManagerDashboard() {
           <Text className="text-xs font-semibold uppercase tracking-wider text-ink-400 mb-1">{t('manager.attendancePercent')}</Text>
           <Text className="text-5xl font-bold text-brand-600 tabular-nums">{attendancePct.toFixed(1)}%</Text>
         </Card>
+
+        <TouchableOpacity
+          onPress={() => router.push('/(manager)/team')}
+          className="flex-row items-center justify-between bg-white rounded-xl px-4 py-3 mb-6 border border-ink-100"
+        >
+          <Text className="text-sm font-semibold text-ink-700">{t('common.team')}</Text>
+          <ChevronRight size={18} color={INK[400]} />
+        </TouchableOpacity>
 
         <Text className="text-xs font-semibold uppercase tracking-wider text-ink-400 mb-2">{t('manager.deptLeaderboard')}</Text>
         <Card className="items-center py-8">

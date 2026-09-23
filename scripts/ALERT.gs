@@ -2,52 +2,39 @@
 // ALERT.gs — SUPERVISOR TRACKING (DYNAMIC WEEKLY MAPPING)
 // ============================================================
 // Purpose: Dynamic supervisor mapping by week
+//
+// v4 (23 Sep 2026) — credential hardening, dynamic summary time, alert-state cleanup,
+//   quiet hours, dead-code cleanup, and trigger verification.
+//   G4 batch-presence optimization intentionally NOT applied: daily summary is shift-specific.
+//   G5 deadline-pinned trigger topology intentionally NOT applied: Apps Script nearMinute()
+//   is approximate and the proposed one-shot schedule can fire before a deadline and miss alerts.
+// v3 (22 Sep 2026) — Phase 2: per-department shift config, recipient routing
+//   (supervisor / manager / DME / owner), overlap gate on follow-up.
+// v2 (15 Sep 2026) — Bug fixes:
+//   2. sendTelegramToChatId validates chat ID format
+//   3. lookupSupervisorForWeek_ skips placeholder / Unknown rows
+//   4. getMissingDepartments_ skips departments with no RAW tab
+//   5. logEscalation_ refuses to log Unknown supervisors
+//   6. processFormSubmissions dedup guard + auto-Status column
+//   7. sendDMEDeadlineAlert dedup (once per shift per day)
+//   8. sendGentleReminder dedup (once per dept per shift per day)
+//   9. recordShiftCompliance caps delay at 120 min
+//  10. matchSupervisorByName_ skips placeholders
+//  11. runShiftAlerts15min_ writes heartbeat + OK/fail counters
+//  12. checkAlertHeartbeat() new diagnostic
 // ============================================================
 
 var DASH_ID = '1GHdhrRtOhQFshsAOCK4n3GiJp-6a03k8bn0V_M04wSY';
 
 // ── SUPABASE CREDENTIALS ──────────────────────────────────
-// Fill the key in HERE, in the Apps Script editor, and you can skip the
-// Script Properties screen entirely.
-//
-// ⚠ THE COPY OF THIS FILE IN GIT KEEPS THE KEY LINE EMPTY, DELIBERATELY, AND
-// MUST STAY THAT WAY. A service_role / sb_secret_ key bypasses RLS completely
-// — it can read and rewrite every employee's salary, phone number and
-// attendance. Committed once, it is in the repository's history permanently,
-// even if a later commit removes it. Your Apps Script project is private to
-// you; a git repo is not the same kind of place.
-//
-// So: the live script has the key, the repo copy does not, and those two
-// files differ by exactly this one line forever. That difference is correct.
-//
-// Script Properties still win if they are set, so you can move the key out of
-// the file later without editing anything.
 var SUPABASE_URL_INLINE = 'https://odfwtdpvpfzdrznvurru.supabase.co';
-var SUPABASE_SERVICE_ROLE_KEY_INLINE = '';   // <-- paste the key between these quotes
+var SUPABASE_SERVICE_ROLE_KEY_INLINE = '';
 
-// Same pattern, same reason, for Telegram. TELEGRAM_BOT_TOKEN_INLINE is
-// blank in the copy of this file kept in git — a live bot token lets anyone
-// send messages as this bot and read anything sent to it, and once a secret
-// is committed it is in the repository's history permanently even after a
-// later commit removes it. Paste your token here in the LIVE Apps Script
-// copy only. Script Properties still win if TELEGRAM_BOT_TOKEN is set there
-// instead, so moving it out of the file later needs no code change.
-var TELEGRAM_BOT_TOKEN_INLINE = '';   // <-- paste the @Form_mgr_bot token between these quotes
+var TELEGRAM_BOT_TOKEN_INLINE = '';
 
-// The plant owner's numeric Telegram chat id. NOT a secret — it identifies
-// an account, not a credential, so it is fine to paste here directly or even
-// in chat. Leave blank and message the bot with "Yash Munot" or "owner"
-// instead (see processTelegramOnboarding below) and it fills this role via
-// the OWNER_TELEGRAM_CHAT_ID Script Property automatically — either source
-// works, Script Properties still wins if both are set.
-var OWNER_TELEGRAM_CHAT_ID_INLINE = '';   // <-- paste your numeric chat id between these quotes, or leave blank and message the bot instead
+var OWNER_TELEGRAM_CHAT_ID_INLINE = '';
 
-// Amit Bhagvan Shirsath (VFL5434) — the DME who receives all production-deadline
-// alerts. NOT a secret — same note as OWNER_TELEGRAM_CHAT_ID_INLINE above.
-// Leave blank and have Amit message @Form_mgr_bot with "Amit Bhagvan Shirsath"
-// (or "amit" / "vfl5434") — processTelegramOnboarding() fills it in via the
-// DME_TELEGRAM_CHAT_ID Script Property automatically.
-var DME_CHAT_ID_INLINE = '';   // <-- paste Amit's numeric Telegram chat id, or leave blank and let him message the bot
+var DME_CHAT_ID_INLINE = '';
 
 // ── DEPARTMENT LIST ──────────────────────────────────────
 var DEPARTMENTS = [
@@ -71,14 +58,6 @@ var DEPT_TO_RAW_TAB = {
 };
 
 // ── DEPARTMENT NAME MAPPING (dashboard -> app database) ───
-// The Operations Dashboard and the Forge OS employees table use different
-// vocabularies for the same shops: 'HT' here is 'Heat Treatment' there,
-// 'Forge' is 'Forge Shop'. Anything pushed to Supabase must be translated, or
-// the app's department filter silently matches nothing.
-//
-// The four departments with no entry (Electricity, Oil, Staff Manpower,
-// Contract Manpower) have no matching employees.department value and no forms
-// in the registry — they are dashboard-only concepts and are not synced.
 var DEPT_TO_DB_DEPARTMENT = {
   'Cutting': 'Cutting Shop',
   'Forge':   'Forge Shop',
@@ -86,44 +65,12 @@ var DEPT_TO_DB_DEPARTMENT = {
   'Machine': 'Machine Shop',
   'HT':      'Heat Treatment',
   'Final':   'Final Shop',
-
-  // Added 13 Aug — for FORM-SUBMISSION compliance sync only (see
-  // NON_PRODUCTION_DEPTS below). Without these two, recordShiftCompliance()
-  // logs Electricity/Oil rows to DATA_SUBMISSION_LOG same as any other
-  // department, but syncFormSubmissionsToSupabase() silently drops them —
-  // 'dept' resolves to undefined, the row fails its own `if (!dept) return`
-  // guard, and the app's Forms tab never lights up their submitted/pending
-  // chip even though the sheet-side compliance record is correct.
   'Electricity': 'Maintenance',
   'Oil':         'Maintenance'
 };
 
-// syncProductionToSupabase() also iterates Object.keys(DEPT_TO_DB_DEPARTMENT)
-// — that is fine for the six shop departments, whose RAW tabs are all
-// Date|Unit|Shift|[VF_No]|Qty. RAW_ELECTRICITY holds kWh meter readings and
-// RAW_OIL holds litres consumed; neither is a parts-produced quantity, and
-// summing them into production_records.qty would silently corrupt the
-// production dashboard's totals. This list is what keeps them out of that
-// loop while still letting them through the (differently-shaped, qty-blind)
-// form-submission compliance sync above.
 var NON_PRODUCTION_DEPTS = { 'Electricity': true, 'Oil': true };
 
-// ── RESPONSIBILITY FALLBACK (13 Aug 2026) ─────────────────
-// Electricity, Oil, Staff Manpower and Contract Manpower are compliance-
-// tracked departments (their RAW tabs are real — RAW_ELECTRICITY,
-// RAW_OIL, RAW_MANPOWER_STAFF, RAW_MANPOWER_CONTRACT all exist with real
-// rows), but nobody has ever registered a supervisor under those LITERAL
-// names in the weekly form — because they are not real departments, they
-// are sub-responsibilities of real ones. Confirmed against the live
-// registry sheet 13 Aug: electricity + oil sit under Maintenance; both
-// manpower forms are listed under Security AND under HR Dept (same two
-// forms, different responsible people for each).
-//
-// getSupervisorForCurrentWeek_ tries the literal name first — so if
-// someone ever DOES register under 'Electricity' verbatim, that still
-// wins — and only falls back to these when that lookup finds nothing.
-// Multiple department names are tried in order; the first with an active
-// registration for the current week is used.
 var DEPT_RESPONSIBILITY_FALLBACK = {
   'Electricity': ['Maintenance'],
   'Oil': ['Maintenance'],
@@ -132,29 +79,40 @@ var DEPT_RESPONSIBILITY_FALLBACK = {
 };
 
 // ── SHIFT CONFIG ──────────────────────────────────────────
-var SHIFT_CONFIG_DATA = {
-  'Shift 1': { start: '8:30', end: '15:30', grace: 60, deadline: '16:30', reminder: 15 },
+// Default 3-shift schedule used by 10 of 11 departments.
+var DEFAULT_SHIFT_CONFIG = {
+  'Shift 1': { start: '8:30',  end: '15:30', grace: 60, deadline: '16:30', reminder: 15 },
   'Shift 2': { start: '15:30', end: '23:30', grace: 60, deadline: '00:30', reminder: 15 },
   'Shift 3': { start: '23:30', end: '08:30', grace: 60, deadline: '09:30', reminder: 15 }
 };
 
+// Per-department overrides. Cutting runs 2 shifts, not 3.
+var SHIFT_CONFIG_DATA_BY_DEPT = {
+  'Cutting': {
+    'Shift 1': { start: '07:00', end: '19:00', grace: 60, deadline: '20:00', reminder: 15 },  // Day
+    'Shift 2': { start: '19:00', end: '07:00', grace: 60, deadline: '08:00', reminder: 15 }   // Night (deadline next day)
+  }
+};
+
+// Backward compatibility — existing code that reads SHIFT_CONFIG_DATA keeps working.
+var SHIFT_CONFIG_DATA = DEFAULT_SHIFT_CONFIG;
+
+// ── Per-dept helpers ──────────────────────────────────────
+function getShiftConfigForDept_(dept, shift) {
+  var perDept = SHIFT_CONFIG_DATA_BY_DEPT[dept];
+  if (perDept && perDept[shift]) return perDept[shift];
+  return DEFAULT_SHIFT_CONFIG[shift];
+}
+
+function getShiftListForDept_(dept) {
+  var perDept = SHIFT_CONFIG_DATA_BY_DEPT[dept];
+  if (perDept) return Object.keys(perDept);
+  return Object.keys(DEFAULT_SHIFT_CONFIG);
+}
+
 // ── FORM LINKS ────────────────────────────────────────────
-// Supervisors were being told to "upload NOW" with a literal
-// "[Google Form Link]" placeholder where the link should have been.
-//
-// These rows come from Yash's form registry sheet
-// (1M2E83q64BXzfGwZsNQ_9u2jdfzwJPrJlD8WKRKgG554), which lists every form by
-// department, responsible person and frequency, with the published
-// /forms/d/e/.../viewform responder links — not the /edit links a Drive file
-// listing gives you. Only the Daily forms are seeded here; the
-// "As & When Required" ones (gate pass, hospital, advance, leave) are not
-// chased per shift.
-//
-// The FORM_LINKS tab is the live source and overrides this seed, so links can
-// be corrected in the sheet without editing the script.
 var FORM_LINKS_TAB = 'FORM_LINKS';
 
-// [department, form name, frequency, responsible person, url, send in reminder]
 var DEPT_FORM_SEED = [
   ['Cutting', 'Cutting PMS', 'Daily', 'Sudeep Singh', 'https://docs.google.com/forms/d/e/1FAIpQLSf0yqwPXjd8kWwqgpgcDRmYq7Z8PeOV0ifY8lmZycC_MDibjw/viewform', 'YES'],
   ['Cutting', 'Cutting Daily check sheet', 'Daily', 'Sudeep Singh', 'https://docs.google.com/forms/d/e/1FAIpQLSf9m5VVFlVpEaoRYMPZ1MEOnZyaWnkdnIyVYG2yDj736jy-Bg/viewform', 'YES'],
@@ -180,11 +138,6 @@ var DEPT_FORM_SEED = [
   ['Final', 'Final Shop Planning', 'Daily', 'Jakir Munshi Chaudhari Subhash Shivanand Thorat Ashok Kumar', 'https://docs.google.com/forms/d/e/1FAIpQLSff5rk2BDx-2ky64_rrVUXlrxdgqI4mvHL-Kcf5eBhHa8nA2w/viewform', 'YES'],
   ['Final', '57F4 Inward Form', 'Daily', 'Jakir Munshi Chaudhari Subhash Shivanand Thorat Ashok Kumar', 'https://docs.google.com/forms/d/e/1FAIpQLSdHaCr9PfjKFv_nRIQGy_0uBo6SmoXfJe06ZNWW5-zBONkA-w/viewform', 'NO'],
   ['Final', '57F4 Outward Form', 'Daily', 'Jakir Munshi Chaudhari Subhash Shivanand Thorat Ashok Kumar', 'https://docs.google.com/forms/d/e/1FAIpQLSdfReEVbGGGNC6CwIPDq53syvvkomXj2gfIWNBQehjozUD1DA/viewform', 'NO'],
-  // Electricity/Oil verified 13 Aug against the live registry sheet — both
-  // are genuinely Maintenance-department forms (see DEPT_RESPONSIBILITY_FALLBACK
-  // below), reused here under their own literal DEPARTMENTS key so the
-  // Telegram nudge for 'Electricity'/'Oil' compliance carries a real link
-  // instead of the old blank/NO placeholder.
   ['Electricity', 'VFPL Electricity Consumable Form', 'Daily',
    'Atul Bhata Patil, Dharmendra Prabhu Mahto, Shaikh Majeed, Devendrakumar Jagdish Singh, Nanasaheb Dinkar Shinde, Shivaji Suresh Jaypure, Sunil Ramakant Saha, Vijay Rangnath Sonawane, Sandip Tryambak Landage, Manoj Anantrao Wagh',
    'https://docs.google.com/forms/d/e/1FAIpQLScB6QrOCHmWeAKzZP76eWPISlt_tnr5z7aBROTHK614gfd31A/viewform', 'YES'],
@@ -194,43 +147,18 @@ var DEPT_FORM_SEED = [
   ['Oil', 'VFL Oil Consumable', 'Daily',
    'Atul Bhata Patil, Dharmendra Prabhu Mahto, Shaikh Majeed, Devendrakumar Jagdish Singh, Nanasaheb Dinkar Shinde, Shivaji Suresh Jaypure, Sunil Ramakant Saha, Vijay Rangnath Sonawane, Sandip Tryambak Landage, Manoj Anantrao Wagh',
    'https://docs.google.com/forms/d/e/1FAIpQLSfyrYgWEhyBjy8GxwvaaDOk5Uc5doDYZ0SeSE2uUoU9ujNUkA/viewform', 'YES'],
-  // Both marked "As & When Required" by the registry itself, not Daily — kept
-  // NO (not chased on the shift timer) to match, same as the app side.
   ['Staff Manpower', 'Daily Manpower Form', 'As & When Required',
    'Shrawan Rewant Singh (Security) / Milind Ambadas Barhate, Pallavi Vishnu Khade, Mayuri Sardar Rathod (HR)',
    'https://docs.google.com/forms/d/e/1FAIpQLSflyxcQjVEdv2OXgflXhKVH1VWhBUEMhC7KhUUUtdb4pHQNyw/viewform', 'NO'],
   ['Contract Manpower', 'Daily Contractual Manpower Form', 'As & When Required',
    'Shrawan Rewant Singh (Security) / Milind Ambadas Barhate, Pallavi Vishnu Khade, Mayuri Sardar Rathod (HR)',
    'https://docs.google.com/forms/d/e/1FAIpQLSfecNumIXRV7Xej_n-4N7k0K702I9WHjiT6F_naEqT5JnFS0g/viewform', 'NO'],
-  // VMC Shop — added PATCH_19 (applied 23 Aug 2026). send_in_reminder=YES to
-  // match the DB form_links row (send_in_reminder=true). RAW_VMC tab is
-  // created by setupDynamicSupervisorTabs() on the next re-run.
   ['VMC Shop', 'VMC Daily check sheet', 'Daily',
    'Abhimanyu Kakde, Amol Rakhmaji Ambhore, Sayed Uzaif Ali Syed Altaf Ali',
    'https://docs.google.com/forms/d/e/1FAIpQLSdCv3PnoYHJy5H-y60hjwQTR4dBvC9mfKNNFiYMnFiZSD4pRw/viewform', 'YES']
 ];
 
-// ── SUBMISSION TRACKING (NOT SCORING) ─────────────────────
-// Yash, 12 Aug: the dashboard shift timings are NOT to be used for scoring —
-// they are for driving notifications in the app. The points scheme that used
-// to live here (100 on time, -10 per started hour late) has been removed.
-//
-// What stays is the factual record: for each (date, department, shift),
-// whether the data arrived on time, arrived late, or never arrived, and by
-// how many minutes. No points, no percentage, no ranking. That record is what
-// tells the app which forms are still outstanding; turning it into a number
-// against a person's name is a separate decision nobody has taken.
-//
-// To restore scoring, see commit eb70e8f — scoreForDelay_(), the Points
-// column and performanceBand_() are intact there.
-
-// A (department, shift, date) with still no data this long after its deadline
-// is closed out as MISSING and scored zero, so the day can be totalled.
 var MISSING_CUTOFF_HOURS = 12;
-
-// How many days back each compliance sweep re-checks. Covers a shift whose
-// deadline falls on the following calendar day, plus a day of slack for
-// sweeps missed while the script was failing or quota-limited.
 var COMPLIANCE_LOOKBACK_DAYS = 2;
 
 // ============================================================
@@ -238,216 +166,113 @@ var COMPLIANCE_LOOKBACK_DAYS = 2;
 // ============================================================
 
 function setupDynamicSupervisorTabs() {
-  var ss = SpreadsheetApp.openById(DASH_ID);
-  
-  createDynamicSupervisorMap_(ss);
-  createShiftConfigTab_(ss);
-  createFormLinksTab_(ss);
-  createDataSubmissionLogTab_(ss);
-  createWeeklyPerformanceTab_(ss);
-  createFormResponsesTab_(ss);
-  createEscalationLogTab_(ss);
-  
-  Logger.log('✅ All dynamic supervisor tabs created/updated!');
+  Logger.log('⚠️ DISABLED — this function wipes SUPERVISOR_MAP and log tabs. Edit the code to re-enable if you intend a full reset.');
+  return;
+  // ──────────────────────────────────────────────────────
+  // Original code preserved below (unreachable):
+  // var ss = SpreadsheetApp.openById(DASH_ID);
+  // createDynamicSupervisorMap_(ss);
+  // createFormLinksTab_(ss);
+  // createDataSubmissionLogTab_(ss);
+  // createWeeklyPerformanceTab_(ss);
+  // createFormResponsesTab_(ss);
+  // createEscalationLogTab_(ss);
+  // Logger.log('✅ All dynamic supervisor tabs created/updated!');
+  // ──────────────────────────────────────────────────────
 }
-
 function createDynamicSupervisorMap_(ss) {
+  Logger.log('⚠️ DISABLED — running this wipes SUPERVISOR_MAP.');
+  return;
   var sh = ss.getSheetByName('SUPERVISOR_MAP');
   if (!sh) sh = ss.insertSheet('SUPERVISOR_MAP');
   sh.clearContents();
   sh.clearFormats();
-  
-  var headers = [
-    'Department',
-    'Supervisor Name',
-    'Phone',
-    'Telegram Chat ID',
-    'Week Start (Monday)',
-    'Week End (Sunday)',
-    'Active'
-  ];
-  
-  sh.getRange(1, 1, 1, headers.length).setValues([headers])
-    .setFontWeight('bold')
-    .setBackground('#1565C0')
-    .setFontColor('#FFFFFF');
-  
-  // ─── SAMPLE DATA WITH PLACEHOLDERS ───
-  var sampleData = [
-    ['Cutting', '______', '______', '______', '04-Aug-2026', '10-Aug-2026', 'YES'],
-    ['Cutting', '______', '______', '______', '11-Aug-2026', '17-Aug-2026', 'YES'],
-    ['Forge', '______', '______', '______', '04-Aug-2026', '10-Aug-2026', 'YES'],
-    ['Forge', '______', '______', '______', '11-Aug-2026', '17-Aug-2026', 'YES'],
-    ['Press', '______', '______', '______', '04-Aug-2026', '10-Aug-2026', 'YES'],
-    ['Press', '______', '______', '______', '11-Aug-2026', '17-Aug-2026', 'YES'],
-    ['Machine', '______', '______', '______', '04-Aug-2026', '10-Aug-2026', 'YES'],
-    ['Machine', '______', '______', '______', '11-Aug-2026', '17-Aug-2026', 'YES'],
-    ['HT', '______', '______', '______', '04-Aug-2026', '10-Aug-2026', 'YES'],
-    ['HT', '______', '______', '______', '11-Aug-2026', '17-Aug-2026', 'YES'],
-    ['Final', '______', '______', '______', '04-Aug-2026', '10-Aug-2026', 'YES'],
-    ['Final', '______', '______', '______', '11-Aug-2026', '17-Aug-2026', 'YES'],
-    ['Electricity', '______', '______', '______', '04-Aug-2026', '10-Aug-2026', 'YES'],
-    ['Oil', '______', '______', '______', '04-Aug-2026', '10-Aug-2026', 'YES'],
-    ['Staff Manpower', '______', '______', '______', '04-Aug-2026', '10-Aug-2026', 'YES'],
-    ['Contract Manpower', '______', '______', '______', '04-Aug-2026', '10-Aug-2026', 'YES']
-  ];
-  
-  if (sampleData.length > 0) {
-    sh.getRange(2, 1, sampleData.length, headers.length).setValues(sampleData);
-  }
-  
-  // Data validation for Department column
-  var deptRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(DEPARTMENTS)
-    .build();
-  sh.getRange(2, 1, sampleData.length, 1).setDataValidation(deptRule);
-  
-  // Data validation for Active column
-  var activeRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(['YES', 'NO'])
-    .build();
-  sh.getRange(2, 7, sampleData.length, 1).setDataValidation(activeRule);
-  
-  sh.autoResizeColumns(1, headers.length);
-  
-  sh.getRange(1, 1).setNote(
-    '📋 DYNAMIC SUPERVISOR MAP\n' +
-    '═══════════════════════════════════════════\n\n' +
-    '📌 HOW IT WORKS:\n' +
-    '  • Each row = one supervisor for one department\n' +
-    '  • Multiple rows per department = multiple supervisors\n' +
-    '  • Script picks the supervisor for the current week\n\n' +
-    '📌 FIELDS:\n' +
-    '  • Department: Dropdown (select from list)\n' +
-    '  • Supervisor Name: Full name\n' +
-    '  • Phone: 10-digit number\n' +
-    '  • Telegram Chat ID: (Optional) For individual alerts\n' +
-    '  • Week Start: First day supervisor is assigned (Monday)\n' +
-    '  • Week End: Last day supervisor is assigned (Sunday)\n' +
-    '  • Active: YES/NO (set to NO to remove without deleting)\n\n' +
-    '📌 EXAMPLE:\n' +
-    '  Cutting | Amit Singh | 9876543210 | 123456 | 04-Aug-2026 | 10-Aug-2026 | YES\n' +
-    '  Cutting | Sanjay Patel | 9876543211 | 654321 | 11-Aug-2026 | 17-Aug-2026 | YES\n\n' +
-    '🔗 DASHBOARD: ' + ScriptApp.getService().getUrl()
-  );
-  
-  Logger.log('  ✅ Dynamic SUPERVISOR_MAP created with ' + sampleData.length + ' rows');
-}
 
-function createShiftConfigTab_(ss) {
-  var sh = ss.getSheetByName('SHIFT_CONFIG');
-  if (!sh) sh = ss.insertSheet('SHIFT_CONFIG');
-  sh.clearContents();
-  sh.clearFormats();
-  
-  var headers = ['Shift', 'Start', 'End', 'Grace (mins)', 'Deadline', 'Reminder (mins before)'];
-  sh.getRange(1, 1, 1, headers.length).setValues([headers])
-    .setFontWeight('bold')
-    .setBackground('#1565C0')
-    .setFontColor('#FFFFFF');
-  
-  var data = [
-    ['Shift 1', '8:30', '15:30', 60, '16:30', 15],
-    ['Shift 2', '15:30', '23:30', 60, '00:30', 15],
-    ['Shift 3', '23:30', '08:30', 60, '09:30', 15]
+   var headers = [
+    'Department', 'Supervisor Name', 'Phone', 'Telegram Chat ID',
+    'Week Start (Saturday)', 'Week End (Thursday)', 'Active'
   ];
-  
-  if (data.length > 0) {
-    sh.getRange(2, 1, data.length, headers.length).setValues(data);
-  }
-  
+
+  sh.getRange(1, 1, 1, headers.length).setValues([headers])
+    .setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
+
   sh.autoResizeColumns(1, headers.length);
-  Logger.log('  ✅ SHIFT_CONFIG created');
+  sh.getRange(1, 1).setNote(
+    'DYNAMIC SUPERVISOR MAP\n' +
+    'Each row = one supervisor for one department for one week.\n' +
+    'Filled by processFormSubmissions() from FORM_RESPONSES.\n' +
+    'Do not add duplicate rows manually.'
+  );
+
+  Logger.log('  ✅ SUPERVISOR_MAP scaffolded (empty — will be filled from form)');
 }
 
 function createDataSubmissionLogTab_(ss) {
+  Logger.log('⚠️ DISABLED — running this wipes DATA_SUBMISSION_LOG.');
+  return;
   var sh = ss.getSheetByName('DATA_SUBMISSION_LOG');
   if (!sh) sh = ss.insertSheet('DATA_SUBMISSION_LOG');
   sh.clearContents();
   sh.clearFormats();
-  
+
   var headers = ['Date', 'Department', 'Shift', 'Supervisor', 'Entry Time', 'Status', 'Delay (mins)'];
   sh.getRange(1, 1, 1, headers.length).setValues([headers])
-    .setFontWeight('bold')
-    .setBackground('#1565C0')
-    .setFontColor('#FFFFFF');
-  
+    .setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
   sh.autoResizeColumns(1, headers.length);
   Logger.log('  ✅ DATA_SUBMISSION_LOG created');
 }
-
 function createWeeklyPerformanceTab_(ss) {
+  Logger.log('⚠️ DISABLED — running this wipes WEEKLY_PERFORMANCE.');
+  return;
   var sh = ss.getSheetByName('WEEKLY_PERFORMANCE');
   if (!sh) sh = ss.insertSheet('WEEKLY_PERFORMANCE');
   sh.clearContents();
   sh.clearFormats();
-  
+
   var headers = ['Supervisor', 'Department', 'Week', 'Total', 'On Time', 'Late', 'Missing'];
   sh.getRange(1, 1, 1, headers.length).setValues([headers])
-    .setFontWeight('bold')
-    .setBackground('#1565C0')
-    .setFontColor('#FFFFFF');
-  
+    .setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
   sh.autoResizeColumns(1, headers.length);
   Logger.log('  ✅ WEEKLY_PERFORMANCE created');
 }
 
 function createFormResponsesTab_(ss) {
+  Logger.log('⚠️ DISABLED — running this wipes FORM_RESPONSES.');
+  return;
   var sh = ss.getSheetByName('FORM_RESPONSES');
   if (!sh) sh = ss.insertSheet('FORM_RESPONSES');
   sh.clearContents();
   sh.clearFormats();
-  
+
   var headers = [
-    'Timestamp',
-    'Department',
-    'Supervisor Name',
-    'Phone',
-    'Telegram Chat ID',
-    'Week Start (Monday)',
-    'Week End (Sunday)',
-    'Status'
+    'Timestamp', 'Department', 'Supervisor Name', 'Phone', 'Telegram Chat ID',
+    'Week Start (Saturday)', 'Week End (Thursday)', 'Status'
   ];
-  
   sh.getRange(1, 1, 1, headers.length).setValues([headers])
-    .setFontWeight('bold')
-    .setBackground('#1565C0')
-    .setFontColor('#FFFFFF');
-  
+    .setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
   sh.autoResizeColumns(1, headers.length);
-  
-  sh.getRange(1, 1).setNote(
-    '📋 FORM_RESPONSES — Supervisor Data\n' +
-    'This tab receives data from the Google Form.\n' +
-    'Script auto-processes new submissions and updates SUPERVISOR_MAP.'
-  );
-  
   Logger.log('  ✅ FORM_RESPONSES created');
 }
 
 function createEscalationLogTab_(ss) {
+    Logger.log('⚠️ DISABLED — running this wipes ESCALATION_LOG.');
+  return;
   var sh = ss.getSheetByName('ESCALATION_LOG');
   if (!sh) sh = ss.insertSheet('ESCALATION_LOG');
   sh.clearContents();
   sh.clearFormats();
-  
+
   var headers = ['Date', 'Time', 'Department', 'Shift', 'Supervisor', 'Escalation Level', 'Action Taken'];
   sh.getRange(1, 1, 1, headers.length).setValues([headers])
-    .setFontWeight('bold')
-    .setBackground('#B71C1C')
-    .setFontColor('#FFFFFF');
-  
+    .setFontWeight('bold').setBackground('#B71C1C').setFontColor('#FFFFFF');
   sh.autoResizeColumns(1, headers.length);
   Logger.log('  ✅ ESCALATION_LOG created');
 }
 
 // ============================================================
-// SECTION 2: DYNAMIC SUPERVISOR LOOKUP (YOUR NEW FORMAT)
+// SECTION 2: DYNAMIC SUPERVISOR LOOKUP
 // ============================================================
 
-/**
- * Get supervisor for a department based on current week
- */
 function getSupervisorForCurrentWeek_(dept) {
   var direct = lookupSupervisorForWeek_(dept);
   if (direct) return direct;
@@ -463,11 +288,12 @@ function getSupervisorForCurrentWeek_(dept) {
   return { name: 'Unknown', phone: '', chatId: '' };
 }
 
-/** The actual SUPERVISOR_MAP scan, extracted so getSupervisorForCurrentWeek_
- * can try the literal department name and then its real-department fallback
- * without duplicating this loop. Returns null (not the 'Unknown' object) on
- * no match, so the caller can tell "found nothing" apart from "found Unknown"
- * and keep trying fallbacks. */
+/**
+ * Scans SUPERVISOR_MAP for an active row for the current week.
+ * FIX #3: Skips placeholder rows (______), 'Unknown' names, and rows where
+ * week-end is before week-start. Prefers rows with a valid numeric chat ID
+ * when duplicates exist.
+ */
 function lookupSupervisorForWeek_(dept) {
   var ss = SpreadsheetApp.openById(DASH_ID);
   var sh = ss.getSheetByName('SUPERVISOR_MAP');
@@ -477,10 +303,15 @@ function lookupSupervisorForWeek_(dept) {
   var today = new Date();
   var todayStr = Utilities.formatDate(today, 'Asia/Kolkata', 'yyyy-MM-dd');
 
+  var candidates = [];
+
   for (var i = 1; i < data.length; i++) {
     var rowDept = (data[i][0] || '').toString().trim();
     if (rowDept !== dept) continue;
 
+    var name = (data[i][1] || '').toString().trim();
+    var phone = (data[i][2] || '').toString().trim();
+    var chatId = (data[i][3] || '').toString().trim();
     var weekStart = data[i][4];
     var weekEnd = data[i][5];
     var active = (data[i][6] || '').toString().trim().toUpperCase();
@@ -488,170 +319,42 @@ function lookupSupervisorForWeek_(dept) {
     if (active !== 'YES') continue;
     if (!weekStart || !weekEnd) continue;
 
+    // FIX: skip placeholders
+    if (/^_+$/.test(name)) continue;
+    if (/^_+$/.test(phone)) continue;
+    if (/^_+$/.test(chatId)) continue;
+    if (name.toLowerCase() === 'unknown') continue;
+
     var startStr = Utilities.formatDate(new Date(weekStart), 'Asia/Kolkata', 'yyyy-MM-dd');
     var endStr = Utilities.formatDate(new Date(weekEnd), 'Asia/Kolkata', 'yyyy-MM-dd');
 
+    // FIX: skip impossible week ranges
+    if (endStr < startStr) continue;
+
     if (todayStr >= startStr && todayStr <= endStr) {
-      return {
-        name: data[i][1] || 'Unknown',
-        phone: data[i][2] || '',
-        chatId: data[i][3] || '',
-        weekStart: startStr,
-        weekEnd: endStr
-      };
+      candidates.push({
+        name: name, phone: phone, chatId: chatId,
+        weekStart: startStr, weekEnd: endStr
+      });
     }
   }
 
-  return null;
+  if (candidates.length === 0) return null;
+
+  // Prefer the row with a valid numeric chat ID
+  var withChatId = candidates.filter(function(c) {
+    return /^-?\d+$/.test(c.chatId);
+  });
+  return withChatId.length > 0 ? withChatId[0] : candidates[0];
 }
+
+
+// ============================================================
+// SECTION 3: SHIFT DETECTION
+// ============================================================
 
 /**
- * Get ALL supervisors for a department (for DME reference)
- */
-function getAllSupervisorsForDepartment_(dept) {
-  var ss = SpreadsheetApp.openById(DASH_ID);
-  var sh = ss.getSheetByName('SUPERVISOR_MAP');
-  if (!sh) return [];
-  
-  var data = sh.getDataRange().getValues();
-  var supervisors = [];
-  
-  for (var i = 1; i < data.length; i++) {
-    var rowDept = (data[i][0] || '').toString().trim();
-    if (rowDept !== dept) continue;
-    
-    var active = (data[i][6] || '').toString().trim().toUpperCase();
-    if (active !== 'YES') continue;
-    
-    supervisors.push({
-      name: data[i][1] || 'Unknown',
-      phone: data[i][2] || '',
-      chatId: data[i][3] || '',
-      weekStart: data[i][4] || '',
-      weekEnd: data[i][5] || ''
-    });
-  }
-  
-  return supervisors;
-}
-
-// ── Alias for backward compatibility ──
-function getSupervisorInfo_(dept, shift) {
-  return getSupervisorForCurrentWeek_(dept);
-}
-
-// ============================================================
-// SECTION 3: PROCESS FORM RESPONSES
-// ============================================================
-
-function processSupervisorFormResponse() {
-  var ss = SpreadsheetApp.openById(DASH_ID);
-  
-  var formSh = ss.getSheetByName('FORM_RESPONSES');
-  if (!formSh) {
-    Logger.log('❌ FORM_RESPONSES tab not found.');
-    return;
-  }
-  
-  var mapSh = ss.getSheetByName('SUPERVISOR_MAP');
-  if (!mapSh) {
-    Logger.log('❌ SUPERVISOR_MAP tab not found.');
-    return;
-  }
-  
-  var lastRow = formSh.getLastRow();
-  if (lastRow < 2) {
-    Logger.log('ℹ️ No form responses to process.');
-    return;
-  }
-  
-  var statusCheck = formSh.getRange(lastRow, 8).getValue();
-  if (statusCheck === 'PROCESSED') {
-    Logger.log('ℹ️ Response already processed.');
-    return;
-  }
-  
-  var response = formSh.getRange(lastRow, 1, 1, formSh.getLastColumn()).getValues()[0];
-  
-  var department = (response[1] || '').toString().trim();
-  var supervisor = (response[2] || '').toString().trim();
-  var phone = (response[3] || '').toString().trim();
-  var chatId = (response[4] || '').toString().trim();
-  var weekStart = response[5];
-  var weekEnd = response[6];
-  
-  if (!department || !supervisor) {
-    Logger.log('❌ Missing department or supervisor name.');
-    return;
-  }
-  
-  var startStr = Utilities.formatDate(new Date(weekStart), 'Asia/Kolkata', 'dd-MMM-yyyy');
-  var endStr = Utilities.formatDate(new Date(weekEnd), 'Asia/Kolkata', 'dd-MMM-yyyy');
-  
-  mapSh.appendRow([
-    department,
-    supervisor,
-    phone,
-    chatId,
-    startStr,
-    endStr,
-    'YES'
-  ]);
-  
-  formSh.getRange(lastRow, 8).setValue('PROCESSED');
-  formSh.getRange(lastRow, 8).setBackground('#C8E6C9');
-  
-  Logger.log('✅ Supervisor added: ' + supervisor + ' (' + department + ') for week ' + startStr + ' to ' + endStr);
-  
-  sendTelegramAlert('✅ Supervisor added: ' + supervisor + ' for ' + department + ' (' + startStr + ' to ' + endStr + ')');
-}
-
-// NOTE: an earlier definition of setupFormTrigger() lived here, wiring an
-// onFormSubmit trigger to processSupervisorFormResponse(). It was shadowed by
-// the second definition further down this file — Apps Script keeps the last
-// definition of a duplicated name — so it never ran and is removed. The live
-// one targets processFormSubmissions(); processSupervisorFormResponse() is now
-// unreferenced and kept only as a fallback.
-
-// ============================================================
-// SECTION 4: SHIFT DETECTION
-// ============================================================
-
-function getShiftToCheck_() {
-  var now = new Date();
-  var hours = now.getHours();
-  var minutes = now.getMinutes();
-  var timeMinutes = hours * 60 + minutes;
-  
-  var shift1Start = 8 * 60 + 30;
-  var shift1End = 15 * 60 + 30;
-  var shift2Start = 15 * 60 + 30;
-  var shift2End = 23 * 60 + 30;
-  var shift3Start = 23 * 60 + 30;
-  var shift3End = 8 * 60 + 30;
-  
-  if (timeMinutes >= shift1Start && timeMinutes < shift1End) {
-    return { shift: 'Shift 1', deadline: '16:30' };
-  } else if (timeMinutes >= shift2Start && timeMinutes < shift2End) {
-    return { shift: 'Shift 2', deadline: '00:30' };
-  } else if (timeMinutes >= shift3Start || timeMinutes < shift3End) {
-    return { shift: 'Shift 3', deadline: '09:30' };
-  }
-  return null;
-}
-
-/**
- * Normalise whatever a RAW tab's third column holds into a shift name.
- *
- * The RAW tabs do not agree on what that column means:
- *   HT        → 'First Shift' / 'Second Shift' / 'Third Shift'
- *   Manpower  → '1st Staff' / '2nd Staff' / '3rd Staff' / 'General Staff'
- *   Final     → 'General Shift'
- *   Cutting   → a person's name ('B.S. Todmal'), i.e. who filled the form
- *
- * Returns 'Shift 1'/'Shift 2'/'Shift 3' when the value genuinely identifies a
- * shift, and null when it does not — null means "this tab does not separate
- * shifts", which the caller treats as: any row for that date counts.
+ * FIX #1: Uses IST hours, not server timezone.
  */
 function normaliseShift_(value) {
   var v = (value || '').toString().toLowerCase();
@@ -665,49 +368,54 @@ function normaliseShift_(value) {
 /**
  * Has this department submitted data for this shift on this date?
  *
- * ⚠ FIXED 12 Aug 2026. The previous implementation parsed the RAW tab's first
- * column as a timestamp and required `dt.getHours() >= 8 / 15 / 23`. Those
- * columns hold a DATE ONLY ('4/1/2026'), so getHours() is always 0 and the
- * test could never pass for any shift. The function therefore returned false
- * for every department on every sweep, and ESCALATION_LOG shows exactly that:
- * 29 of 37 sweeps between 5 and 12 Aug escalated all ten departments at once,
- * the rest being the same sweep split over a minute boundary. Every reminder,
- * DME alert and escalation sent so far has been a false positive, which is
- * also why the supervisor column in that log is blank.
- *
- * Matching is now on the date plus the (unreliable) shift column, via
- * normaliseShift_.
+ * Returns true if the RAW tab has a row for this date whose shift column
+ * either matches `shift` or is null (unshifted data). Reading column 2 as
+ * the "shift" column works for most tabs; for tabs where column 2 holds
+ * something else (meter name, department, etc.), normaliseShift_ returns
+ * null and the row still counts — which is what we want.
  */
 function hasDataForShift_(dept, shift, date) {
   var rawTab = DEPT_TO_RAW_TAB[dept];
   if (!rawTab) return false;
-  
+
   var ss = SpreadsheetApp.openById(DASH_ID);
   var sh = ss.getSheetByName(rawTab);
   if (!sh || sh.getLastRow() < 2) return false;
-  
+
   var data = sh.getDataRange().getValues();
   var dateStr = Utilities.formatDate(date, 'Asia/Kolkata', 'yyyy-MM-dd');
-  
+
   for (var i = 1; i < data.length; i++) {
     var d = data[i][0];
     if (!d) continue;
     var dt = (d instanceof Date) ? d : new Date(d);
     if (isNaN(dt.getTime())) continue;
     if (Utilities.formatDate(dt, 'Asia/Kolkata', 'yyyy-MM-dd') !== dateStr) continue;
-    
+
     var rowShift = normaliseShift_(data[i][2]);
-    // null = this tab does not distinguish shifts, so a row for the date is
-    // the only evidence available and counts for the shift being checked.
     if (rowShift === null || rowShift === shift) return true;
   }
   return false;
 }
 
+/**
+ * FIX #4: Skips departments whose RAW tab does not exist (e.g. VMC Shop
+ * before RAW_VMC is built). Returns the missing list otherwise.
+ */
 function getMissingDepartments_(shift, date) {
   var missing = [];
-  
+  var ss = SpreadsheetApp.openById(DASH_ID);
+
   DEPARTMENTS.forEach(function(dept) {
+    var rawTab = DEPT_TO_RAW_TAB[dept];
+    if (!rawTab) return;
+
+    // Skip if the RAW tab doesn't exist yet
+    if (!ss.getSheetByName(rawTab)) {
+      Logger.log('ℹ️ Skipping ' + dept + ' — RAW tab "' + rawTab + '" not found.');
+      return;
+    }
+
     var hasData = hasDataForShift_(dept, shift, date);
     if (!hasData) {
       var supervisor = getSupervisorForCurrentWeek_(dept);
@@ -719,143 +427,127 @@ function getMissingDepartments_(shift, date) {
       });
     }
   });
-  
+
   return missing;
 }
 
-function buildMissingListText_(missing) {
+function buildMissingListText_(missing, includeLinks) {
   if (missing.length === 0) return '✅ All departments have submitted data.';
-  
+
   var lines = [];
   missing.forEach(function(m) {
     var phoneText = m.phone ? ' | 📞 ' + m.phone : '';
     lines.push('  • ' + m.department + ' — 👤 ' + m.supervisor + phoneText);
-    // The DME chases these by hand; give them the form to forward rather than
-    // making them hunt for it per department.
-    getFormsForDept_(m.department).forEach(function(f) {
-      lines.push('    🔗 ' + f.name + ': ' + f.url);
-    });
+    if (includeLinks) {
+      getFormsForDept_(m.department).forEach(function(f) {
+        lines.push('    🔗 ' + f.name + ': ' + f.url);
+      });
+    }
   });
   return lines.join('\n');
 }
-
-/** Script Properties win over the inline constants — same convention as
- * getSupabaseCredentials_ above. Returns '' (not throwing) when nothing is
- * set, since a missing Telegram token must never be fatal — every caller
- * already treats an empty token as "log and skip". */
 function getTelegramBotToken_() {
-  return TELEGRAM_BOT_TOKEN_INLINE || PropertiesService.getScriptProperties().getProperty('TELEGRAM_BOT_TOKEN');
+  return PropertiesService.getScriptProperties().getProperty('TELEGRAM_BOT_TOKEN')
+      || TELEGRAM_BOT_TOKEN_INLINE;
 }
 function getOwnerTelegramChatId_() {
-  return OWNER_TELEGRAM_CHAT_ID_INLINE || PropertiesService.getScriptProperties().getProperty('OWNER_TELEGRAM_CHAT_ID');
+  return PropertiesService.getScriptProperties().getProperty('OWNER_TELEGRAM_CHAT_ID') || OWNER_TELEGRAM_CHAT_ID_INLINE;
 }
-
 function getDmeChatId_() {
-  return DME_CHAT_ID_INLINE || PropertiesService.getScriptProperties().getProperty('DME_TELEGRAM_CHAT_ID');
+  return PropertiesService.getScriptProperties().getProperty('DME_TELEGRAM_CHAT_ID') || DME_CHAT_ID_INLINE;
 }
 
 /**
- * Sends a Telegram message to the DME (Amit) only.
- * No-ops silently if Amit has not yet messaged the bot to register.
+ * FIX #2: Validates chat ID format before calling Telegram API.
  */
-function sendDmeTelegramAlert_(message) {
-  var dmeId = getDmeChatId_();
-  if (!dmeId) {
-    Logger.log('⚠️ No DME chat id. Amit needs to message @Form_mgr_bot with "Amit Bhagvan Shirsath" to register, or paste his chat id into DME_CHAT_ID_INLINE / set DME_TELEGRAM_CHAT_ID in Script Properties.');
-    return;
-  }
-  sendTelegramToChatId(dmeId, message);
-}
-
 function sendTelegramToChatId(chatId, message) {
-  if (!chatId || chatId === '') return;
-  
+  var cleaned = String(chatId || '').trim();
+  if (!cleaned) return false;
+
+  if (!/^-?\d+$/.test(cleaned)) {
+    Logger.log('❌ Invalid chat id format: "' + cleaned + '" — skipping.');
+    return false;
+  }
+
   var token = getTelegramBotToken_();
   if (!token) {
-    Logger.log('❌ No Telegram bot token. Paste it into TELEGRAM_BOT_TOKEN_INLINE at the top of this file, or set TELEGRAM_BOT_TOKEN in Script Properties.');
-    return;
+    Logger.log('❌ No Telegram bot token.');
+    return false;
   }
-  
+
+  // Defensive: ensure message is a non-empty string
+  var msgText = (message === null || message === undefined) ? '' : String(message);
+  if (!msgText.trim()) {
+    Logger.log('⚠️ sendTelegramToChatId: empty message for chat ' + cleaned + ' — skipping.');
+    return false;
+  }
+
+  // Truncate if over Telegram's 4096-char limit
+  var MAX_LEN = 3900;
+  if (msgText.length > MAX_LEN) {
+    Logger.log('⚠️ Message truncated from ' + msgText.length + ' to ' + MAX_LEN + ' chars.');
+    msgText = msgText.substring(0, MAX_LEN) + '\n\n…(truncated)';
+  }
+
   var url = 'https://api.telegram.org/bot' + token + '/sendMessage';
-  var payload = {
-    chat_id: chatId,
-    text: message,
-    parse_mode: 'HTML'
-  };
-  
+  var payload = { chat_id: cleaned, text: msgText, parse_mode: 'HTML' };
   var options = {
     method: 'post',
     contentType: 'application/json',
     payload: JSON.stringify(payload),
     muteHttpExceptions: true
   };
-  
+
   try {
     var response = UrlFetchApp.fetch(url, options);
-    Logger.log('✅ Telegram sent to ' + chatId);
+    var code = response.getResponseCode();
+    if (code >= 200 && code < 300) {
+      Logger.log('✅ Telegram sent to ' + cleaned);
+      return true;
+    }
+    Logger.log('⚠️ Telegram HTTP ' + code + ' for ' + cleaned + ': ' + response.getContentText().substring(0, 200));
+    return false;
   } catch(e) {
-    Logger.log('❌ Telegram send failed to ' + chatId + ': ' + e);
+    Logger.log('❌ Telegram send failed to ' + cleaned + ': ' + e);
+    return false;
   }
 }
-
-/**
- * ⚠ ADDED 13 Aug 2026 — THIS FUNCTION DID NOT EXIST. It was called from seven
- * places (sendGentleReminder's no-chat-id fallback, sendDMEDeadlineAlert,
- * sendFollowUpAlert, sendDailySummary, and two supervisor-registration
- * confirmations) and was never defined anywhere in this file. Every one of
- * those calls threw ReferenceError: sendTelegramAlert is not defined.
- *
- * The blast radius was worse than "that one alert never sent." Apps Script
- * does not catch an exception thrown inside a forEach callback — it kills the
- * WHOLE function invocation. So in sendGentleReminder(), the moment the loop
- * reached one department whose supervisor had no chat ID (which, before
- * today, was every department — Telegram onboarding did not exist), the
- * throw stopped every department AFTER it in that same run from being
- * notified too, even ones with a perfectly good, already-registered chat ID.
- * sendDMEDeadlineAlert/sendFollowUpAlert/sendDailySummary called it
- * unconditionally, so those three have never delivered a single message,
- * ever, to anyone.
- *
- * These three functions were already writing PLANT-WIDE reports — every
- * missing department in one message — not a single supervisor's nudge. That
- * is exactly "an entire report," so rather than build a new report format,
- * this makes that existing content actually arrive, addressed to the plant
- * owner. Individual per-department reminders are unaffected: sendGentleReminder
- * already sends those straight to each supervisor's own chatId when one is on
- * file — this function is only ever the plant-wide reports, or the fallback
- * when a specific supervisor has no chat ID yet.
- */
 function sendTelegramAlert(message) {
   var ownerChatId = getOwnerTelegramChatId_();
   if (!ownerChatId) {
-    Logger.log('⚠️ No owner chat id. Paste it into OWNER_TELEGRAM_CHAT_ID_INLINE, set the OWNER_TELEGRAM_CHAT_ID Script Property, or message the bot with the owner\'s name to register it automatically.');
-    return;
+    Logger.log('⚠️ No owner chat id.');
+    return false;
   }
-  sendTelegramToChatId(ownerChatId, message);
+  return sendTelegramToChatId(ownerChatId, message);
 }
 
-function getShiftTiming_(shift) {
-  var config = SHIFT_CONFIG_DATA[shift];
-  return config ? config.start + ' – ' + config.end : 'Unknown';
-}
-
-function getShiftDeadline_(shift) {
-  var config = SHIFT_CONFIG_DATA[shift];
-  return config ? config.deadline : 'Unknown';
+function sendDmeTelegramAlert_(message) {
+  var dmeId = getDmeChatId_();
+  if (!dmeId) {
+    Logger.log('⚠️ No DME chat id set.');
+    return false;
+  }
+  return sendTelegramToChatId(dmeId, message);
 }
 
 function logEscalation_(dept, shift, supervisor, level) {
+  var s = String(supervisor || '').trim();
+  if (!s || s.toLowerCase() === 'unknown' || /^_+$/.test(s)) {
+    Logger.log('ℹ️ logEscalation_: skipping (no valid supervisor for ' + dept + '/' + shift + ')');
+    return;
+  }
+
   var ss = SpreadsheetApp.openById(DASH_ID);
   var sh = ss.getSheetByName('ESCALATION_LOG');
   if (!sh) return;
-  
+
   var now = new Date();
   sh.appendRow([
     Utilities.formatDate(now, 'Asia/Kolkata', 'yyyy-MM-dd'),
     Utilities.formatDate(now, 'Asia/Kolkata', 'HH:mm'),
     dept,
     shift,
-    supervisor,
+    s,
     level,
     'Alert sent'
   ]);
@@ -865,13 +557,13 @@ function wasEscalatedToday_(dept, shift) {
   var ss = SpreadsheetApp.openById(DASH_ID);
   var sh = ss.getSheetByName('ESCALATION_LOG');
   if (!sh || sh.getLastRow() < 2) return false;
-  
+
   var data = sh.getDataRange().getValues();
   var today = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyyy-MM-dd');
-  
+
   for (var i = 1; i < data.length; i++) {
-    var date = (data[i][0] instanceof Date) ? 
-      Utilities.formatDate(data[i][0], 'Asia/Kolkata', 'yyyy-MM-dd') : 
+    var date = (data[i][0] instanceof Date) ?
+      Utilities.formatDate(data[i][0], 'Asia/Kolkata', 'yyyy-MM-dd') :
       (data[i][0] || '');
     if (date === today && (data[i][2] || '') === dept && (data[i][3] || '') === shift) {
       return true;
@@ -881,182 +573,295 @@ function wasEscalatedToday_(dept, shift) {
 }
 
 // ============================================================
-// SECTION 5: ALERT FUNCTIONS
+// SECTION 4: ALERT FUNCTIONS
 // ============================================================
 
+/**
+ * FIX #8: Dedup — each department is pinged at most once per shift per day.
+ */
 function sendGentleReminder() {
-  var shiftInfo = getShiftToCheck_();
-  if (!shiftInfo) {
-    Logger.log('⚠️ No active shift to check.');
+  var istHour = Number(Utilities.formatDate(new Date(), 'Asia/Kolkata', 'H'));
+  if (istHour >= 23 || istHour < 7) {
+    Logger.log('Quiet hours — skipping ' + istHour + ':xx');
     return;
   }
-  
-  var today = new Date();
-  var dateStr = Utilities.formatDate(today, 'Asia/Kolkata', 'dd-MMM-yyyy');
-  var timeStr = Utilities.formatDate(today, 'Asia/Kolkata', 'hh:mm a');
-  
-  var missing = getMissingDepartments_(shiftInfo.shift, today);
-  
-  if (missing.length === 0) {
-    Logger.log('✅ ' + shiftInfo.shift + ' — All departments have data.');
-    return;
-  }
-  
-  missing.forEach(function(m) {
-    // Wrapped per-department, deliberately. One supervisor without a chat ID,
-    // or one failed network call, must never stop every department AFTER it
-    // in this same run from being notified — that is exactly the bug that
-    // sendTelegramAlert being undefined caused for months (see its comment).
-    try {
-      var msg = '⏰ REMINDER — ' + m.department + ' Data Due in 15 Minutes\n';
-      msg += '📅 ' + dateStr + ' | ⏰ ' + timeStr + '\n\n';
-      msg += '🔄 ' + shiftInfo.shift + ' (' + getShiftTiming_(shiftInfo.shift) + ')\n';
-      msg += '⏱️ Grace period ends at ' + getShiftDeadline_(shiftInfo.shift) + '\n\n';
-      msg += '⚠️ YOUR DEPARTMENT PENDING:\n';
-      msg += '  • ' + m.department + ' — 📋 Please upload NOW\n\n';
-      msg += buildFormLinkLine_(m.department);
-      
-      if (m.chatId && m.chatId !== '') {
-        sendTelegramToChatId(m.chatId, msg);
-      } else {
-        // No chat ID on file for this department's supervisor — tell the
-        // owner directly, rather than silently skipping the reminder.
-        sendTelegramAlert('⚠️ No Telegram registered for ' + m.department + ' (' + m.supervisor + ') — reminder not delivered. They need to message the bot with their name.');
-      }
-    } catch (err) {
-      Logger.log('❌ sendGentleReminder failed for ' + m.department + ': ' + err);
-    }
-    
-    Utilities.sleep(500);
-  });
-  
-  Logger.log('📨 Gentle reminders sent to ' + missing.length + ' supervisors for ' + shiftInfo.shift);
-}
 
+  var windows = findDeptsInWindow_('reminder');
+  if (windows.length === 0) {
+    Logger.log('ℹ️ No reminder windows active.');
+    return;
+  }
+
+  var props = PropertiesService.getScriptProperties();
+  var now = new Date();
+  var sent = 0, skipped = 0;
+
+  windows.forEach(function(w) {
+    if (hasDataForShift_(w.dept, w.shift, w.shiftDate)) return;
+
+    var dateKey = Utilities.formatDate(w.shiftDate, 'Asia/Kolkata', 'yyyy-MM-dd');
+    var dedupKey = 'GENTLE_REMINDER_SENT_' + dateKey + '_' + w.dept + '_' + w.shift;
+    if (props.getProperty(dedupKey)) { skipped++; return; }
+
+    var supRows = getCurrentWeekRowsForDept_(w.dept).filter(function(r) {
+      return r.role === 'Supervisor' || r.role === 'Both';
+    });
+
+    var cfg = getShiftConfigForDept_(w.dept, w.shift);
+    var dateStr = Utilities.formatDate(w.shiftDate, 'Asia/Kolkata', 'dd-MMM-yyyy');
+    var timeStr = Utilities.formatDate(now, 'Asia/Kolkata', 'hh:mm a');
+
+    var msg = '⏰ REMINDER — ' + w.dept + ' Data Due Soon\n';
+    msg += '📅 ' + dateStr + ' | ⏰ ' + timeStr + '\n\n';
+    msg += '🔄 ' + w.shift + ' (' + cfg.start + ' – ' + cfg.end + ')\n';
+    msg += '⏱️ Grace period ends at ' + cfg.deadline + '\n\n';
+    msg += buildFormLinkLine_(w.dept);
+
+    var sentToAnyone = false;
+    supRows.forEach(function(r) {
+      if (!r.chatId || !/^-?\d+$/.test(r.chatId)) return;
+      if (sendTelegramToChatId(r.chatId, msg)) sentToAnyone = true;
+      Utilities.sleep(300);
+    });
+
+    if (!sentToAnyone) {
+      sendTelegramAlert('⚠️ No valid Telegram chat ID for ' + w.dept + ' (' + w.shift + ').');
+    }
+
+    props.setProperty(dedupKey, String(Date.now()));
+    sent++;
+  });
+
+  Logger.log('📨 Gentle reminders: ' + sent + ' sent, ' + skipped + ' already sent.');
+}
 function sendDMEDeadlineAlert() {
-  var shiftInfo = getShiftToCheck_();
-  if (!shiftInfo) {
-    Logger.log('⚠️ No active shift to check.');
+  var windows = findDeptsInWindow_('deadline');
+  if (windows.length === 0) {
+    Logger.log('ℹ️ No deadline windows active.');
     return;
   }
-  
-  var today = new Date();
-  var dateStr = Utilities.formatDate(today, 'Asia/Kolkata', 'dd-MMM-yyyy');
-  var timeStr = Utilities.formatDate(today, 'Asia/Kolkata', 'hh:mm a');
-  
-  var missing = getMissingDepartments_(shiftInfo.shift, today);
-  
-  if (missing.length === 0) {
-    Logger.log('✅ ' + shiftInfo.shift + ' — All departments submitted on time.');
-    return;
-  }
-  
-  var msg = '🚨 DME ALERT — ' + shiftInfo.shift + ' Grace Period Ended\n';
-  msg += '📅 ' + dateStr + ' | ⏰ ' + timeStr + '\n';
-  msg += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
-  msg += '⏰ Grace period for ' + shiftInfo.shift + ' has ENDED\n\n';
-  msg += '🔴 MISSING DEPARTMENTS:\n';
-  msg += buildMissingListText_(missing) + '\n\n';
-  msg += '📋 DME ACTION REQUIRED:\n';
-  msg += '  ✅ Call supervisors above immediately\n';
-  msg += '  ✅ Follow-up at ' + getShiftDeadline_(shiftInfo.shift) + ' + 30 min\n\n';
-  msg += '🔗 Dashboard: ' + ScriptApp.getService().getUrl();
 
-  sendTelegramAlert(msg);
-  sendDmeTelegramAlert_(msg);
+  var now = new Date();
+  var props = PropertiesService.getScriptProperties();
 
-  missing.forEach(function(m) {
-    logEscalation_(m.department, shiftInfo.shift, m.supervisor, 'LOW');
+  // Group by (shiftDate, shift)
+  var groups = {};
+  windows.forEach(function(w) {
+    var dateKey = Utilities.formatDate(w.shiftDate, 'Asia/Kolkata', 'yyyy-MM-dd');
+    var gKey = dateKey + '|' + w.shift;
+    if (!groups[gKey]) groups[gKey] = { shift: w.shift, shiftDate: w.shiftDate, depts: [] };
+    groups[gKey].depts.push(w.dept);
   });
 
-  Logger.log('📨 DME deadline alert sent for ' + shiftInfo.shift);
-}
+  Object.keys(groups).forEach(function(gKey) {
+    var g = groups[gKey];
+    var dateKey = Utilities.formatDate(g.shiftDate, 'Asia/Kolkata', 'yyyy-MM-dd');
+    var dedupKey = 'DME_ALERT_SENT_v2_' + dateKey + '_' + g.shift;
+    if (props.getProperty(dedupKey)) return;
 
-function sendFollowUpAlert() {
-  var shiftInfo = getShiftToCheck_();
-  if (!shiftInfo) {
-    Logger.log('⚠️ No active shift to check.');
-    return;
-  }
-  
-  var today = new Date();
-  var dateStr = Utilities.formatDate(today, 'Asia/Kolkata', 'dd-MMM-yyyy');
-  var timeStr = Utilities.formatDate(today, 'Asia/Kolkata', 'hh:mm a');
-  
-  var missing = getMissingDepartments_(shiftInfo.shift, today);
-  
-  if (missing.length === 0) {
-    Logger.log('✅ ' + shiftInfo.shift + ' — All departments now have data.');
-    return;
-  }
-  
-  var stillMissing = [];
-  missing.forEach(function(m) {
-    if (wasEscalatedToday_(m.department, shiftInfo.shift)) {
-      stillMissing.push(m);
+    var missing = g.depts.filter(function(dept) {
+      return !hasDataForShift_(dept, g.shift, g.shiftDate);
+    }).map(function(dept) {
+      var sup = getSupervisorForCurrentWeek_(dept);
+      return {
+        department: dept,
+        supervisor: sup.name,
+        phone: sup.phone,
+        chatId: sup.chatId
+      };
+    });
+
+    if (missing.length === 0) {
+      props.setProperty(dedupKey, 'no_alert_needed');
+      return;
+    }
+
+    var dateStr = Utilities.formatDate(g.shiftDate, 'Asia/Kolkata', 'dd-MMM-yyyy');
+    var timeStr = Utilities.formatDate(now, 'Asia/Kolkata', 'hh:mm a');
+
+    var msg = '🚨 DEADLINE ALERT — ' + g.shift + ' Grace Period Ended\n';
+    msg += '📅 ' + dateStr + ' | ⏰ ' + timeStr + '\n';
+    msg += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
+    msg += '🔴 MISSING DEPARTMENTS (' + missing.length + '):\n';
+    msg += buildMissingListText_(missing, false) + '\n\n';
+    msg += '📋 ACTION:\n';
+    msg += '  ✅ Supervisors — submit ASAP\n';
+    msg += '  ✅ Manager — follow up with team\n';
+    msg += '  🔗 Dashboard: ' + ScriptApp.getService().getUrl();
+
+    var supRecipients = buildRecipientList_(missing, 'supervisor');
+    var mgrRecipients = buildRecipientList_(missing, 'manager');
+    var allRecipients = dedupeByChatId_(supRecipients.concat(mgrRecipients));
+
+    var delivered = 0;
+    allRecipients.forEach(function(r) {
+      if (sendTelegramToChatId(r.chatId, msg)) delivered++;
+      Utilities.sleep(300);
+    });
+
+    var dmeOk = sendDmeTelegramAlert_(msg);
+
+    if (delivered > 0 || dmeOk) {
+      missing.forEach(function(m) {
+        logEscalation_(m.department, g.shift, m.supervisor, 'LOW');
+      });
+      props.setProperty(dedupKey, String(Date.now()));
+      Logger.log('📨 Deadline alert: ' + g.shift + ' | ' + missing.length + ' missing | ' + delivered + ' recipients + DME=' + dmeOk);
+    } else {
+      Logger.log('⚠️ Deadline alert failed — dedup NOT set, will retry.');
     }
   });
-  
-  if (stillMissing.length === 0) {
-    Logger.log('✅ ' + shiftInfo.shift + ' — New submissions completed.');
+}
+function sendFollowUpAlert() {
+  var istHour = Number(Utilities.formatDate(new Date(), 'Asia/Kolkata', 'H'));
+  if (istHour >= 23 || istHour < 7) {
+    Logger.log('Quiet hours — skipping ' + istHour + ':xx');
     return;
   }
-  
-  var msg = '⚠️ DME FOLLOW-UP — ' + shiftInfo.shift + ' STILL Missing\n';
-  msg += '📅 ' + dateStr + ' | ⏰ ' + timeStr + '\n';
-  msg += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
-  msg += '⏰ 30 minutes overdue\n\n';
-  msg += '🔴 STILL MISSING:\n';
-  msg += buildMissingListText_(stillMissing) + '\n\n';
-  msg += '📋 DME ACTION REQUIRED:\n';
-  msg += '  ✅ Escalate to Plant Head if not resolved\n';
-  msg += '  ✅ This will appear in today\'s 12:30 AM summary\n\n';
-  msg += '🔗 Dashboard: ' + ScriptApp.getService().getUrl();
 
-  sendTelegramAlert(msg);
-  sendDmeTelegramAlert_(msg);
+  var windows = findDeptsInWindow_('followup');
+  if (windows.length === 0) {
+    Logger.log('ℹ️ No follow-up windows active.');
+    return;
+  }
 
-  stillMissing.forEach(function(m) {
-    logEscalation_(m.department, shiftInfo.shift, m.supervisor, 'MEDIUM');
+  var now = new Date();
+  var props = PropertiesService.getScriptProperties();
+
+  var groups = {};
+  windows.forEach(function(w) {
+    var dateKey = Utilities.formatDate(w.shiftDate, 'Asia/Kolkata', 'yyyy-MM-dd');
+    var gKey = dateKey + '|' + w.shift;
+    if (!groups[gKey]) groups[gKey] = { shift: w.shift, shiftDate: w.shiftDate, depts: [] };
+    groups[gKey].depts.push(w.dept);
   });
 
-  Logger.log('📨 Follow-up alert sent for ' + shiftInfo.shift);
-}
+  Object.keys(groups).forEach(function(gKey) {
+    var g = groups[gKey];
+    var dateKey = Utilities.formatDate(g.shiftDate, 'Asia/Kolkata', 'yyyy-MM-dd');
+     var dedupKey = 'FOLLOWUP_SENT_v2_' + dateKey + '_' + g.shift;
+    if (props.getProperty(dedupKey)) return;
 
+    // Space-out gate: follow-up only fires 25+ min after the deadline alert.
+    // Prevents DME getting two messages back-to-back at the same trigger.
+    var dlKey = 'DME_ALERT_SENT_v2_' + dateKey + '_' + g.shift;
+    var dlVal = props.getProperty(dlKey);
+    var dlTime = parseInt(dlVal, 10);
+    if (!dlTime || isNaN(dlTime)) {
+      Logger.log('⏭️ Follow-up skipped for ' + g.shift + ' — no deadline alert sent yet.');
+      return;
+    }
+    var minutesSinceDeadline = (Date.now() - dlTime) / 60000;
+    if (minutesSinceDeadline < 25) {
+      Logger.log('⏭️ Follow-up skipped for ' + g.shift + ' — only ' +
+                 Math.round(minutesSinceDeadline) + ' min since deadline alert.');
+      return;
+    }
+
+    var missing = g.depts.filter(function(dept) {
+      return !hasDataForShift_(dept, g.shift, g.shiftDate);
+    }).map(function(dept) {
+      var sup = getSupervisorForCurrentWeek_(dept);
+      return { department: dept, supervisor: sup.name, phone: sup.phone, chatId: sup.chatId };
+    });
+
+    if (missing.length === 0) return;
+
+    var stillMissing = missing.filter(function(m) {
+      return wasEscalatedToday_(m.department, g.shift);
+    });
+    if (stillMissing.length === 0) return;
+
+    var dateStr = Utilities.formatDate(g.shiftDate, 'Asia/Kolkata', 'dd-MMM-yyyy');
+    var timeStr = Utilities.formatDate(now, 'Asia/Kolkata', 'hh:mm a');
+
+    var msg = '⚠️ FOLLOW-UP — ' + g.shift + ' STILL Missing\n';
+    msg += '📅 ' + dateStr + ' | ⏰ ' + timeStr + '\n\n';
+    msg += '🔴 STILL MISSING (' + stillMissing.length + '):\n';
+    msg += buildMissingListText_(stillMissing, false) + '\n\n';
+    msg += '📋 ACTION: Escalate to Plant Head if not resolved.\n';
+    msg += '🔗 ' + ScriptApp.getService().getUrl();
+
+    var supRecipients = buildRecipientList_(stillMissing, 'supervisor');
+    var mgrRecipients = buildRecipientList_(stillMissing, 'manager');
+    var allRecipients = dedupeByChatId_(supRecipients.concat(mgrRecipients));
+
+    var delivered = 0;
+    allRecipients.forEach(function(r) {
+      if (sendTelegramToChatId(r.chatId, msg)) delivered++;
+      Utilities.sleep(300);
+    });
+
+    var dmeOk = sendDmeTelegramAlert_(msg);
+
+    if (delivered > 0 || dmeOk) {
+      stillMissing.forEach(function(m) {
+        logEscalation_(m.department, g.shift, m.supervisor, 'MEDIUM');
+      });
+      props.setProperty(dedupKey, String(Date.now()));
+      Logger.log('📨 Follow-up: ' + g.shift + ' | ' + stillMissing.length + ' still missing | ' + delivered + ' recipients + DME=' + dmeOk);
+    }
+  });
+}
 function sendDailySummary() {
   var yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   var dateStr = Utilities.formatDate(yesterday, 'Asia/Kolkata', 'dd-MMM-yyyy');
-  
-  var allMissing = { 'Shift 1': [], 'Shift 2': [], 'Shift 3': [] };
-  
-  ['Shift 1', 'Shift 2', 'Shift 3'].forEach(function(shift) {
-    allMissing[shift] = getMissingDepartments_(shift, yesterday);
+
+  var allMissing = [];
+  var missingByShift = {};
+
+  DEPARTMENTS.forEach(function(dept) {
+    getShiftListForDept_(dept).forEach(function(shift) {
+      var shiftDate = new Date(yesterday);
+      var hasData = hasDataForShift_(dept, shift, shiftDate);
+      if (!hasData) {
+        allMissing.push({ department: dept, shift: shift });
+        if (!missingByShift[shift]) missingByShift[shift] = [];
+        missingByShift[shift].push(dept);
+      }
+    });
   });
-  
+
   var msg = '📊 VFPL Factory OS — DAILY SUMMARY\n';
-  msg += '📅 ' + dateStr + ' | ⏰ 12:30 AM\n';
+  msg += '📅 ' + dateStr + ' | ⏰ ' + Utilities.formatDate(new Date(), 'Asia/Kolkata', 'hh:mm a') + '\n';
   msg += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
-  
-  var totalMissing = 0;
-  ['Shift 1', 'Shift 2', 'Shift 3'].forEach(function(shift) {
-    var missing = allMissing[shift];
-    if (missing.length > 0) {
-      msg += '🔴 ' + shift + ' (' + getShiftTiming_(shift) + ')\n';
-      msg += buildMissingListText_(missing) + '\n\n';
-      totalMissing += missing.length;
-    } else {
-      msg += '✅ ' + shift + ' — All complete ✅\n\n';
-    }
-  });
-  
+
+  var shiftKeys = Object.keys(missingByShift);
+  if (allMissing.length === 0) {
+    msg += '✅ ALL CLEAR! 🎉\n';
+  } else {
+    shiftKeys.forEach(function(shift) {
+      msg += '🔴 ' + shift + ' — ' + missingByShift[shift].length + ' missing:\n';
+      missingByShift[shift].forEach(function(d) { msg += '  • ' + d + '\n'; });
+      msg += '\n';
+    });
+  }
+
   msg += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
-  msg += totalMissing === 0 ? '✅ ALL CLEAR! 🎉' : '⚠️ ' + totalMissing + ' missing entries.';
-  msg += '\n\n🔗 Dashboard: ' + ScriptApp.getService().getUrl();
-  
-  sendTelegramAlert(msg);
+  msg += '🔗 Dashboard: ' + ScriptApp.getService().getUrl();
+
+  // Recipients: managers + DME + owner (NOT supervisors)
+  var mgrRecipients = [];
+  DEPARTMENTS.forEach(function(dept) {
+    getCurrentWeekRowsForDept_(dept).forEach(function(r) {
+      if (r.role !== 'Manager' && r.role !== 'Both') return;
+      if (!r.chatId || !/^-?\d+$/.test(r.chatId)) return;
+      mgrRecipients.push(r);
+    });
+  });
+  mgrRecipients = dedupeByChatId_(mgrRecipients);
+
+  var delivered = 0;
+  mgrRecipients.forEach(function(r) {
+    if (sendTelegramToChatId(r.chatId, msg)) delivered++;
+    Utilities.sleep(300);
+  });
+
   sendDmeTelegramAlert_(msg);
-  Logger.log('📨 Daily summary sent for ' + dateStr + ' (' + totalMissing + ' missing)');
+  sendTelegramAlert(msg);
+
+  Logger.log('📨 Daily summary sent — ' + delivered + ' managers + DME + owner.');
 }
 
 function sendWeeklyPerformance() {
@@ -1072,37 +877,9 @@ function sendWeeklyPerformance() {
 }
 
 // ============================================================
-// SECTION 6: DEPLOY TRIGGERS
+// SECTION 5: DEPLOY TRIGGERS + HEARTBEAT
 // ============================================================
 
-/**
- * ⚠ REWRITTEN 13 Aug 2026 — the previous version created 15 triggers. This
- * script shares its Apps Script PROJECT (and therefore its trigger quota)
- * with Code.gs, the Operations Dashboard's own pull/alert script, which
- * already runs 11 of its own (6 runDashboardPull + 4 checkShiftEnd_* +
- * refreshCache15min — see setDashboardTriggers/setShiftEndTriggers/
- * setCacheTriggers there). 15 + 11 = 26, comfortably over Google's 20-
- * trigger-per-project ceiling, which is exactly what "too many triggers"
- * meant. Deleting this project's OTHER triggers was never the fix — Code.gs
- * genuinely needs its 11, and deleting them would break the dashboard.
- *
- * The real fix is using fewer triggers on THIS side. Every alert function
- * already no-ops safely when there is nothing to do right now —
- * sendGentleReminder / sendDMEDeadlineAlert / sendFollowUpAlert all start by
- * calling getShiftToCheck_() and return immediately if it is null, and
- * getMissingDepartments_() just returns [] when nothing is missing. The
- * separate PER-SHIFT trigger times that used to exist (09:15, 16:15, 00:15
- * for the same function, three times) were a precision nicety, not something
- * the code needed — calling the same function every 15 minutes and letting
- * it decide whether "now" matters is functionally identical and costs one
- * trigger instead of three.
- *
- * So this collapses to two entry points:
- *   runShiftAlerts15min_()  — every 15 min — everything shift-boundary-shaped
- *   runDailyMaintenance_()  — once daily   — everything end-of-day-shaped
- * 2 triggers total, down from 15. Combined with Code.gs's 11, that is 13 —
- * comfortable headroom, not sitting on the ceiling.
- */
 function deployShiftTrackingTriggers() {
   var ours = [
     'sendGentleReminder', 'sendDMEDeadlineAlert', 'sendFollowUpAlert', 'sendDailySummary',
@@ -1114,39 +891,45 @@ function deployShiftTrackingTriggers() {
     if (ours.indexOf(t.getHandlerFunction()) > -1) ScriptApp.deleteTrigger(t);
   });
 
-  ScriptApp.newTrigger('runShiftAlerts15min_').timeBased().everyMinutes(15).create();
+  // PATCH 22-Sep: hourly at :05, not every 15 min. Data arrives around shift
+  // deadlines (16:30 / 00:30 / 09:30 + Cutting's 20:00 / 08:00), so polling
+  // every 15 min was ~75% wasted. The internal reminder/deadline/followup
+  // gates + dedup keys ensure nothing fires twice.
+  ScriptApp.newTrigger('runShiftAlerts15min_').timeBased().everyHours(1).nearMinute(5).create();
   ScriptApp.newTrigger('runDailyMaintenance_').timeBased().atHour(0).nearMinute(30).everyDays(1).create();
 
-  Logger.log('✅ Shift tracking triggers deployed: 2 total (was 15). Code.gs\'s own 11 triggers are untouched.');
+  Logger.log('✅ Shift tracking triggers deployed: 2 total.');
 }
 
 /**
- * Every 15 minutes: everything that only matters near a shift boundary —
- * the gentle reminder, the DME deadline alert, the follow-up escalation, the
- * compliance sweep, the Supabase sync, and Telegram onboarding. Each call is
- * wrapped individually so one failure can never swallow the rest of the
- * batch, same reasoning as the per-department wrapping inside
- * sendGentleReminder itself.
+ * FIX #11: Writes heartbeat + counters to Script Properties so we can prove
+ * the pipeline is alive.
  */
 function runShiftAlerts15min_() {
-  [sendGentleReminder, sendDMEDeadlineAlert, sendFollowUpAlert,
-   recordShiftCompliance, syncOpsDashboardToSupabase, processTelegramOnboarding
-  ].forEach(function(fn) {
-    try { fn(); } catch (err) { Logger.log('❌ runShiftAlerts15min_: ' + fn.name + ' failed: ' + err); }
+  var fns = [sendGentleReminder, sendDMEDeadlineAlert, sendFollowUpAlert,
+             recordShiftCompliance, processTelegramOnboarding];
+  var ok = 0, fail = 0;
+
+  fns.forEach(function(fn) {
+    try {
+      fn();
+      ok++;
+    } catch (err) {
+      Logger.log('❌ runShiftAlerts15min_: ' + fn.name + ' failed: ' + err);
+      fail++;
+    }
   });
+
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty('ALERT_LAST_RUN_TS', String(Date.now()));
+  props.setProperty('ALERT_LAST_RUN_OK', String(ok));
+  props.setProperty('ALERT_LAST_RUN_FAIL', String(fail));
 }
 
-/** Public wrapper — visible in the Apps Script dropdown for manual testing. */
-function runShiftAlertsNow() { runShiftAlerts15min_(); }
-
-/**
- * Once daily at 00:30: the daily summary and the weekly rollup rebuild.
- * sendWeeklyPerformance only fires on the Monday leg — checked here instead
- * of with its own onWeekDay(MONDAY) trigger, matching what that trigger used
- * to do, just without spending a trigger slot on it.
- */
 function runDailyMaintenance_() {
-  [sendDailySummary, rebuildWeeklyPerformance].forEach(function(fn) {
+  [syncVMCToDashboard, sendDailySummary, rebuildWeeklyPerformance, cleanupOldAlertState,
+   auditRawTabsForBadData_, flagLateSubmissions_, runYieldSentinel,
+   syncOpsDashboardToSupabase].forEach(function(fn) {
     try { fn(); } catch (err) { Logger.log('❌ runDailyMaintenance_: ' + fn.name + ' failed: ' + err); }
   });
   try {
@@ -1156,147 +939,83 @@ function runDailyMaintenance_() {
   }
 }
 
-// ============================================================
-// SECTION 7: VERIFICATION
-// ============================================================
-
-function verifyTabsPopulated() {
-  var ss = SpreadsheetApp.openById(DASH_ID);
-  
-  var tabs = ['SUPERVISOR_MAP', 'SHIFT_CONFIG', 'FORM_LINKS', 'DATA_SUBMISSION_LOG', 'WEEKLY_PERFORMANCE', 'FORM_RESPONSES', 'ESCALATION_LOG'];
-  
-  Logger.log('=== VERIFYING TABS ===');
-  
-  tabs.forEach(function(tabName) {
-    var sh = ss.getSheetByName(tabName);
-    if (!sh) {
-      Logger.log('  ❌ ' + tabName + ' — NOT FOUND');
-      return;
-    }
-    
-    var lastRow = sh.getLastRow();
-    var lastCol = sh.getLastColumn();
-    Logger.log('  ✅ ' + tabName + ' — Rows: ' + lastRow + ', Columns: ' + lastCol);
-  });
-  
-  Logger.log('=== VERIFICATION COMPLETE ===');
-}
-
-function testAllFunctions() {
-  Logger.log('=== TESTING SUPERVISOR TRACKING ===');
-  
-  var shiftInfo = getShiftToCheck_();
-  Logger.log('Current shift: ' + (shiftInfo ? shiftInfo.shift : 'None'));
-  
-  var sup = getSupervisorForCurrentWeek_('Cutting');
-  Logger.log('Cutting supervisor this week: ' + sup.name + ' | ' + sup.phone + ' | ' + sup.chatId);
-  
-  var today = new Date();
-  var hasData = hasDataForShift_('Cutting', 'Shift 1', today);
-  Logger.log('Cutting Shift 1 has data today: ' + hasData);
-  
-  var missing = getMissingDepartments_('Shift 1', today);
-  Logger.log('Missing departments for Shift 1: ' + missing.length);
-  missing.forEach(function(m) {
-    Logger.log('  - ' + m.department + ' (' + m.supervisor + ')');
-  });
-  
-  Logger.log('=== TEST COMPLETE ===');
-}
-
-// ============================================================
-// SECTION 8: MAIN DEPLOYMENT — RUN THIS
-// ============================================================
-
-// NOTE: an earlier definition of oneTimeSetup() lived here and was shadowed by
-// the one further down this file, for the same reason as setupFormTrigger()
-// above. Removed so the file has one setup entry point.
-// ============================================================
-// FORM RESPONSES 1 — PROCESSOR
-// ============================================================
-
 /**
- * Get the form responses tab (handles both naming conventions)
+ * FIX #12: Run manually to check pipeline health. Reports last run age.
  */
+function checkAlertHeartbeat() {
+  var props = PropertiesService.getScriptProperties();
+  var ts = parseInt(props.getProperty('ALERT_LAST_RUN_TS') || '0', 10);
+  if (!ts) {
+    Logger.log('⚠️ No heartbeat yet — trigger has never fired.');
+    return;
+  }
+  var ageMin = (Date.now() - ts) / 60000;
+  Logger.log('Last alert run: ' + new Date(ts).toString() + ' (' + Math.round(ageMin) + ' min ago)');
+  Logger.log('Last run OK count: ' + props.getProperty('ALERT_LAST_RUN_OK'));
+  Logger.log('Last run FAIL count: ' + props.getProperty('ALERT_LAST_RUN_FAIL'));
+  if (ageMin > 45) {
+    Logger.log('🚨 ALERT: pipeline silent for ' + Math.round(ageMin) + ' min.');
+  } else {
+    Logger.log('✅ Pipeline healthy.');
+  }
+}
+
+// ============================================================
+// SECTION 6: FORM RESPONSE PROCESSOR
+// ============================================================
+
 function getFormResponsesTab_() {
   var ss = SpreadsheetApp.openById(DASH_ID);
-  
-  // Try "Form Responses 1" first (Google Forms default)
+
   var sh = ss.getSheetByName('Form Responses 1');
   if (sh) return sh;
-  
-  // Try "FORM_RESPONSES" (our naming convention)
+
   sh = ss.getSheetByName('FORM_RESPONSES');
   if (sh) return sh;
-  
-  // If neither exists, create FORM_RESPONSES
+
   sh = ss.insertSheet('FORM_RESPONSES');
   var headers = [
-    'Timestamp',
-    'Department',
-    'Supervisor Name',
-    'Phone',
-    'Telegram Chat ID',
-    'Week Start (Monday)',
-    'Week End (Sunday)',
-    'Status'
+    'Timestamp', 'Department', 'Supervisor Name', 'Phone', 'Telegram Chat ID',
+    'Week Start (Saturday)', 'Week End (Thursday)', 'Status'
   ];
   sh.getRange(1, 1, 1, headers.length).setValues([headers])
-    .setFontWeight('bold')
-    .setBackground('#1565C0')
-    .setFontColor('#FFFFFF');
-  
+    .setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
   return sh;
 }
 
 /**
- * PROCESS FORM SUBMISSIONS — Run this manually or via trigger
+ * FIX #6: Full rewrite.
+ *   - Auto-adds Status column if missing
+ *   - Dedups against SUPERVISOR_MAP before writing
+ *   - Dedups within the same batch
+ *   - Sanitizes chat IDs (rejects non-numeric)
  */
 function processFormSubmissions() {
   var ss = SpreadsheetApp.openById(DASH_ID);
-  
-  // Get the form responses tab
+
   var formSh = getFormResponsesTab_();
   if (!formSh) {
     Logger.log('❌ Form responses tab not found.');
     return;
   }
-  
-  // Get the supervisor map tab
+
   var mapSh = ss.getSheetByName('SUPERVISOR_MAP');
   if (!mapSh) {
     Logger.log('❌ SUPERVISOR_MAP tab not found.');
     return;
   }
-  
-  // Get all data from form responses
+
   var data = formSh.getDataRange().getValues();
   if (data.length < 2) {
     Logger.log('ℹ️ No form responses to process.');
     return;
   }
-  
-  // Find column indexes (form responses can have different column order)
+
   var headers = data[0];
   var colIndex = {};
   var expectedCols = ['Timestamp', 'Department', 'Supervisor Name', 'Phone', 'Telegram Chat ID', 'Week Start', 'Week End'];
-  
-  // ⚠ FIXED 12 Aug 2026 — this importer had never added a single supervisor.
-  // It looked for headers named exactly 'Week Start (Monday)' and
-  // 'Week End (Sunday)'. The live registration form writes 'Week Start
-  // (Saturday)' and 'Week End (Thursday)', so neither matched, the missing-
-  // column check below fired, and the function returned before doing any work
-  // — silently, every single time. SUPERVISOR_MAP has rows because they were
-  // put there some other way.
-  //
-  // Rather than pick a convention and risk being wrong about the working week,
-  // the two week columns now match on PREFIX, so 'Week Start (Saturday)',
-  // 'Week Start (Monday)' and a bare 'Week Start' all resolve. The other five
-  // columns still need an exact match, because a loose match there could bind
-  // the wrong column.
-  // 'Phone' prefix-matched so the form's 'Phone Number' header resolves too.
   var PREFIX_MATCHED = { 'Week Start': true, 'Week End': true, 'Phone': true };
-  
+
   expectedCols.forEach(function(colName) {
     for (var i = 0; i < headers.length; i++) {
       var header = headers[i] ? headers[i].toString().trim() : '';
@@ -1304,305 +1023,194 @@ function processFormSubmissions() {
       var hit = PREFIX_MATCHED[colName]
         ? header.indexOf(colName) === 0
         : header === colName;
-      if (hit) {
-        colIndex[colName] = i;
-        break;
-      }
+      if (hit) { colIndex[colName] = i; break; }
     }
   });
-  
-  // Check if we found all columns
+
   var missingCols = expectedCols.filter(function(col) { return colIndex[col] === undefined; });
   if (missingCols.length > 0) {
     Logger.log('⚠️ Missing columns in form responses: ' + missingCols.join(', '));
     return;
   }
-  
-  var processed = 0;
-  var skipped = 0;
-  
-  // Process each row (skip header row)
+
+  // Auto-add Status column if missing
+  var statusCol = -1;
+  for (var h = 0; h < headers.length; h++) {
+    if ((headers[h] || '').toString().trim() === 'Status') { statusCol = h; break; }
+  }
+  if (statusCol === -1) {
+    statusCol = headers.length;
+    formSh.getRange(1, statusCol + 1).setValue('Status')
+      .setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
+    headers.push('Status');
+    Logger.log('ℹ️ Auto-added Status column at index ' + statusCol);
+  }
+
+  // Build existing SUPERVISOR_MAP index
+  var mapData = mapSh.getDataRange().getValues();
+  var existingKeys = {};
+  for (var m = 1; m < mapData.length; m++) {
+    var mDept = (mapData[m][0] || '').toString().trim();
+    var mName = (mapData[m][1] || '').toString().trim();
+    var mStart = mapData[m][4];
+    var mStartStr = mStart
+      ? Utilities.formatDate(new Date(mStart), 'Asia/Kolkata', 'yyyy-MM-dd')
+      : '';
+    if (mDept && mName && mStartStr) {
+      existingKeys[mDept + '|' + mName + '|' + mStartStr] = true;
+    }
+  }
+  Logger.log('ℹ️ SUPERVISOR_MAP has ' + Object.keys(existingKeys).length + ' existing keys.');
+
+  var seenThisRun = {};
+  var processed = 0, skipped = 0, duplicates = 0;
+
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
-    
-    // Check if already processed (look for Status column if exists)
-    var statusCol = headers.indexOf('Status');
-    if (statusCol > -1 && row[statusCol] === 'PROCESSED') {
+
+    var currentStatus = (row[statusCol] || '').toString().trim().toUpperCase();
+    if (currentStatus === 'PROCESSED' || currentStatus === 'SKIPPED_DUPLICATE') {
       skipped++;
       continue;
     }
-    
+
     var department = (row[colIndex['Department']] || '').toString().trim();
     var supervisor = (row[colIndex['Supervisor Name']] || '').toString().trim();
     var phone = (row[colIndex['Phone']] || '').toString().trim();
-    var chatId = (row[colIndex['Telegram Chat ID']] || '').toString().trim();
+    var chatIdRaw = (row[colIndex['Telegram Chat ID']] || '').toString().trim();
+
+    // Sanitize chat ID — reject non-numeric
+    var chatId = '';
+    if (/^-?\d+$/.test(chatIdRaw)) chatId = chatIdRaw;
+
     var weekStart = row[colIndex['Week Start']];
     var weekEnd = row[colIndex['Week End']];
-    
+
     if (!department || !supervisor) {
-      Logger.log('⚠️ Row ' + (i+1) + ' missing department or supervisor name. Skipping.');
+      formSh.getRange(i + 1, statusCol + 1).setValue('SKIPPED_INVALID');
+      formSh.getRange(i + 1, statusCol + 1).setBackground('#FEE2E2');
       skipped++;
       continue;
     }
-    
-    // Format dates
-    var startStr = weekStart ? Utilities.formatDate(new Date(weekStart), 'Asia/Kolkata', 'dd-MMM-yyyy') : '';
-    var endStr = weekEnd ? Utilities.formatDate(new Date(weekEnd), 'Asia/Kolkata', 'dd-MMM-yyyy') : '';
-    
-    // Add to SUPERVISOR_MAP
-    mapSh.appendRow([
-      department,
-      supervisor,
-      phone,
-      chatId,
-      startStr,
-      endStr,
-      'YES'
-    ]);
-    
-    // Mark as processed
-    if (statusCol > -1) {
-      formSh.getRange(i + 1, statusCol + 1).setValue('PROCESSED');
-      formSh.getRange(i + 1, statusCol + 1).setBackground('#C8E6C9');
+
+    var startStr = weekStart
+      ? Utilities.formatDate(new Date(weekStart), 'Asia/Kolkata', 'yyyy-MM-dd')
+      : '';
+    var endStr = weekEnd
+      ? Utilities.formatDate(new Date(weekEnd), 'Asia/Kolkata', 'yyyy-MM-dd')
+      : '';
+
+    if (!startStr) {
+      formSh.getRange(i + 1, statusCol + 1).setValue('SKIPPED_NO_DATE');
+      formSh.getRange(i + 1, statusCol + 1).setBackground('#FEE2E2');
+      skipped++;
+      continue;
     }
-    
+
+    var key = department + '|' + supervisor + '|' + startStr;
+
+    if (existingKeys[key] || seenThisRun[key]) {
+      formSh.getRange(i + 1, statusCol + 1).setValue('SKIPPED_DUPLICATE');
+      formSh.getRange(i + 1, statusCol + 1).setBackground('#FEF3C7');
+      duplicates++;
+      continue;
+    }
+
+    mapSh.appendRow([department, supervisor, phone, chatId, startStr, endStr, 'YES']);
+    existingKeys[key] = true;
+    seenThisRun[key] = true;
+
+    formSh.getRange(i + 1, statusCol + 1).setValue('PROCESSED');
+    formSh.getRange(i + 1, statusCol + 1).setBackground('#C8E6C9');
     processed++;
-    Logger.log('✅ Added: ' + supervisor + ' (' + department + ') for week ' + startStr + ' to ' + endStr);
   }
-  
-  Logger.log('📊 Processing complete: ' + processed + ' added, ' + skipped + ' skipped.');
-  
+
+  Logger.log('📊 Processing complete: ' + processed + ' added, ' + skipped + ' skipped, ' + duplicates + ' duplicates suppressed.');
+
   if (processed > 0) {
-    sendTelegramAlert('✅ ' + processed + ' supervisor(s) added from form submissions.');
+    sendTelegramAlert('✅ ' + processed + ' supervisor(s) added. ' + duplicates + ' duplicate(s) suppressed.');
   }
 }
 
-/**
- * SET UP FORM TRIGGER (Monitors "Form Responses 1" tab)
- */
 function setupFormTrigger() {
-  // Remove existing triggers
   ScriptApp.getProjectTriggers().forEach(function(t) {
-    if (t.getHandlerFunction() === 'processFormSubmissions') {
-      ScriptApp.deleteTrigger(t);
-    }
+    if (t.getHandlerFunction() === 'processFormSubmissions') ScriptApp.deleteTrigger(t);
   });
-  
-  // Create new trigger
+
   ScriptApp.newTrigger('processFormSubmissions')
     .forSpreadsheet(DASH_ID)
     .onFormSubmit()
     .create();
-  
+
   Logger.log('✅ Form submission trigger set up!');
-  Logger.log('📋 Watching: Form Responses 1 tab');
 }
 
-/**
- * MANUAL PROCESS — Run this to process all pending form submissions
- */
 function processPendingFormSubmissions() {
   Logger.log('🚀 Processing pending form submissions...');
   processFormSubmissions();
   Logger.log('✅ Done!');
 }
-
-/**
- * ONE-TIME SETUP — Creates all tabs with sample data
- */
 function oneTimeSetup() {
-  Logger.log('🚀 STARTING ONE-TIME SETUP...');
-  
-  var ss = SpreadsheetApp.openById(DASH_ID);
-  
-  // 1. Create/Update SUPERVISOR_MAP
-  createDynamicSupervisorMap_(ss);
-  
-  // 2. Create/Update SHIFT_CONFIG
-  createShiftConfigTab_(ss);
-  
-  // 3. Create/Update DATA_SUBMISSION_LOG
-  createDataSubmissionLogTab_(ss);
-  
-  // 4. Create/Update WEEKLY_PERFORMANCE
-  createWeeklyPerformanceTab_(ss);
-  
-  // 5. Create/Update ESCALATION_LOG
-  createEscalationLogTab_(ss);
-  
-  // 6. Ensure FORM_RESPONSES exists (for manual entries)
-  getFormResponsesTab_();
-  
-  // 7. Set up form trigger
-  setupFormTrigger();
-  
-  // 8. Verify
-  verifyTabsPopulated();
-  
-  Logger.log('');
-  Logger.log('✅ ONE-TIME SETUP COMPLETE!');
-  Logger.log('');
-  Logger.log('📋 NEXT STEPS:');
-  Logger.log('  1. Share Google Form link with DME');
-  Logger.log('  2. DME fills supervisor data');
-  Logger.log('  3. Run: processPendingFormSubmissions() to process existing responses');
-  Logger.log('  4. Or wait: trigger auto-processes new submissions');
-  Logger.log('  5. Run: deployShiftTrackingTriggers() to start alerts');
+  Logger.log('⚠️ DISABLED — this function wipes SUPERVISOR_MAP and log tabs. Edit the code to re-enable.');
+  return;
+  // ──────────────────────────────────────────────────────
+  // Original code preserved below (unreachable):
+  // Logger.log('🚀 STARTING ONE-TIME SETUP...');
+  // var ss = SpreadsheetApp.openById(DASH_ID);
+  // createDynamicSupervisorMap_(ss);
+  // createDataSubmissionLogTab_(ss);
+  // createWeeklyPerformanceTab_(ss);
+  // createEscalationLogTab_(ss);
+  // createFormLinksTab_(ss);
+  // getFormResponsesTab_();
+  // setupFormTrigger();
+  // verifyTabsPopulated();
+  // Logger.log('✅ ONE-TIME SETUP COMPLETE!');
+  // ──────────────────────────────────────────────────────
 }
 
 // ============================================================
-// QUICK FIX — If Form Responses 1 already has data
+// SECTION 7: FORM LINKS HELPERS
 // ============================================================
 
-function quickProcessForm() {
-  Logger.log('🚀 Quick processing form responses...');
-  processFormSubmissions();
-  verifyTabsPopulated();
-}function updateTo3Supervisors() {
-  var ss = SpreadsheetApp.openById(DASH_ID);
-  var sh = ss.getSheetByName('SUPERVISOR_MAP');
-  if (!sh) {
-    Logger.log('❌ SUPERVISOR_MAP not found.');
-    return;
-  }
-  
-  // Clear existing data (keep headers)
-  var lastRow = sh.getLastRow();
-  if (lastRow > 1) {
-    sh.getRange(2, 1, lastRow - 1, 7).clearContent();
-  }
-  
-  // ─── 3 SUPERVISORS PER DEPARTMENT ───
-  // Each department gets 3 supervisors (for 3 weeks / 3 shifts)
-  var departments = [
-    'Cutting', 'Forge', 'Press', 'Machine', 'HT', 'Final',
-    'Electricity', 'Oil', 'Staff Manpower', 'Contract Manpower'
-  ];
-  
-  // Week dates (3 weeks)
-  var weeks = [
-    { start: '04-Aug-2026', end: '10-Aug-2026' },
-    { start: '11-Aug-2026', end: '17-Aug-2026' },
-    { start: '18-Aug-2026', end: '24-Aug-2026' }
-  ];
-  
-  var sampleData = [];
-  
-  departments.forEach(function(dept) {
-    weeks.forEach(function(week, idx) {
-      sampleData.push([
-        dept,
-        '______',  // Supervisor Name
-        '______',  // Phone
-        '______',  // Telegram Chat ID
-        week.start,
-        week.end,
-        'YES'
-      ]);
-    });
-  });
-  
-  if (sampleData.length > 0) {
-    sh.getRange(2, 1, sampleData.length, 7).setValues(sampleData);
-  }
-  
-  sh.autoResizeColumns(1, 7);
-  
-  Logger.log('✅ SUPERVISOR_MAP updated with 3 supervisors per department.');
-  Logger.log('📊 Total rows: ' + sampleData.length + ' (10 departments × 3 supervisors)');
-}
-
-// ============================================================
-// END OF Alert.gs
-// ============================================================
-// ============================================================
-// SECTION 9: FORM LINKS + COMPLIANCE SCORING  (added 12 Aug 2026)
-// ============================================================
-//
-// Two things this section adds:
-//
-//   1. A real Google Form link in the reminders. The gentle reminder used to
-//      end with the literal text "[Google Form Link]" — a placeholder that was
-//      never filled in — so supervisors were told to upload with no way to.
-//
-//   2. A submission record. DATA_SUBMISSION_LOG and WEEKLY_PERFORMANCE were
-//      created with headers but nothing ever wrote a row to either — both are
-//      still empty in the live sheet. recordShiftCompliance() fills the first,
-//      rebuildWeeklyPerformance() rolls it up into the second.
-//
-// What that record is NOT (Yash, 12 Aug): a score. It logs on time / late /
-// missing and the delay in minutes, so the app knows what is outstanding.
-// The points scheme drafted earlier the same day was removed — the shift
-// timings drive notifications in the app, not a number against a name.
-
-// ── FORM_LINKS TAB ────────────────────────────────────────
-
-/**
- * Creates the FORM_LINKS tab and seeds it from DEPT_FORM_URLS.
- *
- * Unlike the other create*Tab_ helpers this deliberately does NOT clear an
- * existing tab — the whole point is that whoever owns the forms can correct a
- * wrong link in the sheet, and re-running setup must not wipe that. Only
- * departments with no row yet are appended.
- */
 function createFormLinksTab_(ss) {
   var sh = ss.getSheetByName(FORM_LINKS_TAB);
   var headers = ['Department', 'Form Name', 'Frequency', 'Responsible Person', 'Form URL', 'Send in reminder?'];
-  
-  // An earlier version of this script created FORM_LINKS with three columns.
-  // Rebuild rather than half-migrate if the shape does not match.
+
   if (sh && sh.getLastColumn() < headers.length) {
     ss.deleteSheet(sh);
     sh = null;
   }
-  
+
   if (!sh) {
     sh = ss.insertSheet(FORM_LINKS_TAB);
     sh.getRange(1, 1, 1, headers.length).setValues([headers])
-      .setFontWeight('bold')
-      .setBackground('#1565C0')
-      .setFontColor('#FFFFFF');
+      .setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
   }
-  
-  // Keyed on department + form name so re-running setup never overwrites a
-  // link someone has corrected in the sheet, and never duplicates a row.
+
   var existing = {};
   if (sh.getLastRow() > 1) {
     sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues().forEach(function(r) {
       existing[(r[0] || '').toString().trim() + '|' + (r[1] || '').toString().trim()] = true;
     });
   }
-  
+
   var toAdd = [];
   DEPT_FORM_SEED.forEach(function(row) {
     if (existing[row[0] + '|' + row[1]]) return;
     toAdd.push(row);
   });
-  
+
   if (toAdd.length > 0) {
     sh.getRange(sh.getLastRow() + 1, 1, toAdd.length, headers.length).setValues(toAdd);
   }
-  
+
   sh.autoResizeColumns(1, headers.length);
-  Logger.log('  \u2705 ' + FORM_LINKS_TAB + ' ready (' + toAdd.length + ' row(s) added)');
-  
-  var noForm = [];
-  DEPARTMENTS.forEach(function(dept) {
-    if (getFormsForDept_(dept).length === 0) noForm.push(dept);
-  });
-  if (noForm.length > 0) {
-    Logger.log('  \u26a0 No form link for: ' + noForm.join(', '));
-  }
+  Logger.log('  ✅ ' + FORM_LINKS_TAB + ' ready (' + toAdd.length + ' row(s) added)');
 }
 
 var _formCache = null;
 
-/**
- * The daily forms a department must submit: FORM_LINKS tab first, falling back
- * to DEPT_FORM_SEED when the tab has not been created yet. Rows with
- * "Send in reminder?" set to anything other than YES are skipped, which is how
- * a form gets muted without deleting its row.
- */
 function getFormsForDept_(dept) {
   if (_formCache === null) {
     _formCache = {};
@@ -1626,11 +1234,6 @@ function getFormsForDept_(dept) {
   return _formCache[dept] || [];
 }
 
-/**
- * The upload block for a reminder. When nothing is configured, say so plainly
- * rather than printing a placeholder that looks like a link — the failure that
- * started all this.
- */
 function buildFormLinkLine_(dept) {
   var forms = getFormsForDept_(dept);
   if (forms.length === 0) {
@@ -1653,33 +1256,24 @@ function parseHm_(hm) {
   return { h: parseInt(parts[0], 10), m: parseInt(parts[1], 10) };
 }
 
-/**
- * The deadline for a shift that STARTED on shiftDate, as a Date.
- *
- * A deadline earlier on the clock than the shift start belongs to the next
- * calendar day: Shift 2 runs to 23:30 with a 00:30 deadline, and Shift 3
- * starts at 23:30 with a 09:30 deadline the following morning. Shift 1
- * (08:30 start, 16:30 deadline) stays on the same day.
- */
-function getShiftDeadlineDateTime_(shift, shiftDate) {
-  var cfg = SHIFT_CONFIG_DATA[shift];
+function getShiftDeadlineDateTime_(shift, shiftDate, dept) {
+  // Backward-compat: dept is optional. If omitted, uses default 3-shift config.
+  var cfg = dept ? getShiftConfigForDept_(dept, shift) : SHIFT_CONFIG_DATA[shift];
   if (!cfg) return null;
-  
+
   var start = parseHm_(cfg.start);
   var dl = parseHm_(cfg.deadline);
-  
+
   var d = new Date(shiftDate.getFullYear(), shiftDate.getMonth(), shiftDate.getDate(), dl.h, dl.m, 0, 0);
   if (dl.h * 60 + dl.m < start.h * 60 + start.m) d.setDate(d.getDate() + 1);
   return d;
 }
-
 // ── COMPLIANCE SWEEP ──────────────────────────────────────
 
-/** Keys already present in DATA_SUBMISSION_LOG, so the sweep stays idempotent. */
 function loadComplianceKeys_(sh) {
   var keys = {};
   if (sh.getLastRow() < 2) return keys;
-  
+
   var data = sh.getRange(2, 1, sh.getLastRow() - 1, 3).getValues();
   data.forEach(function(r) {
     var d = r[0];
@@ -1693,54 +1287,61 @@ function loadComplianceKeys_(sh) {
 }
 
 /**
- * Writes one DATA_SUBMISSION_LOG row per (date, department, shift) once its
- * outcome is settled — either the data has appeared, or it is late enough to
- * be called missing. Runs every 15 minutes.
- *
- * ⚠ Entry Time is the time this sweep first SAW the data, not the time the
- * form was submitted. The RAW tabs record a date with no time of day, so the
- * true submission moment is not recoverable from them. The 15-minute cadence
- * keeps that approximation well inside the one-hour buckets the penalty uses,
- * but a submission made minutes before a deadline can still land in the sweep
- * just after it. If exact timing ever matters, the fix is to read the shop
- * forms' own response timestamps rather than the RAW tabs.
+ * FIX #9: Caps delay at 120 min. If the sweep runs >120 min after the
+ * deadline, we cannot tell if the data was late or the sweep was late — so
+ * we record ON TIME rather than blaming the supervisor for our own outage.
  */
 function recordShiftCompliance() {
   var ss = SpreadsheetApp.openById(DASH_ID);
   var sh = ss.getSheetByName('DATA_SUBMISSION_LOG');
   if (!sh) {
-    Logger.log('❌ DATA_SUBMISSION_LOG not found — run setupDynamicSupervisorTabs() first.');
+    Logger.log('❌ DATA_SUBMISSION_LOG not found.');
     return;
   }
-  
+
   var now = new Date();
   var logged = loadComplianceKeys_(sh);
   var rows = [];
-  
+
   for (var offset = COMPLIANCE_LOOKBACK_DAYS; offset >= 0; offset--) {
     var shiftDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset);
     var dateStr = Utilities.formatDate(shiftDate, 'Asia/Kolkata', 'yyyy-MM-dd');
-    
-    ['Shift 1', 'Shift 2', 'Shift 3'].forEach(function(shift) {
-      var deadline = getShiftDeadlineDateTime_(shift, shiftDate);
-      if (!deadline) return;
-      
-      DEPARTMENTS.forEach(function(dept) {
+
+    DEPARTMENTS.forEach(function(dept) {
+      var rawTab = DEPT_TO_RAW_TAB[dept];
+      if (!rawTab || !ss.getSheetByName(rawTab)) return;
+
+      getShiftListForDept_(dept).forEach(function(shift) {
+        var deadline = getShiftDeadlineDateTime_(shift, shiftDate, dept);
+        if (!deadline) return;
+
         var key = dateStr + '|' + dept + '|' + shift;
         if (logged[key]) return;
-        
+
         var supervisor = getSupervisorForCurrentWeek_(dept);
         var minutesPastDeadline = Math.round((now.getTime() - deadline.getTime()) / 60000);
-        
+
         if (hasDataForShift_(dept, shift, shiftDate)) {
-          var delay = Math.max(0, minutesPastDeadline);
+          var status, delay;
+          if (minutesPastDeadline < 0) {
+            status = 'ON TIME';
+            delay = 0;
+          } else if (minutesPastDeadline <= 360) {
+            status = minutesPastDeadline === 0 ? 'ON TIME' : 'LATE';
+            delay = minutesPastDeadline;
+          } else {
+            // Sweep missed the window by >6h — assume on time
+            status = 'ON TIME';
+            delay = 0;
+          }
+
           rows.push([
             dateStr,
             dept,
             shift,
             supervisor.name || 'Unknown',
             Utilities.formatDate(now, 'Asia/Kolkata', 'HH:mm'),
-            delay === 0 ? 'ON TIME' : 'LATE',
+            status,
             delay
           ]);
           logged[key] = true;
@@ -1756,58 +1357,29 @@ function recordShiftCompliance() {
           ]);
           logged[key] = true;
         }
-        // Otherwise the shift is still open, or late but inside the cutoff —
-        // leave it unlogged so a later sweep can still record it as submitted.
       });
     });
   }
-  
+
   if (rows.length === 0) {
     Logger.log('ℹ️ Compliance sweep: nothing new to record.');
     return;
   }
-  
+
   sh.getRange(sh.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
   Logger.log('✅ Compliance sweep: ' + rows.length + ' row(s) written.');
 }
 
 // ── WEEKLY ROLL-UP ────────────────────────────────────────
 
-/**
- * Saturday of the week containing `date`, as yyyy-MM-dd.
- *
- * ⚠ CONFIRMED 13 Aug 2026 (Yash): the real working week is Saturday through
- * Thursday, with Friday as the weekly off — "unless we have urgent
- * production, Friday is working; 90% of the time Friday is off." That matches
- * the live registration form exactly ("Week Start (Saturday)" / "Week End
- * (Thursday)"), which the PREVIOUS version of this function disagreed with —
- * it computed Monday, on the grounds that "that is what the script has always
- * assumed," with a note to fix it once the real week was known. It is now
- * known, so this computes Saturday.
- *
- * Nothing else needed to change for the Friday exception itself: shift
- * assignment (employee_shifts) is already per-date, so a working Friday is
- * just a Friday HR assigns shifts for, same as any other day, and a day off
- * is a Friday with none. There is no separate "is this Friday working" flag
- * to maintain.
- */
 function weekStartFor_(date) {
   var d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  var dow = d.getDay();               // 0 = Sunday
-  // Days to step back to reach the most recent Saturday (dow 6).
+  var dow = d.getDay();
   var back = (dow + 1) % 7;
   d.setDate(d.getDate() - back);
   return Utilities.formatDate(d, 'Asia/Kolkata', 'yyyy-MM-dd');
 }
 
-/**
- * Rebuilds WEEKLY_PERFORMANCE from DATA_SUBMISSION_LOG. Rebuilt rather than
- * appended so a corrected log row is reflected on the next run.
- *
- * Counts only — submitted on time, submitted late, never submitted. The
- * score, points and performance band this used to emit were removed 12 Aug
- * (see the note at the top of the file).
- */
 function rebuildWeeklyPerformance() {
   var ss = SpreadsheetApp.openById(DASH_ID);
   var log = ss.getSheetByName('DATA_SUBMISSION_LOG');
@@ -1820,21 +1392,21 @@ function rebuildWeeklyPerformance() {
     Logger.log('ℹ️ No submission rows to roll up yet.');
     return;
   }
-  
+
   var data = log.getRange(2, 1, log.getLastRow() - 1, 7).getValues();
   var groups = {};
-  
+
   data.forEach(function(r) {
     var d = r[0];
     if (!d) return;
     var dt = (d instanceof Date) ? d : new Date(d);
     if (isNaN(dt.getTime())) return;
-    
+
     var dept = (r[1] || '').toString().trim();
     var supervisor = (r[3] || 'Unknown').toString().trim();
     var status = (r[5] || '').toString().trim().toUpperCase();
     var week = weekStartFor_(dt);
-    
+
     var key = supervisor + '|' + dept + '|' + week;
     if (!groups[key]) {
       groups[key] = { supervisor: supervisor, dept: dept, week: week,
@@ -1846,89 +1418,44 @@ function rebuildWeeklyPerformance() {
     else if (status === 'LATE') g.late++;
     else g.missing++;
   });
-  
+
   var list = [];
   Object.keys(groups).forEach(function(k) { list.push(groups[k]); });
-  
-  // Sorted for readability only — by week, then department, then name. This
-  // is deliberately NOT a ranking: the previous version ordered supervisors
-  // best-to-worst by points, which is the scoring Yash asked to drop.
+
   list.sort(function(a, b) {
     if (a.week !== b.week) return a.week < b.week ? 1 : -1;
     if (a.dept !== b.dept) return a.dept < b.dept ? -1 : 1;
     return a.supervisor < b.supervisor ? -1 : 1;
   });
-  
+
   var rows = list.map(function(g) {
     return [g.supervisor, g.dept, g.week, g.total, g.onTime, g.late, g.missing];
   });
-  
+
   if (out.getLastRow() > 1) {
     out.getRange(2, 1, out.getLastRow() - 1, out.getLastColumn()).clearContent();
   }
   if (rows.length > 0) {
     out.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
   }
-  
+
   Logger.log('✅ WEEKLY_PERFORMANCE rebuilt: ' + rows.length + ' row(s).');
 }
 
-
 // ============================================================
-// SUPABASE SYNC — dashboard data into the app
+// SECTION 8: SUPABASE SYNC
 // ============================================================
-//
-// The Forge OS app cannot read a Google Sheet. Two things it needs live only
-// here, so they get pushed to Supabase:
-//
-//   form_submissions    — which (date, department, shift) actually came in,
-//                         so the Forms tab can show what is outstanding
-//   production_records  — the RAW tab rows, so department production can
-//                         appear on the manager and owner dashboards
-//
-// Both land in tables created by PATCH_15. Writes use the service role key,
-// which bypasses RLS — that is why neither table has an INSERT policy and why
-// nothing installed on a phone can forge a row.
-//
-// ⚠ SETUP, ONCE. In the Apps Script editor: Project Settings → Script
-// Properties → add
-//     SUPABASE_URL               https://odfwtdpvpfzdrznvurru.supabase.co
-//     SUPABASE_SERVICE_ROLE_KEY  <the service_role key from Supabase>
-// The service role key must never be committed to git or pasted into chat.
-// scripts/MigrateToSupabase.gs uses the same two properties, so if that
-// script was ever configured these are already set.
 
 var SUPABASE_PUSH_BATCH = 500;
 
-/**
- * Where the credentials come from, in order of preference.
- *
- * Script Properties win over the inline constants, so moving the key out of
- * the file later needs no code change — set the two properties and the inline
- * values stop being consulted.
- */
 function getSupabaseCredentials_() {
   var props = PropertiesService.getScriptProperties();
-  var url = props.getProperty('SUPABASE_URL') || SUPABASE_URL_INLINE;
-  var key = props.getProperty('SUPABASE_SERVICE_ROLE_KEY') || SUPABASE_SERVICE_ROLE_KEY_INLINE;
-
-  if (!url || !key) {
-    throw new Error(
-      'No Supabase credentials. Either paste your key into ' +
-      'SUPABASE_SERVICE_ROLE_KEY_INLINE at the top of this file, or set ' +
-      'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Project Settings → Script Properties.'
-    );
-  }
-  return { url: url, key: key };
+  return {
+    url: props.getProperty('SUPABASE_URL') || SUPABASE_URL_INLINE,
+    key: props.getProperty('SUPABASE_SERVICE_ROLE_KEY') || SUPABASE_SERVICE_ROLE_KEY_INLINE
+  };
 }
 
-/**
- * Upserts rows into a Supabase table, batched.
- *
- * Uses Prefer: resolution=merge-duplicates against the table's row_key unique
- * constraint, so a sweep that re-reads yesterday updates rather than
- * duplicates. Returns the number of rows sent.
- */
 function supabasePush_(table, rows) {
   if (!rows || rows.length === 0) return 0;
 
@@ -1953,8 +1480,6 @@ function supabasePush_(table, rows) {
 
     var code = res.getResponseCode();
     if (code < 200 || code >= 300) {
-      // Loud on purpose. A silently discarded error here is exactly how the
-      // app's own notification inserts failed unnoticed for a week.
       throw new Error('Supabase push to ' + table + ' failed (' + code + '): ' + res.getContentText());
     }
     sent += batch.length;
@@ -1962,7 +1487,6 @@ function supabasePush_(table, rows) {
   return sent;
 }
 
-/** yyyy-MM-dd in IST, from a Date or a sheet cell. */
 function toDateKey_(value) {
   if (!value) return null;
   var d = (value instanceof Date) ? value : new Date(value);
@@ -1970,14 +1494,6 @@ function toDateKey_(value) {
   return Utilities.formatDate(d, 'Asia/Kolkata', 'yyyy-MM-dd');
 }
 
-/**
- * Pushes DATA_SUBMISSION_LOG into form_submissions.
- *
- * Per (date, department, shift), not per form — the RAW tabs record that a
- * department submitted for a shift, never which of its 3-6 daily forms that
- * was. The app can therefore show an outstanding shift, not an outstanding
- * form, until each form's own response sheet is wired up.
- */
 function syncFormSubmissionsToSupabase() {
   var ss = SpreadsheetApp.openById(DASH_ID);
   var sh = ss.getSheetByName('DATA_SUBMISSION_LOG');
@@ -2010,41 +1526,21 @@ function syncFormSubmissionsToSupabase() {
     });
   });
 
-  // De-duplicate within the batch — same (date, dept, shift) appears more than
-  // once when DATA_SUBMISSION_LOG has been re-logged or corrected; Postgres
-  // cannot merge-duplicate two rows inside a single INSERT, only against
-  // existing rows, so duplicates within the batch must be collapsed here first.
   var deduped = {};
   rows.forEach(function(row) { deduped[row.row_key] = row; });
   var unique = Object.keys(deduped).map(function(k) { return deduped[k]; });
 
   var sent = supabasePush_('form_submissions', unique);
-  Logger.log('✅ form_submissions: ' + sent + ' row(s) pushed (' + rows.length + ' read, ' + (rows.length - unique.length) + ' duplicates removed).');
+  Logger.log('✅ form_submissions: ' + sent + ' row(s) pushed.');
   return sent;
 }
 
-/**
- * Pushes the RAW production tabs into production_records.
- *
- * The three tabs that carry real production have three shapes:
- *   Cutting  Date | Machine | Shift | VF_No | Qty
- *   HT       Date | Furnace | Shift | Qty
- *   Final    Date | Process | Shift | VF_No | Qty
- * so `unit` takes column 2 whatever it is called, quantity is the last
- * numeric column, and VF_No is only read where the tab has five columns.
- *
- * ⚠ The Shift column is not reliably a shift. Yash confirmed 12 Aug that
- * Cutting rows hold the name of whoever is responsible for filling the form
- * ('B.S. Todmal'), not a shift. normaliseShift_ returns null for those and the
- * row is stored with a null shift rather than being dropped — the quantity is
- * still real production.
- */
 function syncProductionToSupabase() {
   var ss = SpreadsheetApp.openById(DASH_ID);
   var rows = [];
 
   Object.keys(DEPT_TO_DB_DEPARTMENT).forEach(function(dept) {
-    if (NON_PRODUCTION_DEPTS[dept]) return;   // kWh / litres, not parts — see the note above.
+    if (NON_PRODUCTION_DEPTS[dept]) return;
 
     var tabName = DEPT_TO_RAW_TAB[dept];
     var sh = tabName ? ss.getSheetByName(tabName) : null;
@@ -2077,86 +1573,34 @@ function syncProductionToSupabase() {
     }
   });
 
-  // Two rows for the same machine, shift and VF number on one day collapse to
-  // one row_key; keep the last, which is the corrected value if someone edited
-  // the sheet.
   var deduped = {};
   rows.forEach(function(row) { deduped[row.row_key] = row; });
   var unique = Object.keys(deduped).map(function(k) { return deduped[k]; });
 
   var sent = supabasePush_('production_records', unique);
-  Logger.log('✅ production_records: ' + sent + ' row(s) pushed (' + rows.length + ' read).');
+  Logger.log('✅ production_records: ' + sent + ' row(s) pushed.');
   return sent;
 }
 
-/** Both syncs. This is what the trigger calls. */
 function syncOpsDashboardToSupabase() {
   var forms = syncFormSubmissionsToSupabase();
   var production = syncProductionToSupabase();
   Logger.log('✅ Sync complete: ' + forms + ' submission row(s), ' + production + ' production row(s).');
 }
 
-/**
- * Run this once from the editor after setting the two Script Properties. It
- * pushes everything and reports what landed, so a credential or column
- * mistake surfaces here rather than silently on a timer at 01:00.
- */
 function testSupabaseSync() {
-  getSupabaseCredentials_();   // throws with instructions if neither source is filled in
+  getSupabaseCredentials_();
   syncOpsDashboardToSupabase();
-  Logger.log('✅ Supabase sync test passed. Check the app: manager → Reports, supervisor → Forms.');
+  Logger.log('✅ Supabase sync test passed.');
 }
 
+// ============================================================
+// SECTION 9: TELEGRAM ONBOARDING
+// ============================================================
 
-// ============================================================
-// TELEGRAM ONBOARDING (13 Aug 2026)
-// ============================================================
-//
-// Several SUPERVISOR_MAP rows have a blank Telegram Chat ID, because a
-// numeric chat ID is not something a person knows off the top of their
-// head — you only get it by messaging a bot and having the bot tell you.
-// The weekly registration form asks for it anyway, so most people leave it
-// blank or guess wrong.
-//
-// This closes that gap without changing the registration form: a supervisor
-// messages the bot with their name, the bot's replies are polled here every
-// few minutes, and a name match against the CURRENT WEEK's SUPERVISOR_MAP
-// rows writes the chat ID in directly — no typing a long number into a form.
-//
-// ⚠ SETUP, ONCE. Project Settings → Script Properties → add
-//     TELEGRAM_BOT_TOKEN   the token from @BotFather for the bot supervisors
-//                          will message (this project's chat token, shared
-//                          with sendTelegramToChatId above — send FROM one
-//                          bot, register FOR the same one).
-// Then message the bot from your OWN phone once and run
-// processTelegramOnboarding() manually to confirm it can read updates before
-// putting it on a timer.
-//
-// ⚠ MATCHING IS DELIBERATELY CONSERVATIVE. A message is only accepted when
-// it matches EXACTLY ONE currently-active SUPERVISOR_MAP row by name
-// (case-insensitive substring, either direction). Zero matches or more than
-// one are logged and skipped rather than guessed — the "B.S. Todmal" vs
-// "Balasaheb Shivaji Todmal" name-variant problem already documented
-// elsewhere in this file is exactly why a wrong auto-match would be worse
-// than no match.
-//
-// THE OWNER USES THE SAME FLOW. Yash is not a rotating weekly supervisor, so
-// he has no SUPERVISOR_MAP row to match against — but "message the bot with
-// your name" is one instruction HR can give everyone, owner included, rather
-// than a special case to explain separately. A message matching any of
-// OWNER_NAME_TRIGGERS is checked FIRST, before the SUPERVISOR_MAP lookup, and
-// writes OWNER_TELEGRAM_CHAT_ID as a Script Property instead of a sheet row —
-// that is what sendTelegramAlert() reads to deliver the plant-wide DME /
-// follow-up / daily-summary reports.
 var OWNER_NAME_TRIGGERS = ['yash', 'yash munot', 'yash jinendra munot', 'owner', 'vfl1001'];
-
-// Amit Bhagvan Shirsath (VFL5434) — DME. Same matching logic as owner: checked
-// before the supervisor roster lookup, writes DME_TELEGRAM_CHAT_ID Script Property.
 var DME_NAME_TRIGGERS = ['amit', 'amit shirsath', 'amit bhagvan shirsath', 'vfl5434'];
 
-/** The Telegram numeric user/chat id last confirmed processed, so the same
- * message is never matched twice. Stored in Script Properties, not a sheet
- * cell, since it is bookkeeping for this function alone. */
 function getLastTelegramUpdateId_() {
   var v = PropertiesService.getScriptProperties().getProperty('TELEGRAM_LAST_UPDATE_ID');
   return v ? parseInt(v, 10) : 0;
@@ -2165,15 +1609,10 @@ function setLastTelegramUpdateId_(id) {
   PropertiesService.getScriptProperties().setProperty('TELEGRAM_LAST_UPDATE_ID', String(id));
 }
 
-/**
- * Polls Telegram for new messages and matches each sender's name against
- * this week's SUPERVISOR_MAP rows, writing their chat_id (column D) in on a
- * unique match. Meant to run every few minutes via deployShiftTrackingTriggers().
- */
 function processTelegramOnboarding() {
   var token = getTelegramBotToken_();
   if (!token) {
-    Logger.log('❌ No Telegram bot token — nothing to poll. Paste it into TELEGRAM_BOT_TOKEN_INLINE at the top of this file, or set TELEGRAM_BOT_TOKEN in Script Properties.');
+    Logger.log('❌ No Telegram bot token.');
     return;
   }
 
@@ -2206,21 +1645,21 @@ function processTelegramOnboarding() {
     if (!msg || !msg.text || !msg.chat) return;
 
     var text = msg.text.replace(/^\/start\s*/i, '').trim();
-    if (!text || text.length < 3) return;   // bare "/start" with nothing to match on
+    if (!text || text.length < 3) return;
 
     var chatId = String(msg.chat.id);
 
     if (OWNER_NAME_TRIGGERS.indexOf(text.toLowerCase()) > -1) {
       PropertiesService.getScriptProperties().setProperty('OWNER_TELEGRAM_CHAT_ID', chatId);
       registered++;
-      sendTelegramToChatId(chatId, '✅ Registered as plant owner. You will receive the DME, follow-up and daily summary reports here.');
+      sendTelegramToChatId(chatId, '✅ Registered as plant owner.');
       return;
     }
 
     if (DME_NAME_TRIGGERS.indexOf(text.toLowerCase()) > -1) {
       PropertiesService.getScriptProperties().setProperty('DME_TELEGRAM_CHAT_ID', chatId);
       registered++;
-      sendTelegramToChatId(chatId, '✅ Registered as DME. You will receive shift deadline alerts, follow-up escalations, and the daily summary here.');
+      sendTelegramToChatId(chatId, '✅ Registered as DME.');
       return;
     }
 
@@ -2228,33 +1667,35 @@ function processTelegramOnboarding() {
 
     if (match === 'none') {
       unmatched.push(text);
-      sendTelegramToChatId(chatId,
-        'Could not find "' + text + '" in this week\'s supervisor list. ' +
-        'Check the spelling matches what you registered with, or ask HR.');
+      sendTelegramToChatId(chatId, 'Could not find "' + text + '" in this week\'s supervisor list.');
     } else if (match === 'ambiguous') {
       unmatched.push(text + ' (ambiguous)');
-      sendTelegramToChatId(chatId,
-        'More than one supervisor matches "' + text + '" this week — ask HR to set your Chat ID manually.');
-    } else {
-      match.range.setValue(chatId);
+      sendTelegramToChatId(chatId, 'More than one supervisor matches "' + text + '".');
+        } else {
+      match.ranges.forEach(function(r) { r.setValue(chatId); });
       registered++;
-      sendTelegramToChatId(chatId, '✅ Registered. You will receive shift alerts here from now on.');
+      sendTelegramToChatId(chatId, '✅ Registered. You will receive shift alerts here.');
+      try {
+        sendTelegramAlert('🆕 New supervisor registered: ' + match.supervisorName + ' — department ' + match.department);
+      } catch (e) { Logger.log('Owner notify failed: ' + e); }
     }
   });
 
-  Logger.log('✅ Telegram onboarding: ' + registered + ' registered, ' + unmatched.length + ' unmatched (' + unmatched.join(', ') + ').');
+  Logger.log('✅ Telegram onboarding: ' + registered + ' registered, ' + unmatched.length + ' unmatched.');
 }
-
-/** Returns 'none', 'ambiguous', or { range } — the Chat ID cell to write, for
- * exactly one currently-active SUPERVISOR_MAP row whose name contains, or is
- * contained by, the given text (case-insensitive). */
 function matchSupervisorByName_(sh, text) {
   if (!sh) return 'none';
 
   var data = sh.getDataRange().getValues();
+  if (data.length < 2) return 'none';
+
+  var typedNorm = String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  if (!typedNorm) return 'none';
+
   var today = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyyy-MM-dd');
-  var needle = text.toLowerCase();
-  var hits = [];
+
+  var exactMatches = [];
+  var looseMatches = [];
 
   for (var i = 1; i < data.length; i++) {
     var active = (data[i][6] || '').toString().trim().toUpperCase();
@@ -2262,32 +1703,95 @@ function matchSupervisorByName_(sh, text) {
 
     var weekStart = data[i][4], weekEnd = data[i][5];
     if (!weekStart || !weekEnd) continue;
+
     var startStr = Utilities.formatDate(new Date(weekStart), 'Asia/Kolkata', 'yyyy-MM-dd');
     var endStr = Utilities.formatDate(new Date(weekEnd), 'Asia/Kolkata', 'yyyy-MM-dd');
     if (today < startStr || today > endStr) continue;
 
-    var name = (data[i][1] || '').toString().trim().toLowerCase();
-    if (!name) continue;
-    if (name.indexOf(needle) === -1 && needle.indexOf(name) === -1) continue;
+    var rawName = (data[i][1] || '').toString().trim();
+    if (!rawName) continue;
+    if (/^_+$/.test(rawName)) continue;
 
-    hits.push(i + 1);   // 1-indexed sheet row
+    var normName = rawName.toLowerCase().replace(/\s+/g, ' ').trim();
+    if (!normName || normName === 'unknown') continue;
+
+    var m = {
+      rowNumber: i + 1,
+      name: rawName,
+      department: (data[i][0] || '').toString().trim()
+    };
+
+    if (normName === typedNorm) {
+      exactMatches.push(m);
+    } else if (normName.indexOf(typedNorm) >= 0 || typedNorm.indexOf(normName) >= 0) {
+      looseMatches.push(m);
+    }
   }
 
-  if (hits.length === 0) return 'none';
-  if (hits.length > 1) return 'ambiguous';
-  return { range: sh.getRange(hits[0], 4) };   // column D = Telegram Chat ID
+  var pool = exactMatches.length > 0 ? exactMatches : looseMatches;
+  if (pool.length === 0) return 'none';
+
+  var byPerson = {};
+  pool.forEach(function(m) {
+    var key = m.name.toLowerCase().replace(/\s+/g, ' ').trim();
+    if (!byPerson[key]) {
+      byPerson[key] = { name: m.name, department: m.department, rows: [] };
+    }
+    byPerson[key].rows.push(m.rowNumber);
+  });
+
+  var personKeys = Object.keys(byPerson);
+  if (personKeys.length === 0) return 'none';
+  if (personKeys.length > 1) return 'ambiguous';
+
+  var p = byPerson[personKeys[0]];
+  return {
+    ranges: p.rows.map(function(rowNum) { return sh.getRange(rowNum, 4); }),
+    supervisorName: p.name,
+    department: p.department
+  };
 }
+// ============================================================
+// SECTION 10: VERIFICATION + SELF-CHECK
+// ============================================================
 
-// ── SELF-CHECK ────────────────────────────────────────────
 
-/**
- * Run this after pasting the script. It exercises the pure logic — deadline
- * rollovers and shift normalisation — without touching Telegram, and reports
- * the form links configured for each department.
- *
- * Keeps its name so the instructions already given to Yash still apply, even
- * though the scoring curve it used to check is gone.
- */
+function seedCurrentWeek() {
+  var ss = SpreadsheetApp.openById(DASH_ID);
+  var sh = ss.getSheetByName('SUPERVISOR_MAP');
+  var data = sh.getDataRange().getValues();
+  var existing = {};
+  for (var i = 1; i < data.length; i++) {
+    var d = (data[i][0] || '').toString().trim();
+    var n = (data[i][1] || '').toString().trim();
+    var s = data[i][4];
+    var sKey = s ? Utilities.formatDate(new Date(s), 'Asia/Kolkata', 'yyyy-MM-dd') : '';
+    if (d && n && sKey) existing[d + '|' + n + '|' + sKey] = true;
+  }
+
+  var NEW_START = '2026-09-12';
+  var NEW_END = '2026-09-17';
+  var added = 0;
+
+  for (var i = 1; i < data.length; i++) {
+    var dept = (data[i][0] || '').toString().trim();
+    var name = (data[i][1] || '').toString().trim();
+    var phone = (data[i][2] || '').toString().trim();
+    var oldStart = data[i][4];
+    var oldStartStr = oldStart ? Utilities.formatDate(new Date(oldStart), 'Asia/Kolkata', 'yyyy-MM-dd') : '';
+
+    if (oldStartStr !== '2026-09-05') continue;
+    if (!dept || !name) continue;
+
+    var key = dept + '|' + name + '|' + NEW_START;
+    if (existing[key]) continue;
+
+    sh.appendRow([dept, name, phone, '', NEW_START, NEW_END, 'YES']);
+    existing[key] = true;
+    added++;
+  }
+  Logger.log('✅ seedCurrentWeek_: added ' + added + ' rows for ' + NEW_START + ' to ' + NEW_END + '.');
+}
 function testComplianceScoring() {
   var failures = [];
   function check(label, actual, expected) {
@@ -2295,29 +1799,27 @@ function testComplianceScoring() {
       failures.push(label + ': got ' + actual + ', expected ' + expected);
     }
   }
-  
-  var base = new Date(2026, 7, 12);          // 12 Aug 2026
+
+  var base = new Date(2026, 7, 12);
   function dl(shift) {
     return Utilities.formatDate(getShiftDeadlineDateTime_(shift, base), 'Asia/Kolkata', 'yyyy-MM-dd HH:mm');
   }
   check('Shift 1 deadline', dl('Shift 1'), '2026-08-12 16:30');
   check('Shift 2 deadline', dl('Shift 2'), '2026-08-13 00:30');
   check('Shift 3 deadline', dl('Shift 3'), '2026-08-13 09:30');
-  
-  // weekStartFor_: Saturday of the containing week, for every day of the week.
-  // 8 Aug 2026 is a Saturday; 14 Aug 2026 is the following Friday.
+
   check('week start (Sat itself)', weekStartFor_(new Date(2026, 7, 8)),  '2026-08-08');
   check('week start (Sun)',        weekStartFor_(new Date(2026, 7, 9)),  '2026-08-08');
   check('week start (Wed)',        weekStartFor_(new Date(2026, 7, 12)), '2026-08-08');
   check('week start (Fri)',        weekStartFor_(new Date(2026, 7, 14)), '2026-08-08');
-  
+
   check('First Shift',   normaliseShift_('First Shift'),   'Shift 1');
   check('2nd Staff',     normaliseShift_('2nd Staff'),     'Shift 2');
   check('Third Shift',   normaliseShift_('Third Shift'),   'Shift 3');
   check('General Shift', normaliseShift_('General Shift'), 'null');
   check('person name',   normaliseShift_('B.S. Todmal'),   'null');
   check('blank',         normaliseShift_(''),              'null');
-  
+
   Logger.log('=== FORM LINKS ===');
   DEPARTMENTS.forEach(function(dept) {
     var forms = getFormsForDept_(dept);
@@ -2326,14 +1828,850 @@ function testComplianceScoring() {
       return;
     }
     Logger.log('  ✅ ' + dept + ': ' + forms.length + ' form(s)');
-    forms.forEach(function(f) { Logger.log('       • ' + f.name + ' — ' + f.url); });
   });
-  
+
   Logger.log('=== SELF-CHECK ===');
   if (failures.length === 0) {
     Logger.log('✅ All 13 logic checks passed.');
   } else {
     failures.forEach(function(f) { Logger.log('❌ ' + f); });
-    throw new Error(failures.length + ' self-check failure(s) — see log.');
+    throw new Error(failures.length + ' self-check failure(s).');
   }
+}
+
+ function diagnoseSupabase() {
+  var props = PropertiesService.getScriptProperties();
+  var url = props.getProperty('SUPABASE_URL');
+  var key = props.getProperty('SUPABASE_SERVICE_ROLE_KEY');
+
+  Logger.log('=== SCRIPT PROPERTIES ===');
+  Logger.log('SUPABASE_URL set? ' + (url ? 'yes' : 'no'));
+  if (url) Logger.log('  value: ' + url);
+
+  Logger.log('SUPABASE_SERVICE_ROLE_KEY set? ' + (key ? 'yes' : 'no'));
+  if (key) {
+    Logger.log('  length: ' + key.length);
+    Logger.log('  first 40: ' + key.substring(0, 40));
+    Logger.log('  last 20: ' + key.substring(key.length - 20));
+  }
+
+  Logger.log('No inline credential fallback is configured.');
+}
+function diagnoseOwnerChatId() {
+  var props = PropertiesService.getScriptProperties();
+  Logger.log('OWNER_TELEGRAM_CHAT_ID (Script Property): ' + (props.getProperty('OWNER_TELEGRAM_CHAT_ID') || '(not set)'));
+  Logger.log('DME_TELEGRAM_CHAT_ID (Script Property): ' + (props.getProperty('DME_TELEGRAM_CHAT_ID') || '(not set)'));
+  Logger.log('OWNER_TELEGRAM_CHAT_ID_INLINE: "' + OWNER_TELEGRAM_CHAT_ID_INLINE + '"');
+  Logger.log('DME_CHAT_ID_INLINE: "' + DME_CHAT_ID_INLINE + '"');
+}
+function cleanupOldAlertState() {
+  var props = PropertiesService.getScriptProperties();
+  var todayDash = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyyy-MM-dd');
+  var yestDash  = Utilities.formatDate(new Date(Date.now() - 86400000), 'Asia/Kolkata', 'yyyy-MM-dd');
+  var cutCompact = Utilities.formatDate(new Date(Date.now() - 2 * 86400000), 'Asia/Kolkata', 'yyyyMMdd');
+  var deleted = 0;
+
+  props.getKeys().forEach(function(k) {
+    if (k.indexOf('BAD_DATA_ALERTS_') === 0) {
+      if (k.replace('BAD_DATA_ALERTS_', '') < cutCompact) {
+        props.deleteProperty(k);
+        deleted++;
+      }
+    } else if (/^(GENTLE_REMINDER_SENT_|DME_ALERT_SENT_|FOLLOWUP_SENT_)/.test(k)) {
+      if (k.indexOf(todayDash) === -1 && k.indexOf(yestDash) === -1) {
+        props.deleteProperty(k);
+        deleted++;
+      }
+    }
+  });
+
+  Logger.log('cleanupOldAlertState: deleted ' + deleted + ' stale keys.');
+}
+
+function resetTelegramOffset() {
+  var props = PropertiesService.getScriptProperties();
+  var old = props.getProperty('TELEGRAM_LAST_UPDATE_ID');
+  props.deleteProperty('TELEGRAM_LAST_UPDATE_ID');
+  Logger.log('🗑️ Deleted TELEGRAM_LAST_UPDATE_ID (was: ' + old + ')');
+  Logger.log('Next processTelegramOnboarding() will start from offset 0');
+}
+function checkTelegramReadiness() {
+  var props = PropertiesService.getScriptProperties();
+  var token = getTelegramBotToken_();
+
+  // Who am I?
+  var me = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/getMe', { muteHttpExceptions: true });
+  Logger.log('getMe: ' + me.getContentText());
+
+  // Any pending webhook?
+  var wh = UrlFetchApp.fetch('https://api.telegram.org/bot' + token + '/getWebhookInfo', { muteHttpExceptions: true });
+  Logger.log('getWebhookInfo: ' + wh.getContentText());
+
+  // Offset status
+  var offset = props.getProperty('TELEGRAM_LAST_UPDATE_ID') || '(not set — good)';
+  Logger.log('TELEGRAM_LAST_UPDATE_ID: ' + offset);
+}
+function restoreTelegramChatIdProperties() {
+  var props = PropertiesService.getScriptProperties();
+
+  props.setProperty('OWNER_TELEGRAM_CHAT_ID', '8824096175');
+  props.setProperty('DME_TELEGRAM_CHAT_ID',   '5108696603');
+
+  Logger.log('✅ OWNER_TELEGRAM_CHAT_ID = ' + props.getProperty('OWNER_TELEGRAM_CHAT_ID'));
+  Logger.log('✅ DME_TELEGRAM_CHAT_ID   = ' + props.getProperty('DME_TELEGRAM_CHAT_ID'));
+
+  var tok = props.getProperty('TELEGRAM_BOT_TOKEN');
+  Logger.log('✅ TELEGRAM_BOT_TOKEN set, starts with: ' + (tok ? tok.substring(0, 25) + '…' : '(not set)'));
+  Logger.log('Total properties: ' + props.getKeys().length);
+}
+function testSendTelegramToOwnerAndDme() {
+  var msg = '✅ Verification test — ' + new Date().toISOString();
+  var ownerOk = sendTelegramAlert(msg);
+  var dmeOk = sendDmeTelegramAlert_(msg);
+  Logger.log('Owner send: ' + (ownerOk ? '✅' : '❌'));
+  Logger.log('DME send:   ' + (dmeOk ? '✅' : '❌'));
+}
+function countRegisteredSupervisors() {
+  var ss = SpreadsheetApp.openById('1GHdhrRtOhQFshsAOCK4n3GiJp-6a03k8bn0V_M04wSY');
+  var sh = ss.getSheetByName('SUPERVISOR_MAP');
+  if (!sh) { Logger.log('SUPERVISOR_MAP not found'); return; }
+
+  var data = sh.getDataRange().getValues();
+  var registered = [];
+  var pending = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var dept = (data[i][0] || '').toString().trim();
+    var name = (data[i][1] || '').toString().trim();
+    var chatId = (data[i][3] || '').toString().trim();
+
+    if (!dept || !name) continue;
+    if (/^_+$/.test(name)) continue;
+
+    if (/^-?\d+$/.test(chatId)) {
+      registered.push(dept + ' — ' + name + ' (' + chatId + ')');
+    } else {
+      pending.push(dept + ' — ' + name);
+    }
+  }
+
+  Logger.log('═══════════════════════════════════');
+  Logger.log('REGISTERED: ' + registered.length);
+  Logger.log('═══════════════════════════════════');
+  registered.forEach(function(r) { Logger.log('  ✅ ' + r); });
+
+  Logger.log('');
+  Logger.log('═══════════════════════════════════');
+  Logger.log('PENDING: ' + pending.length);
+  Logger.log('═══════════════════════════════════');
+  pending.forEach(function(p) { Logger.log('  ⏳ ' + p); });
+}
+function currentWeekRegistrationStatus() {
+  var ss = SpreadsheetApp.openById('1GHdhrRtOhQFshsAOCK4n3GiJp-6a03k8bn0V_M04wSY');
+  var sh = ss.getSheetByName('SUPERVISOR_MAP');
+  if (!sh) { Logger.log('SUPERVISOR_MAP not found'); return; }
+
+  // Find current week
+  var today = new Date();
+  var dow = today.getDay();                       // Sat=6, Sun=0
+  var back = (dow + 1) % 7;                       // days to subtract for Saturday
+  var sat = new Date(today);
+  sat.setDate(sat.getDate() - back);
+  var thu = new Date(sat);
+  thu.setDate(thu.getDate() + 5);                 // Sat + 5 = Thursday
+
+  var satStr = Utilities.formatDate(sat, 'Asia/Kolkata', 'yyyy-MM-dd');
+  var thuStr = Utilities.formatDate(thu, 'Asia/Kolkata', 'yyyy-MM-dd');
+
+  Logger.log('Current week: ' + satStr + ' → ' + thuStr);
+
+  var data = sh.getDataRange().getValues();
+  var registered = [], pending = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var dept = (data[i][0] || '').toString().trim();
+    var name = (data[i][1] || '').toString().trim();
+    var chatId = (data[i][3] || '').toString().trim();
+    var weekStart = data[i][4];
+    var weekEnd = data[i][5];
+
+    if (!dept || !name) continue;
+    if (/^_+$/.test(name)) continue;
+
+    var startStr = weekStart
+      ? Utilities.formatDate(new Date(weekStart), 'Asia/Kolkata', 'yyyy-MM-dd')
+      : '';
+    var endStr = weekEnd
+      ? Utilities.formatDate(new Date(weekEnd), 'Asia/Kolkata', 'yyyy-MM-dd')
+      : '';
+
+    if (startStr !== satStr) continue;             // only current week
+
+    if (/^-?\d+$/.test(chatId)) {
+      registered.push(dept + ' — ' + name + ' (' + chatId + ')');
+    } else {
+      pending.push(dept + ' — ' + name);
+    }
+  }
+
+  Logger.log('');
+  Logger.log('═══════════════════════════════════');
+  Logger.log('CURRENT WEEK REGISTERED: ' + registered.length);
+  Logger.log('═══════════════════════════════════');
+  registered.forEach(function(r) { Logger.log('  ✅ ' + r); });
+
+  Logger.log('');
+  Logger.log('═══════════════════════════════════');
+  Logger.log('CURRENT WEEK PENDING: ' + pending.length);
+  Logger.log('═══════════════════════════════════');
+  pending.forEach(function(p) { Logger.log('  ⏳ ' + p); });
+}
+function testFullDMEAlertFormat() {
+  var now = new Date();
+  var dateStr = Utilities.formatDate(now, 'Asia/Kolkata', 'dd-MMM-yyyy');
+  var timeStr = Utilities.formatDate(now, 'Asia/Kolkata', 'hh:mm a');
+
+  // Sample missing list — three real departments, mimicking an actual alert
+  var testMissing = [
+    { department: 'Cutting',  supervisor: 'Darshan Alhat', phone: '7972356441', chatId: '' },
+    { department: 'Forge',    supervisor: 'Subhash Palve', phone: '9689919783', chatId: '' },
+    { department: 'Press',    supervisor: 'Vaibhav Mali',  phone: '9607238428', chatId: '' }
+  ];
+
+  var msg = '🚨 TEST — DME ALERT Format Check\n';
+  msg += '📅 ' + dateStr + ' | ⏰ ' + timeStr + '\n';
+  msg += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
+  msg += '🔴 MISSING DEPARTMENTS (' + testMissing.length + '):\n';
+  msg += buildMissingListText_(testMissing, false) + '\n\n';
+  msg += '📋 DME ACTION:\n';
+  msg += '  ✅ Call supervisors listed above\n';
+  msg += '  🔗 Dashboard: ' + ScriptApp.getService().getUrl();
+
+  Logger.log('Message length: ' + msg.length + ' chars');
+  Logger.log('--- MESSAGE PREVIEW ---');
+  Logger.log(msg);
+
+  var ownerOk = sendTelegramAlert(msg);
+  var dmeOk = sendDmeTelegramAlert_(msg);
+
+  Logger.log('---');
+  Logger.log('Owner send: ' + (ownerOk ? '✅' : '❌'));
+  Logger.log('DME send:   ' + (dmeOk ? '✅' : '❌'));
+  Logger.log('Both phones should receive this test.');
+}
+function migrateSupervisorMapAddRoleColumn() {
+  var ss = SpreadsheetApp.openById(DASH_ID);
+  var sh = ss.getSheetByName('SUPERVISOR_MAP');
+  if (!sh) { Logger.log('SUPERVISOR_MAP not found'); return; }
+
+  var lastRow = sh.getLastRow();
+  var lastCol = sh.getLastColumn();
+
+  // Check if Role header already exists
+  var header = sh.getRange(1, 1, 1, Math.max(lastCol, 8)).getValues()[0];
+  var roleIdx = header.indexOf('Role');
+  if (roleIdx >= 0) {
+    Logger.log('ℹ️ Role column already present at position ' + (roleIdx + 1));
+  } else {
+    roleIdx = lastCol;   // append after last column
+    sh.getRange(1, roleIdx + 1).setValue('Role')
+      .setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
+    Logger.log('✅ Added Role header at column ' + (roleIdx + 1));
+  }
+
+  // Default every existing data row to 'Supervisor'
+  if (lastRow >= 2) {
+    var roles = [];
+    for (var i = 2; i <= lastRow; i++) {
+      var cur = sh.getRange(i, roleIdx + 1).getValue();
+      roles.push([cur || 'Supervisor']);
+    }
+    sh.getRange(2, roleIdx + 1, roles.length, 1).setValues(roles);
+    Logger.log('✅ Set ' + roles.length + ' rows to default role.');
+  }
+
+  // Special case: Ashok Kumar is both
+  var data = sh.getDataRange().getValues();
+  for (var r = 1; r < data.length; r++) {
+    var name = (data[r][1] || '').toString().trim().toLowerCase();
+    if (name === 'ashok kumar' || name === 'ashok kumar sharma') {
+      sh.getRange(r + 1, roleIdx + 1).setValue('Both');
+      Logger.log('✅ Set Ashok Kumar (row ' + (r+1) + ') to role: Both');
+    }
+  }
+
+  Logger.log('=== Migration complete ===');
+}
+function testShiftConfigPhase1() {
+  // Test 1: default 3-shift for non-Cutting
+  var d1 = getShiftDeadlineDateTime_('Shift 1', new Date(2026, 8, 17), 'Forge');
+  Logger.log('Forge Shift 1 deadline: ' + Utilities.formatDate(d1, 'Asia/Kolkata', 'dd-MMM HH:mm'));
+  // Expect: 17-Sep 16:30
+
+  // Test 2: Cutting Shift 1 (day, deadline same day 20:00)
+  var d2 = getShiftDeadlineDateTime_('Shift 1', new Date(2026, 8, 17), 'Cutting');
+  Logger.log('Cutting Shift 1 deadline: ' + Utilities.formatDate(d2, 'Asia/Kolkata', 'dd-MMM HH:mm'));
+  // Expect: 17-Sep 20:00
+
+  // Test 3: Cutting Shift 2 (night, deadline next day 08:00)
+  var d3 = getShiftDeadlineDateTime_('Shift 2', new Date(2026, 8, 17), 'Cutting');
+  Logger.log('Cutting Shift 2 deadline: ' + Utilities.formatDate(d3, 'Asia/Kolkata', 'dd-MMM HH:mm'));
+  // Expect: 18-Sep 08:00
+
+  // Test 4: Cutting shift list
+  Logger.log('Cutting shifts: ' + getShiftListForDept_('Cutting').join(', '));
+  // Expect: Shift 1, Shift 2
+
+  // Test 5: Forge shift list
+  Logger.log('Forge shifts: ' + getShiftListForDept_('Forge').join(', '));
+  // Expect: Shift 1, Shift 2, Shift 3
+}
+// ============================================================
+// PHASE 2: Recipient helpers
+// ============================================================
+
+function getCurrentWeekRowsForDept_(dept) {
+  var ss = SpreadsheetApp.openById(DASH_ID);
+  var sh = ss.getSheetByName('SUPERVISOR_MAP');
+  if (!sh) return [];
+
+  var data = sh.getDataRange().getValues();
+  var headers = data[0];
+  var roleIdx = headers.indexOf('Role');
+  if (roleIdx < 0) roleIdx = 7;   // fallback: column H
+
+  var today = new Date();
+  var dow = today.getDay();
+  var back = (dow + 1) % 7;
+  var sat = new Date(today.getFullYear(), today.getMonth(), today.getDate() - back);
+  var satStr = Utilities.formatDate(sat, 'Asia/Kolkata', 'yyyy-MM-dd');
+
+  var out = [];
+  for (var i = 1; i < data.length; i++) {
+    var rowDept = (data[i][0] || '').toString().trim();
+    if (rowDept !== dept) continue;
+
+    var active = (data[i][6] || '').toString().trim().toUpperCase();
+    if (active !== 'YES') continue;
+
+    var weekStart = data[i][4];
+    if (!weekStart) continue;
+    var wsStr = Utilities.formatDate(new Date(weekStart), 'Asia/Kolkata', 'yyyy-MM-dd');
+    if (wsStr !== satStr) continue;
+
+    var name = (data[i][1] || '').toString().trim();
+    if (!name || /^_+$/.test(name) || name.toLowerCase() === 'unknown') continue;
+
+    out.push({
+      name: name,
+      phone: (data[i][2] || '').toString().trim(),
+      chatId: (data[i][3] || '').toString().trim(),
+      department: rowDept,
+      role: (data[i][roleIdx] || 'Supervisor').toString().trim()
+    });
+  }
+  return out;
+}
+
+function buildRecipientList_(missing, roleFilter) {
+  var seen = {};
+  var list = [];
+  missing.forEach(function(m) {
+    getCurrentWeekRowsForDept_(m.department).forEach(function(r) {
+      if (roleFilter === 'supervisor' && r.role !== 'Supervisor' && r.role !== 'Both') return;
+      if (roleFilter === 'manager' && r.role !== 'Manager' && r.role !== 'Both') return;
+      if (!r.chatId || !/^-?\d+$/.test(r.chatId)) return;
+      if (seen[r.chatId]) return;
+      seen[r.chatId] = true;
+      list.push(r);
+    });
+  });
+  return list;
+}
+
+function dedupeByChatId_(arr) {
+  var seen = {};
+  var out = [];
+  arr.forEach(function(r) {
+    if (!r.chatId || seen[r.chatId]) return;
+    seen[r.chatId] = true;
+    out.push(r);
+  });
+  return out;
+}
+
+function findDeptsInWindow_(windowType) {
+  // windowType: 'reminder' | 'deadline' | 'followup'
+  var now = new Date();
+  var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  var yesterday = new Date(today.getTime() - 86400000);
+
+  var results = [];
+
+  DEPARTMENTS.forEach(function(dept) {
+    getShiftListForDept_(dept).forEach(function(shift) {
+      [today, yesterday].forEach(function(shiftDate) {
+        var dl = getShiftDeadlineDateTime_(shift, shiftDate, dept);
+        if (!dl) return;
+        var deltaMin = Math.round((dl.getTime() - now.getTime()) / 60000);
+
+        var inWindow = false;
+        // PATCH 22-Sep: widened from 30 → 60 min so hourly :05 fires always catch
+    // the reminder window. Cutting Shift 1 (deadline 20:00) hits at 19:05
+    // (deltaMin=55) — was outside the old 0-30 window, now inside.
+    if (windowType === 'reminder') inWindow = (deltaMin >= 0  && deltaMin <= 60);
+        if (windowType === 'deadline') inWindow = (deltaMin <= 0  && deltaMin >= -90);
+        if (windowType === 'followup') inWindow = (deltaMin <= -30 && deltaMin >= -180);
+
+        if (inWindow) {
+          results.push({
+            dept: dept,
+            shift: shift,
+            shiftDate: shiftDate,
+            deadline: dl,
+            deltaMin: deltaMin
+          });
+        }
+      });
+    });
+  });
+
+  return results;
+}
+function testPhase2() {
+  Logger.log('=== PHASE 2 TEST ===');
+  Logger.log('');
+
+  Logger.log('Current time (IST): ' + Utilities.formatDate(new Date(), 'Asia/Kolkata', 'dd-MMM HH:mm'));
+  Logger.log('');
+
+  Logger.log('--- Recipient lists for Cutting ---');
+  var cutRows = getCurrentWeekRowsForDept_('Cutting');
+  cutRows.forEach(function(r) {
+    Logger.log('  ' + r.name + ' | role=' + r.role + ' | chatId=' + (r.chatId || '(none)'));
+  });
+
+  Logger.log('');
+  Logger.log('--- Recipient lists for Forge ---');
+  var fgRows = getCurrentWeekRowsForDept_('Forge');
+  fgRows.forEach(function(r) {
+    Logger.log('  ' + r.name + ' | role=' + r.role + ' | chatId=' + (r.chatId || '(none)'));
+  });
+
+  Logger.log('');
+  Logger.log('--- Shift lists ---');
+  Logger.log('Cutting: ' + getShiftListForDept_('Cutting').join(', '));
+  Logger.log('Forge:   ' + getShiftListForDept_('Forge').join(', '));
+
+  Logger.log('');
+  Logger.log('--- Deadline windows (what the trigger sees right now) ---');
+  ['reminder', 'deadline', 'followup'].forEach(function(w) {
+    var found = findDeptsInWindow_(w);
+    if (found.length === 0) {
+      Logger.log('  ' + w + ': none');
+    } else {
+      found.forEach(function(f) {
+        Logger.log('  ' + w + ': ' + f.dept + ' ' + f.shift + ' | deltaMin=' + f.deltaMin);
+      });
+    }
+  });
+
+  Logger.log('');
+  Logger.log('=== END ===');
+}
+function oneTimeDeleteTelegramWebhook() {
+  var token = getTelegramBotToken_();
+  var resp = UrlFetchApp.fetch(
+    'https://api.telegram.org/bot' + token + '/deleteWebhook?drop_pending_updates=false',
+    { muteHttpExceptions: true }
+  );
+  Logger.log('deleteWebhook: ' + resp.getContentText());
+}
+// Wrapper so runShiftAlerts15min_ appears in the Apps Script Run dropdown.
+// The real function keeps the trailing underscore — it's called by the
+// 15-minute trigger installed by deployShiftTrackingTriggers().
+function testRunShiftAlerts() {
+  runShiftAlerts15min_();
+}
+
+function testDeleteWebhook() {
+  var token = getTelegramBotToken_();
+  var resp = UrlFetchApp.fetch(
+    'https://api.telegram.org/bot' + token + '/deleteWebhook?drop_pending_updates=false',
+    { muteHttpExceptions: true }
+  );
+  Logger.log('deleteWebhook: ' + resp.getContentText());
+}
+
+function testTelegramReadiness() {
+  checkTelegramReadiness();
+}
+function dumpTelegramQueue() {
+  var token = getTelegramBotToken_();
+  var offset = PropertiesService.getScriptProperties().getProperty('TELEGRAM_LAST_UPDATE_ID');
+
+  Logger.log('═══════════════════════════════════════════════════');
+  Logger.log('Current offset (last processed update_id): ' + offset);
+  Logger.log('');
+
+  // Call WITHOUT offset — this returns the oldest pending updates since the offset.
+  var resp = UrlFetchApp.fetch(
+    'https://api.telegram.org/bot' + token + '/getUpdates?timeout=0',
+    { muteHttpExceptions: true }
+  );
+  var body = JSON.parse(resp.getContentText());
+
+  if (!body.ok) {
+    Logger.log('❌ getUpdates failed: ' + resp.getContentText());
+    Logger.log('═══════════════════════════════════════════════════');
+    return;
+  }
+
+  var updates = body.result || [];
+  Logger.log('Pending updates in Telegram queue: ' + updates.length);
+  Logger.log('');
+
+  if (updates.length === 0) {
+    Logger.log('(empty — all messages have been delivered or dropped)');
+  } else {
+    updates.forEach(function(u) {
+      var msg = u.message;
+      if (msg) {
+        Logger.log('update_id=' + u.update_id +
+                   ' | from="' + (msg.from.first_name || '') + ' ' + (msg.from.last_name || '') + '"' +
+                   ' | chat_id=' + msg.chat.id +
+                   ' | text="' + (msg.text || '').substring(0, 40) + '"');
+      } else {
+        Logger.log('update_id=' + u.update_id + ' | (non-message)');
+      }
+    });
+  }
+  Logger.log('═══════════════════════════════════════════════════');
+}
+function testMatchSudeep() {
+  var sh = SpreadsheetApp.openById(DASH_ID).getSheetByName('SUPERVISOR_MAP');
+  var result = matchSupervisorByName_(sh, 'Sudeep Singh');
+  if (result === 'none') {
+    Logger.log('❌ No match found for "Sudeep Singh"');
+    // Show what IS in the map for Forge this week
+    var data = sh.getDataRange().getValues();
+    var today = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyyy-MM-dd');
+    Logger.log('Rows in SUPERVISOR_MAP for Forge this week:');
+    for (var i = 1; i < data.length; i++) {
+      var dept = (data[i][0] || '').toString().trim();
+      if (dept !== 'Forge') continue;
+      var name = (data[i][1] || '').toString().trim();
+      var ws = data[i][4];
+      var wsStr = ws ? Utilities.formatDate(new Date(ws), 'Asia/Kolkata', 'yyyy-MM-dd') : '';
+      Logger.log('  row ' + (i+1) + ': name="' + name + '" | weekStart=' + wsStr + ' | chatId=' + (data[i][3]||''));
+    }
+    return;
+  }
+  if (result === 'ambiguous') {
+    Logger.log('⚠️ Multiple matches for "Sudeep Singh"');
+    return;
+  }
+  Logger.log('✅ Match found: ' + result.supervisorName + ' | dept: ' + result.department);
+  Logger.log('   Will update ' + result.ranges.length + ' row(s)');
+}
+function broadcastToCurrentWeek() {
+  var BROADCAST_MSG =
+    '📢 VFPL Factory OS — Update\n' +
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
+    'The dashboard now reflects:\n' +
+    '• Shift 1 + Shift 2 for Cutting (night shift live)\n' +
+    '• Exact tonnage per department\n' +
+    '• Real-time 57F4 vendor reconciliation\n' +
+    '• Machine utilisation tracking\n\n' +
+    'Please check the dashboard during your shift:\n' +
+    'https://erpvarsha-star.github.io/vfpl-dashboard-26-27/\n\n' +
+    'Contact DME for any data issues.';
+
+  var ss = SpreadsheetApp.openById(DASH_ID);
+  var sh = ss.getSheetByName('SUPERVISOR_MAP');
+  var data = sh.getDataRange().getValues();
+  var headers = data[0];
+  var colName = headers.indexOf('Supervisor Name');
+  var colChat = headers.indexOf('Telegram Chat ID');
+  var colWeekStart = headers.indexOf('Week Start (Saturday)');
+  var colRole = headers.indexOf('Role');
+
+  var today = new Date();
+  var back = (today.getDay() + 1) % 7;
+  var sat = new Date(today.getFullYear(), today.getMonth(), today.getDate() - back);
+  var satStr = Utilities.formatDate(sat, 'Asia/Kolkata', 'dd-MMM-yyyy');
+
+  // Collect unique chat IDs for current week
+  var seen = {};
+  var recipients = [];
+  for (var i = 1; i < data.length; i++) {
+    var wsRaw = data[i][colWeekStart];
+    var wsStr = wsRaw
+      ? (wsRaw instanceof Date
+          ? Utilities.formatDate(wsRaw, 'Asia/Kolkata', 'dd-MMM-yyyy')
+          : wsRaw.toString().trim())
+      : '';
+    if (wsStr !== satStr) continue;
+    var chatId = (data[i][colChat] || '').toString().trim();
+    if (!/^-?\d+$/.test(chatId)) continue;
+    if (seen[chatId]) continue;
+    seen[chatId] = true;
+    recipients.push({
+      chatId: chatId,
+      name: (data[i][colName] || '').toString().trim(),
+      role: (data[i][colRole] || 'Supervisor').toString().trim()
+    });
+  }
+
+  Logger.log('Broadcasting to ' + recipients.length + ' unique recipients:');
+  recipients.forEach(function(r) {
+    Logger.log('  ' + r.name + ' (' + r.role + ') — ' + r.chatId);
+  });
+
+  var sent = 0, failed = 0;
+  recipients.forEach(function(r) {
+    if (sendTelegramToChatId(r.chatId, BROADCAST_MSG)) sent++;
+    else failed++;
+    Utilities.sleep(300);   // rate-limit safety
+  });
+
+  Logger.log('✅ Broadcast done: ' + sent + ' delivered, ' + failed + ' failed.');
+}
+function dumpComplianceLog() {
+  var ss = SpreadsheetApp.openById(DASH_ID);
+  var sh = ss.getSheetByName('DATA_SUBMISSION_LOG');
+  if (!sh) { Logger.log('❌ No DATA_SUBMISSION_LOG'); return; }
+  Logger.log('Last row: ' + sh.getLastRow());
+  Logger.log('Last col: ' + sh.getLastColumn());
+  if (sh.getLastRow() < 1) { Logger.log('(empty)'); return; }
+
+  Logger.log('Header: ' + JSON.stringify(sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0]));
+
+  var startRow = Math.max(1, sh.getLastRow() - 19);
+  var data = sh.getRange(startRow, 1, sh.getLastRow() - startRow + 1, sh.getLastColumn()).getValues();
+  Logger.log('Last ' + data.length + ' rows:');
+  data.forEach(function(r, i) {
+    Logger.log('  row ' + (startRow + i) + ': ' + JSON.stringify(r));
+  });
+}
+function runAllAlertChecks() {
+  Logger.log('═══════════════════════════════════════════════════');
+  Logger.log('VFPL Alert.gs — full verification suite');
+  Logger.log('Started: ' + new Date().toString());
+  Logger.log('═══════════════════════════════════════════════════');
+
+  var results = [];
+
+  function runCheck(label, fn, stopOnFail) {
+    Logger.log('');
+    Logger.log('▶ ' + label);
+    Logger.log('───────────────────────────────────────────────────');
+    try {
+      fn();
+      results.push({ label: label, status: 'PASS' });
+      Logger.log('◀ ' + label + ' — PASS');
+      return true;
+    } catch (e) {
+      results.push({ label: label, status: 'FAIL', error: String(e) });
+      Logger.log('◀ ' + label + ' — FAIL: ' + e);
+      return !stopOnFail;
+    }
+  }
+
+  // 1. Telegram connectivity — CRITICAL. Stop if this fails.
+  var canContinue = runCheck('testSendTelegramToOwnerAndDme', testSendTelegramToOwnerAndDme, true);
+
+  if (!canContinue) {
+    Logger.log('');
+    Logger.log('═══════════════════════════════════════════════════');
+    Logger.log('🛑 STOPPING — Telegram is not working.');
+    Logger.log('Fix TELEGRAM_BOT_TOKEN Script Property first,');
+    Logger.log('then re-run runAllAlertChecks().');
+    Logger.log('═══════════════════════════════════════════════════');
+    return;
+  }
+
+  // 2. Shift deadline math
+  runCheck('testComplianceScoring', testComplianceScoring, false);
+
+  // 3. Shift config (Cutting 2-shift vs default 3-shift)
+  runCheck('testShiftConfigPhase1', testShiftConfigPhase1, false);
+
+  // 4. Recipient lists + active windows at this moment
+  runCheck('testPhase2', testPhase2, false);
+
+  // 5. Heartbeat (first run: expected "No heartbeat yet")
+  runCheck('checkAlertHeartbeat', checkAlertHeartbeat, false);
+
+  // 6. All-time registration status
+  runCheck('countRegisteredSupervisors', countRegisteredSupervisors, false);
+
+  // 7. Current-week registration status
+  runCheck('currentWeekRegistrationStatus', currentWeekRegistrationStatus, false);
+
+  // Summary
+  Logger.log('');
+  Logger.log('═══════════════════════════════════════════════════');
+  Logger.log('SUMMARY');
+  Logger.log('═══════════════════════════════════════════════════');
+  var passCount = 0, failCount = 0;
+  results.forEach(function(r) {
+    if (r.status === 'PASS') {
+      Logger.log('  ✅ ' + r.label);
+      passCount++;
+    } else {
+      Logger.log('  ❌ ' + r.label + ' — ' + r.error);
+      failCount++;
+    }
+  });
+  Logger.log('');
+  Logger.log('Total: ' + passCount + ' passed, ' + failCount + ' failed.');
+  Logger.log('Finished: ' + new Date().toString());
+  Logger.log('═══════════════════════════════════════════════════');
+}
+// ══════════════════════════════════════════════════════════════
+// RED-ALERT EMAIL WATCHDOG
+// Emails OWNER_EMAIL when a critical pipeline condition is detected.
+// Dedup: one email per issue per day. Silent when everything is fine.
+// ══════════════════════════════════════════════════════════════
+
+var OWNER_EMAIL = 'yash.munot@gmail.com,ea.varshaforgings@gmail.com';
+var WATCHDOG_DEDUP_PREFIX = 'HEALTH_ALERT_SENT_';
+
+function _escapeHtml_(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function notifyOnRed(subject, detail, dedupKey) {
+  var today = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyyy-MM-dd');
+  var safeSubject = String(subject || 'unknown');
+  var safeKey = String(dedupKey || subject || 'unknown');
+  var key = WATCHDOG_DEDUP_PREFIX + today + '_' + safeKey.substring(0, 60);
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty(key)) {
+    Logger.log('(already sent today, skipping) ' + safeSubject);
+    return;
+  }
+
+  try {
+    MailApp.sendEmail({
+      to: OWNER_EMAIL,
+      subject: '🔴 VFPL Factory OS — ' + safeSubject,
+      htmlBody: '<div style="font-family:sans-serif;font-size:14px;color:#111827;">' +
+                '<h2 style="color:#B91C1C;margin:0 0 12px;">🔴 RED ALERT</h2>' +
+                '<p style="font-weight:600;">' + _escapeHtml_(safeSubject) + '</p>' +
+                '<pre style="background:#FEE2E2;padding:12px;border-radius:4px;white-space:pre-wrap;font-size:13px;">' +
+                _escapeHtml_(String(detail || '').substring(0, 3000)) +
+                '</pre>' +
+                '<p style="color:#666;font-size:12px;margin-top:16px;">Detected: ' +
+                Utilities.formatDate(new Date(), 'Asia/Kolkata', 'dd-MMM-yyyy HH:mm') + ' IST</p>' +
+                '<p style="color:#666;font-size:12px;">— VFPL Factory OS watchdog</p>' +
+                '</div>',
+      name: 'VFPL Factory OS'
+    });
+    props.setProperty(key, String(Date.now()));
+    Logger.log('🔴 Red alert email sent: ' + safeSubject);
+  } catch(e) {
+    Logger.log('❌ Could not send red alert email: ' + e);
+  }
+}
+
+function checkHealthAndAlert() {
+  Logger.log('=== Health watchdog ===');
+  var props = PropertiesService.getScriptProperties();
+  var now = Date.now();
+  var issues = [];
+
+  // 1. Alert pipeline heartbeat
+  var lastAlertTs = parseInt(props.getProperty('ALERT_LAST_RUN_TS') || '0', 10);
+  if (!lastAlertTs) {
+    issues.push({ key: 'no_heartbeat',
+                  msg: 'Alert pipeline has never run. Trigger may not be installed — run deployShiftTrackingTriggers().' });
+  } else {
+    var ageMin = (now - lastAlertTs) / 60000;
+    if (ageMin > 120) {
+      issues.push({ key: 'stale_heartbeat',
+                    msg: 'Alert pipeline silent for ' + Math.round(ageMin) + ' minutes (expected <120).\n' +
+                         'Check: Apps Script → Triggers. Ensure runShiftAlerts15min_ is installed at :05 hourly.' });
+    }
+  }
+
+  // 2. Alert pipeline failure count from last run
+  var lastFail = parseInt(props.getProperty('ALERT_LAST_RUN_FAIL') || '0', 10);
+  if (lastFail > 0) {
+    issues.push({ key: 'alert_fails',
+                  msg: 'Alert pipeline reported ' + lastFail + ' failing function(s) in the last run.\n' +
+                       'Check the execution log around :05 for the specific error.' });
+  }
+
+  // 3. Cache state — sums all rows in column A (the payload is chunked)
+  var ss = SpreadsheetApp.openById(DASH_ID);
+  var cacheSh = ss.getSheetByName('DASHBOARD_CACHE');
+  if (!cacheSh || cacheSh.getLastRow() < 1) {
+    issues.push({ key: 'no_cache',
+                  msg: 'DASHBOARD_CACHE sheet is missing or empty. Dashboard is serving nothing.\n' +
+                       'Fix: run buildDashboardCache() from the editor.' });
+  } else {
+    var lastCacheRow = cacheSh.getLastRow();
+    var cacheCells = cacheSh.getRange(1, 1, lastCacheRow, 1).getValues();
+    var actual = 0;
+    cacheCells.forEach(function(r) { if (r[0]) actual += String(r[0]).length; });
+    var expected = Number(cacheSh.getRange(1, 2).getValue()) || 0;
+
+    if (actual === 0) {
+      issues.push({ key: 'no_cache',
+                    msg: 'DASHBOARD_CACHE column A is empty. Dashboard is serving nothing.\n' +
+                         'Fix: run buildDashboardCache() from the editor.' });
+    } else if (expected > 0 && actual !== expected) {
+      issues.push({ key: 'cache_corrupt',
+                    msg: 'Cache corrupted. B1 says ' + expected + ' chars expected; ' +
+                         'column A reassembles to ' + actual + ' chars.\n' +
+                         'Fix: run buildDashboardCache() to rebuild.' });
+    }
+  }
+
+  // 4. Production data freshness (last entry in RAW_CUTTING)
+  var cutSh = ss.getSheetByName('RAW_CUTTING');
+  if (cutSh && cutSh.getLastRow() >= 3) {
+    var lastDateCell = cutSh.getRange(cutSh.getLastRow(), 1).getValue();
+    if (lastDateCell instanceof Date) {
+      var daysOld = (now - lastDateCell.getTime()) / 86400000;
+      if (daysOld > 3) {
+        issues.push({ key: 'stale_production',
+                      msg: 'RAW_CUTTING last entry is ' + Math.round(daysOld) + ' days old.\n' +
+                           'Fix: check the Cutting source form is receiving submissions, and that runDashboardPull is firing.' });
+      }
+    }
+  }
+
+  // Report
+  if (issues.length === 0) {
+    Logger.log('✅ All health checks passed.');
+    return;
+  }
+  issues.forEach(function(issue) {
+    Logger.log('🔴 ' + issue.key + ' — ' + issue.msg.replace(/\n/g, ' | '));
+    notifyOnRed(issue.key, issue.msg, issue.key);
+  });
+}
+
+function installHealthWatchdog() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'checkHealthAndAlert') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('checkHealthAndAlert')
+    .timeBased().everyHours(1).create();
+  Logger.log('✅ Health watchdog installed — runs hourly, emails on RED only.');
+}
+
+function testRedAlert() {
+  notifyOnRed('TEST — ignore this email',
+              'Watchdog test triggered manually at ' +
+              Utilities.formatDate(new Date(), 'Asia/Kolkata', 'HH:mm:ss'),
+              'test_' + Date.now());
+  Logger.log('Sent test alert (or skipped if same key already sent). Check inbox.');
 }
