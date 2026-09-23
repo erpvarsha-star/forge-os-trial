@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 23 Sep 2026 — PATCH_24 corrected (24 staff leave balances updated from actual remaining in salary slip generator; critical: VFL1527 overdrawn at -12/-1/-4) + PATCH_26 created (Aug 2026 payroll for 36 active staff — full per-component breakdown). **Run PATCH_24, PATCH_25, PATCH_26 in order in Supabase SQL Editor to unblock Leave and Payslip screens.** Remaining open items: Netlify APPS_SCRIPT_URL env var, SUPERVISOR_MAP backfill, per-form tracking.
+**Last updated:** 23 Sep 2026 — PATCH_24/25/26 all deployed via Supabase MCP (leave_balances 129 rows + payroll_records 55 rows for Aug 2026 confirmed). PATCH_27 created (shifts seed — already present from PR #2, kept as safety net). Netlify connector live — awaiting APPS_SCRIPT_URL from Yash to unblock production panel. Remaining open items: APPS_SCRIPT_URL, SUPERVISOR_MAP backfill, per-form tracking.
 
 ---
 
@@ -45,9 +45,10 @@ below. Empty tables and a broken sync look identical from the app.
       Added `netlify.toml` (static deploy config) and a Production & collections
       card to `dashboard/index.html` that fetches the Apps Script aggregator
       after sign-in.
-      **Still open:** Set `APPS_SCRIPT_URL` env var on the Netlify site (Site
-      config → Environment variables → add `APPS_SCRIPT_URL = <your exec URL>`)
-      then trigger a redeploy — until set, the production panel stays hidden.
+      **Still open:** Provide the Apps Script web app exec URL (Deploy → Manage
+      deployments → copy the `https://script.google.com/macros/s/.../exec` URL).
+      Claude will set `APPS_SCRIPT_URL` on the Netlify site via MCP and trigger
+      a redeploy immediately — no manual steps needed once the URL is shared.
 
 - [x] **Multi-point geofence — APPLIED.** `COMBINED_DEPLOY_21to22` + `PATCH_23`
       (Pune office 200m) applied. 13 campus points total.
@@ -614,23 +615,21 @@ radius).
 
 ---
 
-## ⏳ SQL to run — PATCH_24 + PATCH_25 + PATCH_26 (23 Sep 2026)
+## ✅ SQL deployed — PATCH_24 + PATCH_25 + PATCH_26 (23 Sep 2026)
 
-All three files are in `scripts/`. Run them in Supabase SQL Editor **in order**.
+All three deployed directly via Supabase MCP connector.
 
 | File | Purpose | Status |
 |---|---|---|
-| `PATCH_24_leave_balances_22Sep2026.sql` | Seeds `leave_balances` for all 129 employees (Steps 1–2) then **corrects** 24 staff employees whose values were wrong (Step 3 — actual remaining from "VFL Employee Salary Slip Generator 2026", 23 Sep). Critical: VFL1527 (Sharwan Singh Jodha) is overdrawn at EL=-12/CL=-1/SL=-4. | ⏳ Run in SQL Editor |
-| `PATCH_25_payroll_records_22Sep2026.sql` | Seeds `payroll_records` for Aug 2026 — 19 active VFL4xxx workers. `net_pay` = payable salary. | ⏳ Run in SQL Editor |
-| `PATCH_26_staff_payroll_23Sep2026.sql` | Seeds `payroll_records` for Aug 2026 — 36 active staff (27 VFL1xxx + 8 VFL5xxx + VFL4057). Full per-component breakdown: basic, HRA, conveyance, special_allowance, overtime, PF, ESIC, PT, advance_recovery, TDS, net_pay. Source: "VFL Employee Salary Slip Generator 2026" (Drive ID: `1cmzh1CL2uuBDJ2gT0gObDU1jZ9OJwDFSiPFkDA79XsE`). | ⏳ Run in SQL Editor |
+| `PATCH_24_leave_balances_22Sep2026.sql` | Seeds `leave_balances` for all 129 employees. 24 staff corrected from salary slip actuals. VFL1527 overdrawn at EL=-12/CL=-1/SL=-4. | ✅ Applied — 129 rows confirmed |
+| `PATCH_25_payroll_records_22Sep2026.sql` | 19 active VFL4xxx workers, Aug 2026 payroll, net_pay only. | ✅ Applied |
+| `PATCH_26_staff_payroll_23Sep2026.sql` | 36 active staff, Aug 2026, full per-component breakdown. | ✅ Applied |
+| `PATCH_27_shifts_seed_23Sep2026.sql` | Shifts S1/S2/S3 — already present from PR #2; no-op. | ✅ Verified — 3 rows live |
 
-**After running all three:**
-- `SELECT COUNT(*) FROM leave_balances` → 129
-- `SELECT COUNT(*) FROM payroll_records WHERE year=2026 AND month='08'` → 55 (19 workers + 36 staff)
-- VFL1527 (Sharwan Singh Jodha) → Leave screen → EL=-12, CL=-1, SL=-4 (overdrawn — correct)
-- VFL1482 (Brahmanand Tajne) → Leave screen → EL=11, CL=1, SL=1
-- VFL1064 (Balasaheb Todmal) → Payslip → Aug 2026 → ₹28,400
-- VFL1386 (Fazal Khan) → Payslip → Aug 2026 → ₹1,36,706
+**Confirmed in DB:**
+- `leave_balances` WHERE year=2026 → 129 rows ✅
+- `payroll_records` WHERE year=2026 AND month='08' → 55 rows ✅ (19 workers + 36 staff)
+- `shifts` → 3 rows (Shift 1 08:30, Shift 2 15:30, Shift 3 23:30) ✅
 
 **Staff not in salary slip** (VFL1319, VFL1465, VFL1550, VFL1553, VFL1568, VFL5074, VFL5083, etc.): payslip screen will show blank — acceptable until HR provides data.
 
