@@ -264,6 +264,63 @@ UPDATE leave_balances SET earned_leave = 11,  casual_leave = 0,    sick_leave = 
 UPDATE leave_balances SET earned_leave = 21,  casual_leave = 0,    sick_leave = 0
   WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4061');
 
+-- ============================================================================
+-- Step 3: Corrections from "VFL Employee Salary Slip Generator 2026" (23 Sep 2026).
+--   The leave sheet used "2026 Alloc" initial values for employees without a
+--   "Sep26 Available" row. The salary slip generator calculates actual remaining
+--   balances from real usage and is more accurate. These 24 employees had wrong
+--   values in Steps 2–3 above; this overwrites them with salary-slip actuals.
+-- ============================================================================
+UPDATE leave_balances SET earned_leave = 11,   casual_leave = 1,    sick_leave = 1
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1482');
+UPDATE leave_balances SET earned_leave = 18,   casual_leave = 0,    sick_leave = 1
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1516');
+UPDATE leave_balances SET earned_leave = 0,    casual_leave = 0,    sick_leave = 0
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1520');
+-- VFL1527 is severely overdrawn (-12/-1/-4); correct value from salary slip:
+UPDATE leave_balances SET earned_leave = -12,  casual_leave = -1,   sick_leave = -4
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1527');
+UPDATE leave_balances SET earned_leave = 10,   casual_leave = 0,    sick_leave = 4
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1528');
+UPDATE leave_balances SET earned_leave = 0,    casual_leave = 0,    sick_leave = 0
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1543');
+UPDATE leave_balances SET earned_leave = 15,   casual_leave = 0,    sick_leave = 0.5
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1545');
+UPDATE leave_balances SET earned_leave = 0,    casual_leave = 0,    sick_leave = 0
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1549');
+UPDATE leave_balances SET earned_leave = 0,    casual_leave = 2,    sick_leave = 1
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1556');
+UPDATE leave_balances SET earned_leave = 20,   casual_leave = 0,    sick_leave = 1.5
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1557');
+UPDATE leave_balances SET earned_leave = 10,   casual_leave = 3,    sick_leave = 1
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1560');
+UPDATE leave_balances SET earned_leave = 14,   casual_leave = 0.5,  sick_leave = 0
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1562');
+UPDATE leave_balances SET earned_leave = 1,    casual_leave = 0,    sick_leave = 0
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1564');
+UPDATE leave_balances SET earned_leave = 18,   casual_leave = 0,    sick_leave = 0
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1566');
+UPDATE leave_balances SET earned_leave = 0,    casual_leave = 0,    sick_leave = 0
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1567');
+UPDATE leave_balances SET earned_leave = 15,   casual_leave = 0,    sick_leave = 4
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5079');
+UPDATE leave_balances SET earned_leave = 19.5, casual_leave = 0,    sick_leave = 0
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5237');
+UPDATE leave_balances SET earned_leave = 0,    casual_leave = 0,    sick_leave = 0
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5272');
+UPDATE leave_balances SET earned_leave = 13,   casual_leave = 0,    sick_leave = 0
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5273');
+UPDATE leave_balances SET earned_leave = 2,    casual_leave = 0,    sick_leave = 4
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5302');
+UPDATE leave_balances SET earned_leave = 5,    casual_leave = 1,    sick_leave = 4
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5303');
+UPDATE leave_balances SET earned_leave = 8,    casual_leave = 3,    sick_leave = 0
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5318');
+UPDATE leave_balances SET earned_leave = 2,    casual_leave = 0,    sick_leave = 0
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5321');
+UPDATE leave_balances SET earned_leave = 0,    casual_leave = 0,    sick_leave = 0
+  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4057');
+
 -- Verify
 SELECT COUNT(*) AS total_rows FROM leave_balances;
 SELECT

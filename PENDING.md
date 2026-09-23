@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 22 Sep 2026 — PATCH_24 (leave_balances) + PATCH_25 (payroll_records Aug 2026) written and pushed. Workers: real EL/CL/SL and net-pay from salary slip generator. Staff: leave_balances seeded 0/0/0 pending HR update; payroll_records not seeded (no staff salary data in Drive). **Run both patches in Supabase SQL Editor to unblock Leave and Payslip screens.** Remaining open items: Netlify APPS_SCRIPT_URL env var, SUPERVISOR_MAP backfill, per-form tracking, staff leave/payroll data from Pallavi.
+**Last updated:** 23 Sep 2026 — PATCH_24 corrected (24 staff leave balances updated from actual remaining in salary slip generator; critical: VFL1527 overdrawn at -12/-1/-4) + PATCH_26 created (Aug 2026 payroll for 36 active staff — full per-component breakdown). **Run PATCH_24, PATCH_25, PATCH_26 in order in Supabase SQL Editor to unblock Leave and Payslip screens.** Remaining open items: Netlify APPS_SCRIPT_URL env var, SUPERVISOR_MAP backfill, per-form tracking.
 
 ---
 
@@ -614,17 +614,25 @@ radius).
 
 ---
 
-## ⏳ SQL to run — PATCH_24 + PATCH_25 (22 Sep 2026)
+## ⏳ SQL to run — PATCH_24 + PATCH_25 + PATCH_26 (23 Sep 2026)
 
-Both files are in `scripts/`. Run them in Supabase SQL Editor in order.
+All three files are in `scripts/`. Run them in Supabase SQL Editor **in order**.
 
 | File | Purpose | Status |
 |---|---|---|
-| `PATCH_24_leave_balances_22Sep2026.sql` | Seeds `leave_balances` for all 129 employees: 19 active VFL4xxx workers get real EL/CL/SL values; all others get 0/0/0 (HR must update staff). | ⏳ Run in SQL Editor |
-| `PATCH_25_payroll_records_22Sep2026.sql` | Seeds `payroll_records` for Aug 2026 — 19 active VFL4xxx workers only. `net_pay` = payable salary. Staff payroll not seeded (no data in Drive). | ⏳ Run in SQL Editor |
+| `PATCH_24_leave_balances_22Sep2026.sql` | Seeds `leave_balances` for all 129 employees (Steps 1–2) then **corrects** 24 staff employees whose values were wrong (Step 3 — actual remaining from "VFL Employee Salary Slip Generator 2026", 23 Sep). Critical: VFL1527 (Sharwan Singh Jodha) is overdrawn at EL=-12/CL=-1/SL=-4. | ⏳ Run in SQL Editor |
+| `PATCH_25_payroll_records_22Sep2026.sql` | Seeds `payroll_records` for Aug 2026 — 19 active VFL4xxx workers. `net_pay` = payable salary. | ⏳ Run in SQL Editor |
+| `PATCH_26_staff_payroll_23Sep2026.sql` | Seeds `payroll_records` for Aug 2026 — 36 active staff (27 VFL1xxx + 8 VFL5xxx + VFL4057). Full per-component breakdown: basic, HRA, conveyance, special_allowance, overtime, PF, ESIC, PT, advance_recovery, TDS, net_pay. Source: "VFL Employee Salary Slip Generator 2026" (Drive ID: `1cmzh1CL2uuBDJ2gT0gObDU1jZ9OJwDFSiPFkDA79XsE`). | ⏳ Run in SQL Editor |
 
-**After running both:** Leave screen for VFL4008 (Dnyaneshwar) should show EL=12; payslip should show ₹36,655.
-Staff leave screens will show 0/0/0 until Pallavi provides the leave balance sheet.
+**After running all three:**
+- `SELECT COUNT(*) FROM leave_balances` → 129
+- `SELECT COUNT(*) FROM payroll_records WHERE year=2026 AND month='08'` → 55 (19 workers + 36 staff)
+- VFL1527 (Sharwan Singh Jodha) → Leave screen → EL=-12, CL=-1, SL=-4 (overdrawn — correct)
+- VFL1482 (Brahmanand Tajne) → Leave screen → EL=11, CL=1, SL=1
+- VFL1064 (Balasaheb Todmal) → Payslip → Aug 2026 → ₹28,400
+- VFL1386 (Fazal Khan) → Payslip → Aug 2026 → ₹1,36,706
+
+**Staff not in salary slip** (VFL1319, VFL1465, VFL1550, VFL1553, VFL1568, VFL5074, VFL5083, etc.): payslip screen will show blank — acceptable until HR provides data.
 
 ---
 
