@@ -19,12 +19,12 @@
 
 BEGIN;
 
--- Step 1: Seed 0/0/0 for every employee that doesn't yet have a leave_balances row.
-INSERT INTO leave_balances (employee_id, earned_leave, casual_leave, sick_leave)
-SELECT e.id, 0, 0, 0
+-- Step 1: Seed 0/0/0 for every employee that doesn't yet have a leave_balances row for 2026.
+INSERT INTO leave_balances (employee_id, year, earned_leave, casual_leave, sick_leave)
+SELECT e.id, 2026, 0, 0, 0
 FROM employees e
 WHERE NOT EXISTS (
-  SELECT 1 FROM leave_balances lb WHERE lb.employee_id = e.id
+  SELECT 1 FROM leave_balances lb WHERE lb.employee_id = e.id AND lb.year = 2026
 );
 
 -- ============================================================================
@@ -32,237 +32,237 @@ WHERE NOT EXISTS (
 --   2026 Alloc otherwise)
 -- ============================================================================
 UPDATE leave_balances SET earned_leave = 21,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1001');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1001');
 UPDATE leave_balances SET earned_leave = 16,  casual_leave = 1,   sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1064');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1064');
 UPDATE leave_balances SET earned_leave = 10,  casual_leave = 3,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1066');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1066');
 UPDATE leave_balances SET earned_leave = 0,   casual_leave = 0,   sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1272');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1272');
 UPDATE leave_balances SET earned_leave = 10,  casual_leave = 5,   sick_leave = 3
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1290');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1290');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 2,   sick_leave = 2.5
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1319');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1319');
 UPDATE leave_balances SET earned_leave = 16,  casual_leave = 3,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1327');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1327');
 UPDATE leave_balances SET earned_leave = 21,  casual_leave = 0,   sick_leave = 3
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1386');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1386');
 UPDATE leave_balances SET earned_leave = 11,  casual_leave = 2,   sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1389');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1389');
 UPDATE leave_balances SET earned_leave = 13,  casual_leave = 0.5, sick_leave = 1
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1391');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1391');
 UPDATE leave_balances SET earned_leave = -11, casual_leave = -5,  sick_leave = -2
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1441');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1441');
 UPDATE leave_balances SET earned_leave = 0,   casual_leave = 0,   sick_leave = 0.5
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1446');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1446');
 UPDATE leave_balances SET earned_leave = 5,   casual_leave = 3,   sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1450');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1450');
 UPDATE leave_balances SET earned_leave = 4,   casual_leave = 0,   sick_leave = 2
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1453');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1453');
 UPDATE leave_balances SET earned_leave = 1,   casual_leave = 0,   sick_leave = 0.5
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1463');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1463');
 UPDATE leave_balances SET earned_leave = 19,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1465');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1465');
 UPDATE leave_balances SET earned_leave = 21,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1482');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1482');
 UPDATE leave_balances SET earned_leave = 21,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1516');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1516');
 UPDATE leave_balances SET earned_leave = 14,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1520');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1520');
 UPDATE leave_balances SET earned_leave = 21,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1527');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1527');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1528');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1528');
 UPDATE leave_balances SET earned_leave = 18,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1543');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1543');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1545');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1545');
 UPDATE leave_balances SET earned_leave = 13,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1549');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1549');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1550');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1550');
 UPDATE leave_balances SET earned_leave = 19,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1553');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1553');
 UPDATE leave_balances SET earned_leave = 21,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1556');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1556');
 UPDATE leave_balances SET earned_leave = 21,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1557');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1557');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1560');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1560');
 UPDATE leave_balances SET earned_leave = 21,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1562');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1562');
 UPDATE leave_balances SET earned_leave = 19,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1564');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1564');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1566');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1566');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1567');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1567');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1568');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1568');
 
 -- ============================================================================
 -- Step 3: VFL5xxx STAFF (2026 Alloc)
 -- ============================================================================
 UPDATE leave_balances SET earned_leave = 21,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5074');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5074');
 UPDATE leave_balances SET earned_leave = 21,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5079');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5079');
 UPDATE leave_balances SET earned_leave = 19,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5083');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5083');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5203');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5203');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5237');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5237');
 UPDATE leave_balances SET earned_leave = 18,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5272');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5272');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5273');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5273');
 UPDATE leave_balances SET earned_leave = 19,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5302');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5302');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5303');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5303');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5318');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5318');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5321');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5321');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5322');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5322');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5323');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5323');
 UPDATE leave_balances SET earned_leave = 19,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5324');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5324');
 UPDATE leave_balances SET earned_leave = 17,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5337');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5337');
 UPDATE leave_balances SET earned_leave = 17,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5347');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5347');
 UPDATE leave_balances SET earned_leave = 19,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5354');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5354');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5379');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5379');
 UPDATE leave_balances SET earned_leave = 19,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5382');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5382');
 UPDATE leave_balances SET earned_leave = 17,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5383');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5383');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5397');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5397');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5398');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5398');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5399');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5399');
 UPDATE leave_balances SET earned_leave = 19,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5400');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5400');
 UPDATE leave_balances SET earned_leave = 17,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5405');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5405');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5409');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5409');
 UPDATE leave_balances SET earned_leave = 15,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5410');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5410');
 UPDATE leave_balances SET earned_leave = 19,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5413');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5413');
 UPDATE leave_balances SET earned_leave = 19,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5415');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5415');
 UPDATE leave_balances SET earned_leave = 19,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5420');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5420');
 UPDATE leave_balances SET earned_leave = 18,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5425');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5425');
 UPDATE leave_balances SET earned_leave = 18,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5428');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5428');
 UPDATE leave_balances SET earned_leave = 18,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5429');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5429');
 UPDATE leave_balances SET earned_leave = 21,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5430');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5430');
 UPDATE leave_balances SET earned_leave = 17,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5433');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5433');
 UPDATE leave_balances SET earned_leave = 19,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5434');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5434');
 UPDATE leave_balances SET earned_leave = 16,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5439');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5439');
 UPDATE leave_balances SET earned_leave = 18,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5440');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5440');
 UPDATE leave_balances SET earned_leave = 10,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5442');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5442');
 UPDATE leave_balances SET earned_leave = 12,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5444');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5444');
 UPDATE leave_balances SET earned_leave = 10,  casual_leave = 5,   sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5445');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5445');
 
 -- ============================================================================
 -- Step 4: VFL4xxx WORKERS — Sep26 Available (actual remaining)
 -- ============================================================================
 UPDATE leave_balances SET earned_leave = 17,  casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4002');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4002');
 UPDATE leave_balances SET earned_leave = 19,  casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4004');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4004');
 UPDATE leave_balances SET earned_leave = 13,  casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4006');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4006');
 UPDATE leave_balances SET earned_leave = 14,  casual_leave = -0.5, sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4007');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4007');
 UPDATE leave_balances SET earned_leave = 12,  casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4008');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4008');
 UPDATE leave_balances SET earned_leave = 6,   casual_leave = 0,    sick_leave = 1
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4011');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4011');
 UPDATE leave_balances SET earned_leave = 14,  casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4012');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4012');
 UPDATE leave_balances SET earned_leave = 0,   casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4024');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4024');
 UPDATE leave_balances SET earned_leave = 9,   casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4025');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4025');
 UPDATE leave_balances SET earned_leave = 3,   casual_leave = 2,    sick_leave = 1
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4026');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4026');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4030');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4030');
 UPDATE leave_balances SET earned_leave = 13,  casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4032');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4032');
 UPDATE leave_balances SET earned_leave = 1,   casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4033');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4033');
 UPDATE leave_balances SET earned_leave = 12,  casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4036');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4036');
 UPDATE leave_balances SET earned_leave = 13,  casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4041');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4041');
 
 -- VFL4xxx — salary slip actual remaining (Aug 2026), more accurate than 2026 Alloc
 UPDATE leave_balances SET earned_leave = 16,  casual_leave = 1,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4042');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4042');
 UPDATE leave_balances SET earned_leave = 9,   casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4043');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4043');
 UPDATE leave_balances SET earned_leave = 13,  casual_leave = 0,    sick_leave = 1
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4045');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4045');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 0,    sick_leave = 1
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4063');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4063');
 UPDATE leave_balances SET earned_leave = 8,   casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4065');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4065');
 UPDATE leave_balances SET earned_leave = 19,  casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4066');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4066');
 UPDATE leave_balances SET earned_leave = 8,   casual_leave = 0,    sick_leave = 2
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4068');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4068');
 UPDATE leave_balances SET earned_leave = 10,  casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4071');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4071');
 UPDATE leave_balances SET earned_leave = 4,   casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4072');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4072');
 
 -- VFL4xxx — 2026 Alloc (no salary slip data for these)
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 5,    sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4048');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4048');
 UPDATE leave_balances SET earned_leave = 18,  casual_leave = 5,    sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4057');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4057');
 UPDATE leave_balances SET earned_leave = 15,  casual_leave = 5,    sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4075');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4075');
 
 -- VFL4xxx — 2025 year-end balance (no 2026 data; possible ex-employees)
 UPDATE leave_balances SET earned_leave = 21,  casual_leave = 1,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4014');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4014');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4016');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4016');
 UPDATE leave_balances SET earned_leave = 14,  casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4021');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4021');
 UPDATE leave_balances SET earned_leave = 20,  casual_leave = 1,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4029');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4029');
 UPDATE leave_balances SET earned_leave = 0,   casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4038');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4038');
 UPDATE leave_balances SET earned_leave = 11,  casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4040');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4040');
 UPDATE leave_balances SET earned_leave = 21,  casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4061');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4061');
 
 -- ============================================================================
 -- Step 3: Corrections from "VFL Employee Salary Slip Generator 2026" (23 Sep 2026).
@@ -272,54 +272,54 @@ UPDATE leave_balances SET earned_leave = 21,  casual_leave = 0,    sick_leave = 
 --   values in Steps 2–3 above; this overwrites them with salary-slip actuals.
 -- ============================================================================
 UPDATE leave_balances SET earned_leave = 11,   casual_leave = 1,    sick_leave = 1
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1482');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1482');
 UPDATE leave_balances SET earned_leave = 18,   casual_leave = 0,    sick_leave = 1
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1516');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1516');
 UPDATE leave_balances SET earned_leave = 0,    casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1520');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1520');
 -- VFL1527 is severely overdrawn (-12/-1/-4); correct value from salary slip:
 UPDATE leave_balances SET earned_leave = -12,  casual_leave = -1,   sick_leave = -4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1527');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1527');
 UPDATE leave_balances SET earned_leave = 10,   casual_leave = 0,    sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1528');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1528');
 UPDATE leave_balances SET earned_leave = 0,    casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1543');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1543');
 UPDATE leave_balances SET earned_leave = 15,   casual_leave = 0,    sick_leave = 0.5
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1545');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1545');
 UPDATE leave_balances SET earned_leave = 0,    casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1549');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1549');
 UPDATE leave_balances SET earned_leave = 0,    casual_leave = 2,    sick_leave = 1
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1556');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1556');
 UPDATE leave_balances SET earned_leave = 20,   casual_leave = 0,    sick_leave = 1.5
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1557');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1557');
 UPDATE leave_balances SET earned_leave = 10,   casual_leave = 3,    sick_leave = 1
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1560');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1560');
 UPDATE leave_balances SET earned_leave = 14,   casual_leave = 0.5,  sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1562');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1562');
 UPDATE leave_balances SET earned_leave = 1,    casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1564');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1564');
 UPDATE leave_balances SET earned_leave = 18,   casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1566');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1566');
 UPDATE leave_balances SET earned_leave = 0,    casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1567');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL1567');
 UPDATE leave_balances SET earned_leave = 15,   casual_leave = 0,    sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5079');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5079');
 UPDATE leave_balances SET earned_leave = 19.5, casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5237');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5237');
 UPDATE leave_balances SET earned_leave = 0,    casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5272');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5272');
 UPDATE leave_balances SET earned_leave = 13,   casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5273');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5273');
 UPDATE leave_balances SET earned_leave = 2,    casual_leave = 0,    sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5302');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5302');
 UPDATE leave_balances SET earned_leave = 5,    casual_leave = 1,    sick_leave = 4
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5303');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5303');
 UPDATE leave_balances SET earned_leave = 8,    casual_leave = 3,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5318');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5318');
 UPDATE leave_balances SET earned_leave = 2,    casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5321');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL5321');
 UPDATE leave_balances SET earned_leave = 0,    casual_leave = 0,    sick_leave = 0
-  WHERE employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4057');
+  WHERE year = 2026 AND employee_id = (SELECT id FROM employees WHERE emp_code = 'VFL4057');
 
 -- Verify
 SELECT COUNT(*) AS total_rows FROM leave_balances;
