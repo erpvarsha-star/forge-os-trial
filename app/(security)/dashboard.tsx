@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Header } from '@/components/Header'
 import { FactoryOsLink } from '@/components/FactoryOsLink'
 import { Card } from '@/components/Card'
+import { CheckInCard } from '@/components/CheckInCard'
 import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { LoadingScreen } from '@/components/LoadingScreen'
@@ -71,6 +72,7 @@ export default function VehicleLogScreen() {
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
         <FactoryOsLink />
+        <CheckInCard />
         <Text className="text-sm font-bold text-ink-700 mb-2 px-1">{t('common.today')}</Text>
         <Card className="mb-5">
           <View className="flex-row">

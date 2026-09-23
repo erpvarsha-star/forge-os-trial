@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Header } from '@/components/Header'
 import { FactoryOsLink } from '@/components/FactoryOsLink'
 import { Card } from '@/components/Card'
+import { CheckInCard } from '@/components/CheckInCard'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { Trophy, ChevronRight } from 'lucide-react-native'
@@ -40,6 +41,7 @@ export default function ManagerDashboard() {
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 32 }}>
         <FactoryOsLink />
+        <CheckInCard />
         <View className="mb-5">
           <Text className="text-2xl font-bold text-ink-900 tracking-tight">{t('manager.deptAttendance')}</Text>
           {!!employee.department && <Text className="text-sm text-ink-500 mt-0.5">{employee.department}</Text>}

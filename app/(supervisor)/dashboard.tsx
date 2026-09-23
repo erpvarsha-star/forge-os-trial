@@ -6,6 +6,7 @@ import { Header } from '@/components/Header'
 import { FactoryOsLink } from '@/components/FactoryOsLink'
 import { Card } from '@/components/Card'
 import { LoadingScreen } from '@/components/LoadingScreen'
+import { CheckInCard } from '@/components/CheckInCard'
 import { supabase } from '@/lib/supabase'
 import { UserCheck, UserX, Clock, Users } from 'lucide-react-native'
 import { STATUS, INK } from '@/components/theme'
@@ -42,6 +43,7 @@ export default function SupervisorDashboard() {
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 32 }}>
         <FactoryOsLink />
+        <CheckInCard />
         <View className="mb-5">
           <Text className="text-2xl font-bold text-ink-900 tracking-tight">{t('supervisor.teamStatus')}</Text>
         </View>
@@ -49,7 +51,12 @@ export default function SupervisorDashboard() {
         {stats.total === 0 ? (
           <Card className="items-center py-10">
             <Users size={32} color={INK[300]} />
-            <Text className="text-sm text-ink-500 mt-3 text-center">{t('common.noData')}</Text>
+            <Text className="text-sm font-semibold text-ink-600 mt-3 text-center">
+              {t('supervisor.noTeamAssigned')}
+            </Text>
+            <Text className="text-xs text-ink-400 mt-1 text-center px-4">
+              {t('supervisor.noTeamAssignedHint')}
+            </Text>
           </Card>
         ) : (
           <>

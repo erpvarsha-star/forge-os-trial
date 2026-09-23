@@ -357,7 +357,9 @@
     "quickLogs": "Quick Logs",
     "productionDetails": "Production Details",
     "shiftVerification": "Shift Verification",
-    "shiftReportSubmitted": "Shift report submitted"
+    "shiftReportSubmitted": "Shift report submitted",
+    "noTeamAssigned": "No team assigned yet",
+    "noTeamAssignedHint": "HR Admin can assign your team members from the Shifts screen."
   },
   "manager": {
     "deptAttendance": "Department Attendance",

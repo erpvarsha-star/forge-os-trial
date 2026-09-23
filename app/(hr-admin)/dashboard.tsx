@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Header } from '@/components/Header'
 import { FactoryOsLink } from '@/components/FactoryOsLink'
 import { Card } from '@/components/Card'
+import { CheckInCard } from '@/components/CheckInCard'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { router } from 'expo-router'
@@ -114,6 +115,7 @@ export default function HrAdminDashboard() {
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 32 }}>
         <FactoryOsLink />
+        <CheckInCard />
         <View className="mb-5">
           <Text className="text-2xl font-bold text-ink-900 tracking-tight">{t('hrAdmin.employeeMaster')}</Text>
         </View>

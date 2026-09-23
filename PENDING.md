@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 23 Sep 2026 (session 2) — ALERT.gs updated to v4 (23 Sep 2026): hourly trigger, Phase 2 recipient routing, health watchdog, Cutting 2-shift config, DME Telegram. form_links table verified against v4 DEPT_FORM_SEED (31 rows, all correct — no changes needed). Manager layout reduced to 5 tabs (team tab hidden, accessible via "View Team →" link on dashboard). APK build 40 will trigger on push. Remaining open: APPS_SCRIPT_URL, supervisor Telegram onboarding, per-form tracking. Action for Yash: paste updated `scripts/ALERT.gs` into the live Apps Script editor, then run `deployShiftTrackingTriggers()` to install the new hourly trigger (replaces old 15-min triggers).
+**Last updated:** 23 Sep 2026 (session 3) — GPS check-in added for all 129 employees: `components/CheckInCard.tsx` created (full check-in/out flow, geofence + fraud check + buddy detection + late reason modal); CheckInCard added to supervisor, manager, hr-admin, plant-head, owner, and security dashboards. Supervisor "blank" dashboard now shows helpful "No team assigned yet" message instead of generic noData icon. APK build 41 will trigger on push. Remaining open: APPS_SCRIPT_URL, supervisor Telegram onboarding (5 missing: Subhash Palve, Shivaji Jaypure, Manoj Wagh, Sunil Saha, Abhimanyu Kakde), per-form tracking. Action for Yash: (1) paste updated `scripts/ALERT.gs` into live Apps Script editor, run `deployShiftTrackingTriggers()`; (2) HR Admin must assign supervisor_id for Cutting/Press/Machine/HT/Electricity/Oil/VMC supervisors so their team shows on the dashboard (data gap, not a code issue).
 
 ---
 

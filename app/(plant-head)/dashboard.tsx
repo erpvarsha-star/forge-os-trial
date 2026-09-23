@@ -6,6 +6,7 @@ import { Header } from '@/components/Header'
 import { ProductionSummary } from '@/components/ProductionSummary'
 import { FactoryOsLink } from '@/components/FactoryOsLink'
 import { Card } from '@/components/Card'
+import { CheckInCard } from '@/components/CheckInCard'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { AlertTriangle, TrendingUp, UserCheck, UserX, Clock, Trophy } from 'lucide-react-native'
@@ -43,6 +44,7 @@ export default function PlantHeadDashboard() {
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 32 }}>
         <FactoryOsLink />
+        <CheckInCard />
         <View className="mb-5">
           <Text className="text-2xl font-bold text-ink-900 tracking-tight">{t('plantHead.plantAttendance')}</Text>
         </View>

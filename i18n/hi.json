@@ -357,7 +357,9 @@
     "quickLogs": "त्वरित लॉग",
     "productionDetails": "उत्पादन विवरण",
     "shiftVerification": "शिफ्ट सत्यापन",
-    "shiftReportSubmitted": "शिफ्ट रिपोर्ट जमा हुई"
+    "shiftReportSubmitted": "शिफ्ट रिपोर्ट जमा हुई",
+    "noTeamAssigned": "अभी कोई टीम नहीं सौंपी गई",
+    "noTeamAssignedHint": "HR Admin शिफ्ट स्क्रीन से आपके टीम सदस्यों को असाइन कर सकते हैं।"
   },
   "manager": {
     "deptAttendance": "विभाग उपस्थिति",
