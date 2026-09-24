@@ -169,7 +169,8 @@
     "hrOperations": "HR Operations",
     "shiftPlanning": "Shift Planning",
     "shiftPlanningSub": "Assign shifts for the week",
-    "deptForms": "Department Forms"
+    "deptForms": "Department Forms",
+    "managementForms": "Management"
   },
   "production": {
     "title": "Production this month",

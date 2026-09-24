@@ -169,7 +169,8 @@
     "hrOperations": "एचआर संचालन",
     "shiftPlanning": "शिफ़्ट योजना",
     "shiftPlanningSub": "सप्ताह के लिए शिफ़्ट असाइन करें",
-    "deptForms": "विभाग फ़ॉर्म"
+    "deptForms": "विभाग फ़ॉर्म",
+    "managementForms": "प्रबंधन"
   },
   "production": {
     "title": "इस माह का उत्पादन",

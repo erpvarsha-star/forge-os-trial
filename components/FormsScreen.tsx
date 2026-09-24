@@ -121,6 +121,7 @@ export function FormsScreen() {
   const { employee } = useAuth()
   const { department } = useEffectiveIdentity()
   const [commonForms, setCommonForms] = useState<FormLink[]>([])
+  const [mgmtForms, setMgmtForms] = useState<FormLink[]>([])
   const [deptForms, setDeptForms] = useState<FormLink[]>([])
   const [shifts, setShifts] = useState<ShiftWindow[]>([])
   const [submitted, setSubmitted] = useState<Record<string, FormSubmission['status']>>({})
@@ -129,6 +130,7 @@ export function FormsScreen() {
 
   const role = employee?.role
   const showDeptForms = role === 'supervisor' || role === 'manager' || role === 'security_guard'
+  const showMgmtForms = role === 'manager' || role === 'plant_head' || role === 'owner'
   const showHrOps = role === 'hr_admin'
 
   const load = useCallback(async () => {
@@ -141,31 +143,47 @@ export function FormsScreen() {
       supabase.from('plant_config').select('config_value').eq('config_key', 'form_shift_schedule').maybeSingle(),
     ]
 
+    let mgmtIdx = -1
+    let deptIdx = -1
+    let subIdx = -1
+
+    if (showMgmtForms) {
+      mgmtIdx = queries.length
+      queries.push(
+        supabase.from('form_links').select('*').eq('department', 'MANAGEMENT').eq('is_active', true).order('sort_order'),
+      )
+    }
+
     if (showDeptForms) {
+      deptIdx = queries.length
       queries.push(
         supabase.from('form_links').select('*').eq('department', dept).eq('is_active', true).eq('is_common', false).order('sort_order'),
+      )
+      subIdx = queries.length
+      queries.push(
         supabase.from('form_submissions').select('shift, status').eq('department', dept).eq('date', today),
       )
     }
 
     const results = await Promise.all(queries)
-    const [commonResult, configResult, deptResult, submissionResult] = results
+    const [commonResult, configResult] = results
 
     if (commonResult.data) setCommonForms(commonResult.data as FormLink[])
 
     const schedule = configResult.data?.config_value as { shifts?: ShiftWindow[] } | null
     setShifts(Array.isArray(schedule?.shifts) ? schedule.shifts : [])
 
-    if (deptResult?.data) setDeptForms(deptResult.data as FormLink[])
+    if (mgmtIdx >= 0 && results[mgmtIdx]?.data) setMgmtForms(results[mgmtIdx].data as FormLink[])
+    if (deptIdx >= 0 && results[deptIdx]?.data) setDeptForms(results[deptIdx].data as FormLink[])
 
     const status: Record<string, FormSubmission['status']> = {}
-    for (const row of (submissionResult?.data ?? []) as FormSubmission[]) {
+    for (const row of (subIdx >= 0 ? (results[subIdx]?.data ?? []) : []) as FormSubmission[]) {
       if (row.shift) status[row.shift] = row.status
     }
     setSubmitted(status)
 
     setIsLoading(false)
-  }, [employee, department, showDeptForms])
+  }, [employee, department, showDeptForms, showMgmtForms])
 
   useEffect(() => { load() }, [load])
 
@@ -205,6 +223,16 @@ export function FormsScreen() {
         ))}
         {commonForms.length === 0 && (
           <Text className="text-xs text-ink-400 mb-1">{t('forms.commonPending')}</Text>
+        )}
+
+        {/* MANAGEMENT FORMS — manager, plant_head, owner */}
+        {showMgmtForms && mgmtForms.length > 0 && (
+          <>
+            <SectionLabel title={t('forms.managementForms')} />
+            {mgmtForms.map(form => (
+              <ExternalFormCard key={form.id} item={form} onPress={openURL} />
+            ))}
+          </>
         )}
 
         {/* HR OPERATIONS — hr_admin only */}
