@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { View, Text, ScrollView, Alert, Modal, TouchableOpacity, ActivityIndicator } from 'react-native'
+import { View, Text, ScrollView, Alert, Modal, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/hooks/useAuth'
 import { useAttendance } from '@/hooks/useAttendance'
@@ -10,25 +10,30 @@ import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { LoadingScreen } from '@/components/LoadingScreen'
-import { getCurrentLocation, getPlantConfig, isInsideGeofence, getPlantLocations, isInsideAnyGeofence } from '@/lib/location'
+import { getCurrentLocation, getPlantConfig, isInsideGeofence, getPlantLocations, isInsideAnyGeofence, buildQrValue } from '@/lib/location'
 import { supabase } from '@/lib/supabase'
 import { getDeviceId } from '@/lib/deviceId'
 import { EmployeeShift } from '@/types'
 import { MAX_DAILY_OBSERVATIONS } from '@/constants'
-import { MapPin, Clock, CheckSquare, AlertCircle, Camera, QrCode, CheckCircle2, Calendar, ChevronRight, Star } from 'lucide-react-native'
+import { MapPin, Clock, CheckSquare, AlertCircle, Camera, QrCode, CheckCircle2, Calendar, ChevronRight, Star, X, LogOut } from 'lucide-react-native'
+import { BarCodeScanner } from 'expo-barcode-scanner'
 import { router } from 'expo-router'
 import * as Location from 'expo-location'
 
 export default function WorkerHome() {
   const { t } = useTranslation()
   const { employee } = useAuth()
-  const { todayRecord, checkIn, checkOut, refresh, isLoading: attendanceLoading } = useAttendance(employee?.id || '')
+  const { todayRecord, checkIn, checkOut, confirmQrOut, refresh, isLoading: attendanceLoading } = useAttendance(employee?.id || '')
   const [shift, setShift] = useState<EmployeeShift | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [showLateModal, setShowLateModal] = useState(false)
   const [lateReason, setLateReason] = useState('')
   const [checklist, setChecklist] = useState([false, false, false])
   const [observationCount, setObservationCount] = useState(0)
+  const [showExitQrModal, setShowExitQrModal] = useState(false)
+  const [exitQrScanned, setExitQrScanned] = useState(false)
+  const [exitQrLoading, setExitQrLoading] = useState(false)
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null)
 
   useEffect(() => {
     fetchShift()
@@ -186,6 +191,7 @@ export default function WorkerHome() {
     }
 
     setIsLoading(true)
+
     const location = await getCurrentLocation()
     if (!location) {
       Alert.alert(t('common.error'), 'Location permission required')
@@ -193,9 +199,109 @@ export default function WorkerHome() {
       return
     }
 
+    const plant = await getPlantConfig()
+    if (!plant) {
+      Alert.alert(t('common.error'), 'Plant config not found')
+      setIsLoading(false)
+      return
+    }
+
+    const plantLocations = await getPlantLocations()
+    const inside =
+      plantLocations.length > 0
+        ? isInsideAnyGeofence(location.coords.latitude, location.coords.longitude, plantLocations)
+        : isInsideGeofence(
+            location.coords.latitude,
+            location.coords.longitude,
+            plant.latitude,
+            plant.longitude,
+            plant.geofence_radius_meters
+          )
+
+    if (!inside) {
+      Alert.alert(t('common.warning'), t('worker.outsidePlant'))
+      setIsLoading(false)
+      return
+    }
+
+    const providerStatus = await Location.getProviderStatusAsync()
+    const mockDetected = !providerStatus.gpsAvailable
+    if (mockDetected) {
+      Alert.alert(t('common.warning'), t('worker.mockLocationDetected'))
+      setIsLoading(false)
+      return
+    }
+
     await checkOut(location.coords.latitude, location.coords.longitude, shift?.shift?.end_time)
     await refresh()
     setIsLoading(false)
+
+    // After GPS checkout: prompt exit QR scan for gate confirmation
+    if (employee.requires_qr) {
+      setExitQrScanned(false)
+      if (hasCameraPermission === null) {
+        const { status } = await BarCodeScanner.requestPermissionsAsync()
+        setHasCameraPermission(status === 'granted')
+      }
+      setShowExitQrModal(true)
+    }
+  }
+
+  const handleExitQrScanned = async ({ data }: { data: string }) => {
+    if (exitQrScanned || exitQrLoading) return
+    setExitQrScanned(true)
+    setExitQrLoading(true)
+
+    const plant = await getPlantConfig()
+    if (!plant) {
+      Alert.alert(t('common.error'), 'Plant config not found')
+      setExitQrLoading(false)
+      return
+    }
+
+    const location = await getCurrentLocation()
+    if (!location) {
+      Alert.alert(t('common.error'), 'Location required')
+      setExitQrLoading(false)
+      return
+    }
+
+    const plantLocations = await getPlantLocations()
+    const inside =
+      plantLocations.length > 0
+        ? isInsideAnyGeofence(location.coords.latitude, location.coords.longitude, plantLocations)
+        : isInsideGeofence(
+            location.coords.latitude,
+            location.coords.longitude,
+            plant.latitude,
+            plant.longitude,
+            plant.geofence_radius_meters
+          )
+
+    if (!inside) {
+      Alert.alert(t('common.warning'), t('worker.outsidePlant'))
+      setExitQrLoading(false)
+      return
+    }
+
+    const expectedQr = buildQrValue(plant)
+    if (data !== expectedQr) {
+      Alert.alert(t('common.error'), t('worker.invalidQr'))
+      setExitQrScanned(false)
+      setExitQrLoading(false)
+      return
+    }
+
+    const { error } = await confirmQrOut()
+    if (error) {
+      Alert.alert(t('common.error'), t('common.somethingWentWrong'))
+      setExitQrScanned(false)
+    } else {
+      await refresh()
+      setShowExitQrModal(false)
+      Alert.alert(t('common.success'), t('worker.exitQrConfirmed'))
+    }
+    setExitQrLoading(false)
   }
 
   const submitLateReason = async () => {
@@ -285,8 +391,8 @@ export default function WorkerHome() {
             </View>
           </View>
 
-          {/* QR star card — hidden for requires_qr=false employees (owner, Pune office) */}
-          {employee?.requires_qr && (isCheckedIn || isCheckedOut) && (
+          {/* Entry QR star — shown while checked in, hidden after checkout */}
+          {employee?.requires_qr && isCheckedIn && (
             todayRecord?.qr_verified ? (
               <View className="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden">
                 <View className="px-5 py-4 flex-row items-center gap-3">
@@ -311,6 +417,42 @@ export default function WorkerHome() {
                   <View className="flex-1">
                     <Text className="text-sm font-bold text-ink-900">{t('worker.scanQrForStar')}</Text>
                     <Text className="text-xs text-ink-500">{t('worker.scanQrForStarHint')}</Text>
+                  </View>
+                  <ChevronRight size={18} color="#9CA3AF" />
+                </View>
+              </TouchableOpacity>
+            )
+          )}
+
+          {/* Exit QR — shown after GPS checkout, data collection until 15 Oct */}
+          {employee?.requires_qr && isCheckedOut && (
+            todayRecord?.check_out_qr_verified ? (
+              <View className="bg-white rounded-2xl border border-green-200 shadow-sm overflow-hidden">
+                <View className="px-5 py-4 flex-row items-center gap-3">
+                  <View className="w-10 h-10 rounded-full bg-green-50 items-center justify-center">
+                    <CheckCircle2 size={22} color="#16A34A" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-sm font-bold text-ink-900">{t('worker.exitQrDone')}</Text>
+                    <Text className="text-xs text-ink-500">{t('worker.exitQrDoneHint')}</Text>
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={() => {
+                  setExitQrScanned(false)
+                  setShowExitQrModal(true)
+                }}
+                className="bg-white rounded-2xl border border-brand-200 shadow-sm overflow-hidden"
+              >
+                <View className="px-5 py-4 flex-row items-center gap-3">
+                  <View className="w-10 h-10 rounded-full bg-brand-50 items-center justify-center">
+                    <LogOut size={22} color="#E65C00" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-sm font-bold text-ink-900">{t('worker.scanExitQr')}</Text>
+                    <Text className="text-xs text-ink-500">{t('worker.scanExitQrHint')}</Text>
                   </View>
                   <ChevronRight size={18} color="#9CA3AF" />
                 </View>
@@ -422,6 +564,45 @@ export default function WorkerHome() {
             <Button title="common.submit" onPress={submitLateReason} loading={isLoading} />
             <Button title="common.cancel" onPress={() => setShowLateModal(false)} variant="ghost" />
           </View>
+        </View>
+      </Modal>
+
+      {/* Exit QR scanner modal */}
+      <Modal visible={showExitQrModal} animationType="slide" onRequestClose={() => setShowExitQrModal(false)}>
+        <View className="flex-1 bg-ink-50">
+          <View className="flex-row items-center justify-between px-4 pt-12 pb-2">
+            <Text className="text-base font-bold text-ink-900">{t('worker.exitQrTitle')}</Text>
+            <TouchableOpacity onPress={() => setShowExitQrModal(false)} className="p-2">
+              <X size={22} color="#374151" />
+            </TouchableOpacity>
+          </View>
+          {hasCameraPermission === null ? (
+            <View className="flex-1 items-center justify-center">
+              <ActivityIndicator color="#E65C00" />
+            </View>
+          ) : hasCameraPermission === false ? (
+            <View className="flex-1 items-center justify-center p-6">
+              <Text className="text-sm text-ink-500 text-center">{t('worker.cameraPermissionRequired')}</Text>
+            </View>
+          ) : (
+            <View className="flex-1 p-4">
+              <Text className="text-xs text-ink-500 text-center mb-3 px-2">{t('worker.exitQrHint')}</Text>
+              <View className="flex-1 rounded-2xl overflow-hidden">
+                <BarCodeScanner
+                  onBarCodeScanned={exitQrScanned ? undefined : handleExitQrScanned}
+                  style={StyleSheet.absoluteFillObject}
+                />
+                <View className="absolute inset-0 items-center justify-center">
+                  <View className="w-48 h-48 border-2 border-brand-500 rounded-lg opacity-50" />
+                </View>
+                <View className="absolute bottom-8 left-0 right-0 items-center">
+                  <Text className="text-white text-sm bg-black/50 px-4 py-2 rounded-full">
+                    {exitQrScanned ? t('common.loading') : t('worker.scanQr')}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
         </View>
       </Modal>
     </View>

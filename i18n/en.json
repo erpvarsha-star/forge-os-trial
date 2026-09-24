@@ -200,7 +200,8 @@
     "pinTooWeak": "Choose a less obvious PIN",
     "pinSameAsStarting": "Choose a PIN different from your starting PIN",
     "pinChangeFailed": "Could not update PIN. Please try again.",
-    "profileLoadFailed": "Signed in, but your employee profile could not be loaded. Please report this to HR."
+    "profileLoadFailed": "Signed in, but your employee profile could not be loaded. Please report this to HR.",
+    "deviceTaken": "This device is already registered to another employee. Contact HR to resolve."
   },
   "worker": {
     "safetyTip": "Safety Tip of the Day",
@@ -317,7 +318,14 @@
     "payslipTitle": "Payslip",
     "cameraPermissionRequired": "Camera permission is required for QR scanning",
     "photoUploadFailed": "Photo upload failed. Check your connection and try again.",
-    "observationSubmitted": "Observation submitted"
+    "observationSubmitted": "Observation submitted",
+    "exitQrTitle": "Scan Exit QR",
+    "exitQrHint": "Scan the gate QR code as you leave the plant",
+    "exitQrConfirmed": "Exit QR scanned — departure recorded",
+    "exitQrDone": "Exit QR Confirmed",
+    "exitQrDoneHint": "Your departure from the plant has been recorded",
+    "scanExitQr": "Scan Exit Gate QR",
+    "scanExitQrHint": "Tap to confirm your departure at the gate"
   },
   "supervisor": {
     "teamStatus": "Team Status",
@@ -475,7 +483,13 @@
     "workersAndSupervisors": "Workers & Supervisors",
     "securityTeam": "Security Team",
     "weekSaved": "Week assignments saved",
-    "noRotatingEmployees": "No rotating employees found"
+    "noRotatingEmployees": "No rotating employees found",
+    "deviceRegistrations": "Device Registrations",
+    "deviceRegistrationsHint": "One device per employee. Clear to allow login on a new phone.",
+    "noDevices": "No devices registered yet",
+    "clearDeviceTitle": "Clear Device Registration",
+    "clearDeviceConfirm": "Remove device registration for {{name}}? They will need to log in again on their new device.",
+    "clearDeviceAction": "Clear Device"
   },
   "owner": {
     "kpiDashboard": "KPI Dashboard",

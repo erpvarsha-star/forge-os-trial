@@ -37,9 +37,17 @@ export interface AttendanceRecord {
   late_minutes?: number
   hours_worked?: number
   qr_verified: boolean
+  check_out_qr_verified?: boolean
   checkpoint2_confirmed_by?: string
   checkpoint2_at?: string
   created_at: string
+}
+
+export interface DeviceRegistration {
+  id: string
+  device_id: string
+  employee_id: string
+  registered_at: string
 }
 
 export interface Shift {

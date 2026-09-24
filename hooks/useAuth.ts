@@ -4,6 +4,7 @@ import { Employee } from '@/types'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { router } from 'expo-router'
 import { registerForPushNotificationsAsync } from '@/lib/notifications'
+import { getDeviceId } from '@/lib/deviceId'
 
 interface AuthState {
   session: any | null
@@ -100,6 +101,28 @@ export function useAuth() {
     }
 
     const employee = data as Employee
+
+    // Device lock: one device ↔ one employee. register_device() is a
+    // SECURITY DEFINER function — it upserts if the device is new or already
+    // this employee's, and returns allowed=false if it belongs to someone else.
+    // Fail open on any RPC error (network drop, first-time migration not yet
+    // run) so a backend issue never permanently locks a legitimate employee out.
+    const deviceId = await getDeviceId()
+    const { data: deviceCheck, error: deviceError } = await supabase.rpc('register_device', {
+      p_device_id: deviceId,
+    })
+    if (!deviceError && deviceCheck?.allowed === false) {
+      await supabase.auth.signOut()
+      await AsyncStorage.removeItem('employee')
+      setState(s => ({
+        ...s,
+        isLoading: false,
+        isAuthenticated: false,
+        loadError: 'DEVICE_TAKEN',
+      }))
+      return
+    }
+
     await AsyncStorage.setItem('employee', JSON.stringify(employee))
 
     setState({
@@ -110,16 +133,7 @@ export function useAuth() {
       loadError: null,
     })
 
-    // Runs on EVERY successful load — including an already-logged-in
-    // session resuming on app launch, not just a fresh login — so a device
-    // re-registers just by being opened, no logout/login required. Was
-    // previously only called from login.tsx's button handler, and with the
-    // wrong id (session.user.id, an auth user id, instead of employee.id —
-    // push_tokens.user_id is a foreign key to employees(id)), so every
-    // registration attempt violated that FK and push_tokens stayed
-    // completely empty for everyone. Both bugs found and fixed 24 Sep 2026.
-    // Non-throwing (lib/notifications.ts) and fire-and-forget: push is a
-    // nice-to-have, never a login blocker.
+    // Non-throwing fire-and-forget: push is a nice-to-have, never a login blocker.
     registerForPushNotificationsAsync(employee.id)
   }
 

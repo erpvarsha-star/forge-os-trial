@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 24 Sep 2026 (session 8) — PATCH_38: shifts seed + late tracking + hours_worked
+**Last updated:** 24 Sep 2026 (session 9) — PATCH_39: device lock + checkout GPS+QR
 
 **Consultant logins**: Added 9 confirmed-active consultants (CON01, CON05,
 CON09, CON12, CON16, CON18, CON20, CON21 with departments; CON13 no
@@ -47,6 +47,15 @@ Material In, Dispatch) so HR can add them to the table.
   (not capped at 50%); everyone else unchanged.
 - SQL applied to Supabase (verified: 136 true, 2 false). Committed as one
   batch with `PATCH_36` (security forms) in this session's final push.
+
+**PATCH_39 (24 Sep 2026, session 9):** Device lock + checkout GPS+QR.
+- `device_registrations` table (device_id UNIQUE → employee_id). SECURITY DEFINER `register_device()` returns `{allowed, reason}`. Called on every `loadEmployee()` — registered once, stays locked until HR resets it.
+- `clear_device_registration(employee_id)` SECURITY DEFINER — HR admin resets device so employee can log in on a new phone. HR Missing Data screen (`hr-admin/missing-data.tsx`) now lists all registered devices with a trash-icon reset button.
+- `attendance_records.check_out_qr_verified BOOLEAN DEFAULT FALSE` — data collection until 15 Oct 2026.
+- `handleCheckOut` in `home.tsx` and `CheckInCard.tsx`: now includes geofence check + mock-location block (same as check-in). After successful GPS checkout, shows inline exit QR scanner modal — same gate QR + same geofence validation, calls `confirmQrOut()`.
+- Entry QR card (shown while checked in) and exit QR card (shown after checkout) are now separate — was one card covering both states incorrectly.
+- `login.tsx`: `DEVICE_TAKEN` error shown with a clear HR-contact message (not the raw error string).
+- SQL applied via Supabase MCP (verified).
 
 **PATCH_38 (24 Sep 2026, session 8):** Shifts seed + late tracking + hours_worked + half-day.
 - `shifts.late_grace_minutes INTEGER` + `attendance_records.hours_worked NUMERIC(5,2)` added to schema.

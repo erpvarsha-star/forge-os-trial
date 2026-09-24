@@ -118,7 +118,12 @@ export default function LoginScreen() {
                 fix by retrying. Show it rather than stalling silently, and
                 include the raw reason so it can be reported to whoever can
                 actually fix it. */}
-            {!error && !!loadError && (
+            {!error && loadError === 'DEVICE_TAKEN' && (
+              <View className="mb-3 bg-red-50 rounded-xl p-3">
+                <Text className="text-sm font-semibold text-red-700">{t('auth.deviceTaken')}</Text>
+              </View>
+            )}
+            {!error && !!loadError && loadError !== 'DEVICE_TAKEN' && (
               <View className="mb-3">
                 <Text className="text-sm text-red-600">{t('auth.profileLoadFailed')}</Text>
                 <Text className="text-xs text-ink-400 mt-1">{loadError}</Text>

@@ -200,7 +200,8 @@
     "pinTooWeak": "कम अनुमान लगाने योग्य पिन चुनें",
     "pinSameAsStarting": "शुरुआती पिन से अलग पिन चुनें",
     "pinChangeFailed": "पिन अपडेट नहीं हो सका। पुनः प्रयास करें।",
-    "profileLoadFailed": "साइन इन हो गया, लेकिन आपकी कर्मचारी प्रोफ़ाइल लोड नहीं हो सकी। कृपया HR को सूचित करें।"
+    "profileLoadFailed": "साइन इन हो गया, लेकिन आपकी कर्मचारी प्रोफ़ाइल लोड नहीं हो सकी। कृपया HR को सूचित करें।",
+    "deviceTaken": "यह डिवाइस पहले से किसी अन्य कर्मचारी के नाम पर रजिस्टर है। HR से संपर्क करें।"
   },
   "worker": {
     "safetyTip": "दिन की सुरक्षा सलाह",
@@ -317,7 +318,14 @@
     "payslipTitle": "पेस्लिप",
     "cameraPermissionRequired": "QR स्कैन करने के लिए कैमरा अनुमति आवश्यक है",
     "photoUploadFailed": "फोटो अपलोड नहीं हो सका। कनेक्शन जांचकर पुनः प्रयास करें।",
-    "observationSubmitted": "अवलोकन जमा हो गया"
+    "observationSubmitted": "अवलोकन जमा हो गया",
+    "exitQrTitle": "निकास QR स्कैन करें",
+    "exitQrHint": "प्लांट से निकलते समय गेट QR कोड स्कैन करें",
+    "exitQrConfirmed": "निकास QR स्कैन हो गया — प्रस्थान दर्ज",
+    "exitQrDone": "निकास QR पुष्टि हो गई",
+    "exitQrDoneHint": "प्लांट से आपका प्रस्थान दर्ज हो गया है",
+    "scanExitQr": "निकास गेट QR स्कैन करें",
+    "scanExitQrHint": "गेट पर प्रस्थान की पुष्टि के लिए टैप करें"
   },
   "supervisor": {
     "teamStatus": "टीम की स्थिति",
@@ -475,7 +483,13 @@
     "workersAndSupervisors": "कर्मचारी और सुपरवाइजर",
     "securityTeam": "सुरक्षा टीम",
     "weekSaved": "सप्ताह की शिफ्ट सहेजी गई",
-    "noRotatingEmployees": "कोई रोटेटिंग कर्मचारी नहीं मिला"
+    "noRotatingEmployees": "कोई रोटेटिंग कर्मचारी नहीं मिला",
+    "deviceRegistrations": "डिवाइस रजिस्ट्रेशन",
+    "deviceRegistrationsHint": "प्रति कर्मचारी एक डिवाइस। नए फोन पर लॉगिन के लिए क्लियर करें।",
+    "noDevices": "अभी तक कोई डिवाइस रजिस्टर नहीं हुई",
+    "clearDeviceTitle": "डिवाइस रजिस्ट्रेशन हटाएं",
+    "clearDeviceConfirm": "{{name}} का डिवाइस रजिस्ट्रेशन हटाएं? उन्हें नए डिवाइस पर दोबारा लॉगिन करना होगा।",
+    "clearDeviceAction": "डिवाइस हटाएं"
   },
   "owner": {
     "kpiDashboard": "KPI डैशबोर्ड",

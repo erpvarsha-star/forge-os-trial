@@ -163,5 +163,23 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     return { data, error }
   }
 
-  return { records, todayRecord, isLoading, checkIn, checkOut, confirmQr, refresh: fetchRecords }
+  const confirmQrOut = async () => {
+    const date = istDateStr()
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .update({ check_out_qr_verified: true })
+      .eq('employee_id', employeeId)
+      .eq('date', date)
+      .select()
+      .single()
+
+    if (!error && data) {
+      setTodayRecord(data as AttendanceRecord)
+      await fetchRecords()
+    }
+
+    return { data, error }
+  }
+
+  return { records, todayRecord, isLoading, checkIn, checkOut, confirmQr, confirmQrOut, refresh: fetchRecords }
 }
