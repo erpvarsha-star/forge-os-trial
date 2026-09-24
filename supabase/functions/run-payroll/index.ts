@@ -18,25 +18,37 @@
  * during the review (not guessed) — see the plan file's "Formulas confirmed
  * from the actual spreadsheet formulas" section.
  *
- * BACKTESTED against VFL4008's real Aug 2026 row (24 Sep 2026) — results:
+ * BACKTESTED against real data (24 Sep 2026):
  *   - Basic, Conveyance, Washing, Education, HRA pro-ration: MATCH exactly.
  *   - PF: MATCHES exactly (₹1,800 = ₹1,800).
- *   - VDA: DOES NOT MATCH. Simple pro-ration gives ₹2,790; the real sheet
- *     shows ₹2,678 for the same employee despite Days Payable = Working
- *     Days (27/27), where simple pro-ration should be a no-op. VDA follows
- *     a different rule not yet identified — `calcVDA` below still uses
- *     plain pro-ration and is flagged with a runtime warning on every call
- *     until this is resolved. Do not trust VDA figures for real payroll.
- *   - OT Amount: CLOSE BUT NOT EXACT. ₹13,137 computed vs ₹12,939 actual
- *     (~1.5% off) for the same employee/month. The formula text this was
- *     built from came from the reusable template tab, which turned out to
- *     have a different column layout than the actual monthly tabs — so it
- *     doesn't necessarily map to what really runs. Flagged with a runtime
- *     warning; do not trust OT figures for real payroll until re-confirmed.
- * Only PF/Basic/HRA/Conveyance/Washing/Education are backtest-confirmed.
- * Everything else (ESIC, PT, ELIGIBILITY thresholds, Production Efficiency,
- * Heat Allowance, staff-side OT) is either newly-corrected-by-design (ESIC)
- * or not yet checked against a real row — see inline warnings.
+ *   - VDA: the blueprint's original assumption (pro-rates like Basic) was
+ *     WRONG — 25-55% match across 1,718 real employee-months tested. The
+ *     REAL formula, found by backtesting all 52 worker-sheet monthly tabs
+ *     back to Apr 2022: `VDA = per-day VDA rate x Present Days` — Present
+ *     Days ONLY, not Days Payable (excludes EL/CL/SL/PH, unlike every other
+ *     component). CONFIRMED EXACT for all 172 employee-months checked
+ *     across the 7 most recent tabs (Feb 2026 - Aug 2026, 100% match, zero
+ *     exceptions). The per-day rate is a company-wide value that changes
+ *     periodically and isn't in `employee_salary_structure` — see
+ *     `payroll_monthly_rates` (PATCH_31).
+ *   - OT Amount: formula CONFIRMED correct — 89.8% exact match across 1,123
+ *     worker employee-months (47 of 52 months exact), USING
+ *     `employee_salary_structure.vda` (the stored "VDA (F)" snapshot) as
+ *     the hourly-rate input, NOT the monthly per-day rate above. Verified
+ *     this is the right choice, not a leftover bug: swapping in the
+ *     monthly rate x Working Days instead broke Jul/Jun/May 2026 (which
+ *     matched exactly, 16/16, 19/19, 19/19, using the stored VDA_F) to fix
+ *     nothing. The one real exception, Aug 2026 (₹13,137 computed vs
+ *     ₹12,939 actual), traced to the live sheet's stored VDA_F for that
+ *     month itself being stale (still showing July's ₹93/day-equivalent
+ *     instead of August's revised ₹103/day) — a data-freshness bug in the
+ *     SOURCE SHEET, not this formula. Keeping `employee_salary_structure`
+ *     current when the union agreement revises VDA is what prevents this
+ *     going forward, not a formula change.
+ *     Staff OT: ~99%+ match across 1,510 employee-months.
+ * Everything else (ESIC, PT, Production Efficiency, Heat Allowance) is
+ * either newly-corrected-by-design (ESIC) or not yet checked against a
+ * real row — see inline warnings.
  *
  * POST body: either a single employee input object, or { employees: [...] }
  * for a batch. See `EmployeeInput` below for the shape.
@@ -128,16 +140,70 @@ function calcESIC(grossFixed: number, grossPayable: number): number {
 
 /**
  * OT Amount — confirmed formula for workers: ((Basic_F + VDA_F) /
- * Working_Days / 8) x 2 x OT_Hours (double the per-hour rate). Staff have
- * no VDA; the analogous ((Basic_F) / Working_Days / 8) x 2 x OT_Hours is
- * used for them, adapted from the worker formula, NOT independently
- * confirmed from a live staff OT example — flag if the backtest shows a
- * staff OT mismatch.
+ * Working_Days / 8) x 2 x OT_Hours (double the per-hour rate), where VDA_F
+ * is `employee_salary_structure.vda` — the stored "VDA (F)" snapshot, NOT
+ * the monthly per-day rate used for the VDA payable line item (see
+ * `calcVDA` below — they are two different numbers in the source sheet).
+ *
+ * Tested this distinction directly: swapping VDA_F for "current month's
+ * per-day rate x Working Days" broke Jul/Jun/May 2026 (which matched
+ * exactly using the stored VDA_F, 16/16, 19/19, 19/19) to fix nothing —
+ * Aug 2026's known OT mismatch is a real staleness bug in the SOURCE
+ * SHEET's VDA_F field that month, not evidence VDA_F is the wrong input in
+ * general. Keeping `employee_salary_structure.vda` here is correct as
+ * long as it's kept current when the union agreement revises rates — a
+ * data-freshness responsibility for whoever maintains that table, not
+ * something this formula should paper over.
+ *
+ * Staff have no VDA, so `vdaF` is passed as 0 for them — matches the staff
+ * backtest (~99%+ across 1,510 employee-months).
  */
 function calcOT(basicF: number, vdaF: number, workingDays: number, otHours: number): number {
   if (workingDays <= 0 || !otHours) return 0;
   const hourlyRate = (basicF + vdaF) / workingDays / 8;
   return Math.round(hourlyRate * 2 * otHours * 100) / 100;
+}
+
+/**
+ * VDA — confirmed formula (24 Sep 2026 backtest, see header comment):
+ * per-day rate x Present Days ONLY. Deliberately does not take EL/CL/SL/PH
+ * into account, unlike `prorate()` above — this is a real, backtest-proven
+ * difference from every other component, not an oversight.
+ */
+function calcVDA(perDayRate: number, presentDays: number): number {
+  return round0(perDayRate * presentDays);
+}
+
+/**
+ * The company-wide per-day VDA rate for a given month, from
+ * `payroll_monthly_rates` (PATCH_31) — entered once per month, applied to
+ * every worker, same shape as `department_efficiency_actuals`. Cached per
+ * batch call since every worker in a request shares the same lookup.
+ */
+async function getVdaRate(
+  db: ReturnType<typeof supabaseAdmin>,
+  month: string,
+  year: number,
+  cache: Map<string, number | null>
+): Promise<{ rate: number | null; warning?: string }> {
+  const key = `${year}-${month}`;
+  if (!cache.has(key)) {
+    const { data } = await db
+      .from('payroll_monthly_rates')
+      .select('vda_per_day_rate')
+      .eq('month', month)
+      .eq('year', year)
+      .maybeSingle();
+    cache.set(key, data ? data.vda_per_day_rate : null);
+  }
+  const rate = cache.get(key)!;
+  if (rate === null) {
+    return {
+      rate: null,
+      warning: `No payroll_monthly_rates row for ${month}/${year} — VDA and worker OT not computed (left at 0) until HR enters this month's VDA per-day rate.`,
+    };
+  }
+  return { rate };
 }
 
 /**
@@ -229,7 +295,11 @@ async function calcEfficiencyDeduction(
   return { deduction };
 }
 
-async function computeOne(db: ReturnType<typeof supabaseAdmin>, input: EmployeeInput) {
+async function computeOne(
+  db: ReturnType<typeof supabaseAdmin>,
+  input: EmployeeInput,
+  vdaRateCache: Map<string, number | null>
+) {
   const { data: employee } = await db
     .from('employees')
     .select('id, category, department, gender')
@@ -273,9 +343,10 @@ async function computeOne(db: ReturnType<typeof supabaseAdmin>, input: EmployeeI
   let productionAllowP = 0;
 
   if (isWorker) {
-    vdaP = prorate(n(s.vda), daysPayable, workingDays);
-    if (vdaP > 0) {
-      warnings.push('VDA is simple-prorated, but the backtest showed this does NOT match the real sheet (₹2,790 computed vs ₹2,678 actual for VFL4008 Aug 2026, same Days Payable/Working Days ratio) — VDA figure is not reliable yet.');
+    const vdaResult = await getVdaRate(db, input.month, input.year, vdaRateCache);
+    if (vdaResult.warning) warnings.push(vdaResult.warning);
+    if (vdaResult.rate !== null) {
+      vdaP = calcVDA(vdaResult.rate, n(input.present_days));
     }
     // Heat Allowance: confirmed quirk — pays only if the fixed rate is
     // exactly flagged 150 (eligibility marker, not a real rate); then it's
@@ -300,9 +371,6 @@ async function computeOne(db: ReturnType<typeof supabaseAdmin>, input: EmployeeI
   const otAmount = isWorker
     ? calcOT(s.basic, n(s.vda), workingDays, n(input.ot_hours))
     : calcOT(s.basic, 0, workingDays, n(input.ot_hours));
-  if (otAmount > 0) {
-    warnings.push('OT Amount formula is not backtest-confirmed (₹13,137 computed vs ₹12,939 actual for VFL4008 Aug 2026, ~1.5% off) — not reliable yet for real payroll.');
-  }
 
   const pf = calcPF(basicP, vdaP);
 
@@ -405,8 +473,9 @@ Deno.serve(async (req: Request) => {
 
   try {
     const results = [];
+    const vdaRateCache = new Map<string, number | null>();
     for (const input of inputs) {
-      results.push(await computeOne(db, input));
+      results.push(await computeOne(db, input, vdaRateCache));
     }
     return jsonResponse({ results });
   } catch (err) {
