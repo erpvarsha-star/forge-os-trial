@@ -24,24 +24,31 @@ export default function GateQrScreen() {
   const { employee } = useAuth()
   const [plant, setPlant] = useState<PlantConfig | null>(null)
   const [qrKey, setQrKey] = useState(istQrKey())
+  const [minutesRemaining, setMinutesRemaining] = useState(
+    () => 30 - (Math.floor((Date.now() + 5.5 * 60 * 60 * 1000) / 60000) % 30)
+  )
   const [isLoading, setIsLoading] = useState(true)
 
   const load = async () => {
     const config = await getPlantConfig()
     setPlant(config)
-    setQrKey(istQrKey())
+    const key = istQrKey()
+    setQrKey(key)
+    setMinutesRemaining(30 - (Math.floor((Date.now() + 5.5 * 60 * 60 * 1000) / 60000) % 30))
     setIsLoading(false)
   }
 
   useEffect(() => {
     load()
-    // Checks every minute for date or bucket change — bucket rolls every 30
-    // minutes, so a 1-minute tick is fast enough to pick it up promptly.
+    // Fires every minute. Updates both the QR key (when the bucket rolls over)
+    // and the countdown, so the guard sees a live "Expires in N min" that ticks
+    // down each minute without needing to tap anything.
     const interval = setInterval(() => {
       const next = istQrKey()
       setQrKey(current =>
         current.date === next.date && current.bucket === next.bucket ? current : next
       )
+      setMinutesRemaining(30 - (Math.floor((Date.now() + 5.5 * 60 * 60 * 1000) / 60000) % 30))
     }, 60_000)
     return () => clearInterval(interval)
   }, [])
@@ -53,8 +60,6 @@ export default function GateQrScreen() {
   // that forces a re-render when the bucket or date rolls over.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plant, qrKey])
-
-  const bucketMinutesRemaining = 30 - (Math.floor((Date.now() + 5.5 * 60 * 60 * 1000) / 60000) % 30)
 
   if (!employee || isLoading) return <LoadingScreen />
 
@@ -80,7 +85,7 @@ export default function GateQrScreen() {
             </Text>
             <Text className="text-lg font-bold text-ink-900 mb-1">{qrKey.date}</Text>
             <Text className="text-xs text-ink-500 mb-5">
-              {t('security.qrExpiresIn', { minutes: bucketMinutesRemaining })}
+              {t('security.qrExpiresIn', { minutes: minutesRemaining })}
             </Text>
 
             <View className="p-4 bg-white rounded-2xl border border-ink-100">
