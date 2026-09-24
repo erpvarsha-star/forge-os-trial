@@ -159,7 +159,17 @@
     "emptyTitle": "No forms listed",
     "emptyMessage": "No daily forms are set up for {{department}} yet. HR can add them.",
     "shiftIn": "submitted",
-    "shiftPending": "pending"
+    "shiftPending": "pending",
+    "myRequests": "My Requests",
+    "leaveApplication": "Leave Application",
+    "leaveApplicationSub": "View balance & apply",
+    "advanceRequest": "Advance Request",
+    "advanceRequestSub": "View history & apply",
+    "commonPending": "Google Form links coming soon",
+    "hrOperations": "HR Operations",
+    "shiftPlanning": "Shift Planning",
+    "shiftPlanningSub": "Assign shifts for the week",
+    "deptForms": "Department Forms"
   },
   "production": {
     "title": "Production this month",

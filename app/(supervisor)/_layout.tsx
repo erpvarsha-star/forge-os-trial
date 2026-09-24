@@ -17,6 +17,8 @@ export default function SupervisorLayout() {
         <Tabs.Screen name="shift-report" options={{ href: null }} />
         <Tabs.Screen name="casual-workers" options={{ href: null }} />
         <Tabs.Screen name="5s-verify" options={{ href: null }} />
+        <Tabs.Screen name="leave" options={{ href: null }} />
+        <Tabs.Screen name="advance" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )

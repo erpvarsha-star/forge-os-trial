@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router'
 import { RoleGate } from '@/components/RoleGate'
 import { useTranslation } from 'react-i18next'
-import { Home, Calendar, Trophy, FileText, MoreHorizontal } from 'lucide-react-native'
+import { Home, Calendar, Trophy, ClipboardCheck, MoreHorizontal } from 'lucide-react-native'
 
 export default function WorkerLayout() {
   const { t } = useTranslation()
@@ -38,10 +38,10 @@ export default function WorkerLayout() {
           }}
         />
         <Tabs.Screen
-          name="leave"
+          name="forms"
           options={{
-            title: t('common.leave'),
-            tabBarIcon: ({ color }) => <FileText size={22} color={color} />,
+            title: t('forms.tab'),
+            tabBarIcon: ({ color }) => <ClipboardCheck size={22} color={color} />,
           }}
         />
         <Tabs.Screen
@@ -51,7 +51,8 @@ export default function WorkerLayout() {
             tabBarIcon: ({ color }) => <MoreHorizontal size={22} color={color} />,
           }}
         />
-        {/* Hidden screens — navigated to programmatically, not shown in tab bar */}
+        {/* Hidden screens — navigated to programmatically */}
+        <Tabs.Screen name="leave" options={{ href: null }} />
         <Tabs.Screen name="advance" options={{ href: null }} />
         <Tabs.Screen name="payslip" options={{ href: null }} />
         <Tabs.Screen name="5s" options={{ href: null }} />

@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router'
 import { RoleGate } from '@/components/RoleGate'
 import { useTranslation } from 'react-i18next'
-import { BarChart3, TrendingUp, CheckCircle, Bell, MoreHorizontal } from 'lucide-react-native'
+import { BarChart3, TrendingUp, CheckCircle, Bell, ClipboardCheck, MoreHorizontal } from 'lucide-react-native'
 
 export default function OwnerLayout() {
   const { t } = useTranslation()
@@ -12,8 +12,11 @@ export default function OwnerLayout() {
         <Tabs.Screen name="kpi" options={{ title: t('owner.kpiDashboard'), tabBarIcon: ({ color }) => <TrendingUp size={22} color={color} /> }} />
         <Tabs.Screen name="approvals" options={{ title: t('common.approvals'), tabBarIcon: ({ color }) => <CheckCircle size={22} color={color} /> }} />
         <Tabs.Screen name="alerts" options={{ title: t('owner.fraudAlerts'), tabBarIcon: ({ color }) => <Bell size={22} color={color} /> }} />
+        <Tabs.Screen name="forms" options={{ title: t('forms.tab'), tabBarIcon: ({ color }) => <ClipboardCheck size={22} color={color} /> }} />
         <Tabs.Screen name="more" options={{ title: t('common.more'), tabBarIcon: ({ color }) => <MoreHorizontal size={22} color={color} /> }} />
         <Tabs.Screen name="eotm" options={{ href: null }} />
+        <Tabs.Screen name="leave" options={{ href: null }} />
+        <Tabs.Screen name="advance" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )

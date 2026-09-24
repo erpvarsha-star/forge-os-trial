@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router'
 import { RoleGate } from '@/components/RoleGate'
 import { useTranslation } from 'react-i18next'
-import { BarChart3, CheckCircle, FileText, Mail, MoreHorizontal } from 'lucide-react-native'
+import { BarChart3, CheckCircle, FileText, Mail, ClipboardCheck, MoreHorizontal } from 'lucide-react-native'
 
 export default function PlantHeadLayout() {
   const { t } = useTranslation()
@@ -12,7 +12,10 @@ export default function PlantHeadLayout() {
         <Tabs.Screen name="approvals" options={{ title: t('common.approvals'), tabBarIcon: ({ color }) => <CheckCircle size={22} color={color} /> }} />
         <Tabs.Screen name="mrm" options={{ title: 'MRM', tabBarIcon: ({ color }) => <FileText size={22} color={color} /> }} />
         <Tabs.Screen name="email" options={{ title: t('plantHead.emailDashboard'), tabBarIcon: ({ color }) => <Mail size={22} color={color} /> }} />
+        <Tabs.Screen name="forms" options={{ title: t('forms.tab'), tabBarIcon: ({ color }) => <ClipboardCheck size={22} color={color} /> }} />
         <Tabs.Screen name="more" options={{ title: t('common.more'), tabBarIcon: ({ color }) => <MoreHorizontal size={22} color={color} /> }} />
+        <Tabs.Screen name="leave" options={{ href: null }} />
+        <Tabs.Screen name="advance" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )

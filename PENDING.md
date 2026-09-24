@@ -3,7 +3,18 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 25 Oct 2026 (session 10) — PATCH_40: permissions onboarding + FRESH_INSTALL script
+**Last updated:** 24 Sep 2026 (session 11) — PATCH_41: Forms tab for all 7 roles, My Requests banner, common forms
+
+**PATCH_41 (24 Sep 2026, session 11):** Forms tab reorganization across all 7 roles.
+- `components/FormsScreen.tsx` — completely rewritten with three conditional sections: "My Requests" (all roles: Leave + Advance + common Google Forms from DB), "HR Operations" (hr_admin only: Shift Planning), "Department Forms" (supervisor/manager/security: deadline strip + dept form_links).
+- `components/LeaveScreen.tsx` + `components/AdvanceScreen.tsx` — new shared components; each role's leave.tsx/advance.tsx is now a one-line wrapper around these.
+- Worker: Leave tab replaced with Forms tab. Leave + Advance are now hidden routes navigated from the My Requests banner.
+- HR Admin: Shift Planning tab replaced with Forms tab. Shifts accessible as hidden route from Forms → HR Operations banner.
+- Plant Head + Owner: Forms tab added (now 6 tabs each).
+- Security: Vehicle Log removed from tab bar (hidden route); Forms tab kept.
+- Supervisor + Manager: Forms tab already existed; leave + advance added as hidden routes.
+- `scripts/PATCH_41_common_forms_banner.sql` — `is_common` column on `form_links`; 3 placeholder rows for Gate Pass, Cash Expenses, Hospital Form. **Yash must update the 3 placeholder URLs with real Google Form links.**
+- DB change already applied via Supabase MCP.
 
 **PATCH_40 (25 Oct 2026, session 10):** Permissions onboarding + update check already built.
 - `lib/permissions.ts` — `requestAllPermissions()` requests location, camera, notifications in sequence upfront, so employees never see a surprise system dialog mid-flow.

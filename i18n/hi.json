@@ -159,7 +159,17 @@
     "emptyTitle": "कोई फ़ॉर्म नहीं",
     "emptyMessage": "{{department}} के लिए अभी कोई दैनिक फ़ॉर्म सेट नहीं है। एचआर इन्हें जोड़ सकते हैं।",
     "shiftIn": "जमा हो गया",
-    "shiftPending": "बाकी है"
+    "shiftPending": "बाकी है",
+    "myRequests": "मेरी अर्जियाँ",
+    "leaveApplication": "छुट्टी आवेदन",
+    "leaveApplicationSub": "बैलेंस देखें व आवेदन करें",
+    "advanceRequest": "अग्रिम अनुरोध",
+    "advanceRequestSub": "इतिहास देखें व आवेदन करें",
+    "commonPending": "गूगल फ़ॉर्म लिंक जल्द आएंगे",
+    "hrOperations": "एचआर संचालन",
+    "shiftPlanning": "शिफ़्ट योजना",
+    "shiftPlanningSub": "सप्ताह के लिए शिफ़्ट असाइन करें",
+    "deptForms": "विभाग फ़ॉर्म"
   },
   "production": {
     "title": "इस माह का उत्पादन",
