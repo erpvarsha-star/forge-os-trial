@@ -89,6 +89,76 @@ round-trip once there's device access to confirm.
 
 ---
 
+## 🔴 Push notifications never actually worked for anyone — found and fixed 24 Sep 2026
+
+Reported: no OS-level push/badge for anyone, notifications only ever seen
+after opening the app; asked to verify push works and that check-in data
+starts recording reliably from 1 Oct.
+
+**Root cause 1 (FIXED, code): `push_tokens` was completely empty — 0 rows,
+for every single employee including the owner.** `app/(auth)/login.tsx`
+called `registerForPushNotificationsAsync(session.user.id)` — but
+`push_tokens.user_id` is a foreign key to `employees(id)`, not
+`auth.users`. `session.user.id` is the auth user's own id, a different
+UUID. Every registration attempt violated that FK and was silently
+discarded (`lib/notifications.ts` deliberately never throws, so a push
+failure can't strand someone on the login screen after a real login
+success) — so `push_tokens` has been empty since push was first wired up,
+despite "FCM push confirmed 9 Sep 2026" elsewhere in this file (that
+confirmed the edge function secret was set, not that any token had ever
+actually reached the table). This fully explains the reported symptom —
+there was never anything to send a real push to, for anyone, ever.
+Fixed by moving registration into `useAuth`'s `loadEmployee` (which has
+the correct `employee.id`, and fires on every app launch — including an
+already-logged-in session resuming, not just a fresh login — so simply
+*opening* the new build re-registers, no forced logout/login needed).
+
+**Root cause 2 (NOT a code bug — a data/process gap): `employee_shifts` is
+completely empty — 0 rows, ever, for anyone.** This is why the "Shift
+starting soon" / "You haven't checked in yet" reminders
+(`shift-reminder`'s `daily_checkin_reminder` mode) have never fired even
+once — confirmed by `notifications` type counts: `form_due_reminder`
+(2,391) and `shift_gap_alert` (174, weekly, to HR/plant_head — "nobody has
+a shift assigned") both fire regularly and are current as of today, but
+`checkin_reminder`/`missed_checkin_reminder`/`weekly_shift_assigned` have
+**zero rows, ever**. The mechanism needs an `employee_shifts` row for that
+employee that day to know when their shift starts; with none, there's
+nothing to trigger off. **This needs a real HR action, not a guess from
+me**: assign shifts via `(hr-admin)/shifts.tsx`. Check-in itself does NOT
+require a shift assignment (`home.tsx`'s `handleCheckIn` treats "no shift"
+as just "not late" and proceeds normally) — so tomorrow's check-in rollout
+itself is not blocked by this, only the proactive reminder pushes are.
+
+**Checked and ruled out**: every `cron.job` row calling these functions
+(`shift-reminder`, `mrm-reminder`, etc.) has a literal, never-substituted
+`Authorization: Bearer PASTE_YOUR_KEY_HERE` header — looks alarming, but
+confirmed harmless: all of them have `verify_jwt: false`
+(`list_edge_functions`), so the gateway never checks that header. Real
+activity (form/mrm reminders firing today) confirms this. Worth tidying
+eventually, not worth chasing under this deadline.
+
+**Yash's own attendance IS recording correctly** — checked directly:
+VFL1001 has 4 real `attendance_records` rows in September (4th, 10th,
+14th, 23rd, all `status: 'P'` with a real `check_in_time`). The check-in
+mechanism itself works; "no count of attendance" is very likely about
+there being no personal attendance-count view anywhere in the `(owner)`
+screens (the role has no equivalent of `worker/attendance.tsx`), not
+missing data. Worth adding a small stat if wanted, not chased further
+without confirming that's actually what's meant.
+
+**"Welcome to Varsha" onboarding message does not exist anywhere in the
+code** — nothing to fix, would need to be built new (e.g. triggered once
+after first PIN change via `mark_pin_changed`). Not built yet — holding
+off until confirmed it's wanted as a real feature vs. just an example
+message for testing delivery.
+
+**Still needed before a real test push can be sent to anyone**: at least
+one device needs to be on the new build (with the `push_tokens` fix) and
+have opened the app once. `push_tokens` is currently still empty — cannot
+verify FCM delivery end-to-end until that happens.
+
+---
+
 ## 🟡 Salary consolidation — in progress, started 24 Sep 2026
 
 Replacing 6 Google Sheets (worker + staff calc engines, worker + staff
