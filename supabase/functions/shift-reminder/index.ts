@@ -158,7 +158,7 @@ async function dailyCheckinReminder(db: ReturnType<typeof supabaseAdmin>) {
 
   const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
 
-  // Shifts whose start time falls within the next 30 minutes.
+  // Shifts whose start time falls within the next 30 minutes (pre-shift reminder).
   const dueShifts = (schedule.shifts ?? []).filter((s) => {
     const [h, m] = (s.start ?? '').split(':').map(Number);
     if (Number.isNaN(h) || Number.isNaN(m)) return false;
@@ -166,20 +166,32 @@ async function dailyCheckinReminder(db: ReturnType<typeof supabaseAdmin>) {
     return diff >= 0 && diff <= 30;
   });
 
-  if (dueShifts.length === 0) {
-    return { today, remindedShiftTypes: [], notified: 0 };
+  // Shifts that started 45-105 minutes ago (missed check-in reminder).
+  // The 60-minute window ensures exactly one hourly run catches each shift.
+  const missedShifts = (schedule.shifts ?? []).filter((s) => {
+    const [h, m] = (s.start ?? '').split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return false;
+    let postDiff = nowMinutes - (h * 60 + m);
+    if (postDiff < -12 * 60) postDiff += 24 * 60; // handle night-shift day wrap
+    return postDiff >= 45 && postDiff < 105;
+  });
+
+  if (dueShifts.length === 0 && missedShifts.length === 0) {
+    return { today, remindedShiftTypes: [], notified: 0, missedCheckinReminders: 0 };
   }
 
   const dueShiftNames = dueShifts.map((s) => s.shift);
   const dueStartTimes = dueShifts.map((s) => s.start);
+  const missedStartTimes = missedShifts.map((s) => s.start);
 
-  // employee_shifts joined with shifts master — filter by shift start_time
+  // employee_shifts joined with shifts master — covers both pre-shift and missed checks
   const { data: assignments } = await db
     .from('employee_shifts')
     .select('employee_id, shift:shifts(name, start_time)')
     .eq('date', today);
 
-  const employeeIds = Array.from(
+  // Pre-shift reminder
+  const preShiftIds = Array.from(
     new Set<string>(
       (assignments ?? [])
         .filter((a: { shift?: { start_time?: string } }) => dueStartTimes.includes(a.shift?.start_time ?? ''))
@@ -187,16 +199,47 @@ async function dailyCheckinReminder(db: ReturnType<typeof supabaseAdmin>) {
     )
   );
 
-  if (employeeIds.length > 0) {
+  if (preShiftIds.length > 0) {
     await notifyEmployees(db, {
-      employeeIds,
+      employeeIds: preShiftIds,
       type: 'checkin_reminder',
       title: 'Shift starting soon',
       body: 'Your shift starts within 30 minutes. Check in with GPS + QR at the gate.',
     });
   }
 
-  return { today, remindedShiftTypes: dueShiftNames, notified: employeeIds.length };
+  // Missed check-in reminder: employees whose shift started 45+ min ago with no check_in_time
+  let missedCount = 0;
+  if (missedShifts.length > 0) {
+    const { data: presentToday } = await db
+      .from('attendance_records')
+      .select('employee_id')
+      .eq('date', today)
+      .not('check_in_time', 'is', null);
+
+    const presentIds = new Set<string>((presentToday ?? []).map((r: { employee_id: string }) => r.employee_id));
+
+    const missedIds = Array.from(
+      new Set<string>(
+        (assignments ?? [])
+          .filter((a: { shift?: { start_time?: string } }) => missedStartTimes.includes(a.shift?.start_time ?? ''))
+          .map((a: { employee_id: string }) => a.employee_id)
+          .filter((id: string) => !presentIds.has(id))
+      )
+    );
+
+    if (missedIds.length > 0) {
+      await notifyEmployees(db, {
+        employeeIds: missedIds,
+        type: 'missed_checkin_reminder',
+        title: "You haven't checked in yet",
+        body: 'Your shift started over 45 minutes ago. Tap to check in with GPS.',
+      });
+      missedCount = missedIds.length;
+    }
+  }
+
+  return { today, remindedShiftTypes: dueShiftNames, notified: preShiftIds.length, missedCheckinReminders: missedCount };
 }
 
 /**

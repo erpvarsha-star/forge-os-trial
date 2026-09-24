@@ -15,7 +15,7 @@ import { supabase } from '@/lib/supabase'
 import { getDeviceId } from '@/lib/deviceId'
 import { EmployeeShift } from '@/types'
 import { MAX_DAILY_OBSERVATIONS } from '@/constants'
-import { MapPin, Clock, CheckSquare, AlertCircle, Camera, QrCode, CheckCircle2, Calendar, ChevronRight } from 'lucide-react-native'
+import { MapPin, Clock, CheckSquare, AlertCircle, Camera, QrCode, CheckCircle2, Calendar, ChevronRight, Star } from 'lucide-react-native'
 import { router } from 'expo-router'
 import * as Location from 'expo-location'
 
@@ -268,6 +268,39 @@ export default function WorkerHome() {
               )}
             </View>
           </View>
+
+          {/* QR star card — visible once GPS check-in is recorded */}
+          {(isCheckedIn || isCheckedOut) && (
+            todayRecord?.qr_verified ? (
+              <View className="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden">
+                <View className="px-5 py-4 flex-row items-center gap-3">
+                  <View className="w-10 h-10 rounded-full bg-amber-50 items-center justify-center">
+                    <Star size={22} color="#D97706" fill="#D97706" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-sm font-bold text-ink-900">{t('worker.qrStarEarned')}</Text>
+                    <Text className="text-xs text-ink-500">{t('worker.qrStarEarnedHint')}</Text>
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={() => router.push('/(worker)/qr')}
+                className="bg-white rounded-2xl border border-brand-200 shadow-sm overflow-hidden"
+              >
+                <View className="px-5 py-4 flex-row items-center gap-3">
+                  <View className="w-10 h-10 rounded-full bg-brand-50 items-center justify-center">
+                    <QrCode size={22} color="#E65C00" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-sm font-bold text-ink-900">{t('worker.scanQrForStar')}</Text>
+                    <Text className="text-xs text-ink-500">{t('worker.scanQrForStarHint')}</Text>
+                  </View>
+                  <ChevronRight size={18} color="#9CA3AF" />
+                </View>
+              </TouchableOpacity>
+            )
+          )}
 
           {isCheckedIn && (
             <Card>

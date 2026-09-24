@@ -102,7 +102,7 @@ async function computeAttendanceAndOnTime(
 ) {
   const { data: rows } = await db
     .from('attendance_records')
-    .select('status, late_minutes')
+    .select('status, late_minutes, qr_verified')
     .eq('employee_id', employeeId)
     .gte('date', start)
     .lte('date', end);
@@ -114,12 +114,15 @@ async function computeAttendanceAndOnTime(
   // constraint forbids — they could never appear, so those were dead branches.
   const presentRows = workingDayRows.filter((r: { status: string }) => ['P', 'HL'].includes(r.status));
   const onTimeRows = presentRows.filter((r: { late_minutes: number }) => (r.late_minutes ?? 0) === 0);
+  // GPS only = 50% of attendance score weight; GPS + QR = full 100%.
+  const qrRows = presentRows.filter((r: { qr_verified: boolean }) => r.qr_verified === true);
 
   const attendanceRatio = workingDayRows.length > 0 ? presentRows.length / workingDayRows.length : 0;
   const onTimeRatio = presentRows.length > 0 ? onTimeRows.length / presentRows.length : 0;
+  const qrRatio = presentRows.length > 0 ? qrRows.length / presentRows.length : 0;
   const lcCount = presentRows.length - onTimeRows.length;
 
-  return { attendanceRatio, onTimeRatio, lcCount, presentDays: presentRows.length };
+  return { attendanceRatio, onTimeRatio, qrRatio, lcCount, presentDays: presentRows.length };
 }
 
 /**
@@ -359,7 +362,7 @@ Deno.serve(async (req: Request) => {
 
       const weights = SCORE_WEIGHTS[category];
 
-      const { attendanceRatio, onTimeRatio, lcCount, presentDays } = await computeAttendanceAndOnTime(db, employee.id, start, end);
+      const { attendanceRatio, onTimeRatio, qrRatio, lcCount, presentDays } = await computeAttendanceAndOnTime(db, employee.id, start, end);
       const { ratio: taskRatio, onTimeAll, total: taskTotal } = await computeTaskRatio(db, employee.id, start, end);
       const kpiRatio = await computeKpiRatio(db, category, employee.department, monthStr, year, taskRatio);
       const teamControlRatio =
@@ -370,7 +373,8 @@ Deno.serve(async (req: Request) => {
       const fiveSScore = await computeFiveSScore(db, employee.id, start, end);
       const safetyScore = await computeSafetyScore(db, employee.id, start, end);
 
-      const attendanceScore = attendanceRatio * weights.attendance;
+      // GPS only = 50% of attendance weight; GPS + QR gate scan = full 100%.
+      const attendanceScore = (attendanceRatio * 0.5 + qrRatio * 0.5) * weights.attendance;
       const ontimeScore = onTimeRatio * weights.ontime;
       const taskScore = taskRatio * weights.task;
       const kpiScore = kpiRatio * weights.kpi;

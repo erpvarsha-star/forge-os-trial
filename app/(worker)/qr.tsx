@@ -5,17 +5,21 @@ import { useAuth } from '@/hooks/useAuth'
 import { useAttendance } from '@/hooks/useAttendance'
 import { Header } from '@/components/Header'
 import { Card } from '@/components/Card'
-import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
-import { getCurrentLocation, getPlantConfig, isInsideGeofence } from '@/lib/location'
-import { supabase } from '@/lib/supabase'
+import {
+  getCurrentLocation,
+  getPlantConfig,
+  getPlantLocations,
+  isInsideAnyGeofence,
+  isInsideGeofence,
+} from '@/lib/location'
 import { BarCodeScanner } from 'expo-barcode-scanner'
-import { QrCode, ScanLine, CameraOff } from 'lucide-react-native'
+import { QrCode, CameraOff, MapPin, Star } from 'lucide-react-native'
 
 export default function QRScreen() {
   const { t } = useTranslation()
   const { employee } = useAuth()
-  const { todayRecord, checkIn, refresh } = useAttendance(employee?.id || '')
+  const { todayRecord, confirmQr, refresh } = useAttendance(employee?.id || '')
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
   const [scanned, setScanned] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -33,12 +37,6 @@ export default function QRScreen() {
     setScanned(true)
     setIsLoading(true)
 
-    if (todayRecord?.check_in_time) {
-      Alert.alert(t('common.warning'), t('worker.alreadyCheckedIn'))
-      setIsLoading(false)
-      return
-    }
-
     const plant = await getPlantConfig()
     if (!plant) {
       Alert.alert(t('common.error'), 'Plant config not found')
@@ -53,13 +51,17 @@ export default function QRScreen() {
       return
     }
 
-    const inside = isInsideGeofence(
-      location.coords.latitude,
-      location.coords.longitude,
-      plant.latitude,
-      plant.longitude,
-      plant.geofence_radius_meters
-    )
+    const plantLocations = await getPlantLocations()
+    const inside =
+      plantLocations.length > 0
+        ? isInsideAnyGeofence(location.coords.latitude, location.coords.longitude, plantLocations)
+        : isInsideGeofence(
+            location.coords.latitude,
+            location.coords.longitude,
+            plant.latitude,
+            plant.longitude,
+            plant.geofence_radius_meters
+          )
 
     if (!inside) {
       Alert.alert(t('common.warning'), t('worker.outsidePlant'))
@@ -70,29 +72,20 @@ export default function QRScreen() {
     const today = new Date().toISOString().split('T')[0]
     const expectedQr = `${plant.id}-${today}-${plant.qr_secret_salt}`
 
-    // ⚠ DELIBERATE INTERIM GAP, DOCUMENTED 13 Aug 2026. The second condition
-    // accepts ANY scanned code that merely CONTAINS the plant code
-    // (plant.id, e.g. 'VFL-AKT') — which is public, printed on ID cards, and
-    // in this repository. That branch ignores qr_secret_salt entirely, so
-    // right now the geofence (100m radius, checked above) is the only real
-    // gate control; QR adds no security of its own.
-    //
-    // Not fixed here on purpose. app/(security)/gate-qr.tsx now exists to
-    // display the real, salted daily code — but nothing generates or prints
-    // a QR at the gate today, so removing this fallback before that screen is
-    // actually in daily use would lock out all 129 people at shift change.
-    // Once gate-qr.tsx is confirmed running at the gate, drop the
-    // `|| data.includes(plant.id)` half of this check and require an exact
-    // match against expectedQr.
-    if (data !== expectedQr && !data.includes(plant.id)) {
+    if (data !== expectedQr) {
       Alert.alert(t('common.error'), t('worker.invalidQr'))
       setIsLoading(false)
       return
     }
 
-    await checkIn(location.coords.latitude, location.coords.longitude)
-    await refresh()
-    Alert.alert(t('common.success'), t('common.checkedIn'))
+    const { error } = await confirmQr()
+    if (error) {
+      Alert.alert(t('common.error'), t('common.somethingWentWrong'))
+      setScanned(false)
+    } else {
+      await refresh()
+      Alert.alert(t('common.success'), t('worker.qrConfirmedBody'))
+    }
     setIsLoading(false)
   }
 
@@ -110,35 +103,59 @@ export default function QRScreen() {
     )
   }
 
+  // No GPS check-in yet — must check in with GPS first
+  if (!todayRecord?.check_in_time) {
+    return (
+      <View className="flex-1 bg-ink-50">
+        <Header empCode={employee.emp_code} role={employee.role} />
+        <View className="flex-1 items-center justify-center p-6">
+          <View className="w-16 h-16 rounded-full bg-brand-50 items-center justify-center mb-4">
+            <MapPin size={32} color="#E65C00" />
+          </View>
+          <Text className="text-base font-bold text-ink-900 mb-2 text-center">{t('worker.gpsFirstRequired')}</Text>
+          <Text className="text-sm text-ink-500 text-center px-4">{t('worker.gpsFirstRequiredHint')}</Text>
+        </View>
+      </View>
+    )
+  }
+
+  // QR already confirmed — star already earned
+  if (todayRecord?.qr_verified) {
+    return (
+      <View className="flex-1 bg-ink-50">
+        <Header empCode={employee.emp_code} role={employee.role} />
+        <View className="flex-1 items-center justify-center p-6">
+          <View className="w-16 h-16 rounded-full bg-amber-50 items-center justify-center mb-4">
+            <Star size={32} color="#D97706" fill="#D97706" />
+          </View>
+          <Text className="text-base font-bold text-ink-900 mb-2 text-center">{t('worker.qrStarAlreadyEarned')}</Text>
+          <Text className="text-sm text-ink-500 text-center px-4">{t('worker.qrStarEarnedHint')}</Text>
+        </View>
+      </View>
+    )
+  }
+
+  // GPS checked in, QR not yet confirmed — show scanner
   return (
     <View className="flex-1 bg-ink-50">
       <Header empCode={employee.emp_code} role={employee.role} />
       <View className="flex-1 p-4">
-        {!todayRecord?.check_in_time && (
-          <Text className="text-xs text-ink-500 text-center mb-3 px-2">{t('worker.qrHint')}</Text>
-        )}
+        <Text className="text-xs text-ink-500 text-center mb-3 px-2">{t('worker.qrHint')}</Text>
         <Card className="flex-1 items-center justify-center">
-          {todayRecord?.check_in_time ? (
-            <View className="items-center">
-              <QrCode size={64} className="text-green-600 mb-4" />
-              <Text className="text-lg font-bold text-green-600">{t('worker.alreadyCheckedIn')}</Text>
+          <View className="w-full h-full">
+            <BarCodeScanner
+              onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View className="absolute inset-0 items-center justify-center">
+              <View className="w-48 h-48 border-2 border-brand-500 rounded-lg opacity-50" />
             </View>
-          ) : (
-            <View className="w-full h-full">
-              <BarCodeScanner
-                onBarCodeScanned={handleBarCodeScanned}
-                style={StyleSheet.absoluteFillObject}
-              />
-              <View className="absolute inset-0 items-center justify-center">
-                <View className="w-48 h-48 border-2 border-brand-500 rounded-lg opacity-50" />
-              </View>
-              <View className="absolute bottom-8 left-0 right-0 items-center">
-                <Text className="text-white text-sm bg-black/50 px-4 py-2 rounded-full">
-                  {t('worker.scanQr')}
-                </Text>
-              </View>
+            <View className="absolute bottom-8 left-0 right-0 items-center">
+              <Text className="text-white text-sm bg-black/50 px-4 py-2 rounded-full">
+                {scanned ? t('common.loading') : t('worker.scanQr')}
+              </Text>
             </View>
-          )}
+          </View>
         </Card>
       </View>
     </View>
