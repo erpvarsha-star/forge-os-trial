@@ -3,7 +3,18 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 24 Sep 2026 (session 4) — GPS + QR dual check-in (GPS=50%, GPS+QR=100% attendance score); security QR first tab; missed check-in push notification. `scripts/ALERT.gs` updated to v4 (23 Sep 2026): hourly trigger topology, Phase 2 recipient routing, health watchdog, Cutting 2-shift config, DME Telegram, `setupDynamicSupervisorTabs()` disabled to prevent accidental SUPERVISOR_MAP wipe; all 4 live secrets blanked before commit. `form_links` sync: DB already matches v4 DEPT_FORM_SEED exactly (31 rows) — no changes needed. Manager layout: team tab hidden, "View Team →" on dashboard — already done in prior session. APK build triggers on push. Remaining open: APPS_SCRIPT_URL, supervisor Telegram onboarding (5 missing: Subhash Palve, Shivaji Jaypure, Manoj Wagh, Sunil Saha, Abhimanyu Kakde), per-form tracking. Action for Yash: (1) paste updated `scripts/ALERT.gs` into live Apps Script editor, run `deployShiftTrackingTriggers()`; (2) HR Admin must assign supervisor_id for Cutting/Press/Machine/HT/Electricity/Oil/VMC supervisors.
+**Last updated:** 24 Sep 2026 (session 5) — Salary consolidation kicked off:
+reviewed all 6 payroll-related spreadsheets (5 shared + 1 found via formula
+trace), confirmed the calculation is a real formula engine (CTC breakup +
+statutory rates), got a full implementation blueprint approved, and shipped
+**PATCH_28** (schema only — new `employee_salary_structure`, `pt_slabs`
+[seeded with real Maharashtra slabs], `efficiency_incentive_slabs` [Forge
+Shop only], `payroll_records` extended, `employees.gender` added,
+`leave_requests.type` extended for COFF/OD). See "🟡 Salary consolidation"
+section below for full status and next steps. Nothing app-visible changed
+yet — this is schema-only, existing screens all still work unchanged.
+
+**Previous session (24 Sep, session 4):** GPS + QR dual check-in (GPS=50%, GPS+QR=100% attendance score); security QR first tab; missed check-in push notification. `scripts/ALERT.gs` updated to v4 (23 Sep 2026): hourly trigger topology, Phase 2 recipient routing, health watchdog, Cutting 2-shift config, DME Telegram, `setupDynamicSupervisorTabs()` disabled to prevent accidental SUPERVISOR_MAP wipe; all 4 live secrets blanked before commit. `form_links` sync: DB already matches v4 DEPT_FORM_SEED exactly (31 rows) — no changes needed. Manager layout: team tab hidden, "View Team →" on dashboard — already done in prior session. APK build triggers on push. Remaining open: APPS_SCRIPT_URL, supervisor Telegram onboarding (5 missing: Subhash Palve, Shivaji Jaypure, Manoj Wagh, Sunil Saha, Abhimanyu Kakde), per-form tracking. Action for Yash: (1) paste updated `scripts/ALERT.gs` into live Apps Script editor, run `deployShiftTrackingTriggers()`; (2) HR Admin must assign supervisor_id for Cutting/Press/Machine/HT/Electricity/Oil/VMC supervisors.
 
 ---
 
@@ -22,6 +33,90 @@ Gamma, Wix, Mem**.
 
 Corollary: **commit and push after every completed step.** Power and internet
 drop frequently at this site; work must never be lost mid-task.
+
+---
+
+## 🟡 Salary consolidation — in progress, started 24 Sep 2026
+
+Replacing 6 Google Sheets (worker + staff calc engines, worker + staff
+payslip generators, one shared leave sheet, one empty placeholder) with one
+system inside Forge OS. Full findings + approved implementation blueprint:
+`/root/.claude/plans/zazzy-sauteeing-crystal.md` (this plan file is local to
+the session that wrote it — if it's not accessible in a future session, the
+key facts are summarized below; ask Yash to re-share source docs if the
+detailed formulas are needed again).
+
+**Confirmed design decisions (don't re-litigate these):**
+- Confirmed-days entry (Present/EL/CL/SL/PH/Working Days) stays 100% manual,
+  checked by Dept Heads → Accounts → HR — never automated from
+  `attendance_records`. The only change: HR's screen shows Forge OS's own
+  attendance figure alongside the entry field for their existing cross-check.
+- **Dual input path, not app-only**: both a consolidated Google Sheet (synced
+  via a new Apps Script, same pattern as `syncOpsDashboardToSupabase()`) and
+  in-app HR-Admin screens write into the same tables — this site's frequent
+  power/internet drops mean payroll can't depend on the app alone.
+- Leave allocation is a **fixed annual grant**, not accrued — simpler than
+  first assumed. `leave_requests`/`leave_balances` already fit this shape.
+- Staff production incentive maps to Forge OS's own `monthly_scores`
+  (on-time + form submission) — but the payout tiers are **deliberately
+  deferred ~3 months** until there's real app usage to calibrate against.
+- A bank disbursement statement (printable, stamped, submitted to the bank)
+  needs to be downloadable from the app — format still needs Yash to confirm
+  (PDF letter vs. a specific bulk-upload CSV/Excel the bank wants).
+- **Parallel run required before the old sheets are retired** — old sheets
+  and the new engine run side by side for an agreed number of real payroll
+  cycles (2 months suggested, not fixed), every component compared, not just
+  net pay. Non-negotiable given real statutory numbers are involved.
+
+### ✅ Phase 1 — schema — DONE 24 Sep 2026
+
+`PATCH_28_payroll_schema_24Sep2026.sql` — applied via Supabase MCP, verified
+clean (no new security-advisor findings). Schema-only: no app screens changed,
+`payslip.tsx` and existing payroll reads work exactly as before.
+
+- `employees.gender` added (needed for PT — the real slabs are
+  gender-differentiated). Existing rows are NULL; needs backfilling before
+  PT can compute correctly for anyone.
+- `employee_salary_structure` — new table for CTC + every fixed component +
+  bank/UAN/PAN/ESI details. **Created empty** — seeding from the master
+  spreadsheet is Phase 2, gated on Yash confirming that source data is
+  current (see below).
+- `pt_slabs` — **seeded with real data** Yash shared 24 Sep (Maharashtra
+  slabs, male/female, February ₹300 true-up noted in `remarks`).
+- `efficiency_incentive_slabs` — seeded with Forge Shop's real Union
+  Agreement slabs (01/09/25–31/08/26 period) from the PDF Yash shared.
+  **Forge Shop only** — whether other worker departments have their own
+  agreements is still unconfirmed.
+- `payroll_records` extended: `working_days, present_days, el, cl, sl, ph,
+  days_payable, ot_hours, canteen, society, mlwf, arrears,
+  dispatch_incentive, other_allowance, production_efficiency_deduction,
+  status, updated_at` (+ trigger to auto-set `updated_at`, reusing the
+  existing `set_updated_at()` function).
+- `leave_requests.type` CHECK extended to add `COFF`/`OD` (Compensatory Off,
+  Outdoor Duty — confirmed live categories tracked via the same application
+  form, just via a type value the schema didn't have room for).
+
+### ⏳ Still needed before Phase 2 (data seed) can start
+
+1. **Confirm the master spreadsheet ("VFL Waluj Employee Master Data") is
+   current** — or point to a better source — before seeding
+   `employee_salary_structure` from it. This is real financial data for 129
+   people; not seeded speculatively.
+2. **Bonus scope** — rates confirmed (Staff 8.33%, Worker 18%, both of
+   Basic), but Bonus is an annual statutory payout, different cadence from
+   monthly payroll. Needs a decision: part of this build, or a separate
+   module.
+3. **Does every worker department have its own efficiency agreement like
+   Forge Shop's?** Only Forge Shop's slabs are seeded.
+4. **Bank statement format** — PDF vs. a specific bank bulk-upload layout.
+
+### Not yet built (Phases 3+)
+
+`run-payroll` edge function (calculation engine — formulas for PF/OT/ESIC
+already confirmed from the live spreadsheet formulas, not guessed; see the
+plan file), HR-Admin entry screens, the consolidated sheet + Apps Script
+sync, `payslip.tsx` additive updates, bank statement export, then the
+parallel-run verification gate.
 
 ---
 
