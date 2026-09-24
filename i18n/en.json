@@ -289,6 +289,8 @@
     "observationsLeftShort": "{{count}} left today",
     "manageLeave": "Manage leave & apply",
     "checkingStatus": "Checking status...",
+    "presentThisMonth": "Present this month",
+    "days": "days",
     "tapWhenInsidePlant": "Make sure you're inside the plant boundary",
     "noScoreYet": "Your score will appear here once this month's scoring cycle runs.",
     "payslipNotAvailable": "Payslip for this month isn't ready yet. Check back after payroll is processed.",

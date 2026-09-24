@@ -33,9 +33,10 @@ import { BarCodeScanner } from 'expo-barcode-scanner'
 export function CheckInCard() {
   const { t } = useTranslation()
   const { employee } = useAuth()
-  const { todayRecord, checkIn, checkOut, confirmQr, refresh, isLoading: attendanceLoading } = useAttendance(
+  const { records, todayRecord, checkIn, checkOut, confirmQr, refresh, isLoading: attendanceLoading } = useAttendance(
     employee?.id || ''
   )
+  const presentDaysThisMonth = records.filter(r => r.status === 'P').length
   const [isLoading, setIsLoading] = useState(false)
   const [showLateModal, setShowLateModal] = useState(false)
   const [lateReason, setLateReason] = useState('')
@@ -309,6 +310,12 @@ export function CheckInCard() {
             </>
           )}
         </View>
+        {!attendanceLoading && (
+          <View className="border-t border-ink-100 px-5 py-3 flex-row justify-between items-center">
+            <Text className="text-xs text-ink-500">{t('worker.presentThisMonth')}</Text>
+            <Text className="text-sm font-bold text-ink-900">{presentDaysThisMonth} {t('worker.days')}</Text>
+          </View>
+        )}
       </View>
 
       {(isCheckedIn || isCheckedOut) && (

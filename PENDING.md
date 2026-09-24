@@ -3,11 +3,41 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 24 Sep 2026 (session 5) — Two threads this session:
+**Last updated:** 25 Sep 2026 (session 6) — Three items this session:
 
-**App bug**: fixed a real GPS→QR check-in bug (`hooks/useAttendance.ts` —
-upsert with no conflict target, plus a missing loading gate in `qr.tsx`).
-See "🔴 GPS→QR check-in" below.
+**Consultant logins**: Added 9 confirmed-active consultants (CON01, CON05,
+CON09, CON12, CON16, CON18, CON20, CON21 with departments; CON13 no
+department on file). Applied **PATCH_35** directly via MCP — employees
+inserted, Supabase auth users provisioned, `must_change_pin = true`.
+PIN formula: `'20' || lpad(digits, 4, '0')` — CON01 = 200001. All use
+`role='member'`, `category='consultant'` so they see the worker UI (GPS
+check-in + QR). Deliberately excluded pending Yash confirmation: CON19
+(Bunglow Maid — needs factory GPS?), CON22 (name matches VFL4004 Digambar
+Todekar), CON23 (name matches VFL4030 Suresh Gawali). Total employees now
+138 (129 original + 9 consultants). See "🟡 Consultant logins" below.
+
+**Monthly attendance count**: Every non-worker role now sees a "Present
+this month: N days" stat at the bottom of their `CheckInCard`. Uses the
+`records` the hook already fetches — no extra query. Counts `status='P'`
+rows for the current month. Shows for all 7 roles (workers via
+`worker/attendance.tsx` calendar already had this; now non-workers have it
+too via CheckInCard).
+
+**Security forms tab**: Added `app/(security)/forms.tsx` (wraps the shared
+`FormsScreen` component) and wired it into `(security)/_layout.tsx`.
+Security guards now have 6 tabs: gate-qr, vehicle log, checkpoint2,
+eod-lock, **forms**, more. The tab shows form links from `form_links` scoped
+to the security guard's department. Currently no rows exist for security in
+`form_links` — Yash needs to provide the 4 URLs (57 AT, 57 F4, Out
+Material In, Dispatch) so HR can add them to the table.
+
+**Previous session (24 Sep, session 5):** GPS→QR check-in fix; security
+logout added; 6 non-worker roles got QR check-in via CheckInCard modal;
+salary consolidation PATCH_28–PATCH_33 shipped. See below.
+
+**Two sessions back (24 Sep, session 4):** GPS + QR dual check-in
+(GPS=50%, GPS+QR=100% attendance score); security QR first tab; missed
+check-in push notification. `scripts/ALERT.gs` updated to v4.
 
 **Salary consolidation**: shipped **PATCH_28** through **PATCH_33** —
 schema (`employee_salary_structure`, `pt_slabs`, `efficiency_incentive_slabs`,
@@ -47,6 +77,59 @@ Gamma, Wix, Mem**.
 
 Corollary: **commit and push after every completed step.** Power and internet
 drop frequently at this site; work must never be lost mid-task.
+
+---
+
+## 🟡 Consultant logins — applied 25 Sep 2026, needs Yash action
+
+9 consultants added and live: CON01 Chhagan Dehade (Die Shop), CON05
+Madhukar Gosavi (Design), CON09 Nagnath Kale (Die Shop), CON12 Sadashiv
+Soddy (Quality), CON13 Sanjeev Supsande (no dept), CON16 Sarwan Prasad
+(Forge Shop), CON18 Bapusaheb Gawate (Die Shop), CON20 Prabhuling Achaleri
+(Die Shop), CON21 Balasaheb Yeole (Maintenance).
+
+Login: CON ID (e.g. "CON01") or phone number once added.
+Starting PIN: `'20' + lpad(digits, 4, '0')` — CON01 = **200001**,
+CON21 = **200021**. Must change PIN on first login.
+
+**Pending confirmation from Yash:**
+- **CON19** Chhaya Shelke — Bunglow Maid (Administration). Does she need
+  factory GPS check-in? If yes, add with `department='Administration'`;
+  if no, skip.
+- **CON22** Digambar Mahadeo Todekar — Die Shop. Name matches VFL4004
+  Digambar Todekar from the 5-worker gap list (PATCH_29). Same person
+  re-engaged as consultant? Cannot add without Yash confirming they are
+  different individuals.
+- **CON23** Suresh Sopan Gawali — Final Shop. Name matches VFL4030 Suresh
+  Gawali from the same gap list. Same reason.
+
+---
+
+## 🟡 Security forms tab — shell live, URLs pending
+
+`app/(security)/forms.tsx` is built and wired into the security tab bar.
+The screen shows forms from `form_links` scoped to the security guard's
+department. Currently 0 rows exist for security.
+
+**Action for Yash / HR**: provide the 4 form URLs for security guards:
+- 57 AT (Gate AT form)
+- 57 F4 (Gate F4 form)
+- Out Material In
+- Dispatch
+
+Once you have the URLs, run this in the Supabase SQL Editor:
+```sql
+INSERT INTO form_links (department, form_name, url, send_in_reminder, sort_order)
+VALUES
+  ('Security', '57 AT',           '<URL>', false, 1),
+  ('Security', '57 F4',           '<URL>', false, 2),
+  ('Security', 'Out Material In', '<URL>', false, 3),
+  ('Security', 'Dispatch',        '<URL>', false, 4)
+ON CONFLICT DO NOTHING;
+```
+(Replace `<URL>` with the real Google Form links. `send_in_reminder=false`
+because shift-reminder's form nudge is scoped to production departments —
+confirm with Yash if security should also receive form nudges.)
 
 ---
 
