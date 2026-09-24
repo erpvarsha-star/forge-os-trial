@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { Employee } from '@/types'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { router } from 'expo-router'
+import { registerForPushNotificationsAsync } from '@/lib/notifications'
 
 interface AuthState {
   session: any | null
@@ -108,6 +109,18 @@ export function useAuth() {
       isAuthenticated: true,
       loadError: null,
     })
+
+    // Runs on EVERY successful load — including an already-logged-in
+    // session resuming on app launch, not just a fresh login — so a device
+    // re-registers just by being opened, no logout/login required. Was
+    // previously only called from login.tsx's button handler, and with the
+    // wrong id (session.user.id, an auth user id, instead of employee.id —
+    // push_tokens.user_id is a foreign key to employees(id)), so every
+    // registration attempt violated that FK and push_tokens stayed
+    // completely empty for everyone. Both bugs found and fixed 24 Sep 2026.
+    // Non-throwing (lib/notifications.ts) and fire-and-forget: push is a
+    // nice-to-have, never a login blocker.
+    registerForPushNotificationsAsync(employee.id)
   }
 
   /**

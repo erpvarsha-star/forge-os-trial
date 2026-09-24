@@ -7,9 +7,7 @@ import { Input } from '@/components/Input'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { BrandLogo } from '@/components/BrandLogo'
 import { APP_CONFIG } from '@/lib/config'
-import { supabase } from '@/lib/supabase'
 import { router } from 'expo-router'
-import { registerForPushNotificationsAsync } from '@/lib/notifications'
 
 /**
  * Employee code (or mobile number) + PIN login.
@@ -67,11 +65,12 @@ export default function LoginScreen() {
       return
     }
 
-    // Best-effort only: registerForPushNotificationsAsync swallows its own
-    // failures (lib/notifications.ts), because throwing here would strand the
-    // user on this screen after an otherwise successful login.
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session?.user?.id) await registerForPushNotificationsAsync(session.user.id)
+    // Push registration now happens in useAuth's loadEmployee (fired by the
+    // onAuthStateChange listener right after signInWithPin resolves above),
+    // not here — it needs employee.id (push_tokens.user_id references
+    // employees, not auth.users), and loadEmployee already has that loaded.
+    // Also means it re-registers on every app launch for an already-logged-
+    // in session, not just a fresh login. See useAuth.ts for the full story.
 
     setIsSubmitting(false)
     // Redirect is handled by the isAuthenticated effect above, which also
