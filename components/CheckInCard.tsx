@@ -12,6 +12,7 @@ import {
   isInsideGeofence,
   getPlantLocations,
   isInsideAnyGeofence,
+  buildQrValue,
 } from '@/lib/location'
 import { supabase } from '@/lib/supabase'
 import { getDeviceId } from '@/lib/deviceId'
@@ -93,8 +94,7 @@ export function CheckInCard() {
       return
     }
 
-    const today = new Date().toISOString().split('T')[0]
-    const expectedQr = `${plant.id}-${today}-${plant.qr_secret_salt}`
+    const expectedQr = buildQrValue(plant)
 
     if (data !== expectedQr) {
       Alert.alert(t('common.error'), t('worker.invalidQr'))
@@ -318,7 +318,7 @@ export function CheckInCard() {
         )}
       </View>
 
-      {(isCheckedIn || isCheckedOut) && (
+      {employee?.requires_qr && (isCheckedIn || isCheckedOut) && (
         todayRecord?.qr_verified ? (
           <View className="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden mb-5">
             <View className="px-5 py-4 flex-row items-center gap-3">

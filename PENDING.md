@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 25 Sep 2026 (session 6) — Three items this session:
+**Last updated:** 25 Sep 2026 (session 7) — PATCH_37: QR exemptions + 30-min time buckets
 
 **Consultant logins**: Added 9 confirmed-active consultants (CON01, CON05,
 CON09, CON12, CON16, CON18, CON20, CON21 with departments; CON13 no
@@ -30,6 +30,23 @@ eod-lock, **forms**, more. The tab shows form links from `form_links` scoped
 to the security guard's department. Currently no rows exist for security in
 `form_links` — Yash needs to provide the 4 URLs (57 AT, 57 F4, Out
 Material In, Dispatch) so HR can add them to the table.
+
+**PATCH_37 (25 Sep 2026, session 7):** QR time-bucket security + exemptions.
+- `requires_qr boolean NOT NULL DEFAULT true` added to `employees`; VFL1001
+  (Yash, owner) and VFL1567 (Kajal Sutar, Pune office) set to `false`.
+- QR formula changed from daily (`plant_id-date-salt`) to 30-minute buckets
+  (`plant_id-date-bucket-salt`, bucket 0–47 in IST). A WhatsApp photo of the
+  gate QR is worthless after the current 30-min window ends.
+- `gate-qr.tsx`: shows remaining minutes in current bucket; refresh interval
+  detects bucket rollover (not just date rollover).
+- `qr.tsx`, `CheckInCard.tsx`: both scan paths use `buildQrValue()` from
+  `lib/location.ts` — single formula, can't drift.
+- `home.tsx`, `CheckInCard.tsx`: QR star card and QR quick-action hidden when
+  `employee.requires_qr === false`.
+- `nightly-scoring`: `requires_qr=false` employees score GPS alone as 100%
+  (not capped at 50%); everyone else unchanged.
+- SQL applied to Supabase (verified: 136 true, 2 false). Committed as one
+  batch with `PATCH_36` (security forms) in this session's final push.
 
 **Previous session (24 Sep, session 5):** GPS→QR check-in fix; security
 logout added; 6 non-worker roles got QR check-in via CheckInCard modal;

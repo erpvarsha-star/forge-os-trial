@@ -541,7 +541,8 @@
     "eodHint": "Confirm inward and outward vehicle counts match at end of day",
     "gateQr": "Gate QR",
     "todaysGateCode": "Today's Gate Code",
-    "qrHint": "Show this screen at the gate. It changes automatically every day at midnight.",
+    "qrHint": "Show this screen at the gate. It refreshes every 30 minutes — a photo cannot be reused.",
+    "qrExpiresIn": "Expires in {{minutes}} min",
     "qrNotConfigured": "No gate code available",
     "qrNotConfiguredHint": "The plant QR secret has not been set up yet. Contact HR."
   }

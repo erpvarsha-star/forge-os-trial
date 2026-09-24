@@ -272,8 +272,8 @@ export default function WorkerHome() {
             </View>
           </View>
 
-          {/* QR star card — visible once GPS check-in is recorded */}
-          {(isCheckedIn || isCheckedOut) && (
+          {/* QR star card — hidden for requires_qr=false employees (owner, Pune office) */}
+          {employee?.requires_qr && (isCheckedIn || isCheckedOut) && (
             todayRecord?.qr_verified ? (
               <View className="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden">
                 <View className="px-5 py-4 flex-row items-center gap-3">
@@ -354,13 +354,15 @@ export default function WorkerHome() {
                 <Camera size={22} color="#E65C00" />
                 <Text className="text-xs font-semibold text-ink-900 mt-2">5S</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => router.push('/(worker)/qr')}
-                className="flex-1 bg-white rounded-xl border border-ink-100 shadow-sm py-5 items-center justify-center"
-              >
-                <QrCode size={22} color="#E65C00" />
-                <Text className="text-xs font-semibold text-ink-900 mt-2 text-center">{t('worker.qrCheckIn')}</Text>
-              </TouchableOpacity>
+              {employee?.requires_qr && (
+                <TouchableOpacity
+                  onPress={() => router.push('/(worker)/qr')}
+                  className="flex-1 bg-white rounded-xl border border-ink-100 shadow-sm py-5 items-center justify-center"
+                >
+                  <QrCode size={22} color="#E65C00" />
+                  <Text className="text-xs font-semibold text-ink-900 mt-2 text-center">{t('worker.qrCheckIn')}</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 onPress={() => router.push('/(worker)/observation')}
                 className="flex-1 bg-white rounded-xl border border-ink-100 shadow-sm py-5 items-center justify-center px-1"

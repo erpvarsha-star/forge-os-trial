@@ -103,3 +103,25 @@ export function isInsideAnyGeofence(
 ): boolean {
   return locations.some((loc) => isInsideGeofence(userLat, userLng, loc.latitude, loc.longitude, loc.radius_meters))
 }
+
+/**
+ * Returns the current IST date string (YYYY-MM-DD) and 30-minute bucket
+ * index (0–47). The QR value is `${plant.id}-${date}-${bucket}-${salt}`.
+ *
+ * A photo of the QR shared via WhatsApp is worthless after 30 minutes —
+ * it will fail validation on all later scans that same day, and on any
+ * future day entirely (date component changes).
+ */
+export function istQrKey(): { date: string; bucket: number } {
+  const now = Date.now() + 5.5 * 60 * 60 * 1000          // shift to IST
+  const ist = new Date(now)
+  const date = ist.toISOString().slice(0, 10)
+  const minutesSinceMidnight = ist.getUTCHours() * 60 + ist.getUTCMinutes()
+  const bucket = Math.floor(minutesSinceMidnight / 30)    // 0–47
+  return { date, bucket }
+}
+
+export function buildQrValue(plant: PlantConfig): string {
+  const { date, bucket } = istQrKey()
+  return `${plant.id}-${date}-${bucket}-${plant.qr_secret_salt}`
+}

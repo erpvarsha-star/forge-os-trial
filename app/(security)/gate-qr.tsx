@@ -8,60 +8,53 @@ import { Header } from '@/components/Header'
 import { Card } from '@/components/Card'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { BRAND, INK } from '@/components/theme'
-import { getPlantConfig, PlantConfig } from '@/lib/location'
+import { getPlantConfig, PlantConfig, buildQrValue, istQrKey } from '@/lib/location'
 
 /**
- * The gate QR, on a guard's phone, regenerated daily.
+ * The gate QR, on a guard's phone, regenerated every 30 minutes (PATCH_37).
  *
- * Answers the "a+c" decision on QR check-in (13 Aug): build the real display
- * (a) so QR check-in stops being decorative, while leaving the loose
- * containment check in app/(worker)/qr.tsx alone for now (c) — see the note
- * there — until this screen is confirmed in daily use at the gate. Don't
- * remove a fallback the moment its replacement ships; remove it once the
- * replacement is actually relied on.
- *
- * Computes the SAME string worker/qr.tsx expects:
- *   `${plant.id}-${date}-${plant.qr_secret_salt}`
- * — plant.id is plant_config.plant_code, date is the IST calendar date, and
- * the salt is the one PATCH_16 generates inside Postgres (never seen by
- * anyone, including this screen — it's read straight from plant_config).
- * Because it's IST-anchored, this rolls over correctly even though the guard's
- * phone clock is whatever timezone it happens to be in.
+ * Computes the SAME string worker/qr.tsx and CheckInCard.tsx expect:
+ *   `${plant.id}-${date}-${bucket}-${plant.qr_secret_salt}`
+ * where bucket = IST 30-minute slot index (0–47). A photo of this QR
+ * is worthless after the current 30-minute window ends.
  */
-
-function istDateKey(): string {
-  return new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10)
-}
 
 export default function GateQrScreen() {
   const { t } = useTranslation()
   const { employee } = useAuth()
   const [plant, setPlant] = useState<PlantConfig | null>(null)
-  const [dateKey, setDateKey] = useState(istDateKey())
+  const [qrKey, setQrKey] = useState(istQrKey())
   const [isLoading, setIsLoading] = useState(true)
 
   const load = async () => {
     const config = await getPlantConfig()
     setPlant(config)
-    setDateKey(istDateKey())
+    setQrKey(istQrKey())
     setIsLoading(false)
   }
 
   useEffect(() => {
     load()
-    // Checks every minute for the IST date rolling over, so the screen does
-    // not need to be reopened at midnight for the new day's code to appear.
+    // Checks every minute for date or bucket change — bucket rolls every 30
+    // minutes, so a 1-minute tick is fast enough to pick it up promptly.
     const interval = setInterval(() => {
-      const today = istDateKey()
-      setDateKey(current => (current === today ? current : today))
+      const next = istQrKey()
+      setQrKey(current =>
+        current.date === next.date && current.bucket === next.bucket ? current : next
+      )
     }, 60_000)
     return () => clearInterval(interval)
   }, [])
 
   const qrValue = useMemo(() => {
     if (!plant) return null
-    return `${plant.id}-${dateKey}-${plant.qr_secret_salt}`
-  }, [plant, dateKey])
+    return buildQrValue(plant)
+  // buildQrValue reads the clock internally; qrKey is the reactive dependency
+  // that forces a re-render when the bucket or date rolls over.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plant, qrKey])
+
+  const bucketMinutesRemaining = 30 - (Math.floor((Date.now() + 5.5 * 60 * 60 * 1000) / 60000) % 30)
 
   if (!employee || isLoading) return <LoadingScreen />
 
@@ -85,7 +78,10 @@ export default function GateQrScreen() {
             <Text className="text-xs font-semibold uppercase tracking-wider text-ink-400 mb-1">
               {t('security.todaysGateCode')}
             </Text>
-            <Text className="text-lg font-bold text-ink-900 mb-5">{dateKey}</Text>
+            <Text className="text-lg font-bold text-ink-900 mb-1">{qrKey.date}</Text>
+            <Text className="text-xs text-ink-500 mb-5">
+              {t('security.qrExpiresIn', { minutes: bucketMinutesRemaining })}
+            </Text>
 
             <View className="p-4 bg-white rounded-2xl border border-ink-100">
               <QRCode

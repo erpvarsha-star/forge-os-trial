@@ -347,7 +347,7 @@ Deno.serve(async (req: Request) => {
   try {
     const { data: employees, error } = await db
       .from('employees')
-      .select('id, role, department, name')
+      .select('id, role, department, name, requires_qr')
       .eq('is_active', true)
       .in('role', ['member', 'supervisor', 'manager']);
 
@@ -373,8 +373,11 @@ Deno.serve(async (req: Request) => {
       const fiveSScore = await computeFiveSScore(db, employee.id, start, end);
       const safetyScore = await computeSafetyScore(db, employee.id, start, end);
 
-      // GPS only = 50% of attendance weight; GPS + QR gate scan = full 100%.
-      const attendanceScore = (attendanceRatio * 0.5 + qrRatio * 0.5) * weights.attendance;
+      // requires_qr=false: GPS only counts as 100% (owner, remote-office employees have no gate to scan).
+      // requires_qr=true (everyone else): GPS + QR gate scan = 100%; GPS alone = 50%.
+      const attendanceScore = (employee as any).requires_qr === false
+        ? attendanceRatio * weights.attendance
+        : (attendanceRatio * 0.5 + qrRatio * 0.5) * weights.attendance;
       const ontimeScore = onTimeRatio * weights.ontime;
       const taskScore = taskRatio * weights.task;
       const kpiScore = kpiRatio * weights.kpi;

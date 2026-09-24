@@ -16,6 +16,8 @@ export interface Employee {
   is_active: boolean
   /** Set by PATCH_10. True until the employee replaces their derived starting PIN. */
   must_change_pin?: boolean
+  /** False for owner and remote-office employees who have no gate QR to scan. */
+  requires_qr: boolean
   created_at: string
   updated_at: string
 }

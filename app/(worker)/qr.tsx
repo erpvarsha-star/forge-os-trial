@@ -12,6 +12,7 @@ import {
   getPlantLocations,
   isInsideAnyGeofence,
   isInsideGeofence,
+  buildQrValue,
 } from '@/lib/location'
 import { BarCodeScanner } from 'expo-barcode-scanner'
 import { QrCode, CameraOff, MapPin, Star } from 'lucide-react-native'
@@ -69,8 +70,7 @@ export default function QRScreen() {
       return
     }
 
-    const today = new Date().toISOString().split('T')[0]
-    const expectedQr = `${plant.id}-${today}-${plant.qr_secret_salt}`
+    const expectedQr = buildQrValue(plant)
 
     if (data !== expectedQr) {
       Alert.alert(t('common.error'), t('worker.invalidQr'))
