@@ -89,6 +89,36 @@ round-trip once there's device access to confirm.
 
 ---
 
+## 🔴 Security had no logout; 6 roles had GPS check-in but no QR — found and fixed 24 Sep 2026
+
+Two reports, both real gaps:
+
+1. **Security had no `more.tsx` at all** — `(security)/_layout.tsx` only
+   had `gate-qr`, `dashboard`, `team`, `eod-lock`: no tab anywhere led to a
+   logout button. Every other role group has a `more.tsx` with one; security
+   was simply missing it. **Fixed**: added `app/(security)/more.tsx`
+   (mirrors `(manager)/more.tsx`) and wired it into the tab bar.
+
+2. **Manager (and 5 other roles) had GPS check-in but no way to do the QR
+   half.** `components/CheckInCard.tsx` — used by manager, hr-admin,
+   supervisor, plant-head, security, AND owner dashboards — implements GPS
+   check-in/out but never had a QR follow-up, unlike
+   `worker/home.tsx`/`worker/qr.tsx`. Worse than just a missing button:
+   even if one existed pointing at `/(worker)/qr`, that route's
+   `RoleGate allow={['member']}` would bounce every one of these 6 roles
+   straight back out. Since GPS+QR together are what the attendance score
+   treats as 100% (GPS alone is 50%), **every non-worker employee has been
+   structurally capped at 50% attendance score** with no way to reach 100%.
+   **Fixed**: added the same "scan QR for star" card `worker/home.tsx` has,
+   directly into `CheckInCard`, opening the scanner in a `Modal` (not a
+   route) so it works from any dashboard without new per-role routes or
+   RoleGate changes. Scanning/validation logic mirrors `worker/qr.tsx`'s.
+
+**Untested on a real device** — same as the GPS→QR fix above, fixed from
+code reading against the two reports, not reproduced live yet.
+
+---
+
 ## 🔴 Push notifications never actually worked for anyone — found and fixed 24 Sep 2026
 
 Reported: no OS-level push/badge for anyone, notifications only ever seen
