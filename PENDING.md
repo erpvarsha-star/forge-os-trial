@@ -105,31 +105,23 @@ CON21 = **200021**. Must change PIN on first login.
 
 ---
 
-## 🟡 Security forms tab — shell live, URLs pending
+## ✅ Security forms tab — live 25 Sep 2026 (PATCH_36)
 
-`app/(security)/forms.tsx` is built and wired into the security tab bar.
-The screen shows forms from `form_links` scoped to the security guard's
-department. Currently 0 rows exist for security.
+`app/(security)/forms.tsx` is built, wired into the security tab bar, and
+populated. Applied via Supabase MCP. Two changes:
 
-**Action for Yash / HR**: provide the 4 form URLs for security guards:
-- 57 AT (Gate AT form)
-- 57 F4 (Gate F4 form)
-- Out Material In
-- Dispatch
+1. **Security guards' department corrected** from `Human Resource` → `Security`
+   (the registry lists them under Security; the old value was making their
+   Forms tab show Pallavi's HR manpower forms instead of gate forms).
 
-Once you have the URLs, run this in the Supabase SQL Editor:
-```sql
-INSERT INTO form_links (department, form_name, url, send_in_reminder, sort_order)
-VALUES
-  ('Security', '57 AT',           '<URL>', false, 1),
-  ('Security', '57 F4',           '<URL>', false, 2),
-  ('Security', 'Out Material In', '<URL>', false, 3),
-  ('Security', 'Dispatch',        '<URL>', false, 4)
-ON CONFLICT DO NOTHING;
-```
-(Replace `<URL>` with the real Google Form links. `send_in_reminder=false`
-because shift-reminder's form nudge is scoped to production departments —
-confirm with Yash if security should also receive form nudges.)
+2. **4 gate forms added to `form_links` under `Security`:**
+   - Gate Pass (sort 10) — from forms registry
+   - 57F4 Inward ("57 AT" in Yash's terminology, sort 20) — same URL as Final Shop
+   - 57F4 Outward ("Out Material In", sort 30) — same URL as Final Shop
+   - Late Attendance (sort 40) — from forms registry
+
+`send_in_reminder = false` for all 4 — security guards don't get shift-based
+form nudges (those are scoped to production departments).
 
 ---
 
