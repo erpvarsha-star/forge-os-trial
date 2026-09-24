@@ -1070,18 +1070,15 @@ radius).
 ## 🔵 Known gaps still in the code
 
 - [x] **QR check-in secret — CONFIRMED SET 13 Aug.** `is_set=true, length=48`.
-- [x] **QR gate mechanism — DECIDED 13 Aug ("a+c").** Build the real display
-      (a) while accepting the current loose check as an interim gap (c), not
-      removing it until (a) is proven in daily use. `app/(security)/gate-qr.tsx`
-      now shows the real salted daily code on the guard's phone (new
-      `react-native-qrcode-svg` dependency, no native module — just SVG,
-      matching `react-native-svg` already in the project). `worker/home.tsx`'s
-      loose match (accepts anything merely containing the plant code, ignoring
-      the salt) is UNCHANGED and now explicitly documented in code as
-      deliberate, not forgotten — removing it before gate-qr.tsx is actually in
-      use at the gate would lock out all 129 people at shift change. Next step:
-      confirm gate-qr.tsx is working at the gate, then drop the loose branch in
-      qr.tsx.
+- [x] **QR gate mechanism — FULLY CLOSED 25 Sep 2026.** `gate-qr.tsx`
+      confirmed working at the gate (tested live, scanned successfully).
+      Both scan paths are already on the strict salted check
+      (`${plant.id}-${today}-${plant.qr_secret_salt}`, exact match) —
+      workers via `app/(worker)/qr.tsx`, all other roles via the
+      `CheckInCard` modal. The loose interim check that once existed in an
+      earlier version of home.tsx was removed when QR scanning was moved to
+      its own route. No further code change needed — strict validation is
+      live for all 138 employees.
 - [x] **Alert copy in Hindi — VERIFIED DONE 12 Aug.** All 38 `Alert.alert()`
       calls already use `t()`. Audited properly with `scripts/check-i18n.mjs`:
       Hindi covers 100% of English, and one key used on two dashboards
