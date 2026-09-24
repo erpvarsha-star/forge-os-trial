@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, Linking, Alert, RefreshControl } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
-import { ClipboardList, ExternalLink, Clock, Calendar, Wallet, ChevronRight, Settings } from 'lucide-react-native'
+import { ClipboardList, ExternalLink, Clock, ChevronRight, Settings } from 'lucide-react-native'
 import { useAuth } from '@/hooks/useAuth'
 import { useEffectiveIdentity } from '@/hooks/useEffectiveIdentity'
 import { Header } from '@/components/Header'
@@ -200,18 +200,6 @@ export function FormsScreen() {
         {/* MY REQUESTS — every role */}
         <SectionLabel title={t('forms.myRequests')} />
 
-        <InAppCard
-          icon={Calendar}
-          title={t('forms.leaveApplication')}
-          subtitle={t('forms.leaveApplicationSub')}
-          onPress={() => router.push('./leave')}
-        />
-        <InAppCard
-          icon={Wallet}
-          title={t('forms.advanceRequest')}
-          subtitle={t('forms.advanceRequestSub')}
-          onPress={() => router.push('./advance')}
-        />
         {commonForms.map(form => (
           <ExternalFormCard key={form.id} item={form} onPress={openURL} />
         ))}

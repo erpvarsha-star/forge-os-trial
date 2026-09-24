@@ -3,7 +3,13 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 24 Sep 2026 (session 11) — PATCH_41: Forms tab for all 7 roles, My Requests banner, common forms
+**Last updated:** 24 Sep 2026 (session 11) — PATCH_42: Leave + Advance switched to Google Forms (no in-app approval chain yet)
+
+**PATCH_42 (24 Sep 2026, session 11):** Leave Application + Advance Application switched to Google Forms.
+- In-app leave/advance screens removed from My Requests banner in FormsScreen — the approval chain (supervisor → manager → HR → accounts) isn't built yet.
+- Both now appear as `is_common=true` rows in `form_links` alongside Gate Pass, Cash Expenses, Hospital Form.
+- `scripts/PATCH_42_leave_advance_as_forms.sql` — 2 rows inserted (DB already applied).
+- **Yash must update the 2 placeholder URLs with real Google Form links** (Leave Application, Advance Application). In-app leave/advance screens remain as hidden routes for when the approval flow is built later.
 
 **PATCH_41 (24 Sep 2026, session 11):** Forms tab reorganization across all 7 roles.
 - `components/FormsScreen.tsx` — completely rewritten with three conditional sections: "My Requests" (all roles: Leave + Advance + common Google Forms from DB), "HR Operations" (hr_admin only: Shift Planning), "Department Forms" (supervisor/manager/security: deadline strip + dept form_links).
