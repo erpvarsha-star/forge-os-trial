@@ -35,9 +35,12 @@ export default function WorkerHome() {
     fetchObservationCount()
   }, [employee])
 
+  const istDateStr = () =>
+    new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10)
+
   const fetchShift = async () => {
     if (!employee) return
-    const today = new Date().toISOString().split('T')[0]
+    const today = istDateStr()
     const { data } = await supabase
       .from('employee_shifts')
       .select('*, shift:shifts(*)')
@@ -51,7 +54,7 @@ export default function WorkerHome() {
 
   const fetchObservationCount = async () => {
     if (!employee) return
-    const today = new Date().toISOString().split('T')[0]
+    const today = istDateStr()
     const { count } = await supabase
       .from('maintenance_observations')
       .select('*', { count: 'exact', head: true })
@@ -122,7 +125,7 @@ export default function WorkerHome() {
       return
     }
 
-    const todayStr = new Date().toISOString().split('T')[0]
+    const todayStr = istDateStr()
     const { data: buddyCheck } = await supabase
       .from('attendance_records')
       .select('employee_id')
@@ -140,24 +143,34 @@ export default function WorkerHome() {
       })
     }
 
-    const now = new Date()
+    const grace = shift?.shift?.late_grace_minutes ?? 15
     const shiftStart = shift?.shift?.start_time
-    let lateMinutes = 0
+    let rawLateMinutes = 0
 
     if (shiftStart) {
       const [hours, minutes] = shiftStart.split(':').map(Number)
-      const startTime = new Date(now)
-      startTime.setHours(hours, minutes, 0)
-      lateMinutes = Math.max(0, Math.floor((now.getTime() - startTime.getTime()) / 60000))
+      const istNow = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
+      const nowMins = istNow.getUTCHours() * 60 + istNow.getUTCMinutes()
+      const startMins = hours * 60 + minutes
+      rawLateMinutes = Math.max(0, nowMins - startMins)
     }
+    // effectiveLateMinutes is 0 if within grace — this is what gets stored in DB
+    const effectiveLateMinutes = rawLateMinutes > grace ? rawLateMinutes : 0
 
-    if (lateMinutes > 30 && !lateReason) {
+    if (rawLateMinutes > grace && !lateReason) {
       setShowLateModal(true)
       setIsLoading(false)
       return
     }
 
-    const { error: checkInError } = await checkIn(location.coords.latitude, location.coords.longitude, lateReason || undefined, mockDetected, deviceId)
+    const { error: checkInError } = await checkIn(
+      location.coords.latitude,
+      location.coords.longitude,
+      effectiveLateMinutes,
+      lateReason || undefined,
+      mockDetected,
+      deviceId
+    )
     if (checkInError) {
       Alert.alert(t('common.error'), t('common.somethingWentWrong'))
     }
@@ -180,7 +193,7 @@ export default function WorkerHome() {
       return
     }
 
-    await checkOut(location.coords.latitude, location.coords.longitude)
+    await checkOut(location.coords.latitude, location.coords.longitude, shift?.shift?.end_time)
     await refresh()
     setIsLoading(false)
   }

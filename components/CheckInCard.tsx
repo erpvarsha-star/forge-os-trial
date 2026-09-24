@@ -16,6 +16,7 @@ import {
 } from '@/lib/location'
 import { supabase } from '@/lib/supabase'
 import { getDeviceId } from '@/lib/deviceId'
+import { EmployeeShift } from '@/types'
 import { MapPin, CheckCircle2, QrCode, Star, X } from 'lucide-react-native'
 import * as Location from 'expo-location'
 import { BarCodeScanner } from 'expo-barcode-scanner'
@@ -31,6 +32,12 @@ import { BarCodeScanner } from 'expo-barcode-scanner'
  * instead of a separate route so it works from any dashboard without new
  * per-role routes or RoleGate changes.
  */
+
+// Returns today's date string in IST (YYYY-MM-DD). Critical for Shift 3
+// (00:00–07:00 IST): at 01:00 IST, UTC is still the previous day.
+const istDateStr = () =>
+  new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10)
+
 export function CheckInCard() {
   const { t } = useTranslation()
   const { employee } = useAuth()
@@ -38,14 +45,28 @@ export function CheckInCard() {
     employee?.id || ''
   )
   const presentDaysThisMonth = records.filter(r => r.status === 'P').length
+  const lateThisMonth = records.filter(r => r.status === 'L' || r.status === 'HL').length
   const [isLoading, setIsLoading] = useState(false)
   const [showLateModal, setShowLateModal] = useState(false)
   const [lateReason, setLateReason] = useState('')
 
+  const [shift, setShift] = useState<EmployeeShift | null>(null)
   const [showQrModal, setShowQrModal] = useState(false)
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null)
   const [scanned, setScanned] = useState(false)
   const [qrLoading, setQrLoading] = useState(false)
+
+  useEffect(() => {
+    if (!employee?.id) return
+    const date = istDateStr()
+    supabase
+      .from('employee_shifts')
+      .select('*, shift:shifts(*)')
+      .eq('employee_id', employee.id)
+      .eq('date', date)
+      .maybeSingle()
+      .then(({ data }) => setShift(data as EmployeeShift | null))
+  }, [employee?.id])
 
   useEffect(() => {
     if (!showQrModal || hasCameraPermission !== null) return
@@ -182,7 +203,7 @@ export function CheckInCard() {
       return
     }
 
-    const todayStr = new Date().toISOString().split('T')[0]
+    const todayStr = istDateStr()
     const { data: buddyCheck } = await supabase
       .from('attendance_records')
       .select('employee_id')
@@ -199,6 +220,7 @@ export function CheckInCard() {
       })
     }
 
+    // Read shift for today using IST date (already loaded in state, but re-fetch for freshness)
     const { data: shiftData } = await supabase
       .from('employee_shifts')
       .select('*, shift:shifts(*)')
@@ -206,16 +228,21 @@ export function CheckInCard() {
       .eq('date', todayStr)
       .maybeSingle()
 
-    const now = new Date()
-    let lateMinutes = 0
-    if (shiftData?.shift?.start_time) {
-      const [hours, minutes] = (shiftData.shift.start_time as string).split(':').map(Number)
-      const startTime = new Date(now)
-      startTime.setHours(hours, minutes, 0)
-      lateMinutes = Math.max(0, Math.floor((now.getTime() - startTime.getTime()) / 60000))
+    if (shiftData) setShift(shiftData as EmployeeShift)
+
+    const grace = (shiftData as EmployeeShift | null)?.shift?.late_grace_minutes ?? 15
+    let rawLateMinutes = 0
+    if ((shiftData as EmployeeShift | null)?.shift?.start_time) {
+      const [hours, minutes] = ((shiftData as EmployeeShift).shift.start_time as string).split(':').map(Number)
+      const startMins = hours * 60 + minutes
+      const istNow = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
+      const nowMins = istNow.getUTCHours() * 60 + istNow.getUTCMinutes()
+      rawLateMinutes = Math.max(0, nowMins - startMins)
     }
 
-    if (lateMinutes > 30 && !lateReason) {
+    const effectiveLateMinutes = rawLateMinutes > grace ? rawLateMinutes : 0
+
+    if (rawLateMinutes > grace && !lateReason) {
       setShowLateModal(true)
       setIsLoading(false)
       return
@@ -224,6 +251,7 @@ export function CheckInCard() {
     await checkIn(
       location.coords.latitude,
       location.coords.longitude,
+      effectiveLateMinutes,
       lateReason || undefined,
       mockDetected,
       deviceId
@@ -242,7 +270,7 @@ export function CheckInCard() {
       setIsLoading(false)
       return
     }
-    await checkOut(location.coords.latitude, location.coords.longitude)
+    await checkOut(location.coords.latitude, location.coords.longitude, shift?.shift?.end_time)
     await refresh()
     setIsLoading(false)
   }
@@ -312,8 +340,16 @@ export function CheckInCard() {
         </View>
         {!attendanceLoading && (
           <View className="border-t border-ink-100 px-5 py-3 flex-row justify-between items-center">
-            <Text className="text-xs text-ink-500">{t('worker.presentThisMonth')}</Text>
-            <Text className="text-sm font-bold text-ink-900">{presentDaysThisMonth} {t('worker.days')}</Text>
+            <View>
+              <Text className="text-xs text-ink-500">{t('worker.presentThisMonth')}</Text>
+              <Text className="text-sm font-bold text-ink-900">{presentDaysThisMonth} {t('worker.days')}</Text>
+            </View>
+            {lateThisMonth > 0 && (
+              <View className="items-end">
+                <Text className="text-xs text-ink-500">{t('worker.lateThisMonth')}</Text>
+                <Text className="text-sm font-bold text-amber-600">{lateThisMonth} {t('worker.days')}</Text>
+              </View>
+            )}
           </View>
         )}
       </View>

@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 25 Sep 2026 (session 7) — PATCH_37: QR exemptions + 30-min time buckets
+**Last updated:** 24 Sep 2026 (session 8) — PATCH_38: shifts seed + late tracking + hours_worked
 
 **Consultant logins**: Added 9 confirmed-active consultants (CON01, CON05,
 CON09, CON12, CON16, CON18, CON20, CON21 with departments; CON13 no
@@ -47,6 +47,17 @@ Material In, Dispatch) so HR can add them to the table.
   (not capped at 50%); everyone else unchanged.
 - SQL applied to Supabase (verified: 136 true, 2 false). Committed as one
   batch with `PATCH_36` (security forms) in this session's final push.
+
+**PATCH_38 (24 Sep 2026, session 8):** Shifts seed + late tracking + hours_worked + half-day.
+- `shifts.late_grace_minutes INTEGER` + `attendance_records.hours_worked NUMERIC(5,2)` added to schema.
+- Shift 1/2/3 confirmed times (7:00–15:30, 15:30–00:00, 00:00–07:00) with 15 min grace each.
+- General (09:00–18:00, 30 min grace), Security Day (07:00–19:00), Security Night (19:00–07:00) inserted.
+- General shift auto-assigned to all active staff+consultants (not supervisor/security_guard) Sep 24–Dec 31 2026, skipping Fridays.
+- `useAttendance.ts`: IST date everywhere (fixes Shift 3 UTC-off-by-one), `checkIn()` now takes `lateMinutes` — writes `status='L'` vs `'P'`, `late_minutes` to DB. `checkOut()` computes `hours_worked` and applies half-day rule (`late_minutes ≥ 180 + checkout ≤ shift end → status='HL'`).
+- `home.tsx`, `CheckInCard.tsx`: read grace from shift, compute `rawLateMinutes` using IST minutes (not device timezone), pass `effectiveLateMinutes` to `checkIn()`, pass `shift.end_time` to `checkOut()`.
+- `CheckInCard.tsx`: shows `lateThisMonth` count (L+HL) alongside present days.
+- `shifts.tsx`: full redesign as Sat–Thu weekly grid; workers+supervisors pick Shift 1/2/3 chips; security picks Day/Night; "Save Week" batch-upserts all 6 days.
+- HR notification for very-late arrivals (no-hard-lockout rule) deferred — RLS blocks workers inserting notifications; needs an edge function. See 🔲 below.
 
 **Previous session (24 Sep, session 5):** GPS→QR check-in fix; security
 logout added; 6 non-worker roles got QR check-in via CheckInCard modal;
@@ -300,6 +311,22 @@ monthly `records` and counts `status === 'P'` rows directly from
 day's `checkIn()` upsert fix (repeat check-ins across different days no
 longer silently fail). No further bug found here; flagging as confirmed
 rather than newly fixed.
+
+---
+
+## 🔲 Salary calculation rules — target 15 Oct 2026
+
+Requires ~15 days of real app usage data from the 1 Oct rollout. Once workers
+are checking in/out consistently and late-minutes + hours_worked are
+accumulating in `attendance_records`, review the data with Yash to confirm
+practical late thresholds, half-day edge cases, and OT patterns before
+encoding salary deduction rules.
+
+Also covers: HR notification for very-late arrivals (deferred from PATCH_38 —
+currently check-in always proceeds but HR has no in-app alert; needs an edge
+function since RLS blocks client-side notification inserts for workers).
+
+**Not to start before:** 15 Oct 2026.
 
 ---
 

@@ -290,6 +290,7 @@
     "manageLeave": "छुट्टी प्रबंधित करें और आवेदन करें",
     "checkingStatus": "स्थिति जांची जा रही है...",
     "presentThisMonth": "इस माह उपस्थित",
+    "lateThisMonth": "इस माह देरी",
     "days": "दिन",
     "tapWhenInsidePlant": "सुनिश्चित करें कि आप प्लांट क्षेत्र के अंदर हैं",
     "noScoreYet": "इस माह का स्कोरिंग चक्र पूरा होने के बाद आपका स्कोर यहां दिखेगा।",
@@ -468,7 +469,13 @@
     "outstanding": "बकाया",
     "supervisorField": "सुपरवाइजर",
     "employeeLabel": "कर्मचारी",
-    "shiftAssigned": "शिफ्ट सौंपी गई"
+    "shiftAssigned": "शिफ्ट सौंपी गई",
+    "saveWeek": "सप्ताह सहेजें",
+    "weekOf": "सप्ताह",
+    "workersAndSupervisors": "कर्मचारी और सुपरवाइजर",
+    "securityTeam": "सुरक्षा टीम",
+    "weekSaved": "सप्ताह की शिफ्ट सहेजी गई",
+    "noRotatingEmployees": "कोई रोटेटिंग कर्मचारी नहीं मिला"
   },
   "owner": {
     "kpiDashboard": "KPI डैशबोर्ड",

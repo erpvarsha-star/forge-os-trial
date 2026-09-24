@@ -290,6 +290,7 @@
     "manageLeave": "Manage leave & apply",
     "checkingStatus": "Checking status...",
     "presentThisMonth": "Present this month",
+    "lateThisMonth": "Late this month",
     "days": "days",
     "tapWhenInsidePlant": "Make sure you're inside the plant boundary",
     "noScoreYet": "Your score will appear here once this month's scoring cycle runs.",
@@ -468,7 +469,13 @@
     "outstanding": "Outstanding",
     "supervisorField": "Supervisor",
     "employeeLabel": "Employee",
-    "shiftAssigned": "Shift assigned"
+    "shiftAssigned": "Shift assigned",
+    "saveWeek": "Save Week",
+    "weekOf": "Week of",
+    "workersAndSupervisors": "Workers & Supervisors",
+    "securityTeam": "Security Team",
+    "weekSaved": "Week assignments saved",
+    "noRotatingEmployees": "No rotating employees found"
   },
   "owner": {
     "kpiDashboard": "KPI Dashboard",

@@ -2,6 +2,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { AttendanceRecord } from '@/types'
 
+// Returns today's date string in IST (YYYY-MM-DD). Critical for Shift 3
+// (00:00–07:00 IST): at 01:00 IST, UTC is still the previous day, so a
+// plain toISOString().slice(0,10) would write yesterday's date.
+const istDateStr = () =>
+  new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10)
+
 export function useAttendance(employeeId: string, month?: string, year?: number) {
   const [records, setRecords] = useState<AttendanceRecord[]>([])
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null)
@@ -27,10 +33,7 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
       setRecords(data as AttendanceRecord[])
     }
 
-    const today = now.toISOString().split('T')[0]
-    // maybeSingle, not single: before check-in there's no row for today,
-    // and single() treats "no rows" as an error — same class of bug as
-    // home.tsx's fetchShift (see its comment).
+    const today = istDateStr()
     const { data: todayData } = await supabase
       .from('attendance_records')
       .select('*')
@@ -46,10 +49,21 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     fetchRecords()
   }, [fetchRecords])
 
-  const checkIn = async (lat: number, lng: number, lateReason?: string, mockDetected?: boolean, deviceId?: string) => {
+  // lateMinutes: the EFFECTIVE late minutes (0 if within grace period) — callers
+  // compute raw lateness, apply the shift's grace, pass 0 if within grace.
+  // status is derived here so it's always consistent with what's in the DB.
+  const checkIn = async (
+    lat: number,
+    lng: number,
+    lateMinutes: number,
+    lateReason?: string,
+    mockDetected?: boolean,
+    deviceId?: string
+  ) => {
     const now = new Date()
-    const date = now.toISOString().split('T')[0]
+    const date = istDateStr()
     const time = now.toISOString()
+    const status = lateMinutes > 0 ? 'L' : 'P'
 
     const { data, error } = await supabase
       .from('attendance_records')
@@ -57,21 +71,16 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
         {
           employee_id: employeeId,
           date,
-          status: 'P',
+          status,
           check_in_time: time,
           check_in_lat: lat,
           check_in_lng: lng,
+          late_minutes: lateMinutes > 0 ? lateMinutes : null,
           late_reason: lateReason || null,
           qr_verified: false,
           mock_location_detected: mockDetected || false,
           device_id: deviceId || null,
         },
-        // Without this, Postgres defaults to resolving conflicts on the
-        // primary key (`id`) — never included in this payload, so it's
-        // never a conflict, so EVERY call is a plain INSERT. A double-tap
-        // or a retry after a slow/dropped response then violates the
-        // table's unique(employee_id, date) constraint and throws instead
-        // of updating the existing row.
         { onConflict: 'employee_id,date' }
       )
       .select()
@@ -85,18 +94,44 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     return { data, error }
   }
 
-  const checkOut = async (lat: number, lng: number) => {
+  // shiftEndTime: the shift's end_time (HH:MM). Used for:
+  //   1. Computing hours_worked
+  //   2. Half-day rule: arrived 3+ hrs late AND checks out at or before shift end → HL
+  const checkOut = async (lat: number, lng: number, shiftEndTime?: string) => {
     const now = new Date()
-    const date = now.toISOString().split('T')[0]
+    const date = istDateStr()
     const time = now.toISOString()
+
+    let hours_worked: number | undefined
+    if (todayRecord?.check_in_time) {
+      const elapsed = now.getTime() - new Date(todayRecord.check_in_time).getTime()
+      hours_worked = Math.round((elapsed / 3600000) * 100) / 100
+    }
+
+    // Half-day: came 3+ hours late AND checked out at or before the shift end time.
+    // "00:00" as an end time means midnight (end of shift), treated as 24:00 = 1440 min.
+    let halfDay = false
+    if (todayRecord?.late_minutes && todayRecord.late_minutes >= 180 && shiftEndTime) {
+      const [sh, sm] = shiftEndTime.split(':').map(Number)
+      const shiftEndMins = sh === 0 && sm === 0 ? 24 * 60 : sh * 60 + sm
+      const istNow = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
+      const checkoutMins = istNow.getUTCHours() * 60 + istNow.getUTCMinutes()
+      halfDay = checkoutMins <= shiftEndMins
+    }
+
+    const updatePayload: Record<string, unknown> = {
+      check_out_time: time,
+      check_out_lat: lat,
+      check_out_lng: lng,
+      hours_worked,
+    }
+    if (halfDay) {
+      updatePayload.status = 'HL'
+    }
 
     const { data, error } = await supabase
       .from('attendance_records')
-      .update({
-        check_out_time: time,
-        check_out_lat: lat,
-        check_out_lng: lng,
-      })
+      .update(updatePayload)
       .eq('employee_id', employeeId)
       .eq('date', date)
       .select()
@@ -111,7 +146,7 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
   }
 
   const confirmQr = async () => {
-    const date = new Date().toISOString().split('T')[0]
+    const date = istDateStr()
     const { data, error } = await supabase
       .from('attendance_records')
       .update({ qr_verified: true })

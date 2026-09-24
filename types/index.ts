@@ -35,6 +35,7 @@ export interface AttendanceRecord {
   check_out_lng?: number
   late_reason?: string
   late_minutes?: number
+  hours_worked?: number
   qr_verified: boolean
   checkpoint2_confirmed_by?: string
   checkpoint2_at?: string
@@ -48,6 +49,7 @@ export interface Shift {
   end_time: string
   department?: string
   is_night_shift: boolean
+  late_grace_minutes?: number
 }
 
 export interface EmployeeShift {
