@@ -152,10 +152,32 @@ after first PIN change via `mark_pin_changed`). Not built yet — holding
 off until confirmed it's wanted as a real feature vs. just an example
 message for testing delivery.
 
-**Still needed before a real test push can be sent to anyone**: at least
-one device needs to be on the new build (with the `push_tokens` fix) and
-have opened the app once. `push_tokens` is currently still empty — cannot
-verify FCM delivery end-to-end until that happens.
+### ✅ Confirmed working end-to-end, 24 Sep 2026, later same day
+
+After the push-token fix shipped, two real employees opened the updated
+app and registered successfully — Tushar Abasaheb Shirgire (VFL1389) and
+Brahmanand Kaduba Tajne (VFL1482), both real Android FCM tokens,
+`push_tokens` timestamps ~13:33 UTC. Sent a real test push to both via
+`send-push-notification` (through `net.http_post`, same internal path
+pg_cron uses) — response: `{"success":true,"notified":2,"pushed":2}`.
+**Both actually received it.** FCM delivery is proven working end-to-end,
+not just theoretically fixed.
+
+**Yash's own device still has no token after logging out and back in.**
+Given two other people's devices registered successfully the same day on
+the same build, the mechanism itself is proven — his device specifically
+hasn't picked up the new APK (most likely didn't redownload the release
+after the fix landed) or has a device-specific issue (platform, denied
+notification permission). Worth checking with him directly which build
+number he's on rather than assuming further.
+
+**Attendance count for the other 128** — confirmed important to Yash
+(his own count isn't). `worker/attendance.tsx` reads `useAttendance`'s
+monthly `records` and counts `status === 'P'` rows directly from
+`attendance_records` — logically correct, and now benefits from the same
+day's `checkIn()` upsert fix (repeat check-ins across different days no
+longer silently fail). No further bug found here; flagging as confirmed
+rather than newly fixed.
 
 ---
 
@@ -261,6 +283,39 @@ HR to re-enter before this person's payroll can actually be disbursed).
   Shreyash Mhaske (VFL5445). Their payroll stays blank until Yash provides
   the data — same "acceptable until HR provides it" precedent PATCH_26
   already set for staff missing from its source sheet.
+
+### ✅ Advance balances seeded — PATCH_34, 24 Sep 2026
+
+Yash gave a real list: name, current balance, monthly deduction until
+cleared, for 8 employees. `advance_requests` had no column for a fixed
+monthly rupee figure (only `repayment_months`, an integer month count) —
+added `monthly_deduction` rather than force-converting into a month count
+that was never actually given.
+
+**7 of 8 matched and inserted** (`status: 'approved'`,
+`outstanding_balance` = the given balance): Tushar Abasaheb Shirgire
+(VFL1389, ₹95,000/₹5,000mo), Brahmanand Kaduba Tajne (VFL1482,
+₹18,000/₹3,000mo), Jitendrasingh Nainsingh (VFL1441, ₹253,000/₹5,000mo),
+Bhupendra Kashinath Bharude (VFL1528, ₹12,000/₹5,000mo), Kajal Balkrishna
+Sutar (VFL1567, ₹168,000/₹8,000mo), Shrawan Rewant Singh (VFL1520,
+₹142,000/₹4,000mo), Sudeep Singh (VFL5079, ₹169,000/₹5,000mo).
+
+One deliberate disambiguation caught before it became a real mistake:
+"Shrawan Rewant Singh" is VFL1520 by exact full-name match — **not**
+VFL1527 "Sharwan Singh Jodha", a different person CLAUDE.md already flags
+as historically confused with VFL1520 ("phone... duplicate of VFL1520").
+
+**8th name, Ganesh Laxmanrao Kausadkar — NOT in Forge OS.** No match on
+"Ganesh" anywhere in `employees`, at all. Same class of gap as Nidhi
+Kumari (PATCH_29/33) — a real person in Yash's own records with no
+`employees` row. Not fabricated. Needs a real emp_code from Yash before
+this one can be added.
+
+Not yet wired into `run-payroll` — the engine's `advance_recovery` is
+still an HR-typed monthly input per the confirmed-days screen, not yet
+auto-populated from this table. Worth doing once Phase 4's entry screens
+are built (default the field to `monthly_deduction`, editable), not done
+silently now.
 
 ### ⏳ Still needed before Phase 3 (calculation engine) can go live
 
