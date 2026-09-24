@@ -3,22 +3,30 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 24 Sep 2026 (session 5) — Salary consolidation: shipped
-**PATCH_28** (schema — `employee_salary_structure`, `pt_slabs` [seeded],
-`efficiency_incentive_slabs` [Forge Shop only], `payroll_records` extended,
-`employees.gender`, `leave_requests.type` COFF/OD), **PATCH_29** (seeded
-`employee_salary_structure` for 91 of 129 employees), **PATCH_30** (small
-schema fixups), and **PATCH_31** (`payroll_monthly_rates`, for the real VDA
-formula found this session). Ran a full historical backtest across all 52
-worker-sheet and 29 staff-sheet monthly tabs (not just Aug 2026): found the
-real VDA formula (`per-day rate × Present Days`, 100% match on the 7 most
-recent months) after the original assumption tested at only 25-55%, and
-confirmed the OT formula was already correct (89.8% match, one real
-exception traced to a stale value in the source sheet, not this engine).
-`run-payroll` (v3) redeployed with the corrected VDA logic. See "🟡 Salary
-consolidation" below for the full story. Nothing app-visible changed yet —
-schema + reference data + the edge function only, existing screens all
-still work unchanged.
+**Last updated:** 24 Sep 2026 (session 5) — Two threads this session:
+
+**App bug**: fixed a real GPS→QR check-in bug (`hooks/useAttendance.ts` —
+upsert with no conflict target, plus a missing loading gate in `qr.tsx`).
+See "🔴 GPS→QR check-in" below.
+
+**Salary consolidation**: shipped **PATCH_28** through **PATCH_33** —
+schema (`employee_salary_structure`, `pt_slabs`, `efficiency_incentive_slabs`,
+extended `payroll_records`, `employees.gender`), seeded
+`employee_salary_structure` for 91/129 employees, `payroll_monthly_rates`
+(PATCH_31, for the real VDA formula found this session), corrected
+Production Efficiency to NOT be department-scoped (PATCH_32), and
+backfilled `employees.gender` for all 129 (PATCH_33, from Yash's direct
+confirmation of the 3 female employees currently on staff). Ran a full
+historical backtest across all 52 worker-sheet and 29 staff-sheet monthly
+tabs (not just Aug 2026): found the real VDA formula (`per-day rate ×
+Present Days`, 100% match on the 7 most recent months) after the original
+assumption tested at only 25-55%, and confirmed OT was already correct
+(89.8% match, one real exception traced to a stale value in the source
+sheet). `run-payroll` (v4) redeployed with all corrections. Queued next:
+the consolidated Google Sheet + Apps Script sync (Yash's request, not yet
+started). See "🟡 Salary consolidation" below for the full story. Nothing
+else app-visible changed — schema + reference data + the edge function
+only, existing screens all still work unchanged besides the check-in fix.
 
 **Previous session (24 Sep, session 4):** GPS + QR dual check-in (GPS=50%, GPS+QR=100% attendance score); security QR first tab; missed check-in push notification. `scripts/ALERT.gs` updated to v4 (23 Sep 2026): hourly trigger topology, Phase 2 recipient routing, health watchdog, Cutting 2-shift config, DME Telegram, `setupDynamicSupervisorTabs()` disabled to prevent accidental SUPERVISOR_MAP wipe; all 4 live secrets blanked before commit. `form_links` sync: DB already matches v4 DEPT_FORM_SEED exactly (31 rows) — no changes needed. Manager layout: team tab hidden, "View Team →" on dashboard — already done in prior session. APK build triggers on push. Remaining open: APPS_SCRIPT_URL, supervisor Telegram onboarding (5 missing: Subhash Palve, Shivaji Jaypure, Manoj Wagh, Sunil Saha, Abhimanyu Kakde), per-form tracking. Action for Yash: (1) paste updated `scripts/ALERT.gs` into live Apps Script editor, run `deployShiftTrackingTriggers()`; (2) HR Admin must assign supervisor_id for Cutting/Press/Machine/HT/Electricity/Oil/VMC supervisors.
 
@@ -39,6 +47,45 @@ Gamma, Wix, Mem**.
 
 Corollary: **commit and push after every completed step.** Power and internet
 drop frequently at this site; work must never be lost mid-task.
+
+---
+
+## 🔴 GPS→QR check-in — found and fixed 24 Sep 2026
+
+Reported: after GPS check-in, opening the QR screen sometimes said "check
+in with GPS first" even though the worker just had, and separately looked
+like it was blocking QR entirely once GPS was done.
+
+Two real bugs found in `hooks/useAttendance.ts`:
+
+1. **`checkIn()`'s `.upsert()` had no `onConflict` target.** Supabase then
+   defaults to resolving conflicts on the primary key (`id`) — never in the
+   payload, so never a conflict, so every call was a plain INSERT. A
+   double-tap, or a retry after a slow/dropped response (this site's
+   flaky network), threw a real Postgres unique-constraint violation
+   (`unique(employee_id, date)`) on the second attempt instead of updating
+   the existing row — silently, since `home.tsx`'s `handleCheckIn` never
+   checked `checkIn()`'s returned error. **Fixed**: added
+   `{ onConflict: 'employee_id,date' }`, and `handleCheckIn` now alerts on
+   a real error instead of failing silently.
+2. **`qr.tsx` had no loading gate.** Its own `useAttendance` instance
+   starts with `todayRecord = null` until its fetch resolves, but the
+   screen decided "GPS first required" vs. "show scanner" immediately, with
+   no check for whether that fetch had finished — so every navigation here
+   showed the wrong "GPS first" screen for a beat, and on this site's slow
+   network that beat could last long enough to look like a real bug even
+   though check-in had genuinely already happened. **Fixed**: added the
+   same `isLoading` guard `home.tsx` already uses for its own screen.
+
+Also brought `useAttendance`'s today-lookup from `.single()` to
+`.maybeSingle()` — matches `home.tsx`'s `fetchShift` convention (its own
+comment already documents exactly this anti-pattern) and avoids an error
+being generated (and silently discarded) on the normal "no check-in yet"
+case.
+
+**Untested on a real device** — fixed from direct code reading against the
+two reported symptoms, not reproduced live. Worth a real check-in→QR
+round-trip once there's device access to confirm.
 
 ---
 
@@ -173,61 +220,78 @@ months, back to Jan 2024) checked, not just Aug 2026:
 |---|---|
 | Basic, Conveyance, Washing, Education, HRA pro-ration | ✅ Match exactly |
 | PF | ✅ Matches exactly (₹1,800 = ₹1,800) |
-| **VDA** | ✅ **Fixed** — the original assumption (pro-rates like Basic) was wrong, only 25-55% match across 1,718 employee-months. Real formula found: `per-day VDA rate × Present Days` (Present Days ONLY, excludes EL/CL/SL/PH, unlike every other component). **100% exact match, 172/172 employee-months, across the 7 most recent tabs (Feb–Aug 2026).** The per-day rate is a company-wide monthly value, now its own table: `payroll_monthly_rates` (PATCH_31) — not in `employee_salary_structure`, must be entered once per month like `department_efficiency_actuals`. **Currently empty — VDA computes to ₹0 with a warning until HR enters the first month's rate.** |
+| **VDA** | ✅ **Fixed** — the original assumption (pro-rates like Basic) was wrong, only 25-55% match across 1,718 employee-months. Real formula found: `per-day VDA rate × Present Days` (Present Days ONLY, excludes EL/CL/SL/PH, unlike every other component). **100% exact match, 172/172 employee-months, across the 7 most recent tabs (Feb–Aug 2026).** The per-day rate is a company-wide monthly value, now its own table: `payroll_monthly_rates` (PATCH_31) — not in `employee_salary_structure`, entered once per month. **Currently empty — VDA computes to ₹0 with a warning until HR enters the first month's rate.** |
 | **OT Amount** | ✅ **Confirmed correct as originally coded** — 89.8% exact match across 1,123 worker employee-months, 47 of 52 months exact. Uses `employee_salary_structure.vda` (the stored "VDA (F)" snapshot) in the hourly-rate calc, deliberately NOT the new monthly VDA rate — tested swapping it and it broke 3 previously-exact months to fix nothing. The one live-relevant miss, Aug 2026, traced to the *source sheet's* VDA(F) snapshot being one revision stale that month — a data-freshness issue in the old sheet, not this formula; keeping `employee_salary_structure` current avoids repeating it. Staff OT: ~99%+ match across 1,510 employee-months. |
 | ESIC | Not backtested against a real row yet — but the *rule itself* (0.75% of gross, exempt above ₹21,000) is confirmed correct by Yash, replacing the sheet's buggy copy-paste-from-PF formula. |
-| PT, Production Efficiency | Not backtested — need `employees.gender` backfilled and a `department_efficiency_actuals` row respectively before they can compute for anyone. |
+| **PT** | Rule confirmed (Maharashtra slabs, gender-differentiated). **`employees.gender` now backfilled for all 129** (PATCH_33) — can compute for everyone. Still not backtested against a real payslip row. |
+| **Production Efficiency** | ✅ **Fixed** — was wrongly modelled as department-scoped. Now correctly one shared figure for all 19 workers (PATCH_32). Not yet backtested — `worker_efficiency_actuals` is still empty, needs HR's first monthly entry. |
 
 **PATCH_31** (applied 24 Sep 2026): new `payroll_monthly_rates` table
 (`month`, `year`, `vda_per_day_rate`, unique per month/year) — the missing
-piece VDA needed. Same "entered once, service-role only" shape as
-`department_efficiency_actuals`.
+piece VDA needed. **Confirmed by Yash: the rate is one fixed number for
+every worker, company-wide** (not per-grade/department), revised roughly
+every 6 months, same change for everyone when it happens. No schema change
+needed beyond PATCH_31 — HR just re-enters the same value each month within
+a 6-month block, same as they'll already be doing for confirmed-days/OT
+hours. **HR needs a place to update this** — scoped into the Phase 4
+HR-Admin build below, not built yet.
 
-**Confirmed by Yash (24 Sep 2026): the rate is one fixed number for every
-worker, company-wide — not per-grade/department.** It's revised roughly
-every 6 months, and the change is identical for everyone when it happens.
-No schema change needed — `payroll_monthly_rates` already models this
-correctly (HR just enters the same value again for each month within a
-6-month block, same as they'll already be doing for confirmed-days/OT-hours
-every month). **HR needs a place to update this** — scoped into the Phase 4
-HR-Admin build below (a small entry field alongside/near the monthly
-efficiency-actuals entry, not a separate screen), not built yet.
+**PATCH_32** (applied 24 Sep 2026) — **Production Efficiency is NOT
+department-scoped, confirmed by Yash.** It's one achieved % per month,
+same for all 19 workers, entered once a month before the salary run (not
+daily). Corrects the department-keyed design from PATCH_28/30 — the Aug
+2026 "Efficiency Calculations" sheet listing several departments under one
+shared 80% figure was the tell; "Data is Collected from Forge Shop" meant
+Forge Shop's supervisor *collects* the number for the whole worker roster,
+not that it's Forge-Shop-specific. Dropped `department` from
+`efficiency_incentive_slabs`; replaced `department_efficiency_actuals`
+with `worker_efficiency_actuals` (month, year, achieved_pct — no
+department column). `run-payroll` (v4) updated and redeployed to match.
 
-**New finding, not yet resolved: Production Efficiency may not actually be
-department-scoped.** The Aug 2026 "Efficiency Calculations" sheet listed
-workers from Die Shop, Forge Shop, Maintenance, Cutting Shop, Final Shop and
-Heat Treatment together under one shared 80% achieved figure — the earlier
-"Data is Collected from Forge Shop" note likely meant Forge Shop's
-supervisor (Sudeep Singh) *collects* the number on behalf of the whole
-worker roster, not that it's Forge-Shop-specific. The schema
-(`efficiency_incentive_slabs`, `department_efficiency_actuals`) is
-department-keyed based on the earlier reading — may need to collapse to one
-shared row instead of per-department ones. Needs Yash to confirm before the
-efficiency piece can be trusted for anyone, Forge Shop included.
+**PATCH_33** (applied 24 Sep 2026) — **`employees.gender` backfilled for
+all 129 employees.** Yash confirmed the complete company-wide female list
+directly: Mayuri Sardar Rathod (VFL5446), Pallavi Vishnu Khade (VFL5440),
+Kajal Balkrishna Sutar (VFL1567) — 3 found and set to `female`. The 4th
+name given, Nidhi Kumari, has no `employees` row yet (matches the known
+open item: real-looking hire in the calc sheet, never onboarded into Forge
+OS — needs a real emp_code before she can be added). Everyone else (126)
+set to `male`. PT can now compute for every employee.
 
 **PATCH_30** (small schema fix, applied same session): added
-`payroll_records.other_deduction` (missed in PATCH_28) and the new
-`department_efficiency_actuals` table.
+`payroll_records.other_deduction` (missed in PATCH_28).
 
 **Not yet tested from Forge OS itself** — the sandbox's outbound network
 proxy blocks direct calls to the Supabase functions endpoint (same
-restriction noted elsewhere in this file for other integrations), so this
-backtest was done by replicating the engine's exact logic in a local Python
-script against real seeded data, not by literally invoking the deployed
-function over HTTP. Worth a real end-to-end call once there's app access to
-verify the deployed version behaves identically — should, since the logic
-is line-for-line the same, but not independently confirmed.
+restriction noted elsewhere in this file for other integrations), so every
+backtest so far was done by replicating the engine's exact logic in a local
+Python script against real seeded data, not by literally invoking the
+deployed function over HTTP. Worth a real end-to-end call once there's app
+access to verify the deployed version behaves identically — should, since
+the logic is line-for-line the same, but not independently confirmed.
 
 ### Not yet built (Phase 4+)
 
-HR-Admin entry screens (confirmed-days first, plus a way to enter the
-monthly VDA rate into `payroll_monthly_rates`), the consolidated sheet +
-Apps Script sync, `payslip.tsx` additive updates, bank statement export,
-then the parallel-run verification gate. VDA and OT are now backtest-
-confirmed — the remaining gate before Phase 4 is just the Production
-Efficiency department-scope question below, plus getting `employees.gender`
-backfilled and `department_efficiency_actuals`/`payroll_monthly_rates`
-populated for the first real month.
+HR-Admin entry screens (confirmed-days first, plus small fields for the
+monthly VDA rate and worker efficiency %), the consolidated sheet + Apps
+Script sync (see below — in progress), `payslip.tsx` additive updates, bank
+statement export, then the parallel-run verification gate. Every formula
+is now backtest-confirmed or confirmed-by-design; the only things standing
+between here and a real payroll run are HR's first-month data entry
+(`payroll_monthly_rates`, `worker_efficiency_actuals`, confirmed-days) and
+the entry screens themselves.
+
+### 🔲 Consolidated Google Sheet + Apps Script sync — requested 24 Sep 2026, not started
+
+Per the approved blueprint's dual-input-path decision: a single Google
+Sheet, synced via a new Apps Script (same pattern as
+`syncOpsDashboardToSupabase()`), pulling from all 5 old payroll sheets +
+the new Forge OS forms, using the **exact same formulas and writing to the
+same data bank** (`payroll_records`, via `run-payroll`) as the in-app path
+— neither is the "real" one. Scope: **April 2026 to present, at minimum.**
+Plan: build the workbook (openpyxl, using the same cached source data this
+session's backtest already pulled from) with real formulas per month tab,
+upload to Drive, then write the Apps Script sync script. Not yet started —
+queued as the next build task.
 
 ---
 

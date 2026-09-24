@@ -157,7 +157,10 @@ export default function WorkerHome() {
       return
     }
 
-    await checkIn(location.coords.latitude, location.coords.longitude, lateReason || undefined, mockDetected, deviceId)
+    const { error: checkInError } = await checkIn(location.coords.latitude, location.coords.longitude, lateReason || undefined, mockDetected, deviceId)
+    if (checkInError) {
+      Alert.alert(t('common.error'), t('common.somethingWentWrong'))
+    }
     await refresh()
     setIsLoading(false)
   }

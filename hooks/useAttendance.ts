@@ -28,12 +28,15 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     }
 
     const today = now.toISOString().split('T')[0]
+    // maybeSingle, not single: before check-in there's no row for today,
+    // and single() treats "no rows" as an error — same class of bug as
+    // home.tsx's fetchShift (see its comment).
     const { data: todayData } = await supabase
       .from('attendance_records')
       .select('*')
       .eq('employee_id', employeeId)
       .eq('date', today)
-      .single()
+      .maybeSingle()
 
     setTodayRecord(todayData as AttendanceRecord | null)
     setIsLoading(false)
@@ -50,18 +53,27 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
 
     const { data, error } = await supabase
       .from('attendance_records')
-      .upsert({
-        employee_id: employeeId,
-        date,
-        status: 'P',
-        check_in_time: time,
-        check_in_lat: lat,
-        check_in_lng: lng,
-        late_reason: lateReason || null,
-        qr_verified: false,
-        mock_location_detected: mockDetected || false,
-        device_id: deviceId || null,
-      })
+      .upsert(
+        {
+          employee_id: employeeId,
+          date,
+          status: 'P',
+          check_in_time: time,
+          check_in_lat: lat,
+          check_in_lng: lng,
+          late_reason: lateReason || null,
+          qr_verified: false,
+          mock_location_detected: mockDetected || false,
+          device_id: deviceId || null,
+        },
+        // Without this, Postgres defaults to resolving conflicts on the
+        // primary key (`id`) — never included in this payload, so it's
+        // never a conflict, so EVERY call is a plain INSERT. A double-tap
+        // or a retry after a slow/dropped response then violates the
+        // table's unique(employee_id, date) constraint and throws instead
+        // of updating the existing row.
+        { onConflict: 'employee_id,date' }
+      )
       .select()
       .single()
 

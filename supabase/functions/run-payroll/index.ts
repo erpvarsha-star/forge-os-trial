@@ -177,8 +177,9 @@ function calcVDA(perDayRate: number, presentDays: number): number {
 /**
  * The company-wide per-day VDA rate for a given month, from
  * `payroll_monthly_rates` (PATCH_31) — entered once per month, applied to
- * every worker, same shape as `department_efficiency_actuals`. Cached per
- * batch call since every worker in a request shares the same lookup.
+ * every worker, same shape as `worker_efficiency_actuals` (PATCH_32).
+ * Cached per batch call since every worker in a request shares the same
+ * lookup.
  */
 async function getVdaRate(
   db: ReturnType<typeof supabaseAdmin>,
@@ -241,55 +242,71 @@ async function calcPT(
 }
 
 /**
- * Production Efficiency — workers only. Slab lookup by department against
- * `efficiency_incentive_slabs`, using that department's achieved % for the
- * month from `department_efficiency_actuals` (entered once per department,
- * not per employee — per the approved blueprint). Below the lowest slab
- * threshold, the incentive is zero and the FULL fixed Production Allowance
- * (already included in Total Earning via pro-ration) gets clawed back —
- * confirmed from the real Aug 2026 Forge Shop data during the review.
+ * Production Efficiency — workers only. Confirmed by Yash (24 Sep 2026):
+ * ONE achieved % per month, the same for all 19 workers — NOT per
+ * department (an earlier reading of the Aug 2026 "Efficiency Calculations"
+ * sheet had assumed department-scoping; PATCH_32 dropped that dimension
+ * from both `efficiency_incentive_slabs` and the actuals table, now
+ * `worker_efficiency_actuals`). Entered once a month, before the salary
+ * run — not daily. Below the lowest slab threshold, the incentive is zero
+ * and the FULL fixed Production Allowance (already included in Total
+ * Earning via pro-ration) gets clawed back — confirmed from the real
+ * Aug 2026 data during the review.
+ *
+ * Cached per batch call, same pattern as getVdaRate, since every worker in
+ * a request shares the same lookup.
  */
-async function calcEfficiencyDeduction(
+async function getEfficiencyContext(
   db: ReturnType<typeof supabaseAdmin>,
-  department: string | null,
+  month: string,
+  year: number,
+  cache: Map<string, { achievedPct: number | null; slabs: { threshold_pct: number; incentive_amount: number }[] }>
+) {
+  const key = `${year}-${month}`;
+  if (!cache.has(key)) {
+    const { data: actual } = await db
+      .from('worker_efficiency_actuals')
+      .select('achieved_pct')
+      .eq('month', month)
+      .eq('year', year)
+      .maybeSingle();
+
+    const { data: slabs } = await db
+      .from('efficiency_incentive_slabs')
+      .select('threshold_pct, incentive_amount')
+      .lte('period_start', `${year}-${month}-01`)
+      .gte('period_end', `${year}-${month}-01`)
+      .order('threshold_pct', { ascending: false });
+
+    cache.set(key, { achievedPct: actual ? actual.achieved_pct : null, slabs: slabs ?? [] });
+  }
+  return cache.get(key)!;
+}
+
+function calcEfficiencyDeduction(
+  achievedPct: number | null,
+  slabs: { threshold_pct: number; incentive_amount: number }[],
   productionAllowPayable: number,
   month: string,
   year: number
-): Promise<{ deduction: number; warning?: string }> {
-  if (!department || productionAllowPayable <= 0) return { deduction: 0 };
+): { deduction: number; warning?: string } {
+  if (productionAllowPayable <= 0) return { deduction: 0 };
 
-  const { data: actual } = await db
-    .from('department_efficiency_actuals')
-    .select('achieved_pct')
-    .eq('department', department)
-    .eq('month', month)
-    .eq('year', year)
-    .maybeSingle();
-
-  if (!actual) {
+  if (achievedPct === null) {
     return {
       deduction: 0,
-      warning: `No department_efficiency_actuals row for ${department} ${month}/${year} — Production Efficiency not computed, full allowance left payable.`,
+      warning: `No worker_efficiency_actuals row for ${month}/${year} — Production Efficiency not computed, full allowance left payable.`,
     };
   }
 
-  const { data: slabs } = await db
-    .from('efficiency_incentive_slabs')
-    .select('threshold_pct, incentive_amount')
-    .eq('department', department)
-    .lte('period_start', `${year}-${month}-01`)
-    .gte('period_end', `${year}-${month}-01`)
-    .order('threshold_pct', { ascending: false });
-
-  if (!slabs || slabs.length === 0) {
+  if (slabs.length === 0) {
     return {
       deduction: 0,
-      warning: `No efficiency_incentive_slabs found for ${department} covering ${year}-${month} — Production Efficiency not computed.`,
+      warning: `No efficiency_incentive_slabs covering ${year}-${month} — Production Efficiency not computed.`,
     };
   }
 
-  const achieved = actual.achieved_pct;
-  const matched = slabs.find((s: { threshold_pct: number }) => achieved >= s.threshold_pct);
+  const matched = slabs.find((s) => achievedPct >= s.threshold_pct);
   const incentiveEarned = matched ? matched.incentive_amount : 0;
   const deduction = Math.max(0, productionAllowPayable - incentiveEarned);
   return { deduction };
@@ -298,11 +315,12 @@ async function calcEfficiencyDeduction(
 async function computeOne(
   db: ReturnType<typeof supabaseAdmin>,
   input: EmployeeInput,
-  vdaRateCache: Map<string, number | null>
+  vdaRateCache: Map<string, number | null>,
+  efficiencyCache: Map<string, { achievedPct: number | null; slabs: { threshold_pct: number; incentive_amount: number }[] }>
 ) {
   const { data: employee } = await db
     .from('employees')
-    .select('id, category, department, gender')
+    .select('id, category, gender')
     .eq('id', input.employee_id)
     .single();
 
@@ -384,7 +402,8 @@ async function computeOne(
 
   let productionEfficiencyDeduction = 0;
   if (isWorker) {
-    const effResult = await calcEfficiencyDeduction(db, employee.department, productionAllowP, input.month, input.year);
+    const effContext = await getEfficiencyContext(db, input.month, input.year, efficiencyCache);
+    const effResult = calcEfficiencyDeduction(effContext.achievedPct, effContext.slabs, productionAllowP, input.month, input.year);
     productionEfficiencyDeduction = effResult.deduction;
     if (effResult.warning) warnings.push(effResult.warning);
   }
@@ -474,8 +493,9 @@ Deno.serve(async (req: Request) => {
   try {
     const results = [];
     const vdaRateCache = new Map<string, number | null>();
+    const efficiencyCache = new Map<string, { achievedPct: number | null; slabs: { threshold_pct: number; incentive_amount: number }[] }>();
     for (const input of inputs) {
-      results.push(await computeOne(db, input, vdaRateCache));
+      results.push(await computeOne(db, input, vdaRateCache, efficiencyCache));
     }
     return jsonResponse({ results });
   } catch (err) {

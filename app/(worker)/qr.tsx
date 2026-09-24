@@ -19,7 +19,7 @@ import { QrCode, CameraOff, MapPin, Star } from 'lucide-react-native'
 export default function QRScreen() {
   const { t } = useTranslation()
   const { employee } = useAuth()
-  const { todayRecord, confirmQr, refresh } = useAttendance(employee?.id || '')
+  const { todayRecord, confirmQr, refresh, isLoading: attendanceLoading } = useAttendance(employee?.id || '')
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
   const [scanned, setScanned] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -91,6 +91,12 @@ export default function QRScreen() {
 
   if (!employee) return <LoadingScreen />
   if (hasPermission === null) return <LoadingScreen />
+  // Without this, every navigation here shows "GPS first required" for a
+  // beat before this screen's own fresh useAttendance fetch resolves —
+  // on this site's flaky network that beat can last long enough to look
+  // like a real bug (the worker DID check in, but this screen's todayRecord
+  // hasn't loaded yet). home.tsx already guards its own render the same way.
+  if (attendanceLoading && !todayRecord) return <LoadingScreen />
   if (hasPermission === false) {
     return (
       <View className="flex-1 bg-ink-50">
