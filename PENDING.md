@@ -10,9 +10,12 @@ statutory rates), got a full implementation blueprint approved, and shipped
 **PATCH_28** (schema only — new `employee_salary_structure`, `pt_slabs`
 [seeded with real Maharashtra slabs], `efficiency_incentive_slabs` [Forge
 Shop only], `payroll_records` extended, `employees.gender` added,
-`leave_requests.type` extended for COFF/OD). See "🟡 Salary consolidation"
-section below for full status and next steps. Nothing app-visible changed
-yet — this is schema-only, existing screens all still work unchanged.
+`leave_requests.type` extended for COFF/OD) **and PATCH_29** (seeded
+`employee_salary_structure` for 91 of 129 employees from the calc engines'
+own live Master Data — caught and resolved a real source conflict along the
+way, see "🟡 Salary consolidation" below for the full story and the
+remaining 24-person gap). Nothing app-visible changed yet — schema +
+reference data only, existing screens all still work unchanged.
 
 **Previous session (24 Sep, session 4):** GPS + QR dual check-in (GPS=50%, GPS+QR=100% attendance score); security QR first tab; missed check-in push notification. `scripts/ALERT.gs` updated to v4 (23 Sep 2026): hourly trigger topology, Phase 2 recipient routing, health watchdog, Cutting 2-shift config, DME Telegram, `setupDynamicSupervisorTabs()` disabled to prevent accidental SUPERVISOR_MAP wipe; all 4 live secrets blanked before commit. `form_links` sync: DB already matches v4 DEPT_FORM_SEED exactly (31 rows) — no changes needed. Manager layout: team tab hidden, "View Team →" on dashboard — already done in prior session. APK build triggers on push. Remaining open: APPS_SCRIPT_URL, supervisor Telegram onboarding (5 missing: Subhash Palve, Shivaji Jaypure, Manoj Wagh, Sunil Saha, Abhimanyu Kakde), per-form tracking. Action for Yash: (1) paste updated `scripts/ALERT.gs` into live Apps Script editor, run `deployShiftTrackingTriggers()`; (2) HR Admin must assign supervisor_id for Cutting/Press/Machine/HT/Electricity/Oil/VMC supervisors.
 
@@ -96,21 +99,63 @@ clean (no new security-advisor findings). Schema-only: no app screens changed,
   Outdoor Duty — confirmed live categories tracked via the same application
   form, just via a type value the schema didn't have room for).
 
-### ⏳ Still needed before Phase 2 (data seed) can start
+### ✅ Phase 2 — employee_salary_structure seed — DONE 24 Sep 2026
 
-1. **Confirm the master spreadsheet ("VFL Waluj Employee Master Data") is
-   current** — or point to a better source — before seeding
-   `employee_salary_structure` from it. This is real financial data for 129
-   people; not seeded speculatively.
-2. **Bonus scope** — rates confirmed (Staff 8.33%, Worker 18%, both of
+`PATCH_29_employee_salary_structure_seed_24Sep2026.sql` — applied via
+Supabase MCP, verified (91 rows, `select count(*) from
+employee_salary_structure` = 91).
+
+**Source corrected mid-flight**: not the "VFL Waluj Employee Master Data"
+spreadsheet's Staff/Permanent Worker tabs used in the first pass — those
+disagreed with a separate "Sheet17" tab in the same workbook for 71 of 75
+overlapping employees (always Sheet17 higher, no way to tell which was
+current). Switched to the calc engines' own `Master Data` tabs instead
+(the ones that actually drive live payroll, confirmed via formula trace) —
+Yash re-downloaded the staff one fresh 24 Sep to make sure it was current.
+
+**91 of 129 employees seeded** (19 workers + 72 staff, `Status='Active'` in
+the calc sheet). Corrections applied: VFL5463 ("Manoj Anantrao Wagh")
+remapped to VFL5337 (already documented in CLAUDE.md as the same person);
+VFL5465/VFL5466 excluded (obvious placeholder test rows — email "aaaaa",
+IFSC "000000", PAN "asdfgh"); VFL5400's account number nulled (source value
+was a float-precision-loss artifact, not a real account number — needs
+HR to re-enter before this person's payroll can actually be disbursed).
+
+**Still open — 24 people, real follow-up, not a code gap:**
+- **VFL5464 "Nidhi Kumari"** — real-looking data (real email, Kotak Mahindra
+  bank details, joined 26 Jul 2026, QMS dept) in the calc sheet but **no
+  employees row in Forge OS at all**. Looks like a genuine hire never
+  onboarded into the app — needs a real emp_code decision from Yash, not a
+  guess, same as every other "confirm before adding" case in this file.
+- **23 employees active in Forge OS but missing from the calc sheet**: 5
+  workers whose calc-sheet status disagrees with Forge OS — Kailash Dhiwar
+  (VFL4002), Digambar Todekar (VFL4004), Hanumant Shigarkanti (VFL4007),
+  Suresh Gawali (VFL4030), Babasaheb Randive (VFL4048) — worth checking
+  whether these five have actually left. Plus 18 staff missing entirely:
+  Dipak Patil (VFL1319), Jitendrasingh Nainsingh (VFL1441), Mahipal Singh
+  (VFL1465), Swapnil Kakade (VFL1550), Farhan Shah (VFL1568), Angad Kate
+  (VFL5074), Nivrutti Jadhav (VFL5083), Santosh Dabhade (VFL5203), Shaikh
+  Abdul Gani (VFL5323), Rahul Patil (VFL5354), Vikas Pere (VFL5383), Raju
+  Kasare (VFL5410), Payal Surve (VFL5415), Rohit Mokase (VFL5420), Dipak
+  Kharat (VFL5425), Saurabh Ghorpade (VFL5428), Pooja Pawar (VFL5429),
+  Shreyash Mhaske (VFL5445). Their payroll stays blank until Yash provides
+  the data — same "acceptable until HR provides it" precedent PATCH_26
+  already set for staff missing from its source sheet.
+
+### ⏳ Still needed before Phase 3 (calculation engine) can go live
+
+1. **Bonus scope** — rates confirmed (Staff 8.33%, Worker 18%, both of
    Basic), but Bonus is an annual statutory payout, different cadence from
    monthly payroll. Needs a decision: part of this build, or a separate
    module.
-3. **Does every worker department have its own efficiency agreement like
+2. **Does every worker department have its own efficiency agreement like
    Forge Shop's?** Only Forge Shop's slabs are seeded.
-4. **Bank statement format** — PDF vs. a specific bank bulk-upload layout.
+3. **Bank statement format** — confirmed: printable A4 PDF, print + stamp,
+   no special bank bulk-upload format needed.
+4. The 24 people above (VFL5464 + the 23-person gap) — engine can go live
+   for the 91 who have data without waiting on these.
 
-### Not yet built (Phases 3+)
+### Not yet built (Phase 3+)
 
 `run-payroll` edge function (calculation engine — formulas for PF/OT/ESIC
 already confirmed from the live spreadsheet formulas, not guessed; see the
