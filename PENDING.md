@@ -181,11 +181,17 @@ months, back to Jan 2024) checked, not just Aug 2026:
 **PATCH_31** (applied 24 Sep 2026): new `payroll_monthly_rates` table
 (`month`, `year`, `vda_per_day_rate`, unique per month/year) — the missing
 piece VDA needed. Same "entered once, service-role only" shape as
-`department_efficiency_actuals`. **Open question for Yash**: is this rate
-really uniform for every worker (all 19 checked in Aug 2026 shared one
-rate), or does it vary by grade/department? And where does HR actually get
-this number each month? Not blocking — the engine works correctly for
-whatever single rate is entered, this only matters if it turns out to vary.
+`department_efficiency_actuals`.
+
+**Confirmed by Yash (24 Sep 2026): the rate is one fixed number for every
+worker, company-wide — not per-grade/department.** It's revised roughly
+every 6 months, and the change is identical for everyone when it happens.
+No schema change needed — `payroll_monthly_rates` already models this
+correctly (HR just enters the same value again for each month within a
+6-month block, same as they'll already be doing for confirmed-days/OT-hours
+every month). **HR needs a place to update this** — scoped into the Phase 4
+HR-Admin build below (a small entry field alongside/near the monthly
+efficiency-actuals entry, not a separate screen), not built yet.
 
 **New finding, not yet resolved: Production Efficiency may not actually be
 department-scoped.** The Aug 2026 "Efficiency Calculations" sheet listed
