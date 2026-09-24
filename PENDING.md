@@ -3,7 +3,21 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 24 Sep 2026 (session 11) — PATCH_42: Leave + Advance switched to Google Forms (no in-app approval chain yet)
+**Last updated:** 24 Sep 2026 (session 12) — Payroll engine written; PATCH_43/44 forms work complete
+
+**Payroll Engine (24 Sep 2026, session 12):** `scripts/VFPL_Payroll_Engine_24Sep2026.gs` — paste into the `VFL HR OS 2026 27` spreadsheet's Apps Script editor.
+- Applies all FORMULA_AUDIT corrections: VDA = physical days × ₹103, heat allow = ₹5.78/day, no intermediate rounding for staff, efficiency slab 81–85%, ESIC exempt above ₹21,000, PF capped at ₹1,800.
+- Writes PAYROLL_DRAFT; promotePayrollDraft() moves approved rows to PAYROLL_STAFF / PAYROLL_WORKER.
+- **Before first run, fill these tabs in the spreadsheet:**
+  - `PAYROLL_PERIOD` row 2: Month, Year, Working Days, Period Start, Period End
+  - `STATUTORY_CONFIG`: PF_WAGE_CEILING=15000, PF_EMPLOYEE_RATE=0.12, PF_MAX_EMPLOYEE=1800, ESI_EMPLOYEE_RATE=0.0075, ESI_EXEMPT_ABOVE=21000, WORKER_VDA_RATE=103, WORKER_HEAT_RATE=5.78, PT_SLABS=\<JSON from HR once Maharashtra slabs confirmed\>
+  - `INPUT_ATTENDANCE`, `INPUT_OT`, `INPUT_EFFICIENCY` — sourced per the INPUT sheet design in the spreadsheet
+- PT returns ₹0 until Yash/HR confirm Maharashtra slabs and enters them as PT_SLABS JSON in STATUTORY_CONFIG.
+- Staff incentive is ₹0 placeholder — deferred until ~3 months real app usage.
+- Supabase export: NOT part of this engine. Run `syncOpsDashboardToSupabase()` separately after HR+Finance approve the draft.
+
+**PATCH_43 (24 Sep 2026, session 12):** Real Google Form URLs for all 6 is_common forms. Applied.
+**PATCH_44 (24 Sep 2026, session 12):** OT form for manager/plant_head/owner via MANAGEMENT virtual dept. Applied.
 
 **PATCH_42 (24 Sep 2026, session 11):** Leave Application + Advance Application switched to Google Forms.
 - In-app leave/advance screens removed from My Requests banner in FormsScreen — the approval chain (supervisor → manager → HR → accounts) isn't built yet.
