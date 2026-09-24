@@ -155,13 +155,61 @@ HR to re-enter before this person's payroll can actually be disbursed).
 4. The 24 people above (VFL5464 + the 23-person gap) — engine can go live
    for the 91 who have data without waiting on these.
 
-### Not yet built (Phase 3+)
+### ✅ Phase 3 — run-payroll calculation engine — DEPLOYED 24 Sep 2026, partially backtested
 
-`run-payroll` edge function (calculation engine — formulas for PF/OT/ESIC
-already confirmed from the live spreadsheet formulas, not guessed; see the
-plan file), HR-Admin entry screens, the consolidated sheet + Apps Script
-sync, `payslip.tsx` additive updates, bank statement export, then the
-parallel-run verification gate.
+`supabase/functions/run-payroll` — deployed (v2). Computes one employee's
+month from `employee_salary_structure` + confirmed-days/one-off inputs,
+upserts into `payroll_records`. Two callers by design (in-app screens,
+future sheet sync) — same function, same output either way.
+
+**Backtested against VFL4008's real Aug 2026 row — honest results, not all
+green:**
+
+| Component | Status |
+|---|---|
+| Basic, Conveyance, Washing, Education, HRA pro-ration | ✅ Match exactly |
+| PF | ✅ Matches exactly (₹1,800 = ₹1,800) |
+| VDA | ❌ Does NOT match — ₹2,790 computed vs ₹2,678 actual, despite Days Payable = Working Days (27/27) where simple pro-ration should be a no-op. Real VDA formula not yet identified. |
+| OT Amount | ⚠️ Close but not exact — ₹13,137 vs ₹12,939 (~1.5% off). The formula text this was built from came from the reusable *template* tab, which turned out to have a different column layout than the real monthly tabs — doesn't necessarily map to what actually runs. |
+| ESIC | Not backtested against a real row yet — but the *rule itself* (0.75% of gross, exempt above ₹21,000) is confirmed correct by Yash, replacing the sheet's buggy copy-paste-from-PF formula. |
+| PT, Production Efficiency | Not backtested — need `employees.gender` backfilled and a `department_efficiency_actuals` row respectively before they can compute for anyone. |
+
+The engine flags VDA and OT with a runtime warning on every call so nobody
+mistakes these for reliable numbers before they're fixed — see the
+function's own header comment for full detail.
+
+**New finding, not yet resolved: Production Efficiency may not actually be
+department-scoped.** The Aug 2026 "Efficiency Calculations" sheet listed
+workers from Die Shop, Forge Shop, Maintenance, Cutting Shop, Final Shop and
+Heat Treatment together under one shared 80% achieved figure — the earlier
+"Data is Collected from Forge Shop" note likely meant Forge Shop's
+supervisor (Sudeep Singh) *collects* the number on behalf of the whole
+worker roster, not that it's Forge-Shop-specific. The schema
+(`efficiency_incentive_slabs`, `department_efficiency_actuals`) is
+department-keyed based on the earlier reading — may need to collapse to one
+shared row instead of per-department ones. Needs Yash to confirm before the
+efficiency piece can be trusted for anyone, Forge Shop included.
+
+**PATCH_30** (small schema fix, applied same session): added
+`payroll_records.other_deduction` (missed in PATCH_28) and the new
+`department_efficiency_actuals` table.
+
+**Not yet tested from Forge OS itself** — the sandbox's outbound network
+proxy blocks direct calls to the Supabase functions endpoint (same
+restriction noted elsewhere in this file for other integrations), so this
+backtest was done by replicating the engine's exact logic in a local Python
+script against real seeded data, not by literally invoking the deployed
+function over HTTP. Worth a real end-to-end call once there's app access to
+verify the deployed version behaves identically — should, since the logic
+is line-for-line the same, but not independently confirmed.
+
+### Not yet built (Phase 4+)
+
+HR-Admin entry screens (confirmed-days first), the consolidated sheet +
+Apps Script sync, `payslip.tsx` additive updates, bank statement export,
+then the parallel-run verification gate. **Should wait for VDA/OT/
+Efficiency-scope to be resolved first** — no point building data-entry
+screens for an engine that's still wrong on two real components.
 
 ---
 
