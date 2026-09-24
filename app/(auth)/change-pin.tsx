@@ -65,7 +65,9 @@ export default function ChangePinScreen() {
     }
 
     setIsSubmitting(false)
-    router.replace('/')
+    // First-time users go through the permission onboarding before the app
+    // home; the screen sets PERMISSIONS_DONE_KEY and then routes to '/'.
+    router.replace('/(auth)/permissions-onboarding')
   }
 
   return (

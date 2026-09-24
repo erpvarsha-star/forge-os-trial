@@ -201,7 +201,17 @@
     "pinSameAsStarting": "Choose a PIN different from your starting PIN",
     "pinChangeFailed": "Could not update PIN. Please try again.",
     "profileLoadFailed": "Signed in, but your employee profile could not be loaded. Please report this to HR.",
-    "deviceTaken": "This device is already registered to another employee. Contact HR to resolve."
+    "deviceTaken": "This device is already registered to another employee. Contact HR to resolve.",
+    "permissionsTitle": "Allow App Access",
+    "permissionsSubtitle": "Forge OS needs these permissions to work correctly on the factory floor.",
+    "permLocation": "Location",
+    "permLocationHint": "Required for GPS attendance check-in and check-out",
+    "permCamera": "Camera",
+    "permCameraHint": "Required for QR scanning and 5S photo submissions",
+    "permNotifications": "Notifications",
+    "permNotificationsHint": "For shift reminders, leave and advance status alerts",
+    "grantPermissions": "Grant Permissions",
+    "skipForNow": "Skip for now"
   },
   "worker": {
     "safetyTip": "Safety Tip of the Day",

@@ -3,7 +3,19 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 24 Sep 2026 (session 9) — PATCH_39: device lock + checkout GPS+QR
+**Last updated:** 25 Oct 2026 (session 10) — PATCH_40: permissions onboarding + FRESH_INSTALL script
+
+**PATCH_40 (25 Oct 2026, session 10):** Permissions onboarding + update check already built.
+- `lib/permissions.ts` — `requestAllPermissions()` requests location, camera, notifications in sequence upfront, so employees never see a surprise system dialog mid-flow.
+- `app/(auth)/permissions-onboarding.tsx` — one-time screen shown after first PIN change (via `change-pin.tsx` redirect) and for returning users who haven't done it yet (gated in `app/index.tsx` via AsyncStorage key `app.permissionsRequested`). Dismissible with "Skip" — individual flows keep their own lazy permission requests as a safety net.
+- `UpdateBanner` + `useAppVersion` were already fully built and wired in `_layout.tsx` — CI stamps `versionCode` with the run number, and the banner compares against the GitHub Releases API. No code change needed for update notifications.
+- `scripts/FRESH_INSTALL_25Oct2026.sql` — run in Supabase SQL Editor on 25 Oct before distributing the APK. Clears `device_registrations`, resets `must_change_pin = true` for all 138 active employees, and resets all auth user passwords to starting PINs (VFL employees: `lpad(digits,6,'0')`; CON employees: `'20'||lpad(digits,4,'0')`).
+
+**25 Oct 2026 fresh install procedure:**
+1. Run `scripts/FRESH_INSTALL_25Oct2026.sql` in Supabase SQL Editor.
+2. Share APK download link via WhatsApp: `https://github.com/erpvarsha-star/forge-os-trial/releases/latest/download/app-release.apk`
+3. Every employee installs → logs in with starting PIN → forced PIN change → permissions screen → normal use.
+4. Device locks are fresh — no one is blocked from registering their device.
 
 **Consultant logins**: Added 9 confirmed-active consultants (CON01, CON05,
 CON09, CON12, CON16, CON18, CON20, CON21 with departments; CON13 no
