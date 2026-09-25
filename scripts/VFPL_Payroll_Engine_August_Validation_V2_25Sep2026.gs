@@ -142,7 +142,7 @@ function validateAugustPayrollInputsV2() {
       'August pay-period OT = 5,186 hours.\n\n' +
       'Next run: runAugustPayrollValidationV2()';
   }
-  SpreadsheetApp.getUi().alert(message);
+  uiAlert_(message);
   return { ready: problems.length === 0, problems: problems };
 }
 
@@ -195,7 +195,7 @@ function runAugustPayrollValidationV2() {
   writeOwnedTab_(ss, P3V2_CFG.OWNED_TABS.EXCEPTIONS, exceptionHeaders_(), exceptionRows);
   writeSummary_(ss, stats, exceptionRows, ptConfig, effMap);
 
-  SpreadsheetApp.getUi().alert(
+  uiAlert_(
     'August V2 validation complete.\n\n' +
     'Employees: ' + stats.total + '\n' +
     'Exact generated net: ' + stats.exactNet + '\n' +
@@ -665,3 +665,4 @@ function sumMap_(m){var s=0;Object.keys(m).forEach(function(k){s+=num_(m[k]);});
 function headerMap_(row){var m={};(row||[]).forEach(function(v,i){m[String(v||'').trim().toUpperCase()]=i;});return m;}
 function firstHeader_(hm,names){for(var i=0;i<names.length;i++)if(hm.hasOwnProperty(names[i]))return hm[names[i]];return -1;}
 function isAug2026_(v){var s=String(v||'').trim().toLowerCase();return s==='2026-08'||s==='aug 2026'||s==='august 2026'||s==='august'||s==='aug';}
+function uiAlert_(msg){try{SpreadsheetApp.getUi().alert(msg);}catch(e){Logger.log(msg);}}
