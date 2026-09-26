@@ -3,7 +3,11 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 26 Sep 2026 (session 13) — PATCH_49: Plant Head review stage added to salary/new-hire approvals
+**Last updated:** 26 Sep 2026 (session 13) — PATCH_50: Worker Monthly Efficiency form for management
+
+**PATCH_50 (26 Sep 2026, session 13):** Added "Worker Monthly Efficiency" (real URL from Yash) to `form_links` under the `MANAGEMENT` virtual department — same pattern PATCH_44 used for the Overtime Form. Pure data, no app code touched: `FormsScreen.tsx` already renders every `department='MANAGEMENT'` row under "Management Forms" for manager/plant_head/owner, so this is live for Fazal immediately, no new APK needed.
+
+**PATCH_49 (26 Sep 2026, session 13):** Plant Head review stage added to salary/new-hire approvals
 
 **PATCH_49 (26 Sep 2026, session 13):** Adds the Plant Head review step that was missing from PATCH_46. `new-employee-flow.tsx`'s own labels have always described a 4-step chain (HR Admin Entry → Plant Head Approval → Owner Approval → Account Activation); PATCH_46 built a 2-step one (HR → Owner directly). Confirmed with Yash: applies to **both** new hires and salary revisions, and "plant manager" means the `plant_head` role (Fazal Ilahi Khan, VFL1386) — not a department manager.
 
