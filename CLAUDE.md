@@ -26,6 +26,12 @@ progress.
 outstanding, blocked, or untested. Update it before the final push of any
 session.
 
+**Always use IST (Indian Standard Time, UTC+5:30) when displaying times to the user.** The database stores all timestamps in UTC. When querying for display, convert to IST using PostgreSQL's `AT TIME ZONE 'Asia/Kolkata'` syntax:
+```sql
+SELECT timestamp_column AT TIME ZONE 'Asia/Kolkata' as ist_time FROM table_name;
+```
+This matters for shift times, deadlines, attendance reporting, and all compliance data — the user operates on IST, not UTC.
+
 ---
 
 ## Non-negotiable security rules
