@@ -9,7 +9,7 @@ import { Input } from '@/components/Input'
 import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
-import { BRAND, INK } from '@/components/theme'
+import { SalaryBreakupFields, emptyBreakup, breakupIsValid, breakupToPayload, SalaryBreakup } from '@/components/SalaryBreakupFields'
 
 type Category = 'staff' | 'worker' | 'consultant'
 type OnboardableRole = 'member' | 'supervisor' | 'manager' | 'security_guard'
@@ -54,21 +54,21 @@ export default function AddEmployeeScreen() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [department, setDepartment] = useState('')
-  const [salary, setSalary] = useState('')
   const [category, setCategory] = useState<Category>('staff')
   const [role, setRole] = useState<OnboardableRole>('member')
   const [gender, setGender] = useState<Gender | ''>('')
+  const [breakup, setBreakup] = useState<SalaryBreakup>(emptyBreakup)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   if (!employee) return <LoadingScreen />
 
-  const canSubmit = empCode.trim() && name.trim() && department.trim()
+  const canSubmit = !!(empCode.trim() && name.trim() && department.trim() && breakupIsValid(breakup))
 
   const handleSubmit = async () => {
     if (!canSubmit || isSubmitting) return
     setIsSubmitting(true)
 
-    const { data, error } = await supabase.rpc('add_employee', {
+    const { error } = await supabase.rpc('add_employee', {
       p_emp_code: empCode.trim().toUpperCase(),
       p_name: name.trim(),
       p_phone: phone.trim() || null,
@@ -76,7 +76,7 @@ export default function AddEmployeeScreen() {
       p_category: category,
       p_role: role,
       p_gender: gender || null,
-      p_salary: salary.trim() ? Number(salary.trim()) : null,
+      p_breakup: breakupToPayload(breakup),
     })
 
     setIsSubmitting(false)
@@ -91,8 +91,8 @@ export default function AddEmployeeScreen() {
     }
 
     Alert.alert(
-      t('hrAdmin.employeeAdded'),
-      t('hrAdmin.employeeAddedBody', { name: name.trim(), code: data.emp_code, pin: data.starting_pin }),
+      t('hrAdmin.employeeSubmitted'),
+      t('hrAdmin.employeeSubmittedBody', { name: name.trim(), code: empCode.trim().toUpperCase() }),
       [{ text: t('common.submit'), onPress: () => router.back() }]
     )
   }
@@ -106,7 +106,7 @@ export default function AddEmployeeScreen() {
         </Text>
         <Text className="text-sm text-ink-500 mb-5">{t('hrAdmin.addEmployeeHint')}</Text>
 
-        <Card className="gap-4">
+        <Card className="gap-4 mb-4">
           <Input
             label={t('hrAdmin.empCodeLabel')}
             value={empCode}
@@ -123,13 +123,6 @@ export default function AddEmployeeScreen() {
             helperText={t('common.optional')}
           />
           <Input label={t('common.department')} value={department} onChangeText={setDepartment} required />
-          <Input
-            label={t('common.salary')}
-            value={salary}
-            onChangeText={setSalary}
-            keyboardType="numeric"
-            helperText={t('common.optional')}
-          />
 
           <View>
             <Text className="text-sm font-semibold text-ink-700 mb-1.5">{t('common.category')}</Text>
@@ -171,6 +164,12 @@ export default function AddEmployeeScreen() {
               ]}
             />
           </View>
+        </Card>
+
+        <Text className="text-lg font-bold text-ink-900 mb-1">{t('hrAdmin.salaryBreakup')}</Text>
+        <Text className="text-xs text-ink-500 mb-4">{t('hrAdmin.salaryApprovalHint')}</Text>
+        <Card className="mb-2">
+          <SalaryBreakupFields value={breakup} onChange={setBreakup} />
         </Card>
 
         <Button

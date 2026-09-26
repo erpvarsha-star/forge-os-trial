@@ -3,7 +3,21 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 26 Sep 2026 (session 13) — PATCH_45: GPS radius, HR self-service RPCs, VFL5464 onboarded
+**Last updated:** 26 Sep 2026 (session 13) — PATCH_46: owner-approved salary + new-hire onboarding
+
+**PATCH_46 (26 Sep 2026, session 13):** Owner-approved salary changes + new-hire onboarding — corrects PATCH_45's `add_employee` per Yash's direction: HR must never be able to set salary or activate a login unilaterally.
+
+- **`reset_employee_pin` narrowed** from `is_management()` to `hr_admin` only — "PIN reset for anyone can be done only by HR, we don't give this feature to anyone else," including manager/plant_head/owner.
+- **New table `salary_change_requests`** — one shared approval queue for two cases: a brand-new hire's initial CTC breakup, or an existing employee's revision. Both follow the same shape: HR submits (hr_admin only) → owner approves/rejects (owner only) → only approval writes `employee_salary_structure`.
+- **`add_employee` rewritten.** No longer activates a login or takes a single salary number. Now: creates the `employees` row `is_active=false` with no `auth_user_id` (nothing to log into yet), takes a full CTC breakup (`ctc_annual/basic/hra/conveyance` required, `washing/education/heat_allow/vda/production_allow/medical/professional_development/communication/uniform` optional) as a `jsonb` payload, and inserts a pending `is_new_hire=true` request. Notifies the owner (in-app `notifications` row — a real device push isn't wired for this specific event yet, would need one more edge-function call).
+- **New `request_salary_change(employee_id, breakup)`** — hr_admin only, same shape for an existing employee's revision. Also usable to fill the still-open `employee_salary_structure` gap for the 38 employees flagged missing since PATCH_29.
+- **New `approve_salary_change_request` / `reject_salary_change_request`** — owner only. Approving a new-hire request is the moment the auth login actually gets provisioned and `is_active` flips true (same synthetic-email/PIN-as-password provisioning PATCH_10 established); approving a revision writes `employee_salary_structure` (superseding the previous active row, not deleting it). Rejecting either just marks the request rejected and notifies HR back — no employee/salary state changes.
+- **New screens**: `app/(hr-admin)/add-employee.tsx` (rewritten — full breakup form, "submitted for approval" messaging instead of an instant PIN), `app/(hr-admin)/salary-request.tsx` (new — search an existing employee by emp_code, submit a revision). Both linked from the HR-Admin dashboard.
+- **`app/(owner)/approvals.tsx` extended** — now also lists pending `salary_change_requests` alongside the existing leave/advance escalations, tagged "New Hire" or "Salary Revision" with the CTC/Basic/HRA/Conveyance shown before approving.
+- **Full flow tested** inside a transaction impersonating both Pallavi (hr_admin) and Yash (owner) via `set local request.jwt.claims`, committed, verified, then fully cleaned up (test employee + auth user + salary rows + notifications all deleted) before this was called done.
+- Superseded PATCH_45's `add_employee` signature — old one dropped explicitly so it doesn't linger as a second overload.
+
+**PATCH_45 (26 Sep 2026, session 13):** GPS radius, HR self-service RPCs, VFL5464 onboarded (see below, unchanged from this session's earlier commit).
 
 **PATCH_45 (26 Sep 2026, session 13):** GPS geofence tightening + HR self-service.
 

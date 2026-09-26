@@ -9,7 +9,7 @@ import { CheckInCard } from '@/components/CheckInCard'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { router } from 'expo-router'
-import { Users, AlertCircle, CreditCard, Calendar, ChevronRight, UserPlus } from 'lucide-react-native'
+import { Users, AlertCircle, CreditCard, Calendar, ChevronRight, UserPlus, IndianRupee } from 'lucide-react-native'
 import { BRAND, STATUS, INK } from '@/components/theme'
 
 interface DashboardStats {
@@ -107,6 +107,14 @@ export default function HrAdminDashboard() {
       icon: <UserPlus size={20} color={BRAND[600]} />,
       label: t('hrAdmin.addEmployee'),
       path: '/(hr-admin)/add-employee',
+      badge: null,
+      badgeTone: 'neutral' as const,
+    },
+    {
+      key: 'salary-request',
+      icon: <IndianRupee size={20} color={BRAND[600]} />,
+      label: t('hrAdmin.salaryRequests'),
+      path: '/(hr-admin)/salary-request',
       badge: null,
       badgeTone: 'neutral' as const,
     },
