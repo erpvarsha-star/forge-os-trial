@@ -3,7 +3,11 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 26 Sep 2026 (session 13) — PATCH_46: owner-approved salary + new-hire onboarding
+**Last updated:** 26 Sep 2026 (session 13) — PATCH_47: real push for salary/new-hire approvals
+
+**PATCH_47 (26 Sep 2026, session 13):** Closes the notification gap PATCH_46 left open. All four functions (`add_employee`, `request_salary_change`, `approve_salary_change_request`, `reject_salary_change_request`) now call a new `notify_via_push()` helper instead of inserting into `notifications` directly. That helper calls `send-push-notification` via `net.http_post` — same pattern every pg_cron job already uses, confirmed safe by checking `verify_jwt=false` directly rather than assuming it. **Tested for real**: added a test employee as Pallavi, confirmed `net._http_response` shows `{"success":true,"notified":1,"pushed":1}`, and Yash's registered Android device received the actual push — not just an in-app bell entry. Test employee removed immediately after.
+
+**PATCH_46 (26 Sep 2026, session 13):** Owner-approved salary + new-hire onboarding
 
 **PATCH_46 (26 Sep 2026, session 13):** Owner-approved salary changes + new-hire onboarding — corrects PATCH_45's `add_employee` per Yash's direction: HR must never be able to set salary or activate a login unilaterally.
 
