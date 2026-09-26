@@ -3,7 +3,69 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 24 Sep 2026 (session 12) — Payroll engine written; PATCH_43/44 forms work complete
+**Last updated:** 26 Sep 2026 (session 13) — PATCH_45: GPS radius, HR self-service RPCs, VFL5464 onboarded
+
+**PATCH_45 (26 Sep 2026, session 13):** GPS geofence tightening + HR self-service.
+
+- **GPS radius 100m → 15m** on all 12 real campus points in `plant_locations`
+  (Yash's decision, after confirming the whole campus spans only 134.7m end
+  to end — the old 100m radius reached a public street corner). `plant_config`'s
+  legacy single-point fallback also updated to 15 for consistency. "Pune
+  Office" (200m, an undocumented 13th point not part of the original
+  12-location seed) deliberately left untouched — different kind of location,
+  not what was reported.
+  ⚠ **Watch for `worker.outsidePlant` complaints the first few days** — 15m is
+  tight relative to normal phone GPS accuracy (±5–20m outdoors, worse indoors
+  near steel structures), and Machine shop sits 68.6m from its nearest
+  neighbouring point, so there's a real uncovered gap between them at this
+  radius. If specific shops turn out too tight, loosen per-point rather than
+  globally.
+- **`reset_employee_pin(employee_id)` RPC** — same logic as `HR_reset_pin.sql`,
+  now a button on `missing-data.tsx` ("Reset Forgotten PIN" — enter emp_code,
+  get the reset PIN back in an alert). Replaces the manual SQL Editor step for
+  the everyday "forgot PIN" case.
+- **`add_employee(...)` RPC** — the single-employee version of PATCH_10's
+  provisioning loop (insert `employees` row + synthetic-email/PIN-as-password
+  `auth.users` row, atomically). New screen `app/(hr-admin)/add-employee.tsx`,
+  linked from the HR-Admin dashboard. HR can now onboard someone without a
+  Claude/SQL-Editor session.
+  - Real bug found while testing: both new functions called `crypt()`/
+    `gen_salt()` unqualified, which fails once wrapped in a function with a
+    narrowed `search_path` — pgcrypto lives in the `extensions` schema on
+    this project, not `public`. Fixed by schema-qualifying both calls.
+  - Also found: this project's default privileges silently re-grant `anon`
+    EXECUTE on any `CREATE OR REPLACE FUNCTION`, even after an explicit
+    `revoke ... from public`. Both RPCs now `revoke ... from public, anon`
+    explicitly and were re-verified authenticated-only afterward.
+  - Tested inside a transaction impersonating a real hr_admin (Pallavi,
+    VFL5440) via `set local request.jwt.claims`, then rolled back, before
+    either was wired to a button.
+- **VFL5464 (Nidhi Kumari, Quality, staff) added for real** via `add_employee()`
+  — flagged missing since PATCH_29's `employee_salary_structure` seed. Gender
+  `female` (already confirmed by Yash in PATCH_33's data-gathering, just never
+  had a row to apply it to). Salary left NULL — not in the phone list Yash
+  sent, not guessed. Starting PIN 005464, `must_change_pin=true`.
+  **VFL5465 / VFL5466 deliberately NOT added** — PATCH_29 already found and
+  excluded these two as placeholder/test rows (email "aaaaa"/"aaaaaa", IFSC
+  "000000", PAN "asdfgh"); the phone list just sent carries the same
+  placeholder emails for them, so treating that finding as still current
+  rather than re-litigating it. Flag to Yash if these should be revisited.
+- **Dashboard "Never signed in" list — no longer truncated.** `dashboard/index.html`'s
+  data-quality section already computed this list (from `must_change_pin`)
+  but capped it at 12 names; HR needs the complete list to work through daily.
+  Now shows every never-logged-in employee, grouped by department, with a
+  per-department count — this **is** the "daily list to HR" ask, no new cron
+  or edge function needed since HR already opens this dashboard.
+- **Still open, needs Yash:**
+  - VFL4057 (Devendrakumar Singh, Maintenance) reported "not able to check
+    in." Traced as far as data allows: his device lock was already reset
+    today (device_registrations row from 05:26 UTC this morning) and his
+    auth account works, but he has zero `attendance_records` rows ever — a
+    rejected check-in (outside geofence, or fraud-detector's mock-location
+    check) never writes a row, so the DB can't say which is still blocking
+    him. Needs a screenshot of what his check-in screen actually says.
+  - Whether "Pune Office"'s 200m radius was deliberate (not part of the
+    documented 12-point seed).
 
 **Payroll Engine (24 Sep 2026, session 12):** `scripts/VFPL_Payroll_Engine_24Sep2026.gs` — paste into the `VFL HR OS 2026 27` spreadsheet's Apps Script editor.
 - Applies all FORMULA_AUDIT corrections: VDA = physical days × ₹103, heat allow = ₹5.78/day, no intermediate rounding for staff, efficiency slab 81–85%, ESIC exempt above ₹21,000, PF capped at ₹1,800.

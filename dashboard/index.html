@@ -610,12 +610,37 @@ function renderAttention(emps) {
   };
 
   const html =
-    block('Never signed in', neverLoggedIn, 'Still on their starting PIN, which anyone who has seen their ID card can guess.') +
+    renderNeverLoggedIn(neverLoggedIn) +
     block('No supervisor assigned', noSupervisor, 'Their leave and advance requests have nobody to approve them.') +
     block('No phone number', noPhone, 'No fallback way to reach them outside the app.') +
     block('No department', noDept, 'They are missing from every department view and report.');
 
   $('attention').innerHTML = html || '<div class="empty">Nothing outstanding. Every active employee has signed in, and has a department, a phone number and a supervisor.</div>';
+}
+
+/* --- Full "who's remaining to log in" list, not truncated like the other
+       data-quality categories — this is the one HR actually needs to work
+       through day to day, so it's grouped by department with every name
+       shown, not just the first 12. --- */
+function renderNeverLoggedIn(list) {
+  if (!list.length) return '';
+  const byDept = new Map();
+  for (const e of list) {
+    const d = e.department || '—';
+    if (!byDept.has(d)) byDept.set(d, []);
+    byDept.get(d).push(e);
+  }
+  const depts = [...byDept.entries()].sort((a, b) => b[1].length - a[1].length);
+  const groups = depts.map(([d, emps]) =>
+    `<div style="margin-top:6px"><strong style="font-size:12px">${esc(d)}</strong> <span class="dim">(${emps.length})</span><br>
+     <span style="font-size:12px;color:var(--ink-2)">${emps.map(e => esc(`${e.emp_code} ${e.name}`)).join(', ')}</span></div>`
+  ).join('');
+  return `<div style="margin-bottom:14px">
+    <div class="row"><strong>Never signed in</strong><div class="spacer"></div>
+      <span class="pill ${list.length > 20 ? 'bad' : 'warn'}">${list.length}</span></div>
+    <div class="dim" style="margin-top:3px">Still on their starting PIN, which anyone who has seen their ID card can guess. Full list, grouped by department, for today's follow-up.</div>
+    ${groups}
+  </div>`;
 }
 
 function renderForms(dept) {

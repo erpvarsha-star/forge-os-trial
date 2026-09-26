@@ -7,8 +7,10 @@ import { Card } from '@/components/Card'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { Employee, DeviceRegistration } from '@/types'
-import { AlertCircle, CheckCircle2, Smartphone, Trash2 } from 'lucide-react-native'
+import { AlertCircle, CheckCircle2, Smartphone, Trash2, KeyRound } from 'lucide-react-native'
 import { STATUS, INK } from '@/components/theme'
+import { Input } from '@/components/Input'
+import { Button } from '@/components/Button'
 
 interface DeviceRow extends DeviceRegistration {
   employee?: { name: string; emp_code: string }
@@ -21,6 +23,8 @@ export default function MissingDataScreen() {
   const [devices, setDevices] = useState<DeviceRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [clearingId, setClearingId] = useState<string | null>(null)
+  const [resetCode, setResetCode] = useState('')
+  const [isResetting, setIsResetting] = useState(false)
 
   const loadData = useCallback(async () => {
     if (!employee) return
@@ -70,6 +74,39 @@ export default function MissingDataScreen() {
           },
         },
       ]
+    )
+  }
+
+  const handleResetPin = async () => {
+    const code = resetCode.trim()
+    if (!code || isResetting) return
+    setIsResetting(true)
+
+    const { data: match } = await supabase
+      .from('employees')
+      .select('id, name, emp_code')
+      .ilike('emp_code', code)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (!match) {
+      setIsResetting(false)
+      Alert.alert(t('common.error'), t('hrAdmin.employeeNotFound'))
+      return
+    }
+
+    const { data, error } = await supabase.rpc('reset_employee_pin', { p_employee_id: match.id })
+    setIsResetting(false)
+
+    if (error) {
+      Alert.alert(t('common.error'), t('common.somethingWentWrong'))
+      return
+    }
+
+    setResetCode('')
+    Alert.alert(
+      t('hrAdmin.pinResetTitle'),
+      t('hrAdmin.pinResetBody', { name: match.name, pin: data.starting_pin })
     )
   }
 
@@ -128,6 +165,30 @@ export default function MissingDataScreen() {
             <View className="mb-6" />
           </>
         )}
+
+        {/* Reset forgotten PIN */}
+        <View className="flex-row items-center gap-2 mb-4">
+          <KeyRound size={18} color={INK[500]} />
+          <Text className="text-lg font-bold text-ink-900">{t('hrAdmin.resetPin')}</Text>
+        </View>
+        <Text className="text-xs text-ink-500 mb-4">{t('hrAdmin.resetPinHint')}</Text>
+        <Card className="mb-6">
+          <View className="flex-row gap-2 items-start">
+            <Input
+              value={resetCode}
+              onChangeText={setResetCode}
+              placeholder={t('hrAdmin.resetPinPlaceholder')}
+              className="flex-1"
+            />
+            <Button
+              title="hrAdmin.resetPinAction"
+              onPress={handleResetPin}
+              loading={isResetting}
+              disabled={!resetCode.trim()}
+              size="md"
+            />
+          </View>
+        </Card>
 
         {/* Device registrations */}
         <View className="flex-row items-center gap-2 mb-4">

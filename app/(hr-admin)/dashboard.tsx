@@ -9,7 +9,7 @@ import { CheckInCard } from '@/components/CheckInCard'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { router } from 'expo-router'
-import { Users, AlertCircle, CreditCard, Calendar, ChevronRight } from 'lucide-react-native'
+import { Users, AlertCircle, CreditCard, Calendar, ChevronRight, UserPlus } from 'lucide-react-native'
 import { BRAND, STATUS, INK } from '@/components/theme'
 
 interface DashboardStats {
@@ -101,6 +101,14 @@ export default function HrAdminDashboard() {
       path: '/(hr-admin)/new-employee-flow',
       badge: stats.pendingLeaves,
       badgeTone: stats.pendingLeaves > 0 ? 'pending' : 'neutral',
+    },
+    {
+      key: 'add-employee',
+      icon: <UserPlus size={20} color={BRAND[600]} />,
+      label: t('hrAdmin.addEmployee'),
+      path: '/(hr-admin)/add-employee',
+      badge: null,
+      badgeTone: 'neutral' as const,
     },
   ] as const
 
