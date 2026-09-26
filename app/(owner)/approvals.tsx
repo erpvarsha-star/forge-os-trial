@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { View, Text, ScrollView, Alert } from 'react-native'
+import { View, Text, ScrollView, Alert, TouchableOpacity } from 'react-native'
 import { useTranslation } from 'react-i18next'
+import { router } from 'expo-router'
 import { useAuth } from '@/hooks/useAuth'
 import { Header } from '@/components/Header'
 import { Card } from '@/components/Card'
@@ -8,8 +9,8 @@ import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { LeaveRequest, AdvanceRequest } from '@/types'
-import { CheckCircle, XCircle, Inbox } from 'lucide-react-native'
-import { INK } from '@/components/theme'
+import { CheckCircle, XCircle, Inbox, Upload, ChevronRight } from 'lucide-react-native'
+import { INK, BRAND } from '@/components/theme'
 
 interface SalaryChangeRequest {
   id: string
@@ -107,6 +108,16 @@ export default function OwnerApprovals() {
             </View>
           )}
         </View>
+
+        <TouchableOpacity onPress={() => router.push('/(owner)/bulk-salary')} className="mb-4 min-h-touch">
+          <Card className="bg-brand-50" variant="flat">
+            <View className="flex-row items-center gap-3">
+              <Upload size={20} color={BRAND[600]} />
+              <Text className="text-sm font-bold text-brand-800 flex-1">{t('hrAdmin.bulkSalaryTitle')}</Text>
+              <ChevronRight size={18} color={BRAND[600]} />
+            </View>
+          </Card>
+        </TouchableOpacity>
 
         {salaryItems.length > 0 && (
           <>

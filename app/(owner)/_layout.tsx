@@ -17,6 +17,7 @@ export default function OwnerLayout() {
         <Tabs.Screen name="eotm" options={{ href: null }} />
         <Tabs.Screen name="leave" options={{ href: null }} />
         <Tabs.Screen name="advance" options={{ href: null }} />
+        <Tabs.Screen name="bulk-salary" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )
