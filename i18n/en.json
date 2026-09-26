@@ -575,6 +575,7 @@
     "bulkNothingToApply": "Nothing to apply — every matched row is already up to date.",
     "bulkApplied": "Applied",
     "bulkAppliedBody": "{{updated}} employee(s) updated.",
+    "plantHeadApprovedNote": "Approved by the plant head",
     "resetPin": "Reset Forgotten PIN",
     "resetPinHint": "Enter the employee's code to reset them back to their starting PIN. They'll be asked to change it again on next login.",
     "resetPinPlaceholder": "Employee code",

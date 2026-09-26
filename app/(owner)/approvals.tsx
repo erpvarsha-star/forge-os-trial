@@ -21,6 +21,7 @@ interface SalaryChangeRequest {
   hra: number
   conveyance: number
   requested_at: string
+  plant_head_note?: string | null
   employee?: { name: string; emp_code: string; department: string }
 }
 
@@ -42,7 +43,7 @@ export default function OwnerApprovals() {
       supabase
         .from('salary_change_requests')
         .select('*, employee:employees(name, emp_code, department)')
-        .eq('status', 'pending')
+        .eq('status', 'pending_owner')
         .order('requested_at', { ascending: true }),
     ])
     const all = [...(leaves || []), ...(advances || [])]
@@ -148,6 +149,9 @@ export default function OwnerApprovals() {
                   <Text className="text-xs text-ink-600">{t('hrAdmin.hra')}: <Text className="font-bold font-mono">₹{Number(req.hra).toLocaleString()}</Text></Text>
                   <Text className="text-xs text-ink-600">{t('hrAdmin.conveyance')}: <Text className="font-bold font-mono">₹{Number(req.conveyance).toLocaleString()}</Text></Text>
                 </View>
+                <Text className="text-xs text-ink-400 mb-3">
+                  {t('hrAdmin.plantHeadApprovedNote')}{req.plant_head_note ? `: "${req.plant_head_note}"` : ''}
+                </Text>
                 <View className="flex-row gap-2">
                   <Button
                     title="supervisor.approve"

@@ -3,7 +3,18 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 26 Sep 2026 (session 13) — PATCH_48: bulk salary upload (owner only)
+**Last updated:** 26 Sep 2026 (session 13) — PATCH_49: Plant Head review stage added to salary/new-hire approvals
+
+**PATCH_49 (26 Sep 2026, session 13):** Adds the Plant Head review step that was missing from PATCH_46. `new-employee-flow.tsx`'s own labels have always described a 4-step chain (HR Admin Entry → Plant Head Approval → Owner Approval → Account Activation); PATCH_46 built a 2-step one (HR → Owner directly). Confirmed with Yash: applies to **both** new hires and salary revisions, and "plant manager" means the `plant_head` role (Fazal Ilahi Khan, VFL1386) — not a department manager.
+
+- `salary_change_requests.status` now has three live stages: `pending_plant_head` → `pending_owner` → `approved`/`rejected`. Rejection can happen at either stage; approval only in order — `approve_salary_change_request`/`reject_salary_change_request` now raise a clear error if called on a request still at `pending_plant_head` (verified: owner correctly blocked with "not awaiting owner approval" until the plant head acts).
+- New `plant_head_review_salary_change_request(request_id, approve, note)` — plant_head only. Approve moves it to `pending_owner` and notifies the owner(s); reject ends it there and notifies HR back.
+- New audit columns `plant_head_reviewed_by/at/note` — real bug caught while testing: the first migration attempt failed on a constraint-ordering issue and rolled back *entirely*, silently dropping these three `ADD COLUMN` statements along with everything else in that transaction. Not noticed until the very next test call hit "column does not exist" — added back in a separate follow-up migration, then the whole chain re-verified end to end (HR submits → plant head approves → owner approves, confirmed both `plant_head_reviewed_by` and `reviewed_by` set; separately confirmed the plant-head-reject path leaves the employee correctly inactive).
+- `bulk_apply_salary_changes` (PATCH_48) is **unchanged** — that's Yash uploading directly himself, so there's no one above him in the chain to review it.
+- `app/(owner)/approvals.tsx` now filters salary items to `pending_owner` only (was `pending`), and shows the plant head's note if they left one. `app/(plant-head)/approvals.tsx` gets a new salary-requests section (same card layout, Approve/Reject calling the new RPC) — this reuses that screen's existing pending-sign-off list, just adds a new item type to it.
+- **Real data problem flagged, not yet resolved**: VFL5466's salary_change_request (submitted before this patch, migrated forward to `pending_plant_head`) has `ctc_annual=20117` which is implausibly low — likely a monthly figure entered where annual was expected. Flagged to Yash directly; left untouched pending a corrected resubmission rather than guessed at.
+
+**PATCH_48 (26 Sep 2026, session 13):** Bulk salary upload (owner only)
 
 **PATCH_48 (26 Sep 2026, session 13):** Bulk salary upload — a second, owner-only path alongside PATCH_46/47's one-at-a-time request/approve flow, for revising many employees' pay at once.
 
