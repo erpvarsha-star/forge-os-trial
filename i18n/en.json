@@ -659,5 +659,10 @@
     "qrExpiresIn": "Expires in {{minutes}} min",
     "qrNotConfigured": "No gate code available",
     "qrNotConfiguredHint": "The plant QR secret has not been set up yet. Contact HR."
+  },
+  "reports": {
+    "lateComersReview": "Late Comers Review",
+    "lateComersReviewHint": "Employees late more than {{count}} times this month, grouped by shift",
+    "noChronicLateComers": "No employee has been late more than the threshold this month"
   }
 }
