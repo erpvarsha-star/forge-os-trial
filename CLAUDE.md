@@ -125,6 +125,25 @@ the user operates on IST, never UTC, and never "whatever the device thinks."
 - **URL**: `https://odfwtdpvpfzdrznvurru.supabase.co`
 - **Project ref**: `odfwtdpvpfzdrznvurru`
 - **Expo project**: `@erp.varsha/forge-os` (username: `erp.varsha`)
+- **Org plan: staying on Free — decision from Yash, 27 Sep 2026.** A health
+  check that day found the org (`joixzxeabmmsdguruiih`) on the Free tier —
+  no automated backups/PITR, 500MB storage cap. Flagged Pro ($25/mo) as the
+  one upgrade that actually protects against data loss. **Yash's call:
+  staying free** — usage is well within limits (26MB of 500MB at the time
+  of the check) and "as per reviews it does not break." **Do not re-raise
+  the Pro upgrade recommendation** — this is a closed decision, not an
+  oversight. Revisit only if actual usage approaches the Free tier's limits,
+  or if Yash raises it himself.
+- **`SUPABASE_ACCESS_TOKEN` GitHub secret — rotated 27 Sep 2026, valid to
+  25 Sep 2027, full account access (Supabase personal access tokens have no
+  project-scoping option).** The `Deploy Edge Functions` workflow had been
+  failing on every run since ~24 Sep with `supabase link` returning
+  "Unauthorized" — this token fixes that. **When this token expires
+  (25 Sep 2027) the exact same failure will recur** — check
+  `.github/workflows/deploy-functions.yml` run history if edge function
+  deploys start silently not landing again after that date, and rotate the
+  same way (supabase.com/dashboard/account/tokens → generate → paste into
+  the GitHub repo secret).
 
 ---
 

@@ -1,6 +1,10 @@
 // IST (Indian Standard Time, UTC+5:30) date utilities for edge functions.
 // Critical for Shift 3 (00:00-07:00 IST): at 01:00 IST, UTC is still the
 // previous day, so a plain `new Date()` read via UTC getters is wrong.
+//
+// Touched 27 Sep 2026 solely to re-trigger Deploy Edge Functions after
+// SUPABASE_ACCESS_TOKEN was rotated (new token valid to 25 Sep 2027) —
+// confirms the CI deploy path works again, not a functional change.
 
 export function istNow(): Date {
   const utc = new Date();
