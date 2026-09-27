@@ -11,6 +11,7 @@ import { PayrollRecord } from '@/types'
 import { generatePayslip } from '@/lib/payslip'
 import * as Sharing from 'expo-sharing'
 import { Download, FileText } from 'lucide-react-native'
+import { istMonthYear } from '@/lib/istDate'
 
 export default function PayslipScreen() {
   const { t } = useTranslation()
@@ -24,13 +25,13 @@ export default function PayslipScreen() {
 
   const fetchPayslip = async () => {
     if (!employee) return
-    const now = new Date()
+    const { month, year } = istMonthYear()
     const { data } = await supabase
       .from('payroll_records')
       .select('*')
       .eq('employee_id', employee.id)
-      .eq('month', String(now.getMonth() + 1).padStart(2, '0'))
-      .eq('year', now.getFullYear())
+      .eq('month', month)
+      .eq('year', parseInt(year))
       .single()
     setRecord(data as PayrollRecord)
     setIsLoading(false)

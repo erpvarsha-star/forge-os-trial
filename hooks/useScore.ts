@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { MonthlyScore } from '@/types'
+import { istMonthYear } from '@/lib/istDate'
 
 export function useScore(employeeId: string) {
   const [score, setScore] = useState<MonthlyScore | null>(null)
@@ -10,13 +11,13 @@ export function useScore(employeeId: string) {
     const fetch = async () => {
       if (!employeeId) return
       setIsLoading(true)
-      const now = new Date()
+      const { month, year } = istMonthYear()
       const { data } = await supabase
         .from('monthly_scores')
         .select('*')
         .eq('employee_id', employeeId)
-        .eq('month', String(now.getMonth() + 1).padStart(2, '0'))
-        .eq('year', now.getFullYear())
+        .eq('month', month)
+        .eq('year', parseInt(year))
         .single()
       if (data) setScore(data as MonthlyScore)
       setIsLoading(false)

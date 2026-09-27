@@ -13,6 +13,7 @@ import { ProductionSummary } from '@/components/ProductionSummary'
 import { useEffectiveIdentity } from '@/hooks/useEffectiveIdentity'
 import { Users, CalendarCheck, Clock, Wrench, FileText } from 'lucide-react-native'
 import { BRAND, INK } from '@/components/theme'
+import { istMonthYear, getMonthEndDay } from '@/lib/istDate'
 
 interface DayPoint {
   date: string
@@ -58,11 +59,11 @@ export default function ManagerReports() {
   const load = async () => {
     if (!employee?.department) { setIsLoading(false); return }
 
-    const now = new Date()
-    const year = now.getFullYear()
-    const month = now.getMonth()
-    const monthStart = new Date(year, month, 1).toISOString().split('T')[0]
-    const monthEnd = new Date(year, month + 1, 0).toISOString().split('T')[0]
+    const { month: istMonth, year: istYear } = istMonthYear()
+    const year = parseInt(istYear)
+    const month = istMonth
+    const monthStart = `${istYear}-${month}-01`
+    const monthEnd = `${istYear}-${month}-${String(getMonthEndDay(month, year)).padStart(2, '0')}`
 
     const { data: deptEmployees } = await supabase
       .from('employees')

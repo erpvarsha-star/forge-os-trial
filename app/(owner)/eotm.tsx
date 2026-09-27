@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import { MonthlyScore } from '@/types'
 import { Award, Medal, Star, Trophy } from 'lucide-react-native'
 import { BRAND, STATUS } from '@/components/theme'
+import { istMonthYear } from '@/lib/istDate'
 
 export default function EOTMScreen() {
   const { t } = useTranslation()
@@ -19,8 +20,7 @@ export default function EOTMScreen() {
   useEffect(() => {
     const fetch = async () => {
       if (!employee) return
-      const now = new Date()
-      const month = String(now.getMonth() + 1).padStart(2, '0')
+      const { month, year } = istMonthYear()
       const categories = [
         { key: 'attendance', col: 'attendance_score' },
         { key: 'production', col: 'production_score' },
@@ -29,7 +29,7 @@ export default function EOTMScreen() {
       ]
       const results: any = {}
       for (const cat of categories) {
-        const { data } = await supabase.from('monthly_scores').select('*, employee:employees(name, emp_code, department)').eq('month', month).eq('year', now.getFullYear()).order(cat.col, { ascending: false }).limit(1).single()
+        const { data } = await supabase.from('monthly_scores').select('*, employee:employees(name, emp_code, department)').eq('month', month).eq('year', parseInt(year)).order(cat.col, { ascending: false }).limit(1).single()
         if (data) results[cat.key] = data
       }
       setWinners(results)

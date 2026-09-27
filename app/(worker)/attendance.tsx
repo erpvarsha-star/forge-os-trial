@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { View, Text, ScrollView } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/hooks/useAuth'
@@ -7,12 +7,15 @@ import { Header } from '@/components/Header'
 import { AttendanceCalendar } from '@/components/AttendanceCalendar'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { Card } from '@/components/Card'
+import { istMonthYear } from '@/lib/istDate'
 
 export default function WorkerAttendance() {
   const { t } = useTranslation()
   const { employee } = useAuth()
-  const [currentMonth] = useState(new Date().getMonth() + 1)
-  const [currentYear] = useState(new Date().getFullYear())
+  const { month: currentMonth, year: currentYear } = useMemo(() => {
+    const { month, year } = istMonthYear()
+    return { month: parseInt(month, 10), year: parseInt(year, 10) }
+  }, [])
   const { records, isLoading } = useAttendance(employee?.id || '', String(currentMonth).padStart(2, '0'), currentYear)
 
   if (!employee) return <LoadingScreen />

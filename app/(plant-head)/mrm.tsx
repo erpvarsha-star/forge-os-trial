@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import { MRMReview } from '@/types'
 import { CheckCircle, Clock, FileText } from 'lucide-react-native'
 import { STATUS, INK } from '@/components/theme'
+import { istMonthYear } from '@/lib/istDate'
 
 export default function PlantHeadMRM() {
   const { t } = useTranslation()
@@ -19,8 +20,8 @@ export default function PlantHeadMRM() {
   useEffect(() => {
     const fetch = async () => {
       if (!employee) return
-      const now = new Date()
-      const { data } = await supabase.from('mrm_reviews').select('*').eq('month', String(now.getMonth() + 1).padStart(2, '0')).eq('year', now.getFullYear())
+      const { month, year } = istMonthYear()
+      const { data } = await supabase.from('mrm_reviews').select('*').eq('month', month).eq('year', parseInt(year))
       if (data) setReviews(data as MRMReview[])
       setIsLoading(false)
     }

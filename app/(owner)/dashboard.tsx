@@ -12,6 +12,7 @@ import { TrendingUp, Award } from 'lucide-react-native'
 import { TouchableOpacity } from 'react-native'
 import { router } from 'expo-router'
 import { BRAND, STATUS } from '@/components/theme'
+import { istDateStr, istMonthYear } from '@/lib/istDate'
 
 export default function OwnerDashboard() {
   const { t } = useTranslation()
@@ -22,12 +23,13 @@ export default function OwnerDashboard() {
   useEffect(() => {
     const fetch = async () => {
       if (!employee) return
-      const today = new Date().toISOString().split('T')[0]
+      const today = istDateStr()
+      const { month, year } = istMonthYear()
       const { data: allEmps } = await supabase.from('employees').select('id').eq('is_active', true)
       const { data: attendance } = await supabase.from('attendance_records').select('status').in('employee_id', allEmps?.map(e => e.id) || []).eq('date', today)
       const present = attendance?.filter(a => a.status === 'P').length || 0
       const total = allEmps?.length || 1
-      const { data: payroll } = await supabase.from('payroll_records').select('net_pay').eq('month', String(new Date().getMonth() + 1).padStart(2, '0')).eq('year', new Date().getFullYear())
+      const { data: payroll } = await supabase.from('payroll_records').select('net_pay').eq('month', month).eq('year', parseInt(year))
       const { data: advances } = await supabase.from('advance_requests').select('amount').eq('status', 'approved')
       setKpi({
         attendance: (present / total) * 100,

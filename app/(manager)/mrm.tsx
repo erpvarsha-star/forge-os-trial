@@ -10,6 +10,7 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { Save, AlertTriangle } from 'lucide-react-native'
 import { STATUS } from '@/components/theme'
+import { istMonthYear, istNow } from '@/lib/istDate'
 
 export default function MRMScreen() {
   const { t } = useTranslation()
@@ -25,25 +26,25 @@ export default function MRMScreen() {
 
   const handleSubmit = async () => {
     setIsSubmitting(true)
-    const now = new Date()
+    const { month, year } = istMonthYear()
     await supabase.from('mrm_reviews').insert({
       department: employee.department,
-      month: String(now.getMonth() + 1).padStart(2, '0'),
-      year: now.getFullYear(),
+      month: month,
+      year: parseInt(year),
       safety_score: parseFloat(safety) || 0,
       quality_score: parseFloat(quality) || 0,
       delivery_score: parseFloat(delivery) || 0,
       cost_score: parseFloat(cost) || 0,
       morale_score: parseFloat(morale) || 0,
       submitted_by: employee.id,
-      submitted_at: new Date().toISOString(),
+      submitted_at: istNow().toISOString(),
       status: 'submitted',
     })
     setIsSubmitting(false)
     Alert.alert(t('common.success'), t('manager.mrmSubmitted'))
   }
 
-  const isOverdue = new Date().getDate() > 10
+  const isOverdue = istNow().getUTCDate() > 10
 
   return (
     <View className="flex-1 bg-ink-50">

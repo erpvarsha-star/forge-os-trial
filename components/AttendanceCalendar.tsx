@@ -4,6 +4,7 @@ import { AttendanceRecord } from '@/types'
 import { ATTENDANCE_STATUS_LABELS } from '@/constants'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from 'date-fns'
 import { ATTENDANCE_STATUS_TOKEN, STATUS } from './theme'
+import { istNow } from '@/lib/istDate'
 
 interface AttendanceCalendarProps {
   records: AttendanceRecord[]
@@ -19,7 +20,7 @@ export function AttendanceCalendar({ records, month, year }: AttendanceCalendarP
 
   const firstDayOfWeek = getDay(days[0])
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-  const today = new Date()
+  const today = istNow()
 
   const getStatusForDate = (dateStr: string) => {
     const record = records.find(r => r.date === dateStr)

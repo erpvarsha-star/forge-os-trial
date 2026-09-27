@@ -1,12 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { AttendanceRecord } from '@/types'
-
-// Returns today's date string in IST (YYYY-MM-DD). Critical for Shift 3
-// (00:00–07:00 IST): at 01:00 IST, UTC is still the previous day, so a
-// plain toISOString().slice(0,10) would write yesterday's date.
-const istDateStr = () =>
-  new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10)
+import { istDateStr, istMonthYear, getMonthEndDay } from '@/lib/istDate'
 
 export function useAttendance(employeeId: string, month?: string, year?: number) {
   const [records, setRecords] = useState<AttendanceRecord[]>([])
@@ -17,16 +12,17 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     if (!employeeId) return
     setIsLoading(true)
 
-    const now = new Date()
-    const targetMonth = month || String(now.getMonth() + 1).padStart(2, '0')
-    const targetYear = year || now.getFullYear()
+    const { month: istMonth, year: istYear } = istMonthYear()
+    const targetMonth = month || istMonth
+    const targetYear = year || istYear
+    const monthEndDay = getMonthEndDay(targetMonth, parseInt(targetYear))
 
     const { data, error } = await supabase
       .from('attendance_records')
       .select('*')
       .eq('employee_id', employeeId)
       .gte('date', `${targetYear}-${targetMonth}-01`)
-      .lte('date', `${targetYear}-${targetMonth}-31`)
+      .lte('date', `${targetYear}-${targetMonth}-${String(monthEndDay).padStart(2, '0')}`)
       .order('date', { ascending: true })
 
     if (!error && data) {
