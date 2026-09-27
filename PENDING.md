@@ -3,7 +3,13 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 27 Sep 2026 (session 14) — full-codebase IST audit complete, 25 departed employees deactivated
+**Last updated:** 27 Sep 2026 (session 14) — fixed ambiguous-embed bug affecting every approval screen; full-codebase IST audit complete; 25 departed employees deactivated
+
+**Ambiguous-embed bug — fixed 27 Sep 2026, session 14.** Root cause of "Fazal's Approvals screen shows nothing pending" (Yash reported, with a screenshot showing his app genuinely on Version 60/up to date — this ruled out a stale APK). The actual cause: PostgREST needs an explicit FK hint whenever more than one foreign key connects two tables being embedded together — `salary_change_requests` has 4 FKs to `employees`, `leave_requests`/`advance_requests`/`5s_submissions` have 2 each, `attendance_records` has 3. Every screen writing `employee:employees(...)` (or bare `employees(...)`) against one of these tables was sending an ambiguous embed request, which PostgREST rejects with an error — and every one of those screens destructured only `{ data }`, silently dropping `error`, so the failure looked like "nothing pending" instead of a visible error.
+
+**This was not one screen — verified via `pg_constraint`, it affected 15 query sites across 9 files**: every role's leave/advance/salary-request approval screen (`(plant-head)/approvals.tsx`, `(owner)/approvals.tsx`, `(supervisor)/approvals.tsx`, `(manager)/approvals.tsx`), 5S verification (`(supervisor)/5s-verify.tsx`), security's checkpoint-2 checked-in list (`(security)/team.tsx`), the HR advance ledger (`(hr-admin)/advance-ledger.tsx`), and members' own leave/advance history (`hooks/useLeave.ts`, `hooks/useAdvance.ts`). Fixed by qualifying every embed with its FK column, e.g. `employee:employees!employee_id(...)`.
+
+**⚠ This means leave/advance approvals across every role may have been silently broken for as long as this pattern existed** — not just the salary/new-hire flow added yesterday. Worth Yash/supervisors checking whether leave and advance requests have been piling up unseen. New APK build triggered by this push; Fazal (and everyone else who approves things) needs to reinstall once it's out.
 
 **PATCH_51 (27 Sep 2026, session 14):** Blocked 25 departed employees from ever logging in.
 
