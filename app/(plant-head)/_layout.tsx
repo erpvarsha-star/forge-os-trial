@@ -16,6 +16,7 @@ export default function PlantHeadLayout() {
         <Tabs.Screen name="more" options={{ title: t('common.more'), tabBarIcon: ({ color }) => <MoreHorizontal size={22} color={color} /> }} />
         <Tabs.Screen name="leave" options={{ href: null }} />
         <Tabs.Screen name="advance" options={{ href: null }} />
+        <Tabs.Screen name="late-review" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )

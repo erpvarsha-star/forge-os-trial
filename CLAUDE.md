@@ -339,6 +339,47 @@ was never late before suddenly is.
 
 ---
 
+## Owner has no Forms tab — decision from Yash, 27 Sep 2026
+
+"i dont use any forms as there is no approval beyond me . so i dont need to
+see these forms and i anyways take care of all my expenses." `app/(owner)/forms.tsx`
+deleted, its tab removed from `(owner)/_layout.tsx`. No other role's Forms
+tab touched — this is owner-specific, since owner is the only role with
+nothing above it in the approval chain.
+
+**Bug found and fixed same session:** `late-review.tsx` (owner, plant_head,
+hr_admin) and `(hr-admin)/approvals.tsx` were reachable via each role's
+`more.tsx` link as intended, but none of their `_layout.tsx` files declared
+them as `<Tabs.Screen ... options={{ href: null }} />` — expo-router auto-adds
+any undeclared screen file in a Tabs group as its own visible tab, so all
+three were silently showing up as an extra, icon-less tab at the end of the
+bar (Yash: "i see a new tab in the end late comers review"). **Whenever a new
+screen is added to a role group that already has a `_layout.tsx` Tabs list,
+it MUST get an explicit `<Tabs.Screen>` entry — a real tab if it should be
+one, `href: null` if it's more.tsx-only** — or it silently leaks into the tab
+bar exactly like this.
+
+---
+
+## Working hours → salary calculations — flagged by Yash, not yet built, 27 Sep 2026
+
+"we are mapping thier out time too so working hrs will be important for ppl
+late for salary calculations." Checked before responding: `attendance_records.hours_worked`
+already exists and is computed at check-out (`hooks/useAttendance.ts`,
+PATCH_38, 24 Sep 2026) — check-out time capture and hours math are not new.
+**What's actually missing:** `supabase/functions/run-payroll/index.ts` does
+not read `hours_worked` or `late_minutes` at all today — payroll is
+computed with no attendance-derived deduction. `nightly-scoring` reads
+`late_minutes`, but only for the on-time composite score, not payroll.
+
+**Not built — the exact rule isn't specified yet, don't guess it.** Needs
+Yash's answer on the actual formula: proportional deduction for short hours?
+A minimum-hours-per-day threshold below which a "P" day doesn't count as
+full? Something else already used in the manual payroll process today? Ask
+before touching `run-payroll`.
+
+---
+
 ## SQL Patches applied (run in Supabase SQL Editor in order)
 
 | File | Purpose | Status |

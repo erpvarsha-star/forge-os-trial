@@ -19,6 +19,8 @@ export default function HrAdminLayout() {
         <Tabs.Screen name="advance" options={{ href: null }} />
         <Tabs.Screen name="add-employee" options={{ href: null }} />
         <Tabs.Screen name="salary-request" options={{ href: null }} />
+        <Tabs.Screen name="approvals" options={{ href: null }} />
+        <Tabs.Screen name="late-review" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )
