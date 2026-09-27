@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { istMonthYear, getMonthEndDay } from '@/lib/istDate'
+import { MIN_WORKING_HOURS } from '@/lib/workingHours'
 
 export interface LateOccurrence {
   date: string
@@ -43,11 +44,6 @@ export interface ShiftGroup<T> {
 // none was specified separately.
 const LATE_THRESHOLD = 3
 const SHORT_HOURS_THRESHOLD = 3
-
-// Yash's numbers, exactly as given: floor below which a day counts as
-// short, the same for every shift type (Shift 1/2/3 ~8h with break,
-// General 9h, 09:00-18:00) — "min working hrs for each is 8.30 hrs."
-const MIN_WORKING_HOURS = 8.5
 
 const UNASSIGNED = 'Unassigned Shift'
 
@@ -148,6 +144,13 @@ export function useLateComers() {
         }
       }
 
+      // No checkout recorded (hours_worked null) is deliberately excluded
+      // here, not just an artifact of the null check — Yash's decision:
+      // "IF THERE IS NO CHECK OUT PERSON SHOULD BE CONSIDERED AS WORKED
+      // NORMAL SHIFT HRS." A missing checkout counts as a normal full day
+      // (see lib/workingHours.ts's defaultHoursForShift(), 8.5h/9h — both
+      // >= MIN_WORKING_HOURS, so it can never qualify as short), never as
+      // short and never as "unknown."
       if (typeof r.hours_worked === 'number' && r.hours_worked < MIN_WORKING_HOURS) {
         const occurrence: HoursOccurrence = { date: r.date, hours_worked: r.hours_worked }
         const existing = shortByEmployee.get(r.employee_id)

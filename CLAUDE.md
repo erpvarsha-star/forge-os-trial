@@ -398,6 +398,25 @@ day can happen on a day the employee wasn't late for check-in at all.
 "likely data problem, not a real 16-hour shift" flag) — noted for later, not
 part of this pass.
 
+**No-checkout decision — Yash, 28 Sep 2026, implemented same day.** "IF THERE
+IS NO CHECK OUT PERSON SHOULD BE CONSIDERED AS WORKED NORMAL SHIFT HRS.
+8.5/9 HRS AS PER ROLE." A day where an employee checked in but never checked
+out (`attendance_records.hours_worked` stays null forever — nothing ever
+backfills it) counts as a **normal full day**, not short and not unknown —
+General = 9h, every other shift (Shift 1/2/3, Security Day/Night — only two
+numbers were given, not a per-shift figure) = the same 8.5h floor.
+`lib/workingHours.ts` centralizes this (`MIN_WORKING_HOURS`,
+`defaultHoursForShift()`, `effectiveHoursWorked()`) so anything built later
+that needs a real number for a no-checkout day — a monthly total-hours
+report, `run-payroll` if hours ever feed it — uses the same rule instead of
+re-deriving it (or worse, treating null as 0). The raw `hours_worked` column
+is deliberately left null, not backfilled — this is a read-time convention,
+not a data correction. Late Comers Review's Short Working Hours section
+already excluded null-`hours_worked` rows before this decision (an accident
+of the `typeof === 'number'` check, not an intentional design), so its
+behavior is unchanged; the code comment there now makes that exclusion
+explicit and correct rather than incidental.
+
 ---
 
 ## SQL Patches applied (run in Supabase SQL Editor in order)
