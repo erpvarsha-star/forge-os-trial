@@ -18,7 +18,6 @@ import { supabase } from '@/lib/supabase'
 import { getDeviceId } from '@/lib/deviceId'
 import { EmployeeShift } from '@/types'
 import { MapPin, CheckCircle2, QrCode, Star, X } from 'lucide-react-native'
-import * as Location from 'expo-location'
 import { BarCodeScanner } from 'expo-barcode-scanner'
 
 /**
@@ -179,8 +178,13 @@ export function CheckInCard() {
       return
     }
 
-    const providerStatus = await Location.getProviderStatusAsync()
-    const mockDetected = !providerStatus.gpsAvailable
+    // `location.mocked` — see the matching note in worker/home.tsx.
+    // Location.getProviderStatusAsync().gpsAvailable was being used here as
+    // a mock-GPS proxy; it isn't one, and was falsely flagging real check-ins
+    // with no GPS satellite fix (indoors, weak signal) as fraud. Fixed 27
+    // Sep 2026 — this was the confirmed root cause of VFL4057's blocked
+    // check-in. See PENDING.md.
+    const mockDetected = location.mocked === true
     const deviceId = await getDeviceId()
 
     const { data: fraudCheck, error: fraudCheckError } = await supabase.functions.invoke(
@@ -300,8 +304,7 @@ export function CheckInCard() {
       return
     }
 
-    const providerStatus = await Location.getProviderStatusAsync()
-    const mockDetected = !providerStatus.gpsAvailable
+    const mockDetected = location.mocked === true
     if (mockDetected) {
       Alert.alert(t('common.warning'), t('worker.mockLocationDetected'))
       setIsLoading(false)

@@ -18,7 +18,6 @@ import { MAX_DAILY_OBSERVATIONS } from '@/constants'
 import { MapPin, Clock, CheckSquare, AlertCircle, Camera, QrCode, CheckCircle2, Calendar, ChevronRight, Star, X, LogOut } from 'lucide-react-native'
 import { BarCodeScanner } from 'expo-barcode-scanner'
 import { router } from 'expo-router'
-import * as Location from 'expo-location'
 
 export default function WorkerHome() {
   const { t } = useTranslation()
@@ -109,8 +108,15 @@ export default function WorkerHome() {
     }
 
     // Step 5 fraud detection: mock-location + same-device-different-employee ("buddy device")
-    const providerStatus = await Location.getProviderStatusAsync()
-    const mockDetected = !providerStatus.gpsAvailable
+    // `location.mocked` (Android only, expo-location's real mock-GPS
+    // signal) — NOT Location.getProviderStatusAsync().gpsAvailable, which
+    // answers "is a GPS satellite fix currently available" and is false for
+    // any real, unspoofed check-in from indoors or with a weak fix. That
+    // conflation was live until 27 Sep 2026 and produced false high-severity
+    // mock_location fraud alerts that silently blocked check-in for anyone
+    // whose phone couldn't get a GPS lock, most visibly inside the
+    // steel-frame shop buildings this plant is built from. See PENDING.md.
+    const mockDetected = location.mocked === true
     const deviceId = await getDeviceId()
 
     // Mock-location apps are checked server-side too — the fraud-detector
@@ -224,8 +230,7 @@ export default function WorkerHome() {
       return
     }
 
-    const providerStatus = await Location.getProviderStatusAsync()
-    const mockDetected = !providerStatus.gpsAvailable
+    const mockDetected = location.mocked === true
     if (mockDetected) {
       Alert.alert(t('common.warning'), t('worker.mockLocationDetected'))
       setIsLoading(false)
