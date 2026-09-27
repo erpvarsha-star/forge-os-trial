@@ -26,6 +26,27 @@ progress.
 outstanding, blocked, or untested. Update it before the final push of any
 session.
 
+**🔒 LOCKED RULE — record a decision the moment Yash gives it, in this same
+turn, not "noted for later."** (Added 27 Sep 2026, after Yash caught this file
+re-asking a question he had already answered — VFL5463 was wrongly flagged as
+a duplicate to reject, when he had already explained it was a legitimate
+rejoin.) A decision only exists once it is written into this file's relevant
+section (Employee data, plant_config, etc.) — not once it is written into a
+chat reply, not once it is "remembered." Concretely:
+- When Yash explains or corrects a fact about an employee, a config value, a
+  process, or anything else this file documents, **edit this file before
+  doing anything else with that information** — don't finish the current task
+  first and circle back.
+- Before restating any fact from this file that could plausibly have changed
+  (headcount, who's active, pending approvals, config values) — **verify it
+  against the live database first.** This file is a starting point for what
+  to check, never a substitute for checking. Treat a note here as "true when
+  written," not "true now," unless it is something that cannot change (a
+  primary key, a historical event, a completed one-time migration).
+- If Yash says "I already told you this" or corrects the same fact twice,
+  that is a signal this file has a stale or missing entry — fix the entry
+  itself, don't just apologize and move on.
+
 **🔒 LOCKED RULE — IST everywhere, permanently (audited + fixed 27 Sep 2026, session 14).**
 The app operates on IST (UTC+5:30), never device-local time or bare UTC. The
 database stores timestamps in UTC; every place the app computes "today,"
@@ -199,9 +220,12 @@ the user operates on IST, never UTC, and never "whatever the device thinks."
 - **PATCH_08 (real emp_codes, confirmed against contact list + salary sheet 10 Aug 2026)**:
   VFL5462 Bharat Vasantrao Salve (Manager, Accounts), VFL5458 Shaikh Irfan (Supervisor, Forge Shop, Week 3 rotating), VFL5459 Vaibhav Mali (Supervisor, Press Shop, Week 1 rotating), VFL5460 Ashok Kumar (Supervisor, Final Shop)
   ⚠ Supersedes an earlier PATCH_08 committed 09 Aug that used fabricated codes VFL5463/5465/5466/5467 — see correction note in the patch file.
-- **Nagnath Kale / Sadashiv Soddy**: confirmed NOT in payroll (contact list or salary sheet) — genuine outside consultants, no emp_code exists. Not added to DB. Only add if Yash provides a real emp_code and confirms app login is needed.
+- **Nagnath Kale / Sadashiv Soddy — STALE NOTE, SUPERSEDED 27 Sep 2026.** This used to say "confirmed NOT in payroll, no emp_code, not added." That was true when written; it no longer is. Both are live in `employees` with real emp_codes — **CON09 Nagnath Damu Kale** (Die Shop) and **CON12 Sadashiv Nitalaksha Soddy** (Quality) — both `is_active=true`, both have completed first login (`must_change_pin=false`). **Do not re-flag either as "consultant, no emp_code, not added" again** — verify against the live `employees` table before repeating any older note in this file, not the other way round.
 - **PATCH_09 (confirmed 10 Aug 2026)**: VFL5461 Shaikh Hafizuddin Tamizuddin (Manager, Quality), VFL5452 Bholanath Das (Forge Shop QA), VFL5453 Shaikh Zaker Abdul Quayyum (Press Shop QA), VFL5457 Sandip Tryambak Landage (Maintenance), VFL5454 Shaikh Tohid Yunus (Purchase)
-- **VFL5463 correction (10 Aug 2026)**: "Manoj Anantrao Wagh" is NOT a new employee — he is VFL5337, already in EMPLOYEE_SEED_03Aug2026.sql (same name/dept/salary), just missing his phone. PATCH_03 now sets VFL5337's phone directly instead of PATCH_09 inserting a duplicate VFL5463 row. Caught by cross-checking against the Rev 04 org chart, which shows only one Manoj Wagh (Electrician, Maintenance).
+- **VFL5463 / VFL5337 — two different events, do not conflate.**
+  1. *10 Aug 2026 (historical, still true as a record):* a data-entry mistake nearly inserted "Manoj Anantrao Wagh" a second time as VFL5463 when he already existed as VFL5337 (same name/dept/salary, just missing a phone). Caught before it happened; PATCH_03 set VFL5337's phone directly instead. **That VFL5463 row was never created.**
+  2. *27 Sep 2026 (current, unrelated to #1 — confirmed directly by Yash):* the real VFL5337 (Manoj Anantrao Wagh) **left the company and has since rejoined**. His original record was deactivated 26 Sep 2026 (`VFL5337.is_active=false`, still holds his history/login for the record). HR (Pallavi) submitted a **new, legitimate** employee record under **VFL5463** for his rejoin — this is not a duplicate-in-error like #1, it is the correct way to represent a second stint. **Decision: approve VFL5463 through the normal chain (plant_head → owner) like any other new hire — do not reject it as a duplicate.** The only open item on it is the same CTC concern below, not its legitimacy.
+  - ⚠ **Pattern found 27 Sep 2026, needs Pallavi to confirm/fix before anyone approves:** all three currently-pending new-hire requests (VFL5463, VFL5465, VFL5466) carry a `ctc_annual` in the ₹20,000–21,500 range — implausible as an annual figure, consistent with a monthly gross entered in the annual field each time. Not guessed at or auto-corrected; flagged for HR to verify per-employee before Fazal/Yash act on any of the three.
 - **supervisor_id**: partial assignments done in PATCH_05 (Final/Die/Maintenance/Forge); rotating departments need weekly update or a supervisor_rotation table
 - Salary sheet (Jul 2026 payroll template) — used as source for dept/designation/salary of PATCH_08/09 new hires; contact list (not salary sheet) is the source of truth for phone numbers — several salary-sheet mobile numbers are misaligned/shifted
 - **PATCH_07 corrections**: VFL1463→Press Shop, VFL1556→Press Shop+supervisor, VFL1545→manager, VFL1389→manager, VFL1557→HR dept, VFL5447→Admin dept
@@ -279,7 +303,7 @@ assigns shifts for, same as any other day; a Friday off is one with none.
 | `COMBINED_DEPLOY_21to22_13Aug2026.sql` | PATCH_21 + PATCH_22 concatenated (generated, cannot drift) — run this one file | ✅ Applied 23 Aug |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee | ♾️ On demand |
 
-**Total employees confirmed live: 129** (120 original + 4 PATCH_08 + 5 PATCH_09).
+**Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
 
 ---
 
