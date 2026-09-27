@@ -320,13 +320,15 @@ assigns shifts for, same as any other day; a Friday off is one with none.
 | `PATCH_21_plant_locations_13Aug2026.sql` | Creates `plant_locations` (multi-point geofence table), 0 rows. Safe to run any time — check-in behaviour is unchanged until PATCH_22 also runs | ✅ Applied 23 Aug |
 | `PATCH_22_plant_locations_seed_13Aug2026.sql` | Seeds 12 campus locations (11 from Yash's sheet + "Store") with real coordinates, received 13 Aug | ✅ Applied 23 Aug |
 | `COMBINED_DEPLOY_21to22_13Aug2026.sql` | PATCH_21 + PATCH_22 concatenated (generated, cannot drift) — run this one file | ✅ Applied 23 Aug |
+| `PATCH_52_resolve_false_mock_location_alerts_27Sep2026.sql` | Resolves VFL4057's 10 stale false-positive `mock_location` fraud_alerts, root-caused to a code bug (see "What Claude must NEVER do" / PENDING.md) and fixed the same session | ✅ Applied 27 Sep 2026 |
+| `PATCH_53_staged_leave_advance_approvals_27Sep2026.sql` | Staged multi-role approval chains for `leave_requests`/`advance_requests` — schema, triggers, `my_turn_*`/`review_*` RPCs, audit table. See "Leave & Advance approval chains" section above | ✅ Applied 27 Sep 2026 |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
 
 ---
 
-## App screen map (52 screens, 7 role groups)
+## App screen map (56 screens, 7 role groups — 27 Sep 2026: +1 (hr-admin)/approvals.tsx, +3 late-review.tsx across owner/plant-head/hr-admin)
 
 ```
 app/
@@ -352,7 +354,7 @@ app/
 │   ├── dashboard.tsx      — team attendance summary
 │   ├── team.tsx           — confirm P/A per member (checkpoint 3)
 │   ├── tasks.tsx          — resolve maintenance observations
-│   ├── approvals.tsx      — approve leave/advance requests
+│   ├── approvals.tsx      — static "moved" message (PATCH_53 — supervisors removed from leave/advance chains)
 │   ├── forms.tsx          — Google Forms for this department (PATCH_14)
 │   ├── shift-report.tsx   — submit shift production data
 │   ├── casual-workers.tsx — log casual worker counts
@@ -361,30 +363,34 @@ app/
 ├── (manager)/
 │   ├── dashboard.tsx      — department attendance %
 │   ├── team.tsx           — list supervisors under this manager
-│   ├── approvals.tsx      — approve escalated leave/advance
+│   ├── approvals.tsx      — leave/advance requests at this manager's stage (PATCH_53 my_turn_*/review_*), + Accounts-stage items for the Accounts dept's own manager
 │   ├── forms.tsx          — Google Forms for this department (PATCH_14)
 │   ├── mrm.tsx            — submit MRM review
 │   ├── reports.tsx        — department-scoped reports
 │   └── more.tsx
 ├── (hr-admin)/
 │   ├── dashboard.tsx      — stats: total, present, pending advances/leaves
+│   ├── approvals.tsx      — leave/advance requests at HR's stage (PATCH_53, new screen — HR had none before)
 │   ├── new-employee-flow.tsx — show pending activations
 │   ├── advance-ledger.tsx — all advances with outstanding balance
 │   ├── shifts.tsx         — shift assignment (master + per-employee)
 │   ├── missing-data.tsx   — employees missing phone/dept/supervisor
+│   ├── late-review.tsx    — chronic latecomers (>3x/month), grouped by shift (27 Sep 2026)
 │   └── more.tsx
 ├── (plant-head)/
 │   ├── dashboard.tsx      — plant-wide attendance + low-attendance alert
-│   ├── approvals.tsx      — final approval of all pending requests
+│   ├── approvals.tsx      — salary/new-hire sign-off + leave/advance at plant_head's stage (PATCH_53)
 │   ├── mrm.tsx            — view MRM submission status per dept
 │   ├── email.tsx          — priority email task inbox
+│   ├── late-review.tsx    — chronic latecomers (>3x/month), grouped by shift (27 Sep 2026)
 │   └── more.tsx
 ├── (owner)/
 │   ├── dashboard.tsx      — top-level KPIs
 │   ├── kpi.tsx            — KPI bar chart (data hardcoded — not wired to DB yet)
-│   ├── approvals.tsx      — owner-level escalation approvals
+│   ├── approvals.tsx      — final salary/new-hire sign-off + leave/advance at owner's stage (PATCH_53)
 │   ├── alerts.tsx         — open fraud alerts
 │   ├── eotm.tsx           — Employee of the Month per category
+│   ├── late-review.tsx    — chronic latecomers (>3x/month), grouped by shift (27 Sep 2026)
 │   └── more.tsx
 └── (security)/
     ├── dashboard.tsx      — vehicle log (inward/outward)
@@ -552,22 +558,25 @@ Every row this table used to list is fixed. Kept as a record, not a to-do:
 
 ## Leave & Advance approval chains — frozen 27 Sep 2026, decisions from Yash
 
-**Not yet implemented in code — this is the locked design, recorded per the
-"record a decision the moment Yash gives it" rule above, before any RPC/schema
-work starts.** Today `leave_requests`/`advance_requests` are flat
-pending/approved/rejected (see PATCH_42 note below — the in-app screens are
-hidden and Google Forms are used instead, for the same reason: no staged
-workflow exists yet to build against). This table is the target design for
-when that workflow is built — one stage chain per requester category, mirroring
-the `salary_change_requests` staged-RPC pattern (`pending_X` → `pending_Y` →
-`approved`/`rejected`, one review RPC per stage).
+**Implemented 27 Sep 2026, same session as the design freeze** —
+`PATCH_53_staged_leave_advance_approvals_27Sep2026.sql` (schema + triggers +
+`compute_approval_chain()`/`my_turn_*()`/`review_*()` RPCs + `request_stage_actions`
+audit table) plus every approval screen rewritten onto it
+(`hooks/useLeaveAdvanceApprovals.ts` + `components/LeaveAdvanceApprovalCards.tsx`,
+shared across `(manager)`, `(plant-head)`, `(owner)`, and a brand-new
+`(hr-admin)/approvals.tsx`; `(supervisor)/approvals.tsx` now shows a static
+"moved" message since supervisors are out of both chains). See PENDING.md for
+the full verification record. Design notes below are kept as the reference for
+what the chains mean and why, not as a to-do.
 
-**Two-step transition UX (confirmed, not yet built):** for each form moved to
-this pattern, tapping "Apply" in-app first captures the same fields the process
-needs, shows a "Step 1 complete" confirmation, then opens the existing Google
+**Two-step transition UX — built 27 Sep 2026, same session.**
+`components/TwoStepFormModal.tsx` + `FormsScreen.tsx` special-casing "Leave
+Application"/"Advance Application" by name: tapping "Apply" in-app first
+captures the same fields the process needs (feeding the new staged chain
+above), shows a "Step 1 complete" confirmation, then opens the existing Google
 Form for step 2. The in-app approval workflow and the Google Form process run
 independently — this doesn't replace the Google Form, it runs alongside it
-until the in-app flow is proven with no bugs. Starting with Leave + Advance;
+until the in-app flow is proven with no bugs. Built for Leave + Advance;
 whether to extend this to other common forms (Gate Pass, Cash Expenses,
 Hospital Form) is still open — ask before building those.
 
