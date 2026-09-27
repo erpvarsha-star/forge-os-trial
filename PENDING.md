@@ -3,7 +3,20 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 26 Sep 2026 (session 13) — PATCH_50: Worker Monthly Efficiency form for management
+**Last updated:** 27 Sep 2026 (session 14) — Fix attendance calendar timezone bug
+
+**[URGENT FIX] Attendance calendar timezone bug (27 Sep 2026, session 14):** Calendar showing wrong date + yesterday's (Sep 26) attendance missing.
+
+**Root cause:** 10 locations used device-local `new Date()` instead of IST (UTC+5:30), causing wrong month queries and yesterday's data appearing in the wrong month when device timezone ≠ IST.
+
+**Fixed:**
+- Created `lib/istDate.ts` — shared IST utilities (`istDateStr()`, `istNow()`, `istMonthYear()`, `getMonthEndDay()`)
+- Updated 3 hooks: `useAttendance`, `useScore` — use IST month/year, fix hardcoded 31-day month-end bug
+- Updated 7 screens: `app/(worker)/attendance.tsx`, `components/AttendanceCalendar.tsx`, `app/(manager)/reports.tsx`, `app/(manager)/mrm.tsx`, `app/(worker)/payslip.tsx`, `app/(plant-head)/mrm.tsx`, `app/(owner)/dashboard.tsx`, `app/(owner)/eotm.tsx` — all now use IST date/month/year
+
+**Result:** Calendar now shows correct date in any device timezone, yesterday's attendance appears in correct month, month-end queries work (Sept 31 no longer queried).
+
+**Last major patch:** 26 Sep 2026 (session 13) — PATCH_50: Worker Monthly Efficiency form for management
 
 **PATCH_50 (26 Sep 2026, session 13):** Added "Worker Monthly Efficiency" (real URL from Yash) to `form_links` under the `MANAGEMENT` virtual department — same pattern PATCH_44 used for the Overtime Form. Pure data, no app code touched: `FormsScreen.tsx` already renders every `department='MANAGEMENT'` row under "Management Forms" for manager/plant_head/owner, so this is live for Fazal immediately, no new APK needed.
 
