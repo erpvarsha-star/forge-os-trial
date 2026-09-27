@@ -381,10 +381,22 @@ met each day — not a payroll input.
   16-hour shift, when it comes time to build the flagging logic.
 
 **Already exists, not new:** `attendance_records.hours_worked` is computed
-at check-out (`hooks/useAttendance.ts`, PATCH_38, 24 Sep 2026). What's
-missing is comparing it against the 8.5h/14h bounds and surfacing that
-somewhere. **Not yet built — where to surface it is still open, asked
-Yash directly rather than guessed.**
+at check-out (`hooks/useAttendance.ts`, PATCH_38, 24 Sep 2026).
+
+**Built same session — where to surface it: added to Late Comers Review
+(Yash's choice over a new screen or raw-data-only).** `hooks/useLateComers.ts`
+now computes a second qualifying set alongside the late-arrivals one — any
+active employee with more than 3 days this month where `hours_worked < 8.5`
+— reusing the same per-employee shift-grouping and the same ">3 times"
+review bar (no separate count was specified, so this one is shared, not
+independently tunable yet). `components/LateComersReview.tsx` renders it as
+a second section, "Short Working Hours," alongside the existing "Late
+Arrivals" one. The query is no longer status-filtered, since a short-hours
+day can happen on a day the employee wasn't late for check-in at all.
+
+**Not built yet, and not asked for by name:** the 14h max sanity bound (a
+"likely data problem, not a real 16-hour shift" flag) — noted for later, not
+part of this pass.
 
 ---
 
