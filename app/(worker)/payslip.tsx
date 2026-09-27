@@ -31,7 +31,7 @@ export default function PayslipScreen() {
       .select('*')
       .eq('employee_id', employee.id)
       .eq('month', month)
-      .eq('year', parseInt(year))
+      .eq('year', year)
       .single()
     setRecord(data as PayrollRecord)
     setIsLoading(false)

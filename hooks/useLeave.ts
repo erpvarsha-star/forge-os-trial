@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { LeaveRequest, LeaveBalance } from '@/types'
+import { istNow } from '@/lib/istDate'
 
 export function useLeave(employeeId: string) {
   const [requests, setRequests] = useState<LeaveRequest[]>([])
@@ -23,7 +24,7 @@ export function useLeave(employeeId: string) {
       .from('leave_balances')
       .select('*')
       .eq('employee_id', employeeId)
-      .eq('year', new Date().getFullYear())
+      .eq('year', istNow().getUTCFullYear())
       .single()
 
     if (balData) setBalance(balData as LeaveBalance)

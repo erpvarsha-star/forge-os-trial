@@ -3,7 +3,7 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 27 Sep 2026 (session 14) — PATCH_51: deactivated 25 departed employees; full-codebase IST audit in progress
+**Last updated:** 27 Sep 2026 (session 14) — full-codebase IST audit complete, 25 departed employees deactivated
 
 **PATCH_51 (27 Sep 2026, session 14):** Blocked 25 departed employees from ever logging in.
 
@@ -13,7 +13,25 @@ Yash sent a "Left Employees List" (25 names/emp_codes, no longer working). All 2
 - **⚠ Found, not fixed here:** VFL1550 (Swapnil Kakade, one of the 25) is still `supervisor_id` for 7 active employees (VFL4032, VFL4008, VFL5413, VFL5318, VFL5347, VFL5409, VFL1450). Their supervisor is now an inactive account. Needs HR to name a real replacement — not guessed here, per this project's no-guessing rule on org structure.
 - **Never-logged-in count after this patch: 25** (was 80 before this session's earlier count, now down to just the genuinely active employees who haven't opened the app — full list with department in the chat reply, not repeated here).
 
-**IST audit — in progress (27 Sep 2026, session 14):** Following the attendance-calendar timezone fix (below), doing a full-codebase sweep for the same device-local-`new Date()` bug pattern in every remaining screen, hook, and edge function. Results pending.
+**IST audit — complete (27 Sep 2026, session 14):** Full-codebase sweep (every screen, hook, component, and edge function) for the device-local-`new Date()` bug pattern found in the calendar fix below. Every `new Date()`, `.getMonth()`, `.getDate()`, `.getFullYear()`, `.getDay()`, and `.toISOString().split('T')[0]`/`.slice(0,10)` call in the repo was individually classified as either a real bug (used for a date-boundary query, "today"/"this month" comparison, or overdue check) or safe (elapsed-duration math, raw timestamp storage, cosmetic-only). 16 files had real bugs; all fixed.
+
+**Fixed — 14 frontend files** (all now use `lib/istDate.ts`'s `istDateStr()`/`istNow()`/`istMonthYear()`/`getMonthEndDay()`, added in the earlier calendar fix below, plus a new `istStartOfDayUTC()` for timestamptz-column filters):
+- `app/(hr-admin)/dashboard.tsx`, `app/(security)/dashboard.tsx`, `app/(plant-head)/dashboard.tsx`, `app/(manager)/dashboard.tsx`, `app/(supervisor)/dashboard.tsx` — all had `eq('date', today)` computed from device-local time
+- `hooks/useLeave.ts` — `leave_balances.year` filter used device-local `getFullYear()`
+- `components/ProductionSummary.tsx` — month start/end had a double bug (device-local month math, then local-midnight-to-UTC shift)
+- `app/(supervisor)/casual-workers.tsx`, `app/(supervisor)/shift-report.tsx`, `app/(supervisor)/team.tsx` (×2), `app/(worker)/5s.tsx`, `app/(security)/team.tsx` — daily-record date/query all device-local
+- `app/(security)/dashboard.tsx`, `app/(security)/eod-lock.tsx` — additionally needed `istStartOfDayUTC()` since these filter `vehicle_log.created_at` (timestamptz) with `gte(created_at, today+"T00:00:00")`, which is wrong without the +05:30 offset even after the date string itself is IST-correct
+- `app/(owner)/kpi.tsx` — triple bug: `year` filter, `today` filter, and a 6-month trend window all device-local
+
+**Fixed — 2 edge functions**, new shared `supabase/functions/_shared/istDate.ts` (mirrors `lib/istDate.ts`, Deno-side):
+- `nightly-scoring/index.ts` — computed `year`/`month` from plain UTC getters with no IST shift at all (only "worked" because its cron happens to fire at a time where UTC and IST agree on the calendar date — fragile, not correct)
+- `five-s-challenge-generator/index.ts` — same gap; matters because this function is documented to run "early morning, before the first shift," precisely the boundary window where UTC and IST disagree
+- Also centralized `shift-reminder` and `mrm-reminder`'s previously-duplicated inline `istNow()` to import from the new shared file (both were already correct, just duplicated — removes the risk of the two copies drifting)
+- Also found and fixed one more bug outside the original file list, in **`fraud-detector/index.ts`**'s unused `bulk_confirmation_check` action: `new Date(shiftDate); .setDate(1)` for a month-start boundary has the same missing-offset issue as the `eod-lock.tsx` case, now uses the new `istStartOfDayUTC()`.
+
+**Confirmed safe, no changes:** `app/(plant-head)/approvals.tsx`, `app/(owner)/approvals.tsx`, `app/(supervisor)/approvals.tsx`, `app/(supervisor)/5s-verify.tsx`, `app/(manager)/approvals.tsx` (all just store raw timestamps or compute elapsed-time durations), `lib/notifications.ts`, `components/SafetyTip.tsx` (cosmetic day-of-week rotation only), `shift-reminder`/`mrm-reminder` (already IST-correct before centralizing).
+
+**Verified:** `npx tsc --noEmit` clean (pre-existing unrelated errors in `permissions-onboarding.tsx`/`FormsScreen.tsx` confirmed present on the base branch too, via `git stash`). `npx expo export --platform web` bundled all 2929 modules with zero errors.
 
 **[Fixed 27 Sep 2026, session 14] Attendance calendar timezone bug:** Calendar showing wrong date + yesterday's (Sep 26) attendance missing.
 

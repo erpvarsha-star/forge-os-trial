@@ -10,6 +10,7 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { EODConfirmation } from '@/types'
 import { ShieldCheck, ShieldAlert } from 'lucide-react-native'
+import { istDateStr, istStartOfDayUTC } from '@/lib/istDate'
 
 export default function EODLockScreen() {
   const { t } = useTranslation()
@@ -21,13 +22,13 @@ export default function EODLockScreen() {
   const [isLoading, setIsLoading] = useState(true)
   const [isConfirming, setIsConfirming] = useState(false)
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = istDateStr()
   const mismatch = inwardCount !== outwardCount
 
   const fetchStatus = useCallback(async () => {
     setIsLoading(true)
     const [vehicleRes, eodRes] = await Promise.all([
-      supabase.from('vehicle_log').select('direction').gte('created_at', `${today}T00:00:00`),
+      supabase.from('vehicle_log').select('direction').gte('created_at', istStartOfDayUTC(today)),
       supabase.from('eod_confirmations').select('*').eq('date', today).maybeSingle(),
     ])
     const entries = (vehicleRes.data ?? []) as { direction: 'inward' | 'outward' }[]

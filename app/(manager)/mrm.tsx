@@ -30,7 +30,7 @@ export default function MRMScreen() {
     await supabase.from('mrm_reviews').insert({
       department: employee.department,
       month: month,
-      year: parseInt(year),
+      year: year,
       safety_score: parseFloat(safety) || 0,
       quality_score: parseFloat(quality) || 0,
       delivery_score: parseFloat(delivery) || 0,

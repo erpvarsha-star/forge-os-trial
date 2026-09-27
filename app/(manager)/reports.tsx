@@ -59,11 +59,9 @@ export default function ManagerReports() {
   const load = async () => {
     if (!employee?.department) { setIsLoading(false); return }
 
-    const { month: istMonth, year: istYear } = istMonthYear()
-    const year = parseInt(istYear)
-    const month = istMonth
-    const monthStart = `${istYear}-${month}-01`
-    const monthEnd = `${istYear}-${month}-${String(getMonthEndDay(month, year)).padStart(2, '0')}`
+    const { month, year } = istMonthYear()
+    const monthStart = `${year}-${month}-01`
+    const monthEnd = `${year}-${month}-${String(getMonthEndDay(month, year)).padStart(2, '0')}`
 
     const { data: deptEmployees } = await supabase
       .from('employees')

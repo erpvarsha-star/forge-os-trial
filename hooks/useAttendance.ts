@@ -15,7 +15,7 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     const { month: istMonth, year: istYear } = istMonthYear()
     const targetMonth = month || istMonth
     const targetYear = year || istYear
-    const monthEndDay = getMonthEndDay(targetMonth, parseInt(targetYear))
+    const monthEndDay = getMonthEndDay(targetMonth, targetYear)
 
     const { data, error } = await supabase
       .from('attendance_records')

@@ -10,6 +10,7 @@ import { notifyEmployeesByRole } from '@/lib/notifications'
 import { Employee, AttendanceRecord } from '@/types'
 import { User, Users, CheckCircle2 } from 'lucide-react-native'
 import { BRAND, INK } from '@/components/theme'
+import { istDateStr } from '@/lib/istDate'
 
 // Workflow 11 (Fraud Detection): more than 10 confirmations in 90 seconds by
 // the same supervisor is treated as bulk/buddy confirmation and flagged.
@@ -32,7 +33,7 @@ export default function SupervisorTeam() {
 
   const fetchTeam = async () => {
     if (!employee) return
-    const today = new Date().toISOString().split('T')[0]
+    const today = istDateStr()
     const { data: members } = await supabase.from('employees').select('*').eq('supervisor_id', employee.id)
     if (!members) { setIsLoading(false); return }
     const ids = members.map(m => m.id)
@@ -73,7 +74,7 @@ export default function SupervisorTeam() {
   const confirmAttendance = async (member: Employee, status: 'P' | 'A') => {
     if (!employee) return
     setConfirmingId(member.id)
-    const today = new Date().toISOString().split('T')[0]
+    const today = istDateStr()
 
     const { error } = await supabase.from('attendance_records').upsert(
       { employee_id: member.id, date: today, status, qr_verified: false, checkpoint3_confirmed_by: employee.id, checkpoint3_at: new Date().toISOString() },

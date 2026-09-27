@@ -49,6 +49,7 @@
 
 import { handleOptions, jsonResponse } from '../_shared/cors.ts';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
+import { istMonthYear } from '../_shared/istDate.ts';
 
 // Every row must total 100 before brownie points; asserted at boot below.
 const SCORE_WEIGHTS: Record<
@@ -339,9 +340,8 @@ Deno.serve(async (req: Request) => {
   if (preflight) return preflight;
 
   const db = supabaseAdmin();
-  const now = new Date();
-  const year = now.getUTCFullYear();
-  const month = now.getUTCMonth() + 1;
+  const { month: istMonth, year } = istMonthYear();
+  const month = parseInt(istMonth, 10);
   const { start, end, daysInMonth } = monthRange(year, month);
 
   try {

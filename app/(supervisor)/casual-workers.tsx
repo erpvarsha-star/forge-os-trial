@@ -10,6 +10,7 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { Save, Users } from 'lucide-react-native'
 import { BRAND } from '@/components/theme'
+import { istDateStr } from '@/lib/istDate'
 
 export default function CasualWorkersScreen() {
   const { t } = useTranslation()
@@ -20,7 +21,7 @@ export default function CasualWorkersScreen() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = istDateStr()
 
   const fetchToday = useCallback(async () => {
     if (!employee) return

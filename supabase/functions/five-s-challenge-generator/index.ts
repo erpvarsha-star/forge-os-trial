@@ -13,6 +13,7 @@
 
 import { handleOptions, jsonResponse } from '../_shared/cors.ts';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
+import { istDateStr } from '../_shared/istDate.ts';
 
 interface GeminiChallenge {
   challenge_en: string;
@@ -61,7 +62,7 @@ Deno.serve(async (req: Request) => {
   if (preflight) return preflight;
 
   const db = supabaseAdmin();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = istDateStr();
 
   try {
     const challenge = await generateChallengeFromGemini();

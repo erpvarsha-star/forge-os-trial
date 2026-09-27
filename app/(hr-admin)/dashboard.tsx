@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase'
 import { router } from 'expo-router'
 import { Users, AlertCircle, CreditCard, Calendar, ChevronRight, UserPlus, IndianRupee } from 'lucide-react-native'
 import { BRAND, STATUS, INK } from '@/components/theme'
+import { istDateStr } from '@/lib/istDate'
 
 interface DashboardStats {
   totalEmployees: number
@@ -36,7 +37,7 @@ export default function HrAdminDashboard() {
 
   const fetchStats = async () => {
     if (!employee) return
-    const today = new Date().toISOString().split('T')[0]
+    const today = istDateStr()
 
     const [
       { count: totalEmployees },

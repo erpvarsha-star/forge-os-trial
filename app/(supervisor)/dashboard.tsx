@@ -10,6 +10,7 @@ import { CheckInCard } from '@/components/CheckInCard'
 import { supabase } from '@/lib/supabase'
 import { UserCheck, UserX, Clock, Users } from 'lucide-react-native'
 import { STATUS, INK } from '@/components/theme'
+import { istDateStr } from '@/lib/istDate'
 
 export default function SupervisorDashboard() {
   const { t } = useTranslation()
@@ -21,7 +22,7 @@ export default function SupervisorDashboard() {
 
   const fetchStats = async () => {
     if (!employee) return
-    const today = new Date().toISOString().split('T')[0]
+    const today = istDateStr()
     const { data: team } = await supabase.from('employees').select('id').eq('supervisor_id', employee.id)
     if (!team) { setIsLoading(false); return }
     const ids = team.map(t => t.id)

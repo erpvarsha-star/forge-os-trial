@@ -14,7 +14,7 @@ export default function WorkerAttendance() {
   const { employee } = useAuth()
   const { month: currentMonth, year: currentYear } = useMemo(() => {
     const { month, year } = istMonthYear()
-    return { month: parseInt(month, 10), year: parseInt(year, 10) }
+    return { month: parseInt(month, 10), year }
   }, [])
   const { records, isLoading } = useAttendance(employee?.id || '', String(currentMonth).padStart(2, '0'), currentYear)
 

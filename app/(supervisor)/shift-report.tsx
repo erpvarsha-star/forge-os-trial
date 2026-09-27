@@ -9,6 +9,7 @@ import { Input } from '@/components/Input'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { Save } from 'lucide-react-native'
+import { istDateStr } from '@/lib/istDate'
 
 export default function ShiftReportScreen() {
   const { t } = useTranslation()
@@ -29,7 +30,7 @@ export default function ShiftReportScreen() {
     const variance = supTotal > 0 ? Math.abs((supTotal - opTotal) / supTotal) * 100 : 0
     await supabase.from('data_collection_submissions').insert({
       supervisor_id: employee.id,
-      date: new Date().toISOString().split('T')[0],
+      date: istDateStr(),
       production_output: parseFloat(productionOutput) || 0,
       quality_issues: parseInt(qualityIssues) || 0,
       downtime_minutes: parseInt(downtime) || 0,

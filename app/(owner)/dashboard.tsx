@@ -29,7 +29,7 @@ export default function OwnerDashboard() {
       const { data: attendance } = await supabase.from('attendance_records').select('status').in('employee_id', allEmps?.map(e => e.id) || []).eq('date', today)
       const present = attendance?.filter(a => a.status === 'P').length || 0
       const total = allEmps?.length || 1
-      const { data: payroll } = await supabase.from('payroll_records').select('net_pay').eq('month', month).eq('year', parseInt(year))
+      const { data: payroll } = await supabase.from('payroll_records').select('net_pay').eq('month', month).eq('year', year)
       const { data: advances } = await supabase.from('advance_requests').select('amount').eq('status', 'approved')
       setKpi({
         attendance: (present / total) * 100,

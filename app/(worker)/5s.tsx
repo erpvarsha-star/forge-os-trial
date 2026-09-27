@@ -12,6 +12,7 @@ import { PhotoCapture } from '@/components/PhotoCapture'
 import { uploadSubmissionPhoto } from '@/lib/photos'
 import { Upload, Trophy, CheckCircle, Clock } from 'lucide-react-native'
 import { TouchableOpacity } from 'react-native'
+import { istDateStr } from '@/lib/istDate'
 
 export default function FiveSScreen() {
   const { t, i18n } = useTranslation()
@@ -31,7 +32,7 @@ export default function FiveSScreen() {
 
   const fetchChallenge = async () => {
     if (!employee) return
-    const today = new Date().toISOString().split('T')[0]
+    const today = istDateStr()
     const { data } = await supabase
       .from('5s_challenges')
       .select('*')

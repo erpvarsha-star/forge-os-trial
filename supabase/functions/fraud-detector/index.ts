@@ -36,6 +36,7 @@ import { handleOptions, jsonResponse } from '../_shared/cors.ts';
 import { supabaseAdmin, getPlantConfig } from '../_shared/supabaseAdmin.ts';
 import { notifyEmployees } from '../_shared/push.ts';
 import { distanceMeters } from '../_shared/geo.ts';
+import { istStartOfDayUTC } from '../_shared/istDate.ts';
 
 type GpsCheckBody = {
   action: 'gps_check';
@@ -174,14 +175,16 @@ async function handleBulkConfirmationCheck(db: ReturnType<typeof supabaseAdmin>,
   });
 
   // Escalation tiers based on this supervisor's bulk-confirm alert count this month.
-  const monthStart = new Date(body.shiftDate);
-  monthStart.setDate(1);
+  // body.shiftDate is an IST calendar date (YYYY-MM-DD); the month boundary
+  // must be expressed as IST midnight in UTC, not a naive Date().setDate(1)
+  // which reads/writes in the server's local timezone.
+  const monthStartUTC = istStartOfDayUTC(`${body.shiftDate.slice(0, 7)}-01`);
   const { count: monthFlagCount } = await db
     .from('fraud_alerts')
     .select('id', { count: 'exact', head: true })
     .eq('employee_id', body.supervisorId)
     .eq('type', 'bulk_confirm')
-    .gte('created_at', monthStart.toISOString());
+    .gte('created_at', monthStartUTC);
 
   const flagsThisMonth = monthFlagCount ?? 0;
 

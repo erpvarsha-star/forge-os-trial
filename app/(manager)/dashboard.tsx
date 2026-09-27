@@ -11,6 +11,7 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { Trophy, ChevronRight } from 'lucide-react-native'
 import { INK } from '@/components/theme'
+import { istDateStr } from '@/lib/istDate'
 
 export default function ManagerDashboard() {
   const { t } = useTranslation()
@@ -23,7 +24,7 @@ export default function ManagerDashboard() {
 
   const fetchStats = async () => {
     if (!employee) return
-    const today = new Date().toISOString().split('T')[0]
+    const today = istDateStr()
     const { data: deptEmployees } = await supabase.from('employees').select('id').eq('department', employee.department)
     if (!deptEmployees) { setIsLoading(false); return }
     const ids = deptEmployees.map(e => e.id)

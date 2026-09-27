@@ -13,6 +13,7 @@ import { ProductionSummary } from '@/components/ProductionSummary'
 import { BarChart } from 'react-native-chart-kit'
 import { Users, CalendarCheck, ShieldAlert, TrendingUp, BarChart3 } from 'lucide-react-native'
 import { BRAND, INK } from '@/components/theme'
+import { istDateStr, istMonthYear } from '@/lib/istDate'
 
 interface DeptRow {
   department: string
@@ -44,9 +45,8 @@ export default function OwnerKPI() {
   useEffect(() => { load() }, [employee])
 
   const load = async () => {
-    const now = new Date()
-    const year = now.getFullYear()
-    const today = now.toISOString().split('T')[0]
+    const today = istDateStr()
+    const { month: istMonth, year } = istMonthYear()
 
     const { data: employees } = await supabase
       .from('employees')
@@ -59,7 +59,10 @@ export default function OwnerKPI() {
     if (ids.length === 0) { setIsLoading(false); setIsRefreshing(false); return }
 
     // Six months back, inclusive of the current one.
-    const trendStart = new Date(year, now.getMonth() - 5, 1).toISOString().split('T')[0]
+    let trendMonth = parseInt(istMonth) - 5
+    let trendYear = year
+    if (trendMonth <= 0) { trendMonth += 12; trendYear -= 1 }
+    const trendStart = `${trendYear}-${String(trendMonth).padStart(2, '0')}-01`
 
     const [{ data: todayRows }, { data: trendRows }, { data: alerts }, { data: scores }] = await Promise.all([
       supabase.from('attendance_records').select('status').eq('date', today),

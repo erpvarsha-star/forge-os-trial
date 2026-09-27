@@ -8,6 +8,7 @@ import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { CheckCircle2 } from 'lucide-react-native'
+import { istDateStr } from '@/lib/istDate'
 
 interface CheckedInRow {
   id: string
@@ -25,7 +26,7 @@ export default function SecurityCheckpoint2Screen() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
   const fetchCheckedIn = useCallback(async () => {
-    const today = new Date().toISOString().split('T')[0]
+    const today = istDateStr()
     const { data } = await supabase
       .from('attendance_records')
       .select('id, employee_id, check_in_time, checkpoint2_confirmed_by, employees(name, emp_code, department)')

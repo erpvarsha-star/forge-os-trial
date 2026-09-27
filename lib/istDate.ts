@@ -22,3 +22,11 @@ export const getMonthEndDay = (month: string | number, year: number): number => 
   if (m === 2) return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 29 : 28
   return 31
 }
+
+// Returns the UTC ISO timestamp for IST midnight of the given YYYY-MM-DD date.
+// Needed whenever filtering a timestamptz column (e.g. created_at) by an IST
+// calendar day — a bare "YYYY-MM-DDT00:00:00" is ambiguous/wrong without the
+// +05:30 offset, since Postgres would otherwise read it as UTC midnight,
+// 5.5 hours before the actual IST day starts.
+export const istStartOfDayUTC = (dateStr: string) =>
+  new Date(`${dateStr}T00:00:00+05:30`).toISOString()

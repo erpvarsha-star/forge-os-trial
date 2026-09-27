@@ -5,6 +5,7 @@ import { Factory } from 'lucide-react-native'
 import { Card } from '@/components/Card'
 import { BRAND } from '@/components/theme'
 import { supabase } from '@/lib/supabase'
+import { istMonthYear, getMonthEndDay } from '@/lib/istDate'
 
 /**
  * Department production for the current month, from `production_records`
@@ -41,9 +42,9 @@ export function ProductionSummary({ department }: Props) {
   const [hasLoaded, setHasLoaded] = useState(false)
 
   const load = useCallback(async () => {
-    const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10)
+    const { month, year } = istMonthYear()
+    const monthStart = `${year}-${month}-01`
+    const monthEnd = `${year}-${month}-${String(getMonthEndDay(month, year)).padStart(2, '0')}`
 
     let query = supabase
       .from('production_records')

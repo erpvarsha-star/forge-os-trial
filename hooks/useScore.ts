@@ -17,7 +17,7 @@ export function useScore(employeeId: string) {
         .select('*')
         .eq('employee_id', employeeId)
         .eq('month', month)
-        .eq('year', parseInt(year))
+        .eq('year', year)
         .single()
       if (data) setScore(data as MonthlyScore)
       setIsLoading(false)

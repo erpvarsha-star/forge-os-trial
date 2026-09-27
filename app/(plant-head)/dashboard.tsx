@@ -11,6 +11,7 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { AlertTriangle, TrendingUp, UserCheck, UserX, Clock, Trophy } from 'lucide-react-native'
 import { STATUS, INK } from '@/components/theme'
+import { istDateStr } from '@/lib/istDate'
 
 export default function PlantHeadDashboard() {
   const { t } = useTranslation()
@@ -22,7 +23,7 @@ export default function PlantHeadDashboard() {
 
   const fetchStats = async () => {
     if (!employee) return
-    const today = new Date().toISOString().split('T')[0]
+    const today = istDateStr()
     const { data: allEmployees } = await supabase.from('employees').select('id').eq('is_active', true)
     if (!allEmployees) { setIsLoading(false); return }
     const ids = allEmployees.map(e => e.id)

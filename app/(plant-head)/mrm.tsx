@@ -21,7 +21,7 @@ export default function PlantHeadMRM() {
     const fetch = async () => {
       if (!employee) return
       const { month, year } = istMonthYear()
-      const { data } = await supabase.from('mrm_reviews').select('*').eq('month', month).eq('year', parseInt(year))
+      const { data } = await supabase.from('mrm_reviews').select('*').eq('month', month).eq('year', year)
       if (data) setReviews(data as MRMReview[])
       setIsLoading(false)
     }

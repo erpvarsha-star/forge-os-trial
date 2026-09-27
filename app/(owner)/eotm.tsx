@@ -29,7 +29,7 @@ export default function EOTMScreen() {
       ]
       const results: any = {}
       for (const cat of categories) {
-        const { data } = await supabase.from('monthly_scores').select('*, employee:employees(name, emp_code, department)').eq('month', month).eq('year', parseInt(year)).order(cat.col, { ascending: false }).limit(1).single()
+        const { data } = await supabase.from('monthly_scores').select('*, employee:employees(name, emp_code, department)').eq('month', month).eq('year', year).order(cat.col, { ascending: false }).limit(1).single()
         if (data) results[cat.key] = data
       }
       setWinners(results)

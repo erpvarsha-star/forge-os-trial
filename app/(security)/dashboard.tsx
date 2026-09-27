@@ -12,6 +12,7 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { VehicleLogEntry } from '@/types'
 import { Truck, ArrowDownToLine, ArrowUpFromLine, ClipboardList } from 'lucide-react-native'
+import { istDateStr, istStartOfDayUTC } from '@/lib/istDate'
 
 export default function VehicleLogScreen() {
   const { t } = useTranslation()
@@ -27,11 +28,11 @@ export default function VehicleLogScreen() {
 
   const fetchToday = useCallback(async () => {
     setIsLoading(true)
-    const today = new Date().toISOString().split('T')[0]
+    const today = istDateStr()
     const { data } = await supabase
       .from('vehicle_log')
       .select('*')
-      .gte('created_at', `${today}T00:00:00`)
+      .gte('created_at', istStartOfDayUTC(today))
       .order('created_at', { ascending: false })
     if (data) setEntries(data as VehicleLogEntry[])
     setIsLoading(false)

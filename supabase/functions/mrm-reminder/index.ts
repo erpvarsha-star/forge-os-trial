@@ -29,11 +29,7 @@
 import { handleOptions, jsonResponse } from '../_shared/cors.ts';
 import { supabaseAdmin, getPlantConfig } from '../_shared/supabaseAdmin.ts';
 import { notifyEmployees } from '../_shared/push.ts';
-
-function istNow(): Date {
-  const utc = new Date();
-  return new Date(utc.getTime() + 5.5 * 60 * 60 * 1000);
-}
+import { istNow } from '../_shared/istDate.ts';
 
 Deno.serve(async (req: Request) => {
   const preflight = handleOptions(req);
