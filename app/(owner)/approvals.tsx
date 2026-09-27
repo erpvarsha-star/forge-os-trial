@@ -3,12 +3,13 @@ import { View, Text, ScrollView, Alert, TouchableOpacity } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
 import { useAuth } from '@/hooks/useAuth'
+import { useLeaveAdvanceApprovals } from '@/hooks/useLeaveAdvanceApprovals'
+import { LeaveAdvanceApprovalCards } from '@/components/LeaveAdvanceApprovalCards'
 import { Header } from '@/components/Header'
 import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
-import { LeaveRequest, AdvanceRequest } from '@/types'
 import { CheckCircle, XCircle, Inbox, Upload, ChevronRight } from 'lucide-react-native'
 import { INK, BRAND } from '@/components/theme'
 
@@ -28,44 +29,28 @@ interface SalaryChangeRequest {
 export default function OwnerApprovals() {
   const { t } = useTranslation()
   const { employee } = useAuth()
-  const [items, setItems] = useState<(LeaveRequest | AdvanceRequest)[]>([])
+  const { leaves, advances, isLoading: leaveAdvanceLoading, actingId, reviewLeave, reviewAdvance } = useLeaveAdvanceApprovals()
   const [salaryItems, setSalaryItems] = useState<SalaryChangeRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [actingId, setActingId] = useState<string | null>(null)
+  const [salaryActingId, setSalaryActingId] = useState<string | null>(null)
 
-  useEffect(() => { fetchApprovals() }, [employee])
+  useEffect(() => { fetchSalary() }, [employee])
 
-  const fetchApprovals = async () => {
+  const fetchSalary = async () => {
     if (!employee) return
-    const [{ data: leaves }, { data: advances }, { data: salary }] = await Promise.all([
-      supabase.from('leave_requests').select('*, employee:employees!employee_id(*)').eq('status', 'pending'),
-      supabase.from('advance_requests').select('*, employee:employees!employee_id(*)').eq('status', 'pending'),
-      supabase
-        .from('salary_change_requests')
-        .select('*, employee:employees!employee_id(name, emp_code, department)')
-        .eq('status', 'pending_owner')
-        .order('requested_at', { ascending: true }),
-    ])
-    const all = [...(leaves || []), ...(advances || [])]
-    setItems(all as any)
-    setSalaryItems((salary || []) as any)
+    const { data } = await supabase
+      .from('salary_change_requests')
+      .select('*, employee:employees!employee_id(name, emp_code, department)')
+      .eq('status', 'pending_owner')
+      .order('requested_at', { ascending: true })
+    setSalaryItems((data || []) as any)
     setIsLoading(false)
   }
 
-  const approve = async (table: string, id: string) => {
-    await supabase.from(table).update({ status: 'approved', approved_by: employee!.id, approved_at: new Date().toISOString() }).eq('id', id)
-    fetchApprovals()
-  }
-
-  const reject = async (table: string, id: string) => {
-    await supabase.from(table).update({ status: 'rejected', approved_by: employee!.id, approved_at: new Date().toISOString() }).eq('id', id)
-    fetchApprovals()
-  }
-
   const approveSalary = async (req: SalaryChangeRequest) => {
-    setActingId(req.id)
+    setSalaryActingId(req.id)
     const { data, error } = await supabase.rpc('approve_salary_change_request', { p_request_id: req.id })
-    setActingId(null)
+    setSalaryActingId(null)
     if (error) {
       Alert.alert(t('common.error'), t('common.somethingWentWrong'))
       return
@@ -76,15 +61,15 @@ export default function OwnerApprovals() {
         t('hrAdmin.employeeAddedBody', { name: req.employee?.name, code: req.employee?.emp_code, pin: data.starting_pin })
       )
     }
-    fetchApprovals()
+    fetchSalary()
   }
 
   const rejectSalary = async (req: SalaryChangeRequest) => {
-    setActingId(req.id)
+    setSalaryActingId(req.id)
     const { error } = await supabase.rpc('reject_salary_change_request', { p_request_id: req.id })
-    setActingId(null)
+    setSalaryActingId(null)
     if (error) Alert.alert(t('common.error'), t('common.somethingWentWrong'))
-    fetchApprovals()
+    fetchSalary()
   }
 
   const waitingLabel = (createdAt: string) => {
@@ -93,9 +78,9 @@ export default function OwnerApprovals() {
   }
 
   if (!employee) return <LoadingScreen />
-  if (isLoading) return <LoadingScreen />
+  if (isLoading || leaveAdvanceLoading) return <LoadingScreen />
 
-  const totalCount = items.length + salaryItems.length
+  const totalCount = leaves.length + advances.length + salaryItems.length
 
   return (
     <View className="flex-1 bg-ink-50">
@@ -156,7 +141,7 @@ export default function OwnerApprovals() {
                   <Button
                     title="supervisor.approve"
                     onPress={() => approveSalary(req)}
-                    loading={actingId === req.id}
+                    loading={salaryActingId === req.id}
                     size="sm"
                     className="flex-1"
                     icon={<CheckCircle size={14} color="white" />}
@@ -164,7 +149,7 @@ export default function OwnerApprovals() {
                   <Button
                     title="supervisor.reject"
                     onPress={() => rejectSalary(req)}
-                    loading={actingId === req.id}
+                    loading={salaryActingId === req.id}
                     variant="danger"
                     size="sm"
                     className="flex-1"
@@ -176,43 +161,21 @@ export default function OwnerApprovals() {
           </>
         )}
 
-        {items.length > 0 && (
-          <Text className="text-xs font-semibold uppercase tracking-wider text-ink-400 mb-2 mt-1">
-            {t('owner.finalEscalation')}
-          </Text>
-        )}
-
         {totalCount === 0 ? (
           <Card className="items-center py-10">
             <Inbox size={32} color={INK[300]} />
             <Text className="text-sm text-ink-500 mt-3 text-center">{t('owner.noEscalations')}</Text>
           </Card>
         ) : (
-          items.map((item: any) => {
-            const isLeave = !!item.type
-            return (
-              <Card key={item.id} className="mb-3">
-                <View className="flex-row items-start justify-between mb-2">
-                  <View className="flex-1 pr-2">
-                    <Text className="text-base font-bold text-ink-900">{item.employee?.name}</Text>
-                    <Text className="text-xs text-ink-500 mt-0.5">{item.employee?.department}</Text>
-                  </View>
-                  <View className="items-end">
-                    {isLeave ? (
-                      <View className="bg-ink-100 rounded-full px-2 py-0.5"><Text className="text-xs font-semibold text-ink-600">{item.type}</Text></View>
-                    ) : (
-                      <Text className="text-lg font-bold text-brand-600 font-mono">₹{item.amount.toLocaleString()}</Text>
-                    )}
-                    <Text className="text-xs text-ink-400 mt-1">{waitingLabel(item.created_at)}</Text>
-                  </View>
-                </View>
-                <View className="flex-row gap-2">
-                  <Button title="supervisor.approve" onPress={() => approve(isLeave ? 'leave_requests' : 'advance_requests', item.id)} size="sm" className="flex-1" icon={<CheckCircle size={14} color="white" />} />
-                  <Button title="supervisor.reject" onPress={() => reject(isLeave ? 'leave_requests' : 'advance_requests', item.id)} variant="danger" size="sm" className="flex-1" icon={<XCircle size={14} color="white" />} />
-                </View>
-              </Card>
-            )
-          })
+          <LeaveAdvanceApprovalCards
+            leaves={leaves}
+            advances={advances}
+            actingId={actingId}
+            onReviewLeave={reviewLeave}
+            onReviewAdvance={reviewAdvance}
+            leaveSectionLabel={t('owner.finalEscalation')}
+            advanceSectionLabel={t('owner.finalEscalation')}
+          />
         )}
       </ScrollView>
     </View>

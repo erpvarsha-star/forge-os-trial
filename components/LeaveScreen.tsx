@@ -9,6 +9,7 @@ import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { LEAVE_TYPES } from '@/constants'
+import { stageProgressLabel } from '@/lib/approvalStages'
 import { Plus, FileText } from 'lucide-react-native'
 
 export function LeaveScreen() {
@@ -103,6 +104,9 @@ export function LeaveScreen() {
                     {req.start_date}{req.start_date !== req.end_date ? ` – ${req.end_date}` : ''}
                   </Text>
                   <Text className="text-xs text-ink-600 mt-1">{req.reason}</Text>
+                  {req.status === 'pending' && !!stageProgressLabel(req.current_stage ?? 0, req.approval_chain) && (
+                    <Text className="text-xs text-ink-400 mt-1">{stageProgressLabel(req.current_stage ?? 0, req.approval_chain)}</Text>
+                  )}
                 </View>
                 <View className={`px-2 py-1 rounded-full ${statusColor(req.status)}`}>
                   <Text className="text-xs font-medium capitalize">{t(`common.${req.status}`)}</Text>

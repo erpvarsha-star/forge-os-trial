@@ -10,7 +10,7 @@ import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { UpdateAppLink } from '@/components/UpdateAppLink'
 import { removePushToken } from '@/lib/notifications'
-import { LogOut, Globe, Settings, ChevronRight, AlertCircle, CreditCard, Users, Eye, Clock } from 'lucide-react-native'
+import { LogOut, Globe, Settings, ChevronRight, AlertCircle, CreditCard, Users, Eye, Clock, CheckSquare } from 'lucide-react-native'
 import { router } from 'expo-router'
 import { BRAND, INK } from '@/components/theme'
 
@@ -23,6 +23,7 @@ export default function HRAdminMore() {
   const handleLogout = async () => { if (employee) await removePushToken(employee.id); await logout() }
 
   const links = [
+    { key: 'approvals', label: t('common.approvals'), icon: <CheckSquare size={20} color={INK[500]} />, path: '/(hr-admin)/approvals' },
     { key: 'missing-data', label: t('hrAdmin.missingData'), icon: <AlertCircle size={20} color={INK[500]} />, path: '/(hr-admin)/missing-data' },
     { key: 'advance-ledger', label: t('hrAdmin.advanceLedger'), icon: <CreditCard size={20} color={INK[500]} />, path: '/(hr-admin)/advance-ledger' },
     { key: 'new-employee-flow', label: t('hrAdmin.newEmployeeFlow'), icon: <Users size={20} color={INK[500]} />, path: '/(hr-admin)/new-employee-flow' },

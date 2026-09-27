@@ -8,6 +8,7 @@ import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { LoadingScreen } from '@/components/LoadingScreen'
+import { stageProgressLabel } from '@/lib/approvalStages'
 import { Plus, Wallet } from 'lucide-react-native'
 
 export function AdvanceScreen() {
@@ -86,6 +87,9 @@ export function AdvanceScreen() {
                   <Text className="text-sm font-bold text-ink-900">₹{req.amount.toFixed(2)}</Text>
                   <Text className="text-xs text-ink-500 mt-0.5">{req.reason}</Text>
                   <Text className="text-xs text-ink-500">{t('worker.repaymentMonths')}: {req.repayment_months}</Text>
+                  {req.status === 'pending' && !!stageProgressLabel(req.current_stage ?? 0, req.approval_chain) && (
+                    <Text className="text-xs text-ink-400 mt-1">{stageProgressLabel(req.current_stage ?? 0, req.approval_chain)}</Text>
+                  )}
                 </View>
                 <View className={`px-2 py-1 rounded-full ${statusColor(req.status)}`}>
                   <Text className="text-xs font-medium capitalize">{t(`common.${req.status}`)}</Text>

@@ -91,6 +91,9 @@ export interface LeaveRequest {
   rejection_reason?: string
   created_at: string
   employee?: Employee
+  /** Added by PATCH_53 (staged approval chains). Null on rows inserted before it. */
+  approval_chain?: string[]
+  current_stage?: number
 }
 
 export interface AdvanceRequest {
@@ -105,6 +108,9 @@ export interface AdvanceRequest {
   outstanding_balance: number
   created_at: string
   employee?: Employee
+  /** Added by PATCH_53 (staged approval chains). Null on rows inserted before it. */
+  approval_chain?: string[]
+  current_stage?: number
 }
 
 export interface MaintenanceObservation {

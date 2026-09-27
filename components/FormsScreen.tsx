@@ -9,8 +9,18 @@ import { Header } from '@/components/Header'
 import { Card } from '@/components/Card'
 import { EmptyState } from '@/components/EmptyState'
 import { LoadingScreen } from '@/components/LoadingScreen'
+import { TwoStepFormModal } from '@/components/TwoStepFormModal'
 import { BRAND } from '@/components/theme'
 import { supabase } from '@/lib/supabase'
+
+// These two common form_links rows are being transitioned off pure Google
+// Forms — tapping them opens the in-app step 1 first (see TwoStepFormModal)
+// instead of going straight to the form URL. Matched by name since
+// form_links has no dedicated "kind" column for this.
+const TWO_STEP_FORMS: Record<string, 'leave' | 'advance'> = {
+  'Leave Application': 'leave',
+  'Advance Application': 'advance',
+}
 
 interface FormLink {
   id: string
@@ -127,6 +137,7 @@ export function FormsScreen() {
   const [submitted, setSubmitted] = useState<Record<string, FormSubmission['status']>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [twoStepForm, setTwoStepForm] = useState<FormLink | null>(null)
 
   const role = employee?.role
   const showDeptForms = role === 'supervisor' || role === 'manager' || role === 'security_guard'
@@ -194,6 +205,10 @@ export function FormsScreen() {
   }
 
   const openURL = async (form: FormLink) => {
+    if (TWO_STEP_FORMS[form.form_name]) {
+      setTwoStepForm(form)
+      return
+    }
     try {
       const supported = await Linking.canOpenURL(form.url)
       if (!supported) { Alert.alert(t('common.error'), t('common.cannotOpenLink')); return }
@@ -299,6 +314,15 @@ export function FormsScreen() {
           </>
         )}
       </ScrollView>
+
+      {twoStepForm && (
+        <TwoStepFormModal
+          visible={!!twoStepForm}
+          kind={TWO_STEP_FORMS[twoStepForm.form_name]}
+          formUrl={twoStepForm.url}
+          onClose={() => setTwoStepForm(null)}
+        />
+      )}
     </View>
   )
 }
