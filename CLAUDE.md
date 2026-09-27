@@ -361,22 +361,30 @@ bar exactly like this.
 
 ---
 
-## Working hours → salary calculations — flagged by Yash, not yet built, 27 Sep 2026
+## Working hours mapping (NOT salary) — decision from Yash, 27 Sep 2026
 
-"we are mapping thier out time too so working hrs will be important for ppl
-late for salary calculations." Checked before responding: `attendance_records.hours_worked`
-already exists and is computed at check-out (`hooks/useAttendance.ts`,
-PATCH_38, 24 Sep 2026) — check-out time capture and hours math are not new.
-**What's actually missing:** `supabase/functions/run-payroll/index.ts` does
-not read `hours_worked` or `late_minutes` at all today — payroll is
-computed with no attendance-derived deduction. `nightly-scoring` reads
-`late_minutes`, but only for the on-time composite score, not payroll.
+**Correction to an earlier note in this file (same day) — that entry
+wrongly framed this as a salary-deduction formula request. It is not.**
+Yash: "we are not building salary as per hrs right now. all i am asking for
+is mapping... this is to understand if someone is working less hours."
+Purely a visibility/flagging requirement — whether the expected hours were
+met each day — not a payroll input.
 
-**Not built — the exact rule isn't specified yet, don't guess it.** Needs
-Yash's answer on the actual formula: proportional deduction for short hours?
-A minimum-hours-per-day threshold below which a "P" day doesn't count as
-full? Something else already used in the manual payroll process today? Ask
-before touching `run-payroll`.
+**The numbers, exactly as given:**
+- Shift 1/2/3 (rotating): ~8 hours nominal, includes a break.
+- General: 9 hours nominal (09:00–18:00 — matches `shifts.start_time`/
+  `end_time` for General exactly).
+- **Minimum working hours, same floor for every shift type: 8.5 hours**
+  ("8.30" = 8 hours 30 minutes, not decimal). Below this, flag as short.
+- **Max sanity bound: 14 hours** — above this on `hours_worked`, treat as a
+  likely data problem (forgotten checkout, clock issue), not a real
+  16-hour shift, when it comes time to build the flagging logic.
+
+**Already exists, not new:** `attendance_records.hours_worked` is computed
+at check-out (`hooks/useAttendance.ts`, PATCH_38, 24 Sep 2026). What's
+missing is comparing it against the 8.5h/14h bounds and surfacing that
+somewhere. **Not yet built — where to surface it is still open, asked
+Yash directly rather than guessed.**
 
 ---
 
