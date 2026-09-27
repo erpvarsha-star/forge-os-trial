@@ -668,6 +668,10 @@
   "reports": {
     "lateComersReview": "Late Comers Review",
     "lateComersReviewHint": "Employees late more than {{count}} times this month, grouped by shift",
-    "noChronicLateComers": "No employee has been late more than the threshold this month"
+    "noChronicLateComers": "No employee has been late more than the threshold this month",
+    "lateSectionLabel": "Late Arrivals",
+    "shortHoursSectionLabel": "Short Working Hours",
+    "shortHoursHint": "Days worked below the {{hours}}h minimum, more than 3 times this month",
+    "noShortHours": "No employee has worked short hours more than the threshold this month"
   }
 }
