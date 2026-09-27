@@ -582,13 +582,12 @@ Hospital Form) is still open — ask before building those.
 | owner (Yash) — his own request | No approval gate — auto-recorded | No approval gate — auto-recorded |
 | Bharat Salve (Accounts manager, VFL5462) — his own advance | — (leave follows the manager row above) | Skips the Accounts stage (he *is* Accounts) → HR → Plant Head → Owner |
 
-**Still open — must ask before implementing:** the "Accounts" stage's exact
-mechanism is undecided. Options raised but not yet answered:
-(a) a specific named person (Bharat Salve, VFL5462) hardcoded as the approver,
-(b) role=`manager` AND `department`='Accounts' matched dynamically (so it
-follows whoever holds that seat, not today's name), or (c) something else.
-Ask this before writing the Accounts-stage review RPC — it determines how that
-RPC identifies who is authorized to act at that stage.
+**Accounts stage mechanism — decided 27 Sep 2026:** dynamic role+department
+match — anyone with `role='manager' AND department='Accounts'` can act at the
+Accounts stage, not a hardcoded emp_code. Today that resolves to Bharat Salve
+(VFL5462), but the Accounts-stage review RPC must query on role+department,
+never on his specific `employee_id`, so it keeps working unchanged if he goes
+on leave, changes role, or is replaced.
 
 Yash's exact words locking this in: "we can remove the supervisor approval and
 keep it manager HR accounts planted in me for advance. for leave it can stick
