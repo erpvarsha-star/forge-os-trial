@@ -1,38 +1,52 @@
 import { Shift } from '@/types'
 
-// When an employee has no shift allotted for today (no employee_shifts row —
-// common for anyone whose rotation HR hasn't set yet), check-in used to just
-// skip late detection entirely: shiftStart stayed undefined, so rawLateMinutes
-// was always 0. Requested by Yash: infer the shift instead, using whichever
-// shift's start_time is closest to the actual check-in time, so lateness is
-// still evaluated against *something* reasonable rather than never at all.
-//
-// Restricted to shifts named "Security …" for security_guard, and to
-// everything else otherwise: shifts.department is null on every live row (no
-// DB-level role scoping), and "Security Day" and "Shift 1" both start at
-// 07:00 — an exact tie a plain closest-start-time search would resolve
-// arbitrarily, sometimes putting a security guard's check-in on "Shift 1".
+// Minutes an employee is assumed to normally arrive ahead of their shift's
+// start — Yash's own worked examples (General starts 09:00; 08:45 arrival
+// counts as General, not late for Shift 1; 07:45/08:00/08:15/08:30 all count
+// as Shift 1, late) fix this at a flat 15 minutes for every shift, including
+// General even though General's own `late_grace_minutes` is 30 — those are
+// two different things: this buffer decides WHICH shift a check-in belongs
+// to; `late_grace_minutes` (read separately, after this) decides whether
+// that check-in counts as late once assigned.
+const EARLY_ARRIVAL_BUFFER_MINUTES = 15
+const MINUTES_PER_DAY = 1440
+
+const mod = (n: number, m: number) => ((n % m) + m) % m
+
+// When an employee has no shift allotted for today, each shift "owns" the
+// window from (its own start - 15min) up to (the next shift's start - 15min)
+// — not whichever shift's start_time is numerically closest. Those two
+// methods agree most of the time but disagree right where it matters: at
+// 08:15, closest-start-time picks General (45min away) over Shift 1
+// (75min away), but a real 08:15 arrival is someone late for the 07:00
+// shift, not someone early for the 09:00 one. The window model gets this
+// right by construction, and also removes the exact-tie case at 08:00
+// (equidistant from both) that closest-start-time could resolve either way.
 export function findClosestShift(nowMinutesOfDay: number, role: string | undefined, shifts: Shift[]): Shift | null {
   const isSecurity = role === 'security_guard'
-  const candidates = shifts.filter(s => isSecurity ? s.name.startsWith('Security') : !s.name.startsWith('Security'))
-  const pool = candidates.length > 0 ? candidates : shifts
+  const filtered = shifts.filter(s => isSecurity ? s.name.startsWith('Security') : !s.name.startsWith('Security'))
+  const pool = filtered.length > 0 ? filtered : shifts
   if (pool.length === 0) return null
 
-  let best: Shift | null = null
-  let bestDist = Infinity
-  for (const s of pool) {
-    const [h, m] = s.start_time.split(':').map(Number)
-    if (Number.isNaN(h) || Number.isNaN(m)) continue
-    const startMins = h * 60 + m
-    const diff = Math.abs(nowMinutesOfDay - startMins)
-    // Circular distance — shift start times wrap around midnight (Shift 3
-    // starts 00:00), so a plain difference would wrongly favor shifts on
-    // the "wrong side" of midnight over ones actually close in wall-clock time.
-    const dist = Math.min(diff, 1440 - diff)
-    if (dist < bestDist) {
-      bestDist = dist
-      best = s
-    }
+  const withStart = pool
+    .map(s => {
+      const [h, m] = s.start_time.split(':').map(Number)
+      return Number.isNaN(h) || Number.isNaN(m) ? null : { shift: s, startMin: h * 60 + m }
+    })
+    .filter((s): s is { shift: Shift; startMin: number } => s !== null)
+    .sort((a, b) => a.startMin - b.startMin)
+
+  if (withStart.length === 0) return null
+  if (withStart.length === 1) return withStart[0].shift
+
+  for (let i = 0; i < withStart.length; i++) {
+    const current = withStart[i]
+    const next = withStart[(i + 1) % withStart.length]
+    const windowStart = current.startMin - EARLY_ARRIVAL_BUFFER_MINUTES
+    const windowEnd = next.startMin - EARLY_ARRIVAL_BUFFER_MINUTES
+    const windowLength = mod(windowEnd - windowStart, MINUTES_PER_DAY) || MINUTES_PER_DAY
+    const elapsedSinceWindowStart = mod(nowMinutesOfDay - windowStart, MINUTES_PER_DAY)
+    if (elapsedSinceWindowStart < windowLength) return current.shift
   }
-  return best
+  return withStart[withStart.length - 1].shift
 }

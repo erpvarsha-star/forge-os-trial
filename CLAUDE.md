@@ -295,24 +295,41 @@ with no `employee_shifts` row for today had `shiftStart` stay `undefined`, so
 `rawLateMinutes` was always `0` — **lateness was silently never evaluated at
 all** for anyone HR hadn't assigned a shift to yet, not just left unflagged.
 
-**Implemented same session** — `lib/shiftInference.ts`'s `findClosestShift()`,
-called from both check-in paths (`app/(worker)/home.tsx`,
-`components/CheckInCard.tsx`) whenever no shift row exists for today: finds
-the `shifts` row whose `start_time` is closest (circular distance, handles
-Shift 3's 00:00 wraparound) to the actual check-in instant, **inserts an
-`employee_shifts` row for it** (not just a one-off calculation — this makes
-the inferred shift persist for that date, so Late Comers Review, shift-wise
-reports, and a later check-out all see the same shift consistently), then
-uses its `start_time`/`late_grace_minutes` for the late calculation exactly
-as an HR-assigned shift would.
+**Implemented same session, algorithm corrected same session after Yash
+worked through his own examples** — `lib/shiftInference.ts`'s
+`findClosestShift()`, called from both check-in paths (`app/(worker)/home.tsx`,
+`components/CheckInCard.tsx`) whenever no shift row exists for today.
+
+⚠ **First version used symmetric closest-start-time distance — wrong, caught
+by Yash before it shipped to real behavior.** His own worked example: 08:15
+should be Shift 1 (starts 07:00), late — but 08:15 is numerically closer to
+General's 09:00 (45min away) than to Shift 1's 07:00 (75min away), so
+closest-distance would have wrongly assigned General (on time), not Shift 1
+(late). **Correct model, confirmed against Yash's exact examples
+(07:45/08:00/08:15/08:30 → Shift 1, late; 08:45 → General, on time):** each
+shift owns a window from `(its own start − 15min)` up to `(the next
+chronological shift's start − 15min)`; whichever window contains the actual
+check-in time wins. The 15-minute buffer is fixed for every shift — including
+General, whose own `late_grace_minutes` is 30 — because this buffer answers a
+different question (which shift is this?) than `late_grace_minutes` does
+(is this check-in late for that shift?); conflating them was not what Yash
+described. Verified with a standalone script reproducing every one of his
+examples exactly before merging.
+
+Finds the matching `shifts` row (handles Shift 3's 00:00 wraparound via
+circular window math), **inserts an `employee_shifts` row for it** (not just
+a one-off calculation — this makes the inferred shift persist for that date,
+so Late Comers Review, shift-wise reports, and a later check-out all see the
+same shift consistently), then uses its `start_time`/`late_grace_minutes` for
+the late calculation exactly as an HR-assigned shift would.
 
 **One inference detail decided here, not asked, because it was unambiguous
 given the existing data:** candidate shifts are restricted to `security_guard`
 matching only shift names starting with "Security", everyone else matching
 non-Security shifts. `shifts.department` is `null` on every live row (no
 DB-level role scoping), and "Security Day" and "Shift 1" both start at 07:00
-— an unrestricted closest-start-time search would hit an exact tie there and
-could arbitrarily put a security guard's check-in on "Shift 1".
+— without this split a security guard's 07:00-window check-in could land on
+either shift depending on array order.
 
 **Behavior change to watch for:** employees who were previously never marked
 late (no shift assigned) will now show as late if they check in after their
