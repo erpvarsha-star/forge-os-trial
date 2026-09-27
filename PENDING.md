@@ -3,7 +3,19 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 27 Sep 2026 (session 14) — Fix attendance calendar timezone bug
+**Last updated:** 27 Sep 2026 (session 14) — PATCH_51: deactivated 25 departed employees; full-codebase IST audit in progress
+
+**PATCH_51 (27 Sep 2026, session 14):** Blocked 25 departed employees from ever logging in.
+
+Yash sent a "Left Employees List" (25 names/emp_codes, no longer working). All 25 confirmed live in `employees`, all still `is_active=true` and `must_change_pin=true` (never completed first login — consistent with them no longer being here to do it). Set `is_active=false` for all 25: `resolve_login_identifier()` filters `where is_active = true`, so their emp_code/phone simply stops resolving and login fails at the first step. Rows not deleted (audit trail, per this project's no-DELETE convention).
+
+- **List:** CON16, VFL5074, CON18, VFL4004, VFL4007, VFL5203, VFL5383, VFL5425, CON21, VFL5323, VFL5410, VFL5420, VFL5428, VFL5429, VFL4002, VFL1441, VFL1465, VFL5453, VFL5398, VFL5415, VFL4030, VFL5445, VFL1568, VFL5083, VFL1550
+- **⚠ Found, not fixed here:** VFL1550 (Swapnil Kakade, one of the 25) is still `supervisor_id` for 7 active employees (VFL4032, VFL4008, VFL5413, VFL5318, VFL5347, VFL5409, VFL1450). Their supervisor is now an inactive account. Needs HR to name a real replacement — not guessed here, per this project's no-guessing rule on org structure.
+- **Never-logged-in count after this patch: 25** (was 80 before this session's earlier count, now down to just the genuinely active employees who haven't opened the app — full list with department in the chat reply, not repeated here).
+
+**IST audit — in progress (27 Sep 2026, session 14):** Following the attendance-calendar timezone fix (below), doing a full-codebase sweep for the same device-local-`new Date()` bug pattern in every remaining screen, hook, and edge function. Results pending.
+
+**[Fixed 27 Sep 2026, session 14] Attendance calendar timezone bug:** Calendar showing wrong date + yesterday's (Sep 26) attendance missing.
 
 **[URGENT FIX] Attendance calendar timezone bug (27 Sep 2026, session 14):** Calendar showing wrong date + yesterday's (Sep 26) attendance missing.
 
