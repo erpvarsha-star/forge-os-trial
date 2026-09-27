@@ -16,7 +16,8 @@ import {
 } from '@/lib/location'
 import { supabase } from '@/lib/supabase'
 import { getDeviceId } from '@/lib/deviceId'
-import { EmployeeShift } from '@/types'
+import { findClosestShift } from '@/lib/shiftInference'
+import { EmployeeShift, Shift } from '@/types'
 import { MapPin, CheckCircle2, QrCode, Star, X } from 'lucide-react-native'
 import { BarCodeScanner } from 'expo-barcode-scanner'
 
@@ -228,12 +229,29 @@ export function CheckInCard() {
     }
 
     // Read shift for today using IST date (already loaded in state, but re-fetch for freshness)
-    const { data: shiftData } = await supabase
+    let { data: shiftData } = await supabase
       .from('employee_shifts')
       .select('*, shift:shifts(*)')
       .eq('employee_id', employee.id)
       .eq('date', todayStr)
       .maybeSingle()
+
+    // No shift allotted for today — infer one from the closest start_time
+    // to this actual check-in, instead of leaving lateness never evaluated.
+    if (!shiftData) {
+      const { data: allShifts } = await supabase.from('shifts').select('*')
+      const istNowForShift = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
+      const nowMinutesOfDay = istNowForShift.getUTCHours() * 60 + istNowForShift.getUTCMinutes()
+      const inferred = findClosestShift(nowMinutesOfDay, employee.role, (allShifts || []) as Shift[])
+      if (inferred) {
+        const { data: inserted } = await supabase
+          .from('employee_shifts')
+          .insert({ employee_id: employee.id, shift_id: inferred.id, date: todayStr })
+          .select('*, shift:shifts(*)')
+          .single()
+        if (inserted) shiftData = inserted
+      }
+    }
 
     if (shiftData) setShift(shiftData as EmployeeShift)
 

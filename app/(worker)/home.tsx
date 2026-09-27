@@ -13,7 +13,8 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { getCurrentLocation, getPlantConfig, isInsideGeofence, getPlantLocations, isInsideAnyGeofence, buildQrValue } from '@/lib/location'
 import { supabase } from '@/lib/supabase'
 import { getDeviceId } from '@/lib/deviceId'
-import { EmployeeShift } from '@/types'
+import { findClosestShift } from '@/lib/shiftInference'
+import { EmployeeShift, Shift } from '@/types'
 import { MAX_DAILY_OBSERVATIONS } from '@/constants'
 import { MapPin, Clock, CheckSquare, AlertCircle, Camera, QrCode, CheckCircle2, Calendar, ChevronRight, Star, X, LogOut } from 'lucide-react-native'
 import { BarCodeScanner } from 'expo-barcode-scanner'
@@ -154,8 +155,29 @@ export default function WorkerHome() {
       })
     }
 
-    const grace = shift?.shift?.late_grace_minutes ?? 15
-    const shiftStart = shift?.shift?.start_time
+    // No shift allotted for today — infer one from the closest start_time to
+    // this actual check-in, instead of leaving lateness never evaluated.
+    let activeShift = shift
+    if (!activeShift) {
+      const { data: allShifts } = await supabase.from('shifts').select('*')
+      const istNowForShift = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
+      const nowMinutesOfDay = istNowForShift.getUTCHours() * 60 + istNowForShift.getUTCMinutes()
+      const inferred = findClosestShift(nowMinutesOfDay, employee.role, (allShifts || []) as Shift[])
+      if (inferred) {
+        const { data: inserted } = await supabase
+          .from('employee_shifts')
+          .insert({ employee_id: employee.id, shift_id: inferred.id, date: todayStr })
+          .select('*, shift:shifts(*)')
+          .single()
+        if (inserted) {
+          activeShift = inserted as EmployeeShift
+          setShift(activeShift)
+        }
+      }
+    }
+
+    const grace = activeShift?.shift?.late_grace_minutes ?? 15
+    const shiftStart = activeShift?.shift?.start_time
     let rawLateMinutes = 0
 
     if (shiftStart) {

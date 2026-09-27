@@ -287,6 +287,41 @@ assigns shifts for, same as any other day; a Friday off is one with none.
 
 ---
 
+## Shift inference for unassigned check-ins — decision from Yash, 27 Sep 2026
+
+**Decision:** "if there is no shift allotment done for anyone consider the
+shift closest to their check in time as their time." Before this, an employee
+with no `employee_shifts` row for today had `shiftStart` stay `undefined`, so
+`rawLateMinutes` was always `0` — **lateness was silently never evaluated at
+all** for anyone HR hadn't assigned a shift to yet, not just left unflagged.
+
+**Implemented same session** — `lib/shiftInference.ts`'s `findClosestShift()`,
+called from both check-in paths (`app/(worker)/home.tsx`,
+`components/CheckInCard.tsx`) whenever no shift row exists for today: finds
+the `shifts` row whose `start_time` is closest (circular distance, handles
+Shift 3's 00:00 wraparound) to the actual check-in instant, **inserts an
+`employee_shifts` row for it** (not just a one-off calculation — this makes
+the inferred shift persist for that date, so Late Comers Review, shift-wise
+reports, and a later check-out all see the same shift consistently), then
+uses its `start_time`/`late_grace_minutes` for the late calculation exactly
+as an HR-assigned shift would.
+
+**One inference detail decided here, not asked, because it was unambiguous
+given the existing data:** candidate shifts are restricted to `security_guard`
+matching only shift names starting with "Security", everyone else matching
+non-Security shifts. `shifts.department` is `null` on every live row (no
+DB-level role scoping), and "Security Day" and "Shift 1" both start at 07:00
+— an unrestricted closest-start-time search would hit an exact tie there and
+could arbitrarily put a security guard's check-in on "Shift 1".
+
+**Behavior change to watch for:** employees who were previously never marked
+late (no shift assigned) will now show as late if they check in after their
+inferred shift's start + grace period. This is the intended effect of the
+decision, not a bug — but worth knowing before HR gets asked why someone who
+was never late before suddenly is.
+
+---
+
 ## SQL Patches applied (run in Supabase SQL Editor in order)
 
 | File | Purpose | Status |
