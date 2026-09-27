@@ -550,6 +550,54 @@ Every row this table used to list is fixed. Kept as a record, not a to-do:
 
 ---
 
+## Leave & Advance approval chains — frozen 27 Sep 2026, decisions from Yash
+
+**Not yet implemented in code — this is the locked design, recorded per the
+"record a decision the moment Yash gives it" rule above, before any RPC/schema
+work starts.** Today `leave_requests`/`advance_requests` are flat
+pending/approved/rejected (see PATCH_42 note below — the in-app screens are
+hidden and Google Forms are used instead, for the same reason: no staged
+workflow exists yet to build against). This table is the target design for
+when that workflow is built — one stage chain per requester category, mirroring
+the `salary_change_requests` staged-RPC pattern (`pending_X` → `pending_Y` →
+`approved`/`rejected`, one review RPC per stage).
+
+**Two-step transition UX (confirmed, not yet built):** for each form moved to
+this pattern, tapping "Apply" in-app first captures the same fields the process
+needs, shows a "Step 1 complete" confirmation, then opens the existing Google
+Form for step 2. The in-app approval workflow and the Google Form process run
+independently — this doesn't replace the Google Form, it runs alongside it
+until the in-app flow is proven with no bugs. Starting with Leave + Advance;
+whether to extend this to other common forms (Gate Pass, Cash Expenses,
+Hospital Form) is still open — ask before building those.
+
+**Frozen chains, by requester's own role/category:**
+
+| Requester | Leave chain | Advance chain |
+|---|---|---|
+| member / supervisor / security_guard | Manager → HR → Plant Head | Manager → HR → Accounts → Plant Head → Owner |
+| HR (Pallavi, hr_admin) — her own request | Plant Head only | Accounts → Plant Head → Owner |
+| manager — their own request | HR → Plant Head | HR → Accounts → Plant Head → Owner |
+| plant_head (Fazal) — his own request | Owner only | Owner only |
+| owner (Yash) — his own request | No approval gate — auto-recorded | No approval gate — auto-recorded |
+| Bharat Salve (Accounts manager, VFL5462) — his own advance | — (leave follows the manager row above) | Skips the Accounts stage (he *is* Accounts) → HR → Plant Head → Owner |
+
+**Still open — must ask before implementing:** the "Accounts" stage's exact
+mechanism is undecided. Options raised but not yet answered:
+(a) a specific named person (Bharat Salve, VFL5462) hardcoded as the approver,
+(b) role=`manager` AND `department`='Accounts' matched dynamically (so it
+follows whoever holds that seat, not today's name), or (c) something else.
+Ask this before writing the Accounts-stage review RPC — it determines how that
+RPC identifies who is authorized to act at that stage.
+
+Yash's exact words locking this in: "we can remove the supervisor approval and
+keep it manager HR accounts planted in me for advance. for leave it can stick
+to manager HR plant head." Neither chain has a supervisor stage — advance is
+Manager → HR → Accounts → Plant Head → Owner, leave is Manager → HR → Plant
+Head, exactly as given, for the rank-and-file row above.
+
+---
+
 ## What Claude must NEVER do
 
 - Commit `.env` or any file containing `service_role` key
