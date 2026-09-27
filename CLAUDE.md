@@ -26,11 +26,49 @@ progress.
 outstanding, blocked, or untested. Update it before the final push of any
 session.
 
-**Always use IST (Indian Standard Time, UTC+5:30) when displaying times to the user.** The database stores all timestamps in UTC. When querying for display, convert to IST using PostgreSQL's `AT TIME ZONE 'Asia/Kolkata'` syntax:
-```sql
-SELECT timestamp_column AT TIME ZONE 'Asia/Kolkata' as ist_time FROM table_name;
-```
-This matters for shift times, deadlines, attendance reporting, and all compliance data — the user operates on IST, not UTC.
+**🔒 LOCKED RULE — IST everywhere, permanently (audited + fixed 27 Sep 2026, session 14).**
+The app operates on IST (UTC+5:30), never device-local time or bare UTC. The
+database stores timestamps in UTC; every place the app computes "today,"
+"this month," a query date-boundary, or an overdue/deadline check MUST derive
+it from IST, never from a plain `new Date()`/`.getMonth()`/`.getFullYear()`/
+`.getDate()`/`.getDay()` call, because those read the *device's* clock and
+timezone — wrong the moment a phone isn't set to IST, and wrong for anyone
+near the UTC/IST day boundary (IST is 5.5h ahead, so 18:30 UTC is already the
+next day in IST) regardless of device settings.
+
+**The fix that made this a rule, not a suggestion**: a full-codebase audit
+found and fixed 16 files with exactly this bug (see PENDING.md, 27 Sep 2026)
+— it wasn't hypothetical, it was the live cause of HR's "calendar shows the
+wrong date, yesterday's attendance is missing" report. There are now
+committed, tested helpers specifically so this can never quietly regress:
+
+- **Frontend** (`app/`, `hooks/`, `components/`): import from `lib/istDate.ts`
+  — `istDateStr()` (today, `YYYY-MM-DD`), `istNow()` (IST as a `Date`, read via
+  its `getUTC*` methods), `istMonthYear()` (current month/year), `getMonthEndDay()`
+  (28–31, replaces any hardcoded month-end), `istStartOfDayUTC(dateStr)`
+  (the UTC instant for IST midnight of that date — required whenever filtering
+  a `timestamptz` column like `created_at`, since a bare `"YYYY-MM-DDT00:00:00"`
+  with no `+05:30` offset is silently read as UTC midnight, 5.5h early).
+- **Edge functions** (`supabase/functions/*/index.ts`, Deno): import the
+  equivalent from `supabase/functions/_shared/istDate.ts` — same four
+  functions, same names, ported for Deno. Never duplicate an inline `istNow()`
+  in a new function; import the shared one.
+- **Raw SQL / dashboard queries**: still use `AT TIME ZONE 'Asia/Kolkata'`:
+  ```sql
+  SELECT timestamp_column AT TIME ZONE 'Asia/Kolkata' as ist_time FROM table_name;
+  ```
+
+**Before adding any new date/time logic — frontend, edge function, or SQL —
+Claude must grep for `new Date()`, `.getMonth()`, `.getFullYear()`, `.getDate()`,
+`.getDay()`, and `.toISOString().split('T')[0]`/`.slice(0,10)` in the file being
+touched and confirm the IST helper is used, not a device-local equivalent.**
+A "duration/elapsed-time" calculation (subtracting two Date objects, or a
+`Date.now() - N*1000` sliding window) is the one legitimate exception — that
+kind of math is timezone-invariant by construction and needs no IST helper.
+Everything else that answers "what calendar day/month is it" must go through
+the helpers above. This matters for shift times, deadlines, attendance
+recording and counting, payroll month/year lookups, and all compliance data —
+the user operates on IST, never UTC, and never "whatever the device thinks."
 
 ---
 
@@ -476,6 +514,7 @@ Every row this table used to list is fixed. Kept as a record, not a to-do:
 - Guess employee phone numbers
 - Reference `types/database.ts` column names (old schema) — always use `types/index.ts`
 - Use `shift_date`, `full_name`, `employee_code`, `department_id`, `reporting_manager_id`, `salary_structure` — these are old schema names that don't exist in FINAL_SCHEMA
+- **Compute "today," "this month," or any date-boundary/deadline check from a plain `new Date()`/`.getMonth()`/`.getFullYear()`/`.getDate()`/`.getDay()` call, in frontend or edge-function code.** Always use `lib/istDate.ts` (frontend) or `supabase/functions/_shared/istDate.ts` (edge functions) — see the locked IST rule above. This is not a style preference; it was a live production bug (wrong calendar date, missing attendance data) until the 27 Sep 2026 audit fixed it, and it must never be reintroduced.
 
 ---
 
