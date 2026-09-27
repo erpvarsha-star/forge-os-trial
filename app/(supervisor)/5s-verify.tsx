@@ -24,7 +24,7 @@ export default function FiveSVerifyScreen() {
 
   const fetchSubmissions = async () => {
     if (!employee) return
-    const { data } = await supabase.from('5s_submissions').select('*, employee:employees(name, emp_code)').eq('status', 'pending')
+    const { data } = await supabase.from('5s_submissions').select('*, employee:employees!employee_id(name, emp_code)').eq('status', 'pending')
     if (data) setSubmissions(data as FiveSSubmission[])
     setIsLoading(false)
   }

@@ -11,7 +11,7 @@ export function useAdvance(employeeId: string) {
     setIsLoading(true)
     const { data } = await supabase
       .from('advance_requests')
-      .select('*, employee:employees(*)')
+      .select('*, employee:employees!employee_id(*)')
       .eq('employee_id', employeeId)
       .order('created_at', { ascending: false })
     if (data) setRequests(data as AdvanceRequest[])

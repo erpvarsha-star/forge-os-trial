@@ -38,11 +38,11 @@ export default function OwnerApprovals() {
   const fetchApprovals = async () => {
     if (!employee) return
     const [{ data: leaves }, { data: advances }, { data: salary }] = await Promise.all([
-      supabase.from('leave_requests').select('*, employee:employees(*)').eq('status', 'pending'),
-      supabase.from('advance_requests').select('*, employee:employees(*)').eq('status', 'pending'),
+      supabase.from('leave_requests').select('*, employee:employees!employee_id(*)').eq('status', 'pending'),
+      supabase.from('advance_requests').select('*, employee:employees!employee_id(*)').eq('status', 'pending'),
       supabase
         .from('salary_change_requests')
-        .select('*, employee:employees(name, emp_code, department)')
+        .select('*, employee:employees!employee_id(name, emp_code, department)')
         .eq('status', 'pending_owner')
         .order('requested_at', { ascending: true }),
     ])

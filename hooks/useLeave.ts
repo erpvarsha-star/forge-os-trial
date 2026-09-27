@@ -14,7 +14,7 @@ export function useLeave(employeeId: string) {
 
     const { data: reqData } = await supabase
       .from('leave_requests')
-      .select('*, employee:employees(*)')
+      .select('*, employee:employees!employee_id(*)')
       .eq('employee_id', employeeId)
       .order('created_at', { ascending: false })
 

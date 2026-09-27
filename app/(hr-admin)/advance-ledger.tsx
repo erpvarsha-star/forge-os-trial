@@ -19,7 +19,7 @@ export default function AdvanceLedgerScreen() {
   useEffect(() => {
     const fetch = async () => {
       if (!employee) return
-      const { data } = await supabase.from('advance_requests').select('*, employee:employees(name, emp_code)').order('created_at', { ascending: false })
+      const { data } = await supabase.from('advance_requests').select('*, employee:employees!employee_id(name, emp_code)').order('created_at', { ascending: false })
       if (data) setAdvances(data as AdvanceRequest[])
       setIsLoading(false)
     }

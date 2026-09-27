@@ -34,8 +34,8 @@ export default function SupervisorApprovals() {
     if (!team) { setIsLoading(false); return }
     const ids = team.map(t => t.id)
     const [{ data: leaveData }, { data: advanceData }] = await Promise.all([
-      supabase.from('leave_requests').select('*, employee:employees(*)').in('employee_id', ids).eq('status', 'pending'),
-      supabase.from('advance_requests').select('*, employee:employees(*)').in('employee_id', ids).eq('status', 'pending'),
+      supabase.from('leave_requests').select('*, employee:employees!employee_id(*)').in('employee_id', ids).eq('status', 'pending'),
+      supabase.from('advance_requests').select('*, employee:employees!employee_id(*)').in('employee_id', ids).eq('status', 'pending'),
     ])
     if (leaveData) setLeaves(leaveData as LeaveRequest[])
     if (advanceData) setAdvances(advanceData as AdvanceRequest[])

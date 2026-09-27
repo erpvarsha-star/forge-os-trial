@@ -29,7 +29,7 @@ export default function SecurityCheckpoint2Screen() {
     const today = istDateStr()
     const { data } = await supabase
       .from('attendance_records')
-      .select('id, employee_id, check_in_time, checkpoint2_confirmed_by, employees(name, emp_code, department)')
+      .select('id, employee_id, check_in_time, checkpoint2_confirmed_by, employees!employee_id(name, emp_code, department)')
       .eq('date', today)
       .not('check_in_time', 'is', null)
       .order('check_in_time', { ascending: true })
