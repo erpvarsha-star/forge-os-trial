@@ -26,15 +26,26 @@ export const emptyBreakup: SalaryBreakup = {
 }
 
 export function breakupIsValid(b: SalaryBreakup): boolean {
-  return !!(b.ctc_annual.trim() && b.basic.trim() && b.hra.trim() && b.conveyance.trim())
+  return !!(b.basic.trim() && b.hra.trim() && b.conveyance.trim())
 }
 
+// HR finalises pay as a monthly figure, never an annual one — confirmed by
+// Yash 27 Sep 2026 after a live-data check showed the annual/monthly ratio
+// varies 11.1x-13.9x across the workforce (workers get a higher bonus % than
+// staff), so there is no fixed multiplier that reconstructs a true annual
+// figure. ctc_annual is therefore never typed in; it is derived here as
+// 12x the finalised monthly total, purely for the ctc_annual column/display
+// that already exists — this must never block onboarding on a manually
+// entered value HR doesn't actually have.
 export function breakupToPayload(b: SalaryBreakup): Record<string, number> {
   const payload: Record<string, number> = {}
   ;(Object.keys(b) as (keyof SalaryBreakup)[]).forEach(key => {
+    if (key === 'ctc_annual') return
     const raw = b[key].trim()
     if (raw) payload[key] = Number(raw)
   })
+  const monthlyTotal = Object.values(payload).reduce((sum, v) => sum + v, 0)
+  payload.ctc_annual = Math.round(monthlyTotal * 12)
   return payload
 }
 
@@ -53,7 +64,6 @@ export function SalaryBreakupFields({
 
   return (
     <View className="gap-4">
-      <Input label={t('hrAdmin.ctcAnnual')} value={value.ctc_annual} onChangeText={set('ctc_annual')} keyboardType="numeric" required />
       <Input label={t('hrAdmin.basic')} value={value.basic} onChangeText={set('basic')} keyboardType="numeric" required />
       <Input label={t('hrAdmin.hra')} value={value.hra} onChangeText={set('hra')} keyboardType="numeric" required />
       <Input label={t('hrAdmin.conveyance')} value={value.conveyance} onChangeText={set('conveyance')} keyboardType="numeric" required />
