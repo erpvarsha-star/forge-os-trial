@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase'
 import { Trophy, ChevronRight } from 'lucide-react-native'
 import { INK } from '@/components/theme'
 import { istDateStr } from '@/lib/istDate'
+import { isPresentStatus } from '@/constants'
 
 export default function ManagerDashboard() {
   const { t } = useTranslation()
@@ -25,11 +26,11 @@ export default function ManagerDashboard() {
   const fetchStats = async () => {
     if (!employee) return
     const today = istDateStr()
-    const { data: deptEmployees } = await supabase.from('employees').select('id').eq('department', employee.department)
+    const { data: deptEmployees } = await supabase.from('employees').select('id').eq('department', employee.department).eq('is_active', true)
     if (!deptEmployees) { setIsLoading(false); return }
     const ids = deptEmployees.map(e => e.id)
     const { data: attendance } = await supabase.from('attendance_records').select('status').in('employee_id', ids).eq('date', today)
-    const present = attendance?.filter(a => a.status === 'P').length || 0
+    const present = attendance?.filter(a => isPresentStatus(a.status)).length || 0
     setAttendancePct(ids.length > 0 ? (present / ids.length) * 100 : 0)
     setIsLoading(false)
   }

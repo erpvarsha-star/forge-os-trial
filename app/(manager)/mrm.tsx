@@ -37,7 +37,7 @@ export default function MRMScreen() {
       cost_score: parseFloat(cost) || 0,
       morale_score: parseFloat(morale) || 0,
       submitted_by: employee.id,
-      submitted_at: istNow().toISOString(),
+      submitted_at: new Date().toISOString(),
       status: 'submitted',
     })
     setIsSubmitting(false)

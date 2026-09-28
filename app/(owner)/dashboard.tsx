@@ -13,6 +13,7 @@ import { TouchableOpacity } from 'react-native'
 import { router } from 'expo-router'
 import { BRAND, STATUS } from '@/components/theme'
 import { istDateStr, istMonthYear } from '@/lib/istDate'
+import { isPresentStatus } from '@/constants'
 
 export default function OwnerDashboard() {
   const { t } = useTranslation()
@@ -27,7 +28,7 @@ export default function OwnerDashboard() {
       const { month, year } = istMonthYear()
       const { data: allEmps } = await supabase.from('employees').select('id').eq('is_active', true)
       const { data: attendance } = await supabase.from('attendance_records').select('status').in('employee_id', allEmps?.map(e => e.id) || []).eq('date', today)
-      const present = attendance?.filter(a => a.status === 'P').length || 0
+      const present = attendance?.filter(a => isPresentStatus(a.status)).length || 0
       const total = allEmps?.length || 1
       const { data: payroll } = await supabase.from('payroll_records').select('net_pay').eq('month', month).eq('year', year)
       const { data: advances } = await supabase.from('advance_requests').select('amount').eq('status', 'approved')

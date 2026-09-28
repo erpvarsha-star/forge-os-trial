@@ -12,6 +12,7 @@ import { router } from 'expo-router'
 import { Users, AlertCircle, CreditCard, Calendar, ChevronRight, UserPlus, IndianRupee } from 'lucide-react-native'
 import { BRAND, STATUS, INK } from '@/components/theme'
 import { istDateStr } from '@/lib/istDate'
+import { PRESENT_STATUSES } from '@/constants'
 
 interface DashboardStats {
   totalEmployees: number
@@ -47,7 +48,7 @@ export default function HrAdminDashboard() {
       { count: missingDataCount },
     ] = await Promise.all([
       supabase.from('employees').select('id', { count: 'exact', head: true }).eq('is_active', true),
-      supabase.from('attendance_records').select('id', { count: 'exact', head: true }).eq('date', today).eq('status', 'P'),
+      supabase.from('attendance_records').select('id', { count: 'exact', head: true }).eq('date', today).in('status', PRESENT_STATUSES),
       supabase.from('advance_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('leave_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('employees').select('id', { count: 'exact', head: true }).eq('is_active', true).or('name.is.null,phone.is.null,department.is.null'),

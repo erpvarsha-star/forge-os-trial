@@ -110,10 +110,10 @@ async function computeAttendanceAndOnTime(
 
   const all = rows ?? [];
   const workingDayRows = all.filter((r: { status: string }) => !['H', 'WO'].includes(r.status));
-  // 'P' and 'HL' are the only present-at-work statuses. The previous version
-  // also matched 'OT' and 'LC', which the attendance_records.status CHECK
-  // constraint forbids — they could never appear, so those were dead branches.
-  const presentRows = workingDayRows.filter((r: { status: string }) => ['P', 'HL'].includes(r.status));
+  // Present-at-work statuses: 'P', 'L' (Late — not Leave; the person is at work)
+  // and 'HL'. Excluding 'L' used to score late days as absences and hide them
+  // from the on-time ratio entirely.
+  const presentRows = workingDayRows.filter((r: { status: string }) => ['P', 'L', 'HL'].includes(r.status));
   const onTimeRows = presentRows.filter((r: { late_minutes: number }) => (r.late_minutes ?? 0) === 0);
   // GPS only = 50% of attendance score weight; GPS + QR = full 100%.
   const qrRows = presentRows.filter((r: { qr_verified: boolean }) => r.qr_verified === true);
@@ -287,8 +287,7 @@ async function computeAttendanceStreakBadge(db: ReturnType<typeof supabaseAdmin>
 
   let streak = 0;
   for (const row of rows ?? []) {
-    // 'OT' is not a permitted attendance_records.status value; 'P'/'HL' are.
-    if (['P', 'HL'].includes(row.status)) streak += 1;
+    if (['P', 'L', 'HL'].includes(row.status)) streak += 1;
     else if (['H', 'WO'].includes(row.status)) continue; // doesn't break streak
     else break;
   }

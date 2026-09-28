@@ -20,6 +20,7 @@ import { findClosestShift } from '@/lib/shiftInference'
 import { EmployeeShift, Shift } from '@/types'
 import { MapPin, CheckCircle2, QrCode, Star, X } from 'lucide-react-native'
 import { BarCodeScanner } from 'expo-barcode-scanner'
+import { isPresentStatus } from '@/constants'
 
 /**
  * Every non-worker role (manager, hr-admin, supervisor, plant-head,
@@ -44,7 +45,7 @@ export function CheckInCard() {
   const { records, todayRecord, checkIn, checkOut, confirmQr, confirmQrOut, refresh, isLoading: attendanceLoading } = useAttendance(
     employee?.id || ''
   )
-  const presentDaysThisMonth = records.filter(r => r.status === 'P').length
+  const presentDaysThisMonth = records.filter(r => isPresentStatus(r.status)).length
   const lateThisMonth = records.filter(r => r.status === 'L' || r.status === 'HL').length
   const [isLoading, setIsLoading] = useState(false)
   const [showLateModal, setShowLateModal] = useState(false)

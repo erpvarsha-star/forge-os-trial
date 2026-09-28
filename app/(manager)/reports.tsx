@@ -95,7 +95,7 @@ export default function ManagerReports() {
     // Week-offs and holidays are not attendance failures, so they are excluded
     // from the denominator rather than counted as absence.
     const workingRows = rows.filter(r => !['WO', 'H'].includes(r.status))
-    const presentRows = workingRows.filter(r => ['P', 'HL'].includes(r.status))
+    const presentRows = workingRows.filter(r => ['P', 'L', 'HL'].includes(r.status))
     setMonthAttendancePct(workingRows.length > 0 ? (presentRows.length / workingRows.length) * 100 : 0)
     setLateCount(presentRows.filter(r => (r.late_minutes ?? 0) > 0).length)
 
@@ -108,7 +108,7 @@ export default function ManagerReports() {
     for (const r of workingRows) {
       const bucket = byDate.get(r.date) ?? { present: 0, total: 0 }
       bucket.total += 1
-      if (['P', 'HL'].includes(r.status)) bucket.present += 1
+      if (['P', 'L', 'HL'].includes(r.status)) bucket.present += 1
       byDate.set(r.date, bucket)
     }
     setTrend(

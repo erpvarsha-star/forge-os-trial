@@ -8,6 +8,7 @@ import { AttendanceCalendar } from '@/components/AttendanceCalendar'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { Card } from '@/components/Card'
 import { istMonthYear } from '@/lib/istDate'
+import { isPresentStatus } from '@/constants'
 
 export default function WorkerAttendance() {
   const { t } = useTranslation()
@@ -21,7 +22,7 @@ export default function WorkerAttendance() {
   if (!employee) return <LoadingScreen />
   if (isLoading) return <LoadingScreen />
 
-  const present = records.filter(r => r.status === 'P').length
+  const present = records.filter(r => isPresentStatus(r.status)).length
   const absent = records.filter(r => r.status === 'A').length
   const late = records.filter(r => r.status === 'L').length
 

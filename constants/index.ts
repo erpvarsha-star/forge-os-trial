@@ -41,6 +41,10 @@ export const ATTENDANCE_STATUS_COLORS: Record<string, string> = {
   HL: 'bg-orange-400',
 }
 
+// Statuses meaning the person was physically at work — 'L' is Late, not Leave.
+export const PRESENT_STATUSES = ['P', 'L', 'HL']
+export const isPresentStatus = (s?: string | null) => !!s && PRESENT_STATUSES.includes(s)
+
 export const ATTENDANCE_STATUS_LABELS: Record<string, string> = {
   P: 'Present',
   A: 'Absent',

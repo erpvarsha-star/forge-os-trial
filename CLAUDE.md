@@ -354,6 +354,36 @@ was never late before suddenly is.
 
 ---
 
+## Attendance counting rules — fixed 28 Sep 2026
+
+**`attendance_records.status = 'L'` means Late, not Leave** (`ATTENDANCE_STATUS_LABELS`
+in `constants/index.ts`) — the person checked in and is at work. Found
+28 Sep that almost every counter treated only `'P'` (or `'P'`/`'HL'`) as
+present, so every late arrival was silently counted as absent: the Owner /
+HR / Manager / Plant Head / Supervisor dashboards, the plant HTML dashboard,
+the manager's monthly report, an employee's own "present days", and —
+most seriously — `nightly-scoring`, which scored late days as absences in
+the attendance ratio *and* never counted them as late (so `lcCount` was
+always 0). 26 Sep: 39 counted vs 60 actually at work.
+
+**The rule now, everywhere:** present = `P`, `L`, `HL`
+(`PRESENT_STATUSES` / `isPresentStatus()` in `constants/index.ts` — use
+these, never re-list statuses inline in app code). Expected/denominator =
+active headcount minus `WO`/`H` rows — **not** "people who have a row",
+because a no-show has no row at all and would otherwise vanish from the
+denominator (the HTML dashboard showed ~97% on a day ~56% attended).
+Absent tiles = expected − present, not just explicit `'A'` rows.
+
+Also fixed same pass: the attendance calendar's "today" ring compared
+`istNow()` (shifted, meant for `getUTC*` reads) using date-fns local
+getters, double-applying +5:30 — wrong day every evening after 18:30 IST.
+It now compares against `istDateStr()`. And `(manager)/mrm.tsx` was saving
+`submitted_at` as `istNow().toISOString()`, a timestamp 5.5h in the future
+(no rows affected — no MRM had been submitted yet). **`istNow()` must never
+be written to a `timestamptz` column or read with local getters.**
+
+---
+
 ## Owner has no KPI tab — decision from Yash, 28 Sep 2026
 
 Redundant with `dashboard/index.html` (the plant HTML dashboard, which

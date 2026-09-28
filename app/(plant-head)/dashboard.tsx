@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase'
 import { AlertTriangle, TrendingUp, UserCheck, UserX, Clock, Trophy } from 'lucide-react-native'
 import { STATUS, INK } from '@/components/theme'
 import { istDateStr } from '@/lib/istDate'
+import { isPresentStatus } from '@/constants'
 
 export default function PlantHeadDashboard() {
   const { t } = useTranslation()
@@ -28,10 +29,9 @@ export default function PlantHeadDashboard() {
     if (!allEmployees) { setIsLoading(false); return }
     const ids = allEmployees.map(e => e.id)
     const { data: attendance } = await supabase.from('attendance_records').select('status').in('employee_id', ids).eq('date', today)
-    const present = attendance?.filter(a => a.status === 'P').length || 0
-    const absent = attendance?.filter(a => a.status === 'A').length || 0
+    const present = attendance?.filter(a => isPresentStatus(a.status)).length || 0
     const late = attendance?.filter(a => a.status === 'L').length || 0
-    setPlantStats({ total: ids.length, present, absent, late })
+    setPlantStats({ total: ids.length, present, absent: Math.max(ids.length - present, 0), late })
     setIsLoading(false)
   }
 

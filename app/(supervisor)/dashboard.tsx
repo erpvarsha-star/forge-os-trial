@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase'
 import { UserCheck, UserX, Clock, Users } from 'lucide-react-native'
 import { STATUS, INK } from '@/components/theme'
 import { istDateStr } from '@/lib/istDate'
+import { isPresentStatus } from '@/constants'
 
 export default function SupervisorDashboard() {
   const { t } = useTranslation()
@@ -23,14 +24,13 @@ export default function SupervisorDashboard() {
   const fetchStats = async () => {
     if (!employee) return
     const today = istDateStr()
-    const { data: team } = await supabase.from('employees').select('id').eq('supervisor_id', employee.id)
+    const { data: team } = await supabase.from('employees').select('id').eq('supervisor_id', employee.id).eq('is_active', true)
     if (!team) { setIsLoading(false); return }
     const ids = team.map(t => t.id)
     const { data: attendance } = await supabase.from('attendance_records').select('status').in('employee_id', ids).eq('date', today)
-    const present = attendance?.filter(a => a.status === 'P').length || 0
-    const absent = attendance?.filter(a => a.status === 'A').length || 0
+    const present = attendance?.filter(a => isPresentStatus(a.status)).length || 0
     const late = attendance?.filter(a => a.status === 'L').length || 0
-    setStats({ present, absent, late, total: ids.length })
+    setStats({ present, absent: Math.max(ids.length - present, 0), late, total: ids.length })
     setIsLoading(false)
   }
 

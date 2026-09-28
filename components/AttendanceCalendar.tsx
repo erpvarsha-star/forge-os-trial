@@ -2,9 +2,9 @@ import React from 'react'
 import { View, Text } from 'react-native'
 import { AttendanceRecord } from '@/types'
 import { ATTENDANCE_STATUS_LABELS } from '@/constants'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from 'date-fns'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns'
 import { ATTENDANCE_STATUS_TOKEN, STATUS } from './theme'
-import { istNow } from '@/lib/istDate'
+import { istDateStr } from '@/lib/istDate'
 
 interface AttendanceCalendarProps {
   records: AttendanceRecord[]
@@ -20,7 +20,8 @@ export function AttendanceCalendar({ records, month, year }: AttendanceCalendarP
 
   const firstDayOfWeek = getDay(days[0])
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-  const today = istNow()
+  // istNow() is shifted for getUTC* reads; comparing it with date-fns (local getters) double-applies the offset.
+  const today = istDateStr()
 
   const getStatusForDate = (dateStr: string) => {
     const record = records.find(r => r.date === dateStr)
@@ -45,7 +46,7 @@ export function AttendanceCalendar({ records, month, year }: AttendanceCalendarP
           const dateStr = format(day, 'yyyy-MM-dd')
           const status = getStatusForDate(dateStr)
           const tone = status ? STATUS[ATTENDANCE_STATUS_TOKEN[status as keyof typeof ATTENDANCE_STATUS_TOKEN]] : null
-          const isToday = isSameDay(day, today)
+          const isToday = dateStr === today
 
           return (
             <View key={dateStr} className="w-10 h-10 items-center justify-center p-0.5">

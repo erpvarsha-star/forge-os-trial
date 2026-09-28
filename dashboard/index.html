@@ -407,11 +407,15 @@ function render() {
 
   // Week-offs and holidays are not attendance failures, so they leave the
   // denominator rather than counting as absence — same rule the app uses.
-  const working = todayAtt.filter(a => !['WO', 'H'].includes(a.status));
-  const present = working.filter(a => ['P', 'HL'].includes(a.status));
-  const late = working.filter(a => (a.late_minutes ?? 0) > 0)
+  // Expected = every active employee minus anyone on a week-off/holiday row;
+  // someone with no row at all is a no-show and must stay in the denominator.
+  // 'L' is Late (physically present), not Leave.
+  const offToday = todayAtt.filter(a => ['WO', 'H'].includes(a.status)).length;
+  const expected = Math.max(emps.length - offToday, 0);
+  const present = todayAtt.filter(a => ['P', 'L', 'HL'].includes(a.status));
+  const late = todayAtt.filter(a => (a.late_minutes ?? 0) > 0)
                       .sort((a, b) => (b.late_minutes ?? 0) - (a.late_minutes ?? 0));
-  const pct = working.length ? (present.length / working.length) * 100 : 0;
+  const pct = expected ? (present.length / expected) * 100 : 0;
 
   const pendingLeave = DATA.leaves.filter(l => ids.has(l.employee_id)).length;
   const pendingAdvance = DATA.advances.filter(a => ids.has(a.employee_id)).length;
@@ -421,7 +425,7 @@ function render() {
   const tone = (v, good, warn) => v >= good ? 'good' : v >= warn ? 'warn' : 'bad';
   $('kpis').innerHTML = [
     kpi('Headcount', emps.length, dept || 'active employees'),
-    kpi('Present today', present.length, `of ${working.length} expected`, tone(pct, 90, 75)),
+    kpi('Present today', present.length, `of ${expected} expected`, tone(pct, 90, 75)),
     kpi('Attendance', pct.toFixed(1) + '%', 'today', tone(pct, 90, 75)),
     kpi('Late today', late.length, late.length ? 'needs a word' : 'nobody late', late.length ? (late.length > 5 ? 'bad' : 'warn') : 'good'),
     kpi('Pending approvals', pendingLeave + pendingAdvance, `${pendingLeave} leave · ${pendingAdvance} advance`, (pendingLeave + pendingAdvance) > 8 ? 'warn' : ''),
@@ -453,11 +457,13 @@ function renderTrend(ids) {
   const byDate = new Map();
   for (const r of DATA.monthAtt) {
     if (!ids.has(r.employee_id)) continue;
-    if (['WO', 'H'].includes(r.status)) continue;
-    const b = byDate.get(r.date) || { p: 0, t: 0 };
-    b.t++; if (['P', 'HL'].includes(r.status)) b.p++;
+    const b = byDate.get(r.date) || { p: 0, off: 0 };
+    if (['WO', 'H'].includes(r.status)) b.off++;
+    else if (['P', 'L', 'HL'].includes(r.status)) b.p++;
     byDate.set(r.date, b);
   }
+  // Uses today's active headcount per day, so no-shows (no row) count against attendance.
+  for (const b of byDate.values()) b.t = Math.max(ids.size - b.off, 0);
   const days = [...byDate.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-30);
   if (!days.length) { $('trend').innerHTML = '<div class="empty">No attendance recorded in the last 30 days.</div>'; return; }
 
@@ -562,15 +568,14 @@ function renderDepartments() {
   for (const e of DATA.employees) {
     const d = e.department || '—';
     const r = rows.get(d) || { head: 0, present: 0, working: 0, late: 0 };
-    r.head++; rows.set(d, r);
+    r.head++; r.working++; rows.set(d, r);
   }
   const empDept = new Map(DATA.employees.map(e => [e.id, e.department || '—']));
   for (const a of DATA.todayAtt) {
     const d = empDept.get(a.employee_id); if (!d) continue;
     const r = rows.get(d); if (!r) continue;
-    if (['WO', 'H'].includes(a.status)) continue;
-    r.working++;
-    if (['P', 'HL'].includes(a.status)) r.present++;
+    if (['WO', 'H'].includes(a.status)) { r.working--; continue; }
+    if (['P', 'L', 'HL'].includes(a.status)) r.present++;
     if ((a.late_minutes ?? 0) > 0) r.late++;
   }
   const list = [...rows.entries()].map(([d, r]) => ({ d, ...r, pct: r.working ? (r.present / r.working) * 100 : null }))
