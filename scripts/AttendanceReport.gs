@@ -501,6 +501,30 @@ function installAttendanceReportTrigger() {
     ' — check this is still comfortably under Google\'s 20-per-project ceiling.');
 }
 
+// Diagnostic — run this if the trigger count ever looks off (e.g. sitting
+// at Google's 20-per-project ceiling when CLAUDE.md's own record says it
+// should be ~14). Lists every trigger in this Apps Script project by
+// handler function and type, so it's obvious what's actually registered
+// instead of guessing. Added 28 Sep 2026 after installAttendanceReportTrigger()
+// reported "Triggers before: 20, after: 20" — 6 more than the documented
+// total (2 from ALERT.gs's consolidated dispatchers + 11 from Code.gs + 1
+// new one = 14 expected). Does not change anything — read-only.
+function listAllTriggers_() {
+  var triggers = ScriptApp.getProjectTriggers();
+  Logger.log('Total triggers: ' + triggers.length + ' / 20');
+  var counts = {};
+  triggers.forEach(function(t, i) {
+    var handler = t.getHandlerFunction();
+    var type = t.getEventType();
+    counts[handler] = (counts[handler] || 0) + 1;
+    Logger.log((i + 1) + '. ' + handler + ' — ' + type);
+  });
+  Logger.log('--- grouped by handler ---');
+  Object.keys(counts).forEach(function(h) {
+    Logger.log(h + ': ' + counts[h] + (counts[h] > 1 ? '  ⚠ duplicate?' : ''));
+  });
+}
+
 // Manual test helper — run from the Apps Script editor for a known past
 // date (e.g. testAttendanceReportForDate('2026-09-27')) before trusting
 // the trigger. Does NOT send email — writes to the Sheet and logs a
