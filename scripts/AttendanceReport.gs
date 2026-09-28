@@ -157,8 +157,12 @@ function fetchEmployeeShiftDefaults_(dateStr) {
 // up even with no attendance_records row that day — never silently
 // dropped, matching this app's own "expected = active headcount" rule.
 function fetchDailyAttendance_(dateStr) {
+  if (!dateStr) throw new Error('fetchDailyAttendance_ called with no dateStr — pass a real "YYYY-MM-DD" date, not undefined.');
+  // employees has 3 FK relationships into attendance_records (employee_id,
+  // checkpoint2_confirmed_by, checkpoint3_confirmed_by) — PostgREST refuses
+  // to guess which one to embed (PGRST201) unless the FK is named explicitly.
   var path = '/rest/v1/employees' +
-    '?select=id,emp_code,name,department,attendance_records(check_in_time,check_out_time,hours_worked,late_minutes)' +
+    '?select=id,emp_code,name,department,attendance_records!attendance_records_employee_id_fkey(check_in_time,check_out_time,hours_worked,late_minutes)' +
     '&is_active=eq.true' +
     '&attendance_records.date=eq.' + dateStr;
   var emps = supabaseGet_(path);
@@ -209,8 +213,9 @@ function fetchMonthlyAttendance_(year, month) {
   var lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
   var endDate = year + '-' + mm + '-' + (lastDay < 10 ? '0' : '') + lastDay;
 
+  // Same PGRST201 fix as fetchDailyAttendance_ — must name the FK explicitly.
   var path = '/rest/v1/employees' +
-    '?select=id,emp_code,name,department,attendance_records(date,check_in_time,hours_worked,late_minutes,status)' +
+    '?select=id,emp_code,name,department,attendance_records!attendance_records_employee_id_fkey(date,check_in_time,hours_worked,late_minutes,status)' +
     '&is_active=eq.true' +
     '&attendance_records.date=gte.' + startDate +
     '&attendance_records.date=lte.' + endDate;
@@ -505,4 +510,17 @@ function testAttendanceReportForDate(dateStr) {
   var summary = runAttendanceDailyReport_(dateStr);
   Logger.log(JSON.stringify(summary, null, 2));
   return summary;
+}
+
+// No-argument convenience wrapper for testAttendanceReportForDate — the
+// Apps Script editor's "Run" button on a function with parameters calls it
+// with none, silently passing `undefined` (this is what produced the
+// "date=eq.undefined" PGRST error on the first live test run). Use THIS
+// one when just clicking Run in the editor; it always tests yesterday
+// (IST), a date guaranteed to have real data.
+function testAttendanceReportYesterday() {
+  var y = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  var dateStr = Utilities.formatDate(y, 'Asia/Kolkata', 'yyyy-MM-dd');
+  Logger.log('Testing ' + dateStr + ' (yesterday IST)...');
+  return testAttendanceReportForDate(dateStr);
 }
