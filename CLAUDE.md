@@ -266,6 +266,21 @@ QR salt: set by PATCH_16, generated inside Postgres with pgcrypto — nobody eve
 
 `worker/home.tsx` and `fraud-detector`'s `gps_check` both read `plant_locations` first and fall back to the old single-point `plant_config` geofence when it's empty or doesn't exist — **PATCH_21 (table only, 0 rows) is safe to run any time; behaviour is unchanged until PATCH_22 (the seed) also runs.** Real coordinates received from Yash 13 Aug (this sandbox's network egress proxy cannot reach any Google Maps domain, confirmed with a direct proxy-level 403, not just a fetch-tool restriction) — `COMBINED_DEPLOY_21to22_13Aug2026.sql` has both patches ready to run. Sanity-checked before writing: every point is within 131m of "Plant location" (Machine shop is farthest, at 131.3m — just outside the OLD single-point 100m radius, a real case this fixes). "Cutting shop" and "Final Shop" were sent with identical coordinates — seeded as given, harmless, but worth Yash double-checking it isn't a copy-paste slip in the source sheet. See PENDING.md.
 
+**Per-point radius — 15m tried, too tight, now 25m (PATCH_57, 28 Sep 2026).**
+27 Sep 2026: an audit found the seeded 100m-everywhere radius pushed the
+effective check-in boundary well past the campus (the whole site spans only
+134.7m end to end) — plausibly reaching a public street corner, which
+matched a complaint. Yash's call that day: 15m. Flagged at the time that
+typical phone GPS accuracy (±5-20m outdoors, worse inside a steel-frame shop)
+made 15m risky. **That risk materialized 28 Sep** — Yash: "15m is making it
+difficult for ppl to sign in." Raised to **25m** on all 12 real campus points
+(`Pune Office`, not part of the documented 12-point seed, left at 200m,
+untouched both times). If 25m still proves too tight for a specific shop
+(Machine shop sits 68.6m from its nearest neighbour, the widest gap on
+campus), the fix is a **per-point** radius bump there, not another global
+change — watch `worker.outsidePlant` complaint volume before touching it
+again.
+
 ---
 
 ## Work week — Saturday to Thursday, Friday off (confirmed 13 Aug 2026)
@@ -464,6 +479,10 @@ explicit and correct rather than incidental.
 | `COMBINED_DEPLOY_21to22_13Aug2026.sql` | PATCH_21 + PATCH_22 concatenated (generated, cannot drift) — run this one file | ✅ Applied 23 Aug |
 | `PATCH_52_resolve_false_mock_location_alerts_27Sep2026.sql` | Resolves VFL4057's 10 stale false-positive `mock_location` fraud_alerts, root-caused to a code bug (see "What Claude must NEVER do" / PENDING.md) and fixed the same session | ✅ Applied 27 Sep 2026 |
 | `PATCH_53_staged_leave_advance_approvals_27Sep2026.sql` | Staged multi-role approval chains for `leave_requests`/`advance_requests` — schema, triggers, `my_turn_*`/`review_*` RPCs, audit table. See "Leave & Advance approval chains" section above | ✅ Applied 27 Sep 2026 |
+| `PATCH_54_payroll_schema_extension_28Sep2026.sql` | Adds line-item columns to `payroll_records` (employer_pf/esi, bonus, gratuity, allowances) matching the real salary sheets. See "Real payroll data on file" section above | ✅ Applied 28 Sep 2026 |
+| `PATCH_55_new_employees_from_salary_sheets_28Sep2026.sql` | Adds CON22, CON23 (re-hires), VFL5455, VFL5456 — found only in the salary sheets, not yet in `employees` | ✅ Applied 28 Sep 2026 |
+| `PATCH_56_payroll_import_apr_aug_2026_28Sep2026.sql` | Full Apr-Aug 2026 payroll import for all 3 categories (536 rows), assembled from Python-generated SQL batches | ✅ Applied 28 Sep 2026 |
+| `PATCH_57_gps_radius_25m_28Sep2026.sql` | Raises `plant_locations.radius_meters` from 15m to 25m on all 12 real campus points — 15m (set 27 Sep) was rejecting legitimate check-ins | ✅ Applied 28 Sep 2026 |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
