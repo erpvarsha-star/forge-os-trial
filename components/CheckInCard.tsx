@@ -16,12 +16,12 @@ import {
 } from '@/lib/location'
 import { supabase } from '@/lib/supabase'
 import { getDeviceId } from '@/lib/deviceId'
-import { findClosestShift } from '@/lib/shiftInference'
+import { resolveShiftForCheckIn } from '@/lib/shiftInference'
 import { EmployeeShift, Shift } from '@/types'
 import { MapPin, CheckCircle2, QrCode, Star, X } from 'lucide-react-native'
 import { BarCodeScanner } from 'expo-barcode-scanner'
 import { isPresentStatus } from '@/constants'
-import { attendanceDateStr, lateMinutesAgainst } from '@/lib/istDate'
+import { attendanceDateStr, istNow, lateMinutesAgainst } from '@/lib/istDate'
 
 /**
  * Every non-worker role (manager, hr-admin, supervisor, plant-head,
@@ -233,20 +233,17 @@ export function CheckInCard() {
       .eq('date', todayStr)
       .maybeSingle()
 
-    // No shift allotted for today — infer one from the closest start_time
-    // to this actual check-in, instead of leaving lateness never evaluated.
-    if (!shiftData) {
+    // Check-in time decides the shift, even over HR's allocation (Yash, 28 Sep 2026).
+    {
+      const current = shiftData as EmployeeShift | null
       const { data: allShifts } = await supabase.from('shifts').select('*')
-      const istNowForShift = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
+      const istNowForShift = istNow()
       const nowMinutesOfDay = istNowForShift.getUTCHours() * 60 + istNowForShift.getUTCMinutes()
-      const inferred = findClosestShift(nowMinutesOfDay, employee.role, (allShifts || []) as Shift[])
-      if (inferred) {
-        const { data: inserted } = await supabase
-          .from('employee_shifts')
-          .insert({ employee_id: employee.id, shift_id: inferred.id, date: todayStr })
-          .select('*, shift:shifts(*)')
-          .single()
-        if (inserted) shiftData = inserted
+      const resolved = resolveShiftForCheckIn(current?.shift, nowMinutesOfDay, employee.role, (allShifts || []) as Shift[])
+      if (resolved && resolved.id !== current?.shift_id) {
+        const { error: shiftError } = await supabase.rpc('set_my_shift_for_date', { p_date: todayStr, p_shift_id: resolved.id })
+        if (shiftError) console.warn('set_my_shift_for_date failed', shiftError.message)
+        shiftData = { ...(current ?? {}), employee_id: employee.id, date: todayStr, shift_id: resolved.id, shift: resolved } as any
       }
     }
 

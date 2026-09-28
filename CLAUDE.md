@@ -355,6 +355,25 @@ was never late before suddenly is.
 
 ---
 
+## Check-in time decides the shift, even over HR's allocation — decision from Yash, 28 Sep 2026
+
+"hr is still getting use to the app so, consider the persons check in time as
+his shift, hes coming in that shift as his manager or planthead called him in
+that, hes not deciding himself. so let hr get familiar with allocation of
+shift on thursday; if they do not plan on thursday we have to assume they are
+verbally told of when to come to work." Extends the 27 Sep inference rule
+below from "no allocation" to "allocation that doesn't match the check-in":
+an employee is never marked late against an HR-assigned shift they were
+verbally moved off. Implemented in `lib/shiftInference.ts`
+`resolveShiftForCheckIn()`: if the check-in fits the assigned shift (from
+60 min before its start up to its grace period) the assigned shift is kept;
+otherwise the shift whose window contains the check-in time is used and the
+day's `employee_shifts` row is **updated** to it. The 60-min early allowance
+is Claude's judgment call (not Yash's number) so General staff arriving
+08:00–08:44 aren't reclassified to Shift 1 and marked late — change it in
+one constant if Yash wants it different. Temporary by intent ("while HR gets
+used to it") — revisit once HR plans shifts every Thursday.
+
 ## Shift 3 belongs to the previous working day — decision from Yash, 28 Sep 2026
 
 "it is 3rd shift for 27th not 28th." Shift 3 runs 00:00–07:00, but it is the
@@ -527,6 +546,8 @@ explicit and correct rather than incidental.
 | `PATCH_55_new_employees_from_salary_sheets_28Sep2026.sql` | Adds CON22, CON23 (re-hires), VFL5455, VFL5456 — found only in the salary sheets, not yet in `employees` | ✅ Applied 28 Sep 2026 |
 | `PATCH_56_payroll_import_apr_aug_2026_28Sep2026.sql` | Full Apr-Aug 2026 payroll import for all 3 categories (536 rows), assembled from Python-generated SQL batches | ✅ Applied 28 Sep 2026 |
 | `PATCH_57_gps_radius_25m_28Sep2026.sql` | Raises `plant_locations.radius_meters` from 15m to 25m on all 12 real campus points — 15m (set 27 Sep) was rejecting legitimate check-ins | ✅ Applied 28 Sep 2026 |
+| `PATCH_58_vfl1391_shift3_fix_28Sep2026.sql` | VFL1391's 00:05 check-in filed as Shift 3 of 27 Sep (Yash's rule), 28 Sep shift back to General | ✅ Applied 28 Sep 2026 |
+| `PATCH_59_set_my_shift_rpc_28Sep2026.sql` | `set_my_shift_for_date()` — SECURITY DEFINER, own row only, today/yesterday only. `employee_shifts` writes are management-only, so the 27 Sep shift-inference insert had been failing silently for every regular employee (39 check-ins with no shift, lateness never evaluated) | ✅ Applied 28 Sep 2026 |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.

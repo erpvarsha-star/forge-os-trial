@@ -13,13 +13,13 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { getCurrentLocation, getPlantConfig, isInsideGeofence, getPlantLocations, isInsideAnyGeofence, buildQrValue } from '@/lib/location'
 import { supabase } from '@/lib/supabase'
 import { getDeviceId } from '@/lib/deviceId'
-import { findClosestShift } from '@/lib/shiftInference'
+import { resolveShiftForCheckIn } from '@/lib/shiftInference'
 import { EmployeeShift, Shift } from '@/types'
 import { MAX_DAILY_OBSERVATIONS } from '@/constants'
 import { MapPin, Clock, CheckSquare, AlertCircle, Camera, QrCode, CheckCircle2, Calendar, ChevronRight, Star, X, LogOut } from 'lucide-react-native'
 import { BarCodeScanner } from 'expo-barcode-scanner'
 import { router } from 'expo-router'
-import { attendanceDateStr, istDateStr, istStartOfDayUTC, lateMinutesAgainst } from '@/lib/istDate'
+import { attendanceDateStr, istDateStr, istNow, istStartOfDayUTC, lateMinutesAgainst } from '@/lib/istDate'
 
 export default function WorkerHome() {
   const { t } = useTranslation()
@@ -155,23 +155,17 @@ export default function WorkerHome() {
 
     // No shift allotted for today — infer one from the closest start_time to
     // this actual check-in, instead of leaving lateness never evaluated.
+    // Check-in time decides the shift, even over HR's allocation (Yash, 28 Sep 2026).
     let activeShift = shift
-    if (!activeShift) {
-      const { data: allShifts } = await supabase.from('shifts').select('*')
-      const istNowForShift = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
-      const nowMinutesOfDay = istNowForShift.getUTCHours() * 60 + istNowForShift.getUTCMinutes()
-      const inferred = findClosestShift(nowMinutesOfDay, employee.role, (allShifts || []) as Shift[])
-      if (inferred) {
-        const { data: inserted } = await supabase
-          .from('employee_shifts')
-          .insert({ employee_id: employee.id, shift_id: inferred.id, date: todayStr })
-          .select('*, shift:shifts(*)')
-          .single()
-        if (inserted) {
-          activeShift = inserted as EmployeeShift
-          setShift(activeShift)
-        }
-      }
+    const { data: allShifts } = await supabase.from('shifts').select('*')
+    const istNowForShift = istNow()
+    const nowMinutesOfDay = istNowForShift.getUTCHours() * 60 + istNowForShift.getUTCMinutes()
+    const resolved = resolveShiftForCheckIn(activeShift?.shift, nowMinutesOfDay, employee.role, (allShifts || []) as Shift[])
+    if (resolved && resolved.id !== activeShift?.shift_id) {
+      const { error: shiftError } = await supabase.rpc('set_my_shift_for_date', { p_date: todayStr, p_shift_id: resolved.id })
+      if (shiftError) console.warn('set_my_shift_for_date failed', shiftError.message)
+      activeShift = { ...(activeShift ?? {}), employee_id: employee.id, date: todayStr, shift_id: resolved.id, shift: resolved } as EmployeeShift
+      setShift(activeShift)
     }
 
     const grace = activeShift?.shift?.late_grace_minutes ?? 15

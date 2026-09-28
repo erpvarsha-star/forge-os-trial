@@ -50,3 +50,25 @@ export function findClosestShift(nowMinutesOfDay: number, role: string | undefin
   }
   return withStart[withStart.length - 1].shift
 }
+
+// How early someone may arrive and still count as on their assigned shift.
+// Claude's judgment call, not Yash's number (see CLAUDE.md, 28 Sep 2026).
+const ASSIGNED_EARLY_ALLOWANCE_MINUTES = 60
+
+// Yash, 28 Sep 2026: check-in time decides the shift, even over HR's
+// allocation — people come when their manager tells them to. The assigned
+// shift is kept only when the check-in fits it (on time or up to 60 min early).
+export function resolveShiftForCheckIn(
+  assigned: Shift | null | undefined,
+  nowMinutesOfDay: number,
+  role: string | undefined,
+  shifts: Shift[]
+): Shift | null {
+  if (assigned?.start_time) {
+    const [h, m] = assigned.start_time.split(':').map(Number)
+    const sinceStart = mod(nowMinutesOfDay - (h * 60 + m), MINUTES_PER_DAY)
+    const grace = assigned.late_grace_minutes ?? 15
+    if (sinceStart <= grace || sinceStart >= MINUTES_PER_DAY - ASSIGNED_EARLY_ALLOWANCE_MINUTES) return assigned
+  }
+  return findClosestShift(nowMinutesOfDay, role, shifts) ?? assigned ?? null
+}
