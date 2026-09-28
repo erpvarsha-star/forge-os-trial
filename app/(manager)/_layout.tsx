@@ -19,6 +19,7 @@ export default function ManagerLayout() {
         <Tabs.Screen name="advance" options={{ href: null }} />
         <Tabs.Screen name="payslips" options={{ href: null }} />
         <Tabs.Screen name="payslip" options={{ href: null }} />
+        <Tabs.Screen name="shifts" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )

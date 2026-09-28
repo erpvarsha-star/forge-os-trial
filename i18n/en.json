@@ -611,6 +611,12 @@
     "pinResetTitle": "PIN Reset",
     "pinResetBody": "{{name}}'s PIN has been reset to {{pin}}. Tell them to log in with this and they'll be asked to set a new one."
   },
+  "shiftAllocator": {
+    "tab": "Shift Allocation",
+    "sub": "Set weekly shifts for your team",
+    "myTeam": "My Team",
+    "noTeam": "You are not set as the shift allocator for any employees yet"
+  },
   "owner": {
     "kpiDashboard": "KPI Dashboard",
     "attendanceKpi": "Attendance %",

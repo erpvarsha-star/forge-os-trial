@@ -240,6 +240,8 @@ the user operates on IST, never UTC, and never "whatever the device thinks."
   VFL5462 Bharat Vasantrao Salve (Manager, Accounts), VFL5458 Shaikh Irfan (Supervisor, Forge Shop, Week 3 rotating), VFL5459 Vaibhav Mali (Supervisor, Press Shop, Week 1 rotating), VFL5460 Ashok Kumar (Supervisor, Final Shop)
   ⚠ Supersedes an earlier PATCH_08 committed 09 Aug that used fabricated codes VFL5463/5465/5466/5467 — see correction note in the patch file.
 - **Nagnath Kale / Sadashiv Soddy — STALE NOTE, SUPERSEDED 27 Sep 2026.** This used to say "confirmed NOT in payroll, no emp_code, not added." That was true when written; it no longer is. Both are live in `employees` with real emp_codes — **CON09 Nagnath Damu Kale** (Die Shop) and **CON12 Sadashiv Nitalaksha Soddy** (Quality) — both `is_active=true`, both have completed first login (`must_change_pin=false`). **Do not re-flag either as "consultant, no emp_code, not added" again** — verify against the live `employees` table before repeating any older note in this file, not the other way round.
+- **CON12 Sadashiv Nitalaksha Soddy — role corrected `member`→`manager`, 28 Sep 2026.** He is the Quality group's shift allocator per `Shift_Planning_1.csv` and, per Yash, "consultant and quality manager" — but had `role='member'` from `PATCH_35`'s blanket consultant-role default. Fixed via `PATCH_62`. Do not describe him as a `member` again; check `employees.role` live if in doubt, same rule as everywhere else in this file.
+- **CON24 Shriram Pawar (Maintenance) — added 28 Sep 2026, PATCH_62.** Found only in `Shift_Planning_1.csv` (a Maintenance team member under allocator VFL1560), not previously in `employees`. `role='member'`, `category='consultant'`, salary 0 — CSV had no phone/salary, matching how `PATCH_35` seeded the other consultants. Login provisioned (starting PIN `'20' + LPAD(24, 4, '0')` = `200024`, same formula as every other consultant).
 - **PATCH_09 (confirmed 10 Aug 2026)**: VFL5461 Shaikh Hafizuddin Tamizuddin (Manager, Quality), VFL5452 Bholanath Das (Forge Shop QA), VFL5453 Shaikh Zaker Abdul Quayyum (Press Shop QA), VFL5457 Sandip Tryambak Landage (Maintenance), VFL5454 Shaikh Tohid Yunus (Purchase)
 - **VFL5463 / VFL5337 — two different events, do not conflate.**
   1. *10 Aug 2026 (historical, still true as a record):* a data-entry mistake nearly inserted "Manoj Anantrao Wagh" a second time as VFL5463 when he already existed as VFL5337 (same name/dept/salary, just missing a phone). Caught before it happened; PATCH_03 set VFL5337's phone directly instead. **That VFL5463 row was never created.**
@@ -643,13 +645,14 @@ explicit and correct rather than incidental.
 | `PATCH_59_set_my_shift_rpc_28Sep2026.sql` | `set_my_shift_for_date()` — SECURITY DEFINER, own row only, today/yesterday only. `employee_shifts` writes are management-only, so the 27 Sep shift-inference insert had been failing silently for every regular employee (39 check-ins with no shift, lateness never evaluated) | ✅ Applied 28 Sep 2026 |
 | `PATCH_60_vfl1319_deactivate_28Sep2026.sql` | Deactivates VFL1319 (Dipak Balkrishna Patil, Accounts) — confirmed left by Yash | ✅ Applied 28 Sep 2026 |
 | `PATCH_61_deactivate_4_left_28Sep2026.sql` | Deactivates CON22, CON23, VFL5354, VFL4048 — confirmed left by Yash | ✅ Applied 28 Sep 2026 |
+| `PATCH_62_shift_allocator_28Sep2026.sql` | New `employees.shift_allocator_id` column; populates it for 73 employees across 8 department groups from Yash's `Shift_Planning_1.csv`; adds CON24 (Shriram Pawar, Maintenance — new); fixes CON12's role `member`→`manager`; adds `allocate_team_shift_week()` RPC | ✅ Applied 28 Sep 2026 — verified: 73 allocated (group sizes sum exactly), RPC tested positive+negative via disposable SQL |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
 
 ---
 
-## App screen map (56 screens, 7 role groups — 27 Sep 2026: +1 (hr-admin)/approvals.tsx, +3 late-review.tsx across owner/plant-head/hr-admin)
+## App screen map (56 screens, 7 role groups — 27 Sep 2026: +1 (hr-admin)/approvals.tsx, +3 late-review.tsx across owner/plant-head/hr-admin; 28 Sep 2026: +1 shifts.tsx each in (manager)/(supervisor), reached via More, not a bottom tab — see "Shift allocation tabs" below)
 
 ```
 app/
@@ -680,6 +683,7 @@ app/
 │   ├── shift-report.tsx   — submit shift production data
 │   ├── casual-workers.tsx — log casual worker counts
 │   ├── 5s-verify.tsx      — approve/reject 5S submissions
+│   ├── shifts.tsx         — shift allocation, scoped to shift_allocator_id (PATCH_62, 28 Sep 2026 — empty-team state if not set as anyone's allocator)
 │   └── more.tsx
 ├── (manager)/
 │   ├── dashboard.tsx      — department attendance %
@@ -688,6 +692,7 @@ app/
 │   ├── forms.tsx          — Google Forms for this department (PATCH_14)
 │   ├── mrm.tsx            — submit MRM review
 │   ├── reports.tsx        — department-scoped reports
+│   ├── shifts.tsx         — shift allocation, scoped to shift_allocator_id (PATCH_62, 28 Sep 2026 — empty-team state if not set as anyone's allocator)
 │   └── more.tsx
 ├── (hr-admin)/
 │   ├── dashboard.tsx      — stats: total, present, pending advances/leaves
@@ -1032,6 +1037,104 @@ spoofing app or a device/OS quirk (some Android OEMs flag `mocked:true`
 spuriously) is not answerable from data alone — **needs the same
 one-screenshot check as VFL4057: what does their check-in screen actually
 say when it fails.** Not yet resolved as of this note.
+
+---
+
+## Shift allocation tabs for department allocators — built 28 Sep 2026
+
+Yash uploaded `Shift_Planning_1.csv`, a real weekly shift-planning roster: 8
+department groups, each with one named **allocator** who sets Shift
+1st/2nd/3rd/General for everyone in that group every Thursday, week starting
+Saturday. Previously only HR (`app/(hr-admin)/shifts.tsx`) had a
+shift-assignment screen, and it sees the *entire* company, unscoped. This
+gives the other 7 named allocators their own screen, scoped to just their
+own people.
+
+**Decisions from Yash:**
+1. **Shift-allocation authority is a separate relationship from
+   `supervisor_id`, not a replacement for it.** Checked live data first:
+   Maintenance's `supervisor_id` already correctly points to a different
+   person (attendance confirmation) than the CSV's allocator (Shaikh
+   Majeed) — same pattern in the HR group. Two different jobs, two
+   different people, in several departments. `supervisor_id` stays
+   untouched; shift-allocation gets its own new column.
+2. **CON12 (Sadashiv Soddy) — role fixed to `manager`.** He's the Quality
+   group's allocator per the CSV but had `role='member'`. Root-caused to
+   `PATCH_35_consultants_25Sep2026.sql`, which bulk-inserted all 9
+   consultants with a blanket `'member'` role and its own comment noting a
+   dedicated role was "scoped for a future session" — not a deliberate call
+   about CON12 specifically. Yash, once told the ripple effect (pulls him
+   into the manager leave/advance approval chain and `(manager)/team.tsx`/
+   `mrm.tsx`): **"Fix role to manager now."**
+3. **CON24 (Shriram Pawar, Maintenance) — added**, exactly what the CSV
+   gives (no phone/salary in the sheet, so those stay null/0, matching how
+   `PATCH_35` seeded the other consultants).
+
+**Implemented same session, `PATCH_62_shift_allocator_28Sep2026.sql`:**
+new `employees.shift_allocator_id uuid references employees(id)` column;
+73 employees mapped across the 8 groups (verified: group sizes — 12
+Maintenance incl. CON24, 18 Forge & Cutting, 3 Press, 12 DIE/VMC, 10
+Machine, 4 HT, 6 Quality, 8 HR — sum to 73 exactly, matching the live
+`count(*) where shift_allocator_id is not null`); every emp_code the CSV
+listed (minus CON24) was confirmed to already resolve to a real active
+employee before the patch ran, per this project's no-guessing rule on
+employee data.
+
+**`allocate_team_shift_week(p_employee_id, p_shift_id, p_week_start)`** —
+the real security boundary, `SECURITY DEFINER`, checks
+`employees.shift_allocator_id = current_employee_id()` for the target
+employee before writing, then upserts `employee_shifts` for all 6 days of
+that Sat-Thu week. Needed because `is_management()` (role in manager/
+plant_head/hr_admin/owner) does **not** include `supervisor` — Sudeep Singh
+(Forge & Cutting's allocator) would be flatly blocked by the existing
+`employee_shifts_write` RLS policy otherwise — and because even for
+managers, that policy is unscoped (any manager could write shifts for any
+employee company-wide), which this must not allow. **Verified directly via
+SQL before wiring the UI**: a disposable positive test (VFL1560 allocating
+Shift 1 to his own team member VFL4012) wrote all 6 days correctly; a
+disposable negative test (VFL1560 attempting to allocate for VFL4065, on a
+different allocator's team) correctly raised and was rejected; test rows
+deleted after.
+
+**New shared UI**, following this session's own "thin per-role wrapper
+around a shared component" pattern (same as Payslips, Late Comers Review):
+`components/ShiftAllocationGrid.tsx` + `hooks/useShiftAllocation.ts`,
+extracted from `(hr-admin)/shifts.tsx`'s week-nav/chip-grid UI, offering
+**Shift 1/2/3/General only — no Security options** (no security guard in
+the CSV has an allocator outside HR's own group, matching Yash's own
+wording "1st 2nd 3rd or general"; this also fixes a real gap the old HR
+screen has — it never offered General as an option at all, only Shift
+1/2/3). Team list is scoped to `.eq('shift_allocator_id', me.id)
+.eq('is_active', true)`; save issues one `allocate_team_shift_week()` RPC
+call per employee with a selection (not a single bulk upsert, since the
+RPC — not the UI — is what enforces scoping per employee). Thin wrapper
+screens `app/(manager)/shifts.tsx` and `app/(supervisor)/shifts.tsx`.
+
+**Reached via More, not a bottom tab** — `<Tabs.Screen name="shifts"
+options={{ href: null }} />` added to both `(manager)/_layout.tsx` and
+`(supervisor)/_layout.tsx` (per this project's locked rule: every new
+screen in a role group with an existing `_layout.tsx` needs an explicit
+entry or it leaks in as a stray tab), with a "Shift Allocation" row added
+to each role's `more.tsx` — deliberately matching how HR's own
+`shifts.tsx` is wired (also `href: null` + a more.tsx link), not added as
+a 6th/7th bottom-bar icon, since manager already has 5 visible tabs and
+supervisor already has 6. A manager/supervisor with zero people assigned
+to them as allocator still sees the tab, just with an empty-team state —
+same reasoning as `(supervisor)/approvals.tsx`'s static "moved" message,
+since Expo Router tabs don't support per-user conditional visibility
+cleanly.
+
+New `shiftAllocator.*` i18n keys (`tab`/`sub`/`myTeam`/`noTeam`) added in
+both `en.json` and `hi.json`; everything else (`hrAdmin.weekOf`/`saveWeek`/
+`weekSaved`/`noRotatingEmployees`/`noShiftsYet`) reused verbatim from the
+existing HR screen's keys since the wording is identical.
+
+**Verified:** `npx tsc --noEmit` — still exactly 7 errors, the same
+pre-existing baseline (`permissions-onboarding.tsx`/`FormsScreen.tsx` icon
+typing), none in the new files. `node scripts/check-i18n.mjs` — clean,
+Hindi covers every new key. **Not yet exercised on a real device** — only
+type-checked and verified against live data/RPC calls directly, no UI
+walkthrough. New APK build needed.
 
 ---
 
