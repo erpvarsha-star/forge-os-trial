@@ -738,6 +738,115 @@ Head, exactly as given, for the rank-and-file row above.
 
 ---
 
+## Real payroll data on file — Apr-Aug 2026, FY2026-27 (28 Sep 2026)
+
+**Yash's instruction:** store the 3 salary sheets he uploaded (Consultant,
+Worker, Employee/Staff) tab-by-tab so this is never asked for again, and
+build Payslips only from April 2026 onward for this financial year (the
+sheets carry good history back to 2022-2024, deliberately not imported —
+out of scope for FY2026-27 payslips).
+
+**Done, PATCH_54/55/56:**
+- `payroll_records` gained the line-item columns the real sheets carry that
+  it had no column for — employer_pf/employer_esi/bonus/gratuity/
+  leave_encashment (Worker+Staff), education/medical/professional_development/
+  communication/uniform/washing (Staff allowances), heat_allowance/vda/
+  production_allowance (Worker allowances), week_off. Decision from Yash:
+  store every line item exactly as given, not folded into generic columns.
+- All Apr-Aug 2026 rows imported from the 3 sheets — 536 rows total (Staff
+  79/76/77/76/75, Worker 26/24/24/20/19, Consultant 9/9/11/11/— no Aug tab
+  yet for consultants). Column mapping was derived by aligning each sheet's
+  own header rows programmatically, then cross-checked against the 55
+  pre-existing `payroll_records` draft rows from an earlier `run-payroll`
+  backtest (e.g. VFL1064 Aug net_pay = ₹28,400 in both) before trusting it —
+  the backtest was accurate, just an incomplete subset (0 consultants, ~39
+  staff missing), so this import upserts on top of it (never duplicates)
+  and marks every row `final`.
+- **4 employees found only in the sheets, not in Forge OS at all — added
+  (PATCH_55), not guessed:**
+  - **CON22 / CON23** are re-hires of two already-known inactive workers:
+    CON22 = Digambar Mahadeo Todekar (same person as **VFL4004**), CON23 =
+    Suresh Sopan Gawali (same person as **VFL4030**), both rejoining as
+    consultants from mid-June 2026 — same pattern as the documented
+    VFL5337→VFL5463 rejoin. Both provisioned real login access (starting PIN
+    = emp_code digits padded to 6, same as every other active employee).
+  - **VFL5455 (Anil Dadarao Awchar, Maintenance Sr. Engineer)** and
+    **VFL5456 (Yograj Vishwanath Dharmik, Maintenance Fitter)** were
+    actually paid Apr-Jun 2026 / Apr 2026 per the sheets, but had never been
+    onboarded into Forge OS under any code — a real gap on this app's side,
+    not something Yash had told Claude before. Added as `is_active=false`
+    (matches their current Non-Active status in the sheet's own Master
+    Data), no login provisioned since they've since left.
+- Consultants have no `employee_salary_structure` row (that table is the
+  Worker/Staff fixed-rate breakup only — consultants are a flat monthly fee
+  per their Master Data's single 'Gross P.M.' column) and their one earnings
+  figure per month is stored in `payroll_records.basic` for lack of a
+  better-fitting column — unambiguous on read since `employees.category`
+  says 'consultant'.
+- One documented judgment call: the Consultant sheet's undifferentiated
+  'Leave' column (Worker/Staff split EL/CL/SL/PH, Consultant doesn't) is
+  stored in `el` as the closest-fit generic count — rare, small values (1-2
+  days, 2 people, across all 4 months), noted here rather than silently
+  dropped.
+
+**Still needed from Yash, not yet built:** September 2026 payroll (he said
+it "is still to be generated" — wait for that sheet/update separately, same
+process). The Payslips screen itself (More tab → monthly list) is the next
+build step, not done yet as of this note.
+
+---
+
+## Update banner — real regression, root-caused and fixed (28 Sep 2026)
+
+**`components/UpdateBanner.tsx` is a real, already-built feature** (mounted
+in `app/_layout.tsx`, above the `<Stack>` navigator) — an earlier note in
+this file wrongly told Yash no such banner existed; that was incomplete
+memory, not a fact, and it should not have been stated without checking the
+code first.
+
+**Real bug, introduced by an earlier fix in this same file's history:** the
+27 Sep fix for the More-tab "Download Latest App" row's staleness (mount-once
+`useEffect` never re-checking) switched the shared `hooks/useAppVersion.ts`
+to `useFocusEffect`. That is correct for a component that is itself a screen
+inside the navigator (the More-tab row), but `UpdateBanner` is deliberately
+mounted *outside* the Stack (so an admin can never navigate away from it) —
+it is never a "screen" and never receives expo-router focus/blur events, so
+`useFocusEffect` silently never ran its check there at all. Yash's exact
+report matches this precisely: the banner had worked fine before that fix
+and stopped right after.
+
+**Fixed:** `useAppVersion.ts` now uses a plain `useEffect` (runs once on
+mount, for every consumer) plus an `AppState` listener that re-runs the
+check whenever the app returns to the foreground (`'active'`) — this covers
+both consumers correctly regardless of whether they sit inside a navigator
+screen or not, and is the actual right fix for "a phone kept backgrounded
+should notice a new build on reopen," which `useFocusEffect` only partially
+achieved.
+
+---
+
+## Fraud alerts — 39 open, investigated 28 Sep 2026
+
+All 39 open `fraud_alerts` rows are `type='mock_location'`, `severity='high'`,
+and concentrated in just 3 employees, not spread across the workforce:
+**VFL5442** (Darshan Anil Alhat, 20 alerts in a 10-minute window),
+**VFL4036** (Bhagwan Revji Walunj, 14 alerts over ~12 hours), **VFL5446**
+(Mayuri Sardar Rathod, 5 alerts in 37 minutes) — all 26-27 Sep 2026.
+
+Basis for the flag: `fraud-detector`'s `gps_check` trusts whatever the app
+sends as `mockLocationDetected`, which the app sets from Android's own
+`location.mocked === true` signal — when it fires, check-in is rejected
+outright (same as outside-geofence). The current client code already has
+the `location.mocked` fix (not the old, wrong `Location.getProviderStatusAsync()`
+check) verified in both `CheckInCard.tsx` and `worker/home.tsx`, so this is
+not the same bug class as VFL4057's (PATCH_52). Whether these 3 are a real
+spoofing app or a device/OS quirk (some Android OEMs flag `mocked:true`
+spuriously) is not answerable from data alone — **needs the same
+one-screenshot check as VFL4057: what does their check-in screen actually
+say when it fails.** Not yet resolved as of this note.
+
+---
+
 ## What Claude must NEVER do
 
 - Commit `.env` or any file containing `service_role` key

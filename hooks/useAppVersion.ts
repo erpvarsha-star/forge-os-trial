@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react'
-import { useFocusEffect } from 'expo-router'
+import { useEffect, useState } from 'react'
+import { AppState } from 'react-native'
 import Constants from 'expo-constants'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
@@ -57,68 +57,77 @@ export function useAppVersion(): AppVersionState {
     checkFailed: false,
   })
 
-  // useFocusEffect (not a plain mount-only useEffect) — a phone kept
-  // backgrounded rather than force-closed never remounts this screen, so a
-  // mount-only check would freeze at whatever it first saw and could show
-  // "Up to date" for days even after several newer builds ship. Re-running
-  // on every visit to a screen with this row (still governed by the 6h
-  // cache below, so this doesn't spam the API on fast tab-switching) is
-  // what actually catches a build that shipped since the last check.
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false
+  // Runs on mount AND every time the app returns to the foreground
+  // (AppState -> 'active') — not screen focus. `UpdateBanner` is mounted at
+  // the app root, above the Stack navigator (deliberately, so it can't be
+  // navigated away from), so it is never itself a "screen" and never
+  // receives expo-router focus/blur events; an earlier version of this hook
+  // used useFocusEffect, which fixed the More-tab link's staleness but
+  // silently stopped the root banner's check from ever running at all,
+  // since it had no focus context to attach to. AppState works for both:
+  // a phone kept backgrounded (not force-closed) fires 'active' on reopen,
+  // which is the actual moment a newer build might now be available.
+  useEffect(() => {
+    let cancelled = false
 
-      const finish = (latestBuild: number | null, failed: boolean) => {
-        if (cancelled) return
-        setState(prev => ({
-          ...prev,
-          latestBuild,
-          // Only claim an update exists when BOTH numbers are known and the
-          // remote one is genuinely higher. Unknown must never render as
-          // "update available", or every launch nags with a guess.
-          isUpdateAvailable:
-            prev.currentBuild !== null && latestBuild !== null && latestBuild > prev.currentBuild,
-          isChecking: false,
-          checkFailed: failed,
-        }))
-      }
+    const finish = (latestBuild: number | null, failed: boolean) => {
+      if (cancelled) return
+      setState(prev => ({
+        ...prev,
+        latestBuild,
+        // Only claim an update exists when BOTH numbers are known and the
+        // remote one is genuinely higher. Unknown must never render as
+        // "update available", or every launch nags with a guess.
+        isUpdateAvailable:
+          prev.currentBuild !== null && latestBuild !== null && latestBuild > prev.currentBuild,
+        isChecking: false,
+        checkFailed: failed,
+      }))
+    }
 
-      const run = async () => {
-        try {
-          const cachedRaw = await AsyncStorage.getItem(CACHE_KEY)
-          if (cachedRaw) {
-            const cached = JSON.parse(cachedRaw) as { at: number; latestBuild: number }
-            if (Date.now() - cached.at < CACHE_TTL_MS) {
-              finish(cached.latestBuild, false)
-              return
-            }
+    const run = async () => {
+      try {
+        const cachedRaw = await AsyncStorage.getItem(CACHE_KEY)
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw) as { at: number; latestBuild: number }
+          if (Date.now() - cached.at < CACHE_TTL_MS) {
+            finish(cached.latestBuild, false)
+            return
           }
-
-          const controller = new AbortController()
-          const timeout = setTimeout(() => controller.abort(), 8000)
-          const res = await fetch(RELEASE_API, {
-            headers: { Accept: 'application/vnd.github+json' },
-            signal: controller.signal,
-          })
-          clearTimeout(timeout)
-          if (!res.ok) { finish(null, true); return }
-
-          const json = await res.json()
-          const tag: string | undefined = json?.tag_name
-          const latestBuild = tag ? parseInt(tag.replace(/\D/g, ''), 10) : NaN
-          if (!Number.isFinite(latestBuild)) { finish(null, true); return }
-
-          await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), latestBuild }))
-          finish(latestBuild, false)
-        } catch {
-          finish(null, true)
         }
-      }
 
-      run()
-      return () => { cancelled = true }
-    }, [])
-  )
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 8000)
+        const res = await fetch(RELEASE_API, {
+          headers: { Accept: 'application/vnd.github+json' },
+          signal: controller.signal,
+        })
+        clearTimeout(timeout)
+        if (!res.ok) { finish(null, true); return }
+
+        const json = await res.json()
+        const tag: string | undefined = json?.tag_name
+        const latestBuild = tag ? parseInt(tag.replace(/\D/g, ''), 10) : NaN
+        if (!Number.isFinite(latestBuild)) { finish(null, true); return }
+
+        await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), latestBuild }))
+        finish(latestBuild, false)
+      } catch {
+        finish(null, true)
+      }
+    }
+
+    run()
+
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') run()
+    })
+
+    return () => {
+      cancelled = true
+      subscription.remove()
+    }
+  }, [])
 
   return state
 }
