@@ -21,6 +21,7 @@ import { EmployeeShift, Shift } from '@/types'
 import { MapPin, CheckCircle2, QrCode, Star, X } from 'lucide-react-native'
 import { BarCodeScanner } from 'expo-barcode-scanner'
 import { isPresentStatus } from '@/constants'
+import { attendanceDateStr, lateMinutesAgainst } from '@/lib/istDate'
 
 /**
  * Every non-worker role (manager, hr-admin, supervisor, plant-head,
@@ -33,11 +34,6 @@ import { isPresentStatus } from '@/constants'
  * instead of a separate route so it works from any dashboard without new
  * per-role routes or RoleGate changes.
  */
-
-// Returns today's date string in IST (YYYY-MM-DD). Critical for Shift 3
-// (00:00–07:00 IST): at 01:00 IST, UTC is still the previous day.
-const istDateStr = () =>
-  new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
 export function CheckInCard() {
   const { t } = useTranslation()
@@ -62,7 +58,7 @@ export function CheckInCard() {
 
   useEffect(() => {
     if (!employee?.id) return
-    const date = istDateStr()
+    const date = attendanceDateStr()
     supabase
       .from('employee_shifts')
       .select('*, shift:shifts(*)')
@@ -212,7 +208,7 @@ export function CheckInCard() {
       return
     }
 
-    const todayStr = istDateStr()
+    const todayStr = attendanceDateStr()
     const { data: buddyCheck } = await supabase
       .from('attendance_records')
       .select('employee_id')
@@ -259,11 +255,7 @@ export function CheckInCard() {
     const grace = (shiftData as EmployeeShift | null)?.shift?.late_grace_minutes ?? 15
     let rawLateMinutes = 0
     if ((shiftData as EmployeeShift | null)?.shift?.start_time) {
-      const [hours, minutes] = ((shiftData as EmployeeShift).shift.start_time as string).split(':').map(Number)
-      const startMins = hours * 60 + minutes
-      const istNow = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
-      const nowMins = istNow.getUTCHours() * 60 + istNow.getUTCMinutes()
-      rawLateMinutes = Math.max(0, nowMins - startMins)
+      rawLateMinutes = lateMinutesAgainst((shiftData as EmployeeShift).shift.start_time as string)
     }
 
     const effectiveLateMinutes = rawLateMinutes > grace ? rawLateMinutes : 0

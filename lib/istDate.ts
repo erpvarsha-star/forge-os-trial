@@ -4,6 +4,21 @@
 export const istDateStr = () =>
   new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
+// Date an attendance/shift row is filed under. Shift 3 (00:00–07:00) belongs to
+// the previous working day (Yash, 28 Sep 2026), so the day rolls over at 06:45 IST
+// — Shift 1's start minus the 15-min shift-matching buffer.
+export const attendanceDateStr = () =>
+  new Date(Date.now() + (5.5 - 6.75) * 60 * 60 * 1000).toISOString().slice(0, 10)
+
+// Minutes late against a shift start (HH:MM), handling midnight wraparound.
+// More than 12h "late" means the check-in is actually early for that start.
+export const lateMinutesAgainst = (startTime: string) => {
+  const [h, m] = startTime.split(':').map(Number)
+  const now = istNow()
+  const diff = (now.getUTCHours() * 60 + now.getUTCMinutes() - (h * 60 + m) + 1440) % 1440
+  return diff > 720 ? 0 : diff
+}
+
 export const istNow = () =>
   new Date(Date.now() + 5.5 * 60 * 60 * 1000)
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { AttendanceRecord } from '@/types'
-import { istDateStr, istMonthYear, getMonthEndDay } from '@/lib/istDate'
+import { attendanceDateStr, istMonthYear, getMonthEndDay } from '@/lib/istDate'
 
 export function useAttendance(employeeId: string, month?: string, year?: number) {
   const [records, setRecords] = useState<AttendanceRecord[]>([])
@@ -29,15 +29,29 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
       setRecords(data as AttendanceRecord[])
     }
 
-    const today = istDateStr()
     const { data: todayData } = await supabase
       .from('attendance_records')
       .select('*')
       .eq('employee_id', employeeId)
-      .eq('date', today)
+      .eq('date', attendanceDateStr())
       .maybeSingle()
 
-    setTodayRecord(todayData as AttendanceRecord | null)
+    // Night shifts (Shift 3, Security Night) check out after the 06:45 rollover,
+    // so fall back to a still-open record from the last 14h (the max sane shift).
+    let current = todayData as AttendanceRecord | null
+    if (!current) {
+      const { data: open } = await supabase
+        .from('attendance_records')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .is('check_out_time', null)
+        .gte('check_in_time', new Date(Date.now() - 14 * 60 * 60 * 1000).toISOString())
+        .order('check_in_time', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      current = open as AttendanceRecord | null
+    }
+    setTodayRecord(current)
     setIsLoading(false)
   }, [employeeId, month, year])
 
@@ -57,7 +71,7 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     deviceId?: string
   ) => {
     const now = new Date()
-    const date = istDateStr()
+    const date = attendanceDateStr()
     const time = now.toISOString()
     const status = lateMinutes > 0 ? 'L' : 'P'
 
@@ -94,8 +108,8 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
   //   1. Computing hours_worked
   //   2. Half-day rule: arrived 3+ hrs late AND checks out at or before shift end → HL
   const checkOut = async (lat: number, lng: number, shiftEndTime?: string) => {
+    if (!todayRecord) return { data: null, error: new Error('No open attendance record') }
     const now = new Date()
-    const date = istDateStr()
     const time = now.toISOString()
 
     let hours_worked: number | undefined
@@ -128,8 +142,7 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     const { data, error } = await supabase
       .from('attendance_records')
       .update(updatePayload)
-      .eq('employee_id', employeeId)
-      .eq('date', date)
+      .eq('id', todayRecord.id)
       .select()
       .single()
 
@@ -142,12 +155,11 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
   }
 
   const confirmQr = async () => {
-    const date = istDateStr()
+    if (!todayRecord) return { data: null, error: new Error('No open attendance record') }
     const { data, error } = await supabase
       .from('attendance_records')
       .update({ qr_verified: true })
-      .eq('employee_id', employeeId)
-      .eq('date', date)
+      .eq('id', todayRecord.id)
       .select()
       .single()
 
@@ -160,12 +172,11 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
   }
 
   const confirmQrOut = async () => {
-    const date = istDateStr()
+    if (!todayRecord) return { data: null, error: new Error('No open attendance record') }
     const { data, error } = await supabase
       .from('attendance_records')
       .update({ check_out_qr_verified: true })
-      .eq('employee_id', employeeId)
-      .eq('date', date)
+      .eq('id', todayRecord.id)
       .select()
       .single()
 

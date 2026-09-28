@@ -19,6 +19,7 @@ import { MAX_DAILY_OBSERVATIONS } from '@/constants'
 import { MapPin, Clock, CheckSquare, AlertCircle, Camera, QrCode, CheckCircle2, Calendar, ChevronRight, Star, X, LogOut } from 'lucide-react-native'
 import { BarCodeScanner } from 'expo-barcode-scanner'
 import { router } from 'expo-router'
+import { attendanceDateStr, istDateStr, istStartOfDayUTC, lateMinutesAgainst } from '@/lib/istDate'
 
 export default function WorkerHome() {
   const { t } = useTranslation()
@@ -40,12 +41,9 @@ export default function WorkerHome() {
     fetchObservationCount()
   }, [employee])
 
-  const istDateStr = () =>
-    new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10)
-
   const fetchShift = async () => {
     if (!employee) return
-    const today = istDateStr()
+    const today = attendanceDateStr()
     const { data } = await supabase
       .from('employee_shifts')
       .select('*, shift:shifts(*)')
@@ -64,7 +62,7 @@ export default function WorkerHome() {
       .from('maintenance_observations')
       .select('*', { count: 'exact', head: true })
       .eq('employee_id', employee.id)
-      .gte('created_at', `${today}T00:00:00`)
+      .gte('created_at', istStartOfDayUTC(today))
     setObservationCount(count || 0)
   }
 
@@ -137,7 +135,7 @@ export default function WorkerHome() {
       return
     }
 
-    const todayStr = istDateStr()
+    const todayStr = attendanceDateStr()
     const { data: buddyCheck } = await supabase
       .from('attendance_records')
       .select('employee_id')
@@ -180,13 +178,7 @@ export default function WorkerHome() {
     const shiftStart = activeShift?.shift?.start_time
     let rawLateMinutes = 0
 
-    if (shiftStart) {
-      const [hours, minutes] = shiftStart.split(':').map(Number)
-      const istNow = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
-      const nowMins = istNow.getUTCHours() * 60 + istNow.getUTCMinutes()
-      const startMins = hours * 60 + minutes
-      rawLateMinutes = Math.max(0, nowMins - startMins)
-    }
+    if (shiftStart) rawLateMinutes = lateMinutesAgainst(shiftStart)
     // effectiveLateMinutes is 0 if within grace — this is what gets stored in DB
     const effectiveLateMinutes = rawLateMinutes > grace ? rawLateMinutes : 0
 

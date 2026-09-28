@@ -245,7 +245,7 @@ the user operates on IST, never UTC, and never "whatever the device thinks."
   1. *10 Aug 2026 (historical, still true as a record):* a data-entry mistake nearly inserted "Manoj Anantrao Wagh" a second time as VFL5463 when he already existed as VFL5337 (same name/dept/salary, just missing a phone). Caught before it happened; PATCH_03 set VFL5337's phone directly instead. **That VFL5463 row was never created.**
   2. *27 Sep 2026 (current, unrelated to #1 — confirmed directly by Yash):* the real VFL5337 (Manoj Anantrao Wagh) **left the company and has since rejoined**. His original record was deactivated 26 Sep 2026 (`VFL5337.is_active=false`, still holds his history/login for the record). HR (Pallavi) submitted a **new, legitimate** employee record under **VFL5463** for his rejoin — this is not a duplicate-in-error like #1, it is the correct way to represent a second stint. **Decision: approve VFL5463 through the normal chain (plant_head → owner) like any other new hire — do not reject it as a duplicate.** The only open item on it is the same CTC concern below, not its legitimacy.
   - **🔒 RESOLVED 27 Sep 2026, decision from Yash — HR finalises pay monthly, never annual.** The ₹20-21k figures weren't a data-entry mistake: HR (Pallavi) works entirely in finalised monthly pay. The annual/monthly ratio varying 11.1x-13.9x across the live workforce (checked directly) isn't noise either — it's workers/members carrying a higher bonus % than staff, so no single multiplier reconstructs a "true" annual figure from monthly pay across every category. **Decision: `ctc_annual` is never typed in by HR — it is auto-derived as 12x the finalised monthly total**, and this must never block onboarding on a value HR doesn't have. Implemented in `components/SalaryBreakupFields.tsx` — the CTC Annual input was removed from the form entirely; `breakupToPayload()` computes it from the sum of the monthly fields actually entered. The 3 requests already pending when this shipped (VFL5463, VFL5465, VFL5466) were recomputed the same way (₹207,996 / ₹207,996 / ₹221,712) so they aren't stuck behind the old figure.
-- **VFL1391 Atul Bhata Patil (Maintenance, member) — 00:05 check-in = Shift 3, decision from Yash, 28 Sep 2026.** Yash did NOT say he is a permanent night worker (an earlier version of this note wrongly said so): "if he checked in 12.05 am consider him as night shift." A check-in at 00:05 IST falls in Shift 3 (00:00–07:00, within its 15-min grace), so it belongs to **28 Sep, Shift 3, on time**. The record had been stored as `date=2026-09-27` by a pre-IST-fix APK, against an HR-assigned General shift — corrected to 28 Sep + Shift 3 same day.
+- **VFL1391 Atul Bhata Patil (Maintenance, member) — 00:05 check-in on 28 Sep = Shift 3 of 27 Sep, decision from Yash, 28 Sep 2026.** Yash did NOT say he is a permanent night worker (an earlier version of this note wrongly said so): "if he checked in 12.05 am consider him as night shift" … "it is 3rd shift for 27th not 28th." Record stays `date=2026-09-27`, his 27 Sep shift set to Shift 3, on time. (A first correction wrongly moved it to 28 Sep — reverted same day.) See "Shift 3 belongs to the previous working day" below for the general rule.
 - **supervisor_id**: partial assignments done in PATCH_05 (Final/Die/Maintenance/Forge); rotating departments need weekly update or a supervisor_rotation table
 - Salary sheet (Jul 2026 payroll template) — used as source for dept/designation/salary of PATCH_08/09 new hires; contact list (not salary sheet) is the source of truth for phone numbers — several salary-sheet mobile numbers are misaligned/shifted
 - **PATCH_07 corrections**: VFL1463→Press Shop, VFL1556→Press Shop+supervisor, VFL1545→manager, VFL1389→manager, VFL1557→HR dept, VFL5447→Admin dept
@@ -354,6 +354,19 @@ decision, not a bug — but worth knowing before HR gets asked why someone who
 was never late before suddenly is.
 
 ---
+
+## Shift 3 belongs to the previous working day — decision from Yash, 28 Sep 2026
+
+"it is 3rd shift for 27th not 28th." Shift 3 runs 00:00–07:00, but it is the
+**third shift of the previous working day**: a check-in at 00:05 IST on
+28 Sep is Shift 3 **of 27 Sep**, and its `attendance_records.date` /
+`employee_shifts.date` is 27 Sep, not the IST calendar date. The working day
+therefore runs Shift 1 → Shift 2 → Shift 3, rolling over only when the next
+day's Shift 1 window opens (06:45 IST = Shift 1 start − the 15-min
+shift-matching buffer from the inference rule above). Any check-in before
+06:45 IST belongs to the previous date. Nightly counts, dashboards and
+reports that use "today" still mean the calendar date — only the date an
+attendance/shift row is filed under follows this rule.
 
 ## Attendance counting rules — fixed 28 Sep 2026
 
