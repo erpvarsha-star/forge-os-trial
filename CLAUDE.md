@@ -518,7 +518,7 @@ app/
 │   └── more.tsx
 ├── (owner)/
 │   ├── dashboard.tsx      — top-level KPIs
-│   ├── kpi.tsx            — KPI bar chart (data hardcoded — not wired to DB yet)
+│   ├── kpi.tsx            — KPI bar chart, real DB data (fixed from an earlier hardcoded version; stale note here corrected 28 Sep 2026)
 │   ├── approvals.tsx      — final salary/new-hire sign-off + leave/advance at owner's stage (PATCH_53)
 │   ├── alerts.tsx         — open fraud alerts
 │   ├── eotm.tsx           — Employee of the Month per category
