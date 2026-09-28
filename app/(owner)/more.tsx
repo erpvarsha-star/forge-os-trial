@@ -10,7 +10,7 @@ import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { UpdateAppLink } from '@/components/UpdateAppLink'
 import { removePushToken } from '@/lib/notifications'
-import { LogOut, Globe, Crown, ChevronRight, Eye, IndianRupee, Clock } from 'lucide-react-native'
+import { LogOut, Globe, Crown, ChevronRight, Eye, IndianRupee, Clock, FileText } from 'lucide-react-native'
 import { BRAND } from '@/components/theme'
 
 export default function OwnerMore() {
@@ -62,6 +62,13 @@ export default function OwnerMore() {
         <TouchableOpacity onPress={() => router.push('/(owner)/late-review')} className="mb-2 min-h-touch">
           <Card className="flex-row items-center justify-between">
             <View className="flex-row items-center gap-3"><Clock size={20} color={BRAND[600]} /><Text className="text-base text-ink-900">{t('reports.lateComersReview')}</Text></View>
+            <ChevronRight size={18} color="#9CA3AF" />
+          </Card>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => router.push('/(owner)/payslips')} className="mb-2 min-h-touch">
+          <Card className="flex-row items-center justify-between">
+            <View className="flex-row items-center gap-3"><FileText size={20} color={BRAND[600]} /><Text className="text-base text-ink-900">{t('common.payslip')}</Text></View>
             <ChevronRight size={18} color="#9CA3AF" />
           </Card>
         </TouchableOpacity>

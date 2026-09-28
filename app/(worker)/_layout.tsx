@@ -55,6 +55,7 @@ export default function WorkerLayout() {
         <Tabs.Screen name="leave" options={{ href: null }} />
         <Tabs.Screen name="advance" options={{ href: null }} />
         <Tabs.Screen name="payslip" options={{ href: null }} />
+        <Tabs.Screen name="payslips" options={{ href: null }} />
         <Tabs.Screen name="5s" options={{ href: null }} />
         <Tabs.Screen name="observation" options={{ href: null }} />
         <Tabs.Screen name="notifications" options={{ href: null }} />

@@ -10,7 +10,7 @@ import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { UpdateAppLink } from '@/components/UpdateAppLink'
 import { removePushToken } from '@/lib/notifications'
-import { LogOut, Globe, Settings, ChevronRight, AlertCircle, CreditCard, Users, Eye, Clock, CheckSquare } from 'lucide-react-native'
+import { LogOut, Globe, Settings, ChevronRight, AlertCircle, CreditCard, Users, Eye, Clock, CheckSquare, FileText } from 'lucide-react-native'
 import { router } from 'expo-router'
 import { BRAND, INK } from '@/components/theme'
 
@@ -28,6 +28,7 @@ export default function HRAdminMore() {
     { key: 'advance-ledger', label: t('hrAdmin.advanceLedger'), icon: <CreditCard size={20} color={INK[500]} />, path: '/(hr-admin)/advance-ledger' },
     { key: 'new-employee-flow', label: t('hrAdmin.newEmployeeFlow'), icon: <Users size={20} color={INK[500]} />, path: '/(hr-admin)/new-employee-flow' },
     { key: 'late-review', label: t('reports.lateComersReview'), icon: <Clock size={20} color={INK[500]} />, path: '/(hr-admin)/late-review' },
+    { key: 'payslips', label: t('common.payslip'), icon: <FileText size={20} color={INK[500]} />, path: '/(hr-admin)/payslips' },
   ] as const
 
   return (

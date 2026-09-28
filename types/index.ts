@@ -178,6 +178,45 @@ export interface PayrollRecord {
   production_incentive?: number
   net_pay: number
   created_at: string
+  status?: 'draft' | 'final'
+  // Attendance, added when real HR payroll sheets were imported (PATCH_54/56,
+  // 28 Sep 2026) — not populated by run-payroll's original draft rows.
+  working_days?: number
+  present_days?: number
+  week_off?: number
+  el?: number
+  cl?: number
+  sl?: number
+  ph?: number
+  days_payable?: number
+  ot_hours?: number
+  // Staff-only allowances (null for Worker/Consultant rows)
+  education?: number
+  medical?: number
+  professional_development?: number
+  communication?: number
+  uniform?: number
+  washing?: number
+  // Worker-only allowances (null for Staff/Consultant rows)
+  heat_allowance?: number
+  vda?: number
+  production_allowance?: number
+  production_efficiency_deduction?: number
+  // Shared deduction/earning line items the real sheets carry
+  canteen?: number
+  society?: number
+  mlwf?: number
+  other_deduction?: number
+  arrears?: number
+  dispatch_incentive?: number
+  other_allowance?: number
+  leave_encashment?: number
+  // Employer-side contributions — informational only, never part of the
+  // employee's own deduction total; shown separately if shown at all.
+  employer_pf?: number
+  employer_esi?: number
+  bonus?: number
+  gratuity?: number
 }
 
 export interface PlantConfig {

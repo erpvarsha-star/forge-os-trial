@@ -29,7 +29,7 @@ export default function WorkerMore() {
   }
 
   const menuItems = [
-    { icon: <FileText size={20} color="#E65C00" />, label: 'common.payslip', onPress: () => router.push('/(worker)/payslip') },
+    { icon: <FileText size={20} color="#E65C00" />, label: 'common.payslip', onPress: () => router.push('/(worker)/payslips') },
     { icon: <User size={20} color="#E65C00" />, label: 'common.profile', onPress: () => router.push('/(worker)/profile') },
     { icon: <Bell size={20} color="#E65C00" />, label: 'common.notifications', onPress: () => router.push('/(worker)/notifications') },
     { icon: <Wallet size={20} color="#E65C00" />, label: 'common.advance', onPress: () => router.push('/(worker)/advance') },
