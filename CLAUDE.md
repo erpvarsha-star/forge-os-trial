@@ -339,6 +339,16 @@ was never late before suddenly is.
 
 ---
 
+## Owner has no KPI tab — decision from Yash, 28 Sep 2026
+
+Redundant with `dashboard/index.html` (the plant HTML dashboard, which
+pulls from the same Supabase data) once Yash confirmed he already uses that
+link and doesn't need a second, in-app copy of the same KPIs. `app/(owner)/kpi.tsx`
+deleted, its tab removed from `(owner)/_layout.tsx`. Note: this screen had
+already been fixed earlier (real DB data, not the hardcoded version an
+older note in this file wrongly still described) — removed for redundancy,
+not because it was broken.
+
 ## Owner has no Forms tab — decision from Yash, 27 Sep 2026
 
 "i dont use any forms as there is no approval beyond me . so i dont need to
@@ -518,7 +528,6 @@ app/
 │   └── more.tsx
 ├── (owner)/
 │   ├── dashboard.tsx      — top-level KPIs
-│   ├── kpi.tsx            — KPI bar chart, real DB data (fixed from an earlier hardcoded version; stale note here corrected 28 Sep 2026)
 │   ├── approvals.tsx      — final salary/new-hire sign-off + leave/advance at owner's stage (PATCH_53)
 │   ├── alerts.tsx         — open fraud alerts
 │   ├── eotm.tsx           — Employee of the Month per category
