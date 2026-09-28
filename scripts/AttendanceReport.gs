@@ -525,6 +525,51 @@ function listAllTriggers_() {
   });
 }
 
+// Cleanup for duplicate triggers of the SAME handler function. Added 28 Sep
+// 2026 after listAllTriggers_() showed the project pinned at Google's
+// 20-per-project ceiling, with runCacheBuilder and runAnalyticsDaily each
+// registered 6 times — neither is defined anywhere in this git repo (they
+// belong to the live Operations Dashboard script, which this repo has never
+// had the source for), so the fix has to work generically off ScriptApp's
+// own trigger list rather than patching whatever installer created them.
+// Only touches CLOCK (time-based) triggers — never an installable event
+// trigger like processFormSubmissions' onFormSubmit, which must never be
+// silently removed.
+//
+// Dry-run by default: dedupeClockTriggers_() just logs what it would
+// remove. Pass true to actually delete: dedupeClockTriggers_(true).
+function dedupeClockTriggers_(execute) {
+  var triggers = ScriptApp.getProjectTriggers();
+  var seen = {};
+  var toDelete = [];
+  triggers.forEach(function(t) {
+    if (t.getEventType() !== ScriptApp.EventType.CLOCK) return;
+    var handler = t.getHandlerFunction();
+    if (seen[handler]) {
+      toDelete.push(t);
+    } else {
+      seen[handler] = true;
+    }
+  });
+
+  if (toDelete.length === 0) {
+    Logger.log('No duplicate clock triggers found.');
+    return;
+  }
+
+  Logger.log((execute ? 'Deleting' : 'Would delete') + ' ' + toDelete.length + ' duplicate trigger(s):');
+  toDelete.forEach(function(t) {
+    Logger.log('  - ' + t.getHandlerFunction());
+    if (execute) ScriptApp.deleteTrigger(t);
+  });
+
+  if (!execute) {
+    Logger.log('DRY RUN ONLY — nothing deleted. Re-run as dedupeClockTriggers_(true) to actually remove these.');
+  } else {
+    Logger.log('Done. Triggers remaining: ' + ScriptApp.getProjectTriggers().length + ' / 20');
+  }
+}
+
 // Manual test helper — run from the Apps Script editor for a known past
 // date (e.g. testAttendanceReportForDate('2026-09-27')) before trusting
 // the trigger. Does NOT send email — writes to the Sheet and logs a

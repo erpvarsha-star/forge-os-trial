@@ -810,18 +810,48 @@ Script Property, not two — every send function reads that same one).
   instead. Paste the token (and, optionally, your numeric chat id — not a
   secret, just an account identifier) into the live copy only.
 - **"Too many triggers" — this script shares its Apps Script PROJECT with
-  Code.gs, the Operations Dashboard's own pull/alert script.** Code.gs runs
-  11 triggers of its own (6 `runDashboardPull` + 4 `checkShiftEnd_*` + 1
-  `refreshCache15min`); `deployShiftTrackingTriggers()` used to add 15 more,
-  26 total against Google's 20-per-project ceiling. Fixed by using fewer
-  triggers rather than touching Code.gs's: every alert function already
-  no-ops when there is nothing to do right now, so
-  `deployShiftTrackingTriggers()` now creates exactly 2 —
-  `runShiftAlerts15min_()` and `runDailyMaintenance_()` — each a thin,
-  try/catch-wrapped dispatcher over the individual functions that used to
-  have their own trigger. 2 + Code.gs's 11 = 13.
-- Needs `deployShiftTrackingTriggers()` re-run to pick up the 2-trigger
-  layout (it deletes the old per-function triggers first).
+  the Operations Dashboard's own pull/alert script (referred to here as
+  "Code.gs", though no file by that name is tracked in this git repo — its
+  source lives only in the live Apps Script project).** Historical note,
+  now corrected: an earlier version of this section claimed Code.gs ran 11
+  triggers (`6 runDashboardPull + 4 checkShiftEnd_* + 1 refreshCache15min`)
+  — **that was stale and wrong**, confirmed 28 Sep 2026 by actually listing
+  the live triggers rather than trusting the old note (see the locked
+  "verify against live data" rule). Fixed by using fewer triggers rather
+  than touching Code.gs's: every alert function already no-ops when there
+  is nothing to do right now, so `deployShiftTrackingTriggers()` creates
+  exactly 2 — `runShiftAlerts15min_()` and `runDailyMaintenance_()` — each
+  a thin, try/catch-wrapped dispatcher over the individual functions that
+  used to have their own trigger.
+- **Needs `deployShiftTrackingTriggers()` re-run to pick up the 2-trigger
+  layout** (it deletes the old per-function triggers first).
+- **Real live census, 28 Sep 2026 (via `listAllTriggers_()` in
+  `AttendanceReport.gs`) — project was pinned at the 20-trigger ceiling.**
+  Actual breakdown: `runCacheBuilder` ×6, `runAnalyticsDaily` ×6,
+  `syncVMCToDashboard` ×1, `runDashboardPull` ×1, `backupCacheDaily` ×1,
+  `checkHealthAndAlert` ×1 (defined in `ALERT.gs`, delete-then-create
+  installer, correctly 1x), `processFormSubmissions` ×1 (also `ALERT.gs`,
+  also duplication-safe), plus this project's own
+  `runAttendanceReportHourlyGate_`/`runShiftAlerts15min_`/
+  `runDailyMaintenance_` (1x each, correct). **None of
+  `runCacheBuilder`/`runAnalyticsDaily`/`syncVMCToDashboard`/
+  `runDashboardPull`/`backupCacheDaily` are defined anywhere in this git
+  repo** — confirmed by search, not assumed — so whatever installs
+  `runCacheBuilder`/`runAnalyticsDaily` in the live (untracked) Operations
+  Dashboard script almost certainly calls `ScriptApp.newTrigger(...).create()`
+  on every manual re-run without deleting old copies first (the same bug
+  class as `deployShiftTrackingTriggers()` used to have, just in a file
+  this repo can't fix directly).
+- **Fix: `dedupeClockTriggers_(execute)` in `AttendanceReport.gs`** —
+  works generically off `ScriptApp.getProjectTriggers()`, not tied to any
+  one script's source, so it can clean this up without needing Code.gs's
+  code. Dry-run by default (`dedupeClockTriggers_()`, no args, just logs
+  what it would remove); `dedupeClockTriggers_(true)` actually deletes,
+  keeping exactly one trigger per handler. Only touches `CLOCK`-type
+  triggers, never `processFormSubmissions`' `onFormSubmit` trigger. **If
+  the trigger count balloons again, this is the tool to re-run** — the
+  underlying untracked installer isn't fixed, only mitigated after the
+  fact, so this can recur if that script is ever manually re-run again.
 
 ## Edge functions (6, all Deno)
 
