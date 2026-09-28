@@ -374,6 +374,14 @@ is Claude's judgment call (not Yash's number) so General staff arriving
 one constant if Yash wants it different. Temporary by intent ("while HR gets
 used to it") — revisit once HR plans shifts every Thursday.
 
+**Test mode until 1 Oct 2026 — decision from Yash, 28 Sep 2026.** "we are in
+test mode of app, and 1st october is when we ensure its working well."
+Do NOT retroactively re-evaluate pre-1-Oct attendance (e.g. the 39
+check-ins since 27 Sep that never got a shift/lateness because of the
+PATCH_59 bug) — leave test-period data as it is. 1 Oct is the go-live
+date the app must be working correctly by; fixes land before then, data
+from 1 Oct onward is what counts.
+
 ## Shift 3 belongs to the previous working day — decision from Yash, 28 Sep 2026
 
 "it is 3rd shift for 27th not 28th." Shift 3 runs 00:00–07:00, but it is the
