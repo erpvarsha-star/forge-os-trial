@@ -646,7 +646,8 @@ explicit and correct rather than incidental.
 | `PATCH_60_vfl1319_deactivate_28Sep2026.sql` | Deactivates VFL1319 (Dipak Balkrishna Patil, Accounts) — confirmed left by Yash | ✅ Applied 28 Sep 2026 |
 | `PATCH_61_deactivate_4_left_28Sep2026.sql` | Deactivates CON22, CON23, VFL5354, VFL4048 — confirmed left by Yash | ✅ Applied 28 Sep 2026 |
 | `PATCH_62_shift_allocator_28Sep2026.sql` | New `employees.shift_allocator_id` column; populates it for 73 employees across 8 department groups from Yash's `Shift_Planning_1.csv`; adds CON24 (Shriram Pawar, Maintenance — new); fixes CON12's role `member`→`manager`; adds `allocate_team_shift_week()` RPC | ✅ Applied 28 Sep 2026 — verified: 73 allocated (group sizes sum exactly), RPC tested positive+negative via disposable SQL |
-| `PATCH_63_shift5_ot_29Sep2026.sql` | New `shifts` row: Shift 5 (19:00-07:00, 12h) — the OT variant of Shift 3, coexists with it, chosen week-by-week. See "Shift 5" section below | ✅ Applied 29 Sep 2026 |
+| `PATCH_63_shift5_ot_29Sep2026.sql` | New `shifts` row: Shift 5 (19:00-07:00, 12h) — the night OT variant of Shift 3, coexists with it, chosen week-by-week. See "Shift 4 & Shift 5" section below | ✅ Applied 29 Sep 2026 |
+| `PATCH_64_shift4_day_ot_29Sep2026.sql` | New `shifts` row: Shift 4 (07:00-19:00, 12h) — the day OT variant of Shift 1. Required a real tie-handling bug fix in `lib/shiftInference.ts` first (Shift 4 ties Shift 1's start_time) — see "Shift 4 & Shift 5" section below | ✅ Applied 29 Sep 2026 |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
@@ -1167,76 +1168,91 @@ Hindi covers every new key. **Not yet exercised on a real device** — only
 type-checked and verified against live data/RPC calls directly, no UI
 walkthrough. New APK build needed.
 
-**Real bug found and fixed same session (29 Sep 2026): HR's master shift
-screen excluded plain `member`/`staff` employees.** Yash: HR's shift
-screen (the original, unscoped one, `app/(hr-admin)/shifts.tsx`) was
-missing 2 of the 8 people in her own HR group from the CSV — "it needs to
-show the 8 ppl regardless of role." The screen's employee query only
-matched `category='worker' OR role IN (supervisor,security_guard)`,
-silently excluding `member`-role/`staff`-category employees (most general
-office/admin staff company-wide) — confirmed live: 34 employees matched
-the old filter, 86 match the fix. Changed to `role IN
-(member,supervisor,security_guard)` — every rank-and-file employee
-regardless of worker/staff category, still excluding
-owner/plant_head/hr_admin/manager (not individually shift-assigned via
-this screen). The new `shift_allocator_id`-scoped screens
-(`ShiftAllocationGrid.tsx`) were never affected by this — they have no
-role/category filter at all.
+**Real bug found same session (29 Sep 2026): HR's master shift screen
+excluded plain `member`/`staff` employees.** Yash: HR's shift screen (the
+original, unscoped one, `app/(hr-admin)/shifts.tsx`) was missing 2 of the
+8 people in her own HR group from the CSV. First fix widened the filter
+to `role IN (member,supervisor,security_guard)` — **still wrong, per
+Yash's own follow-up correction; see "Shift 4 & Shift 5" below for the
+final state (no role filter at all).**
 
-## Shift 5 — OT variant of Shift 3, 7pm–7am — decision from Yash, 29 Sep 2026
+## Shift 4 & Shift 5 — day/night OT variants — decisions from Yash, 29 Sep 2026
 
-Some employees on Shift 3 (00:00–07:00) actually come in at 7pm for
+Some Shift 3 (00:00–07:00) employees actually come in at 7pm for
 overtime and work straight through to 7am — the 7pm–12am portion is the
 OT. Confirmed via `AskUserQuestion`: **Shift 5 (19:00–07:00, 12h) coexists
 with Shift 3, chosen week-by-week by the allocator** — not a permanent
-replacement; some weeks a person is on Shift 3, some weeks Shift 5,
-depending on whether that week's OT applies. On the OT-rupee split
-question (how much of the 12h counts as "overtime" for payroll), Yash had
-**no preference** — implemented as **visibility only for now**, matching
-this project's existing "Working hours mapping (NOT salary)" precedent:
-Shift 5 is tracked as an ordinary 12h shift (mapping/flagging, not a
-payroll input), with no rupee OT amount computed. Revisit the split rule
-only if Yash raises it.
+replacement. Yash also proposed a day-shift equivalent when describing
+this ("7am to 7pm and 7pm to 7am, as shift 4 and shift 5") — first built
+only Shift 5 since Shift 4 had no described concrete use case yet, but
+Yash then confirmed he wants both live now: **"all people allocating
+shifts from the csv... will now see shift 1 2 3 4 5 and general to choose
+from?"** — yes, built same session. On the OT-rupee split question (how
+much of the 12h counts as "overtime" for payroll), Yash had **no
+preference** — implemented as **visibility only**, matching this
+project's existing "Working hours mapping (NOT salary)" precedent: both
+are tracked as ordinary 12h shifts (mapping/flagging, not a payroll
+input), no rupee OT amount computed. Revisit the split rule only if Yash
+raises it.
 
-**`PATCH_63_shift5_ot_29Sep2026.sql`** — new `shifts` row, `start_time
-19:00`, `end_time 07:00`, `is_night_shift=true`, `late_grace_minutes=15`.
-Kept as its **own** row rather than reusing the existing `Security Night`
-row (same 19:00-07:00 window) so security-specific reporting/logic keyed
-on that exact name is untouched.
+**`PATCH_63_shift5_ot_29Sep2026.sql`** (19:00–07:00) and
+**`PATCH_64_shift4_day_ot_29Sep2026.sql`** (07:00–19:00) — both
+`is_night_shift`/`false` as appropriate, `late_grace_minutes=15`. Kept as
+their **own** rows rather than reusing `Security Night`/`Security Day`
+(same windows) so security-specific reporting/logic keyed on those exact
+names is untouched.
 
-**Zero changes needed to `lib/shiftInference.ts`** — `findClosestShift()`/
-`resolveShiftForCheckIn()` are fully data-driven off the live `shifts`
-table (sorted by `start_time`, circular window math), so adding a new row
-is picked up automatically. Verified with a standalone script (same
-practice as the original Shift-1-vs-General and Shift-3-wraparound
-verifications) reproducing 12 check-in times against the full shift set
-including Shift 5 — all passed, confirming Shift 5 correctly owns the
-18:45–23:45 window (its own start minus the 15-min buffer, up to Shift
-3's window opening) and doesn't disturb Shift 1/2/3/General's windows.
+**Real bug found and fixed before Shift 4 could ship: `findClosestShift()`
+broke completely when two shifts share a `start_time`.** Shift 4
+(07:00) ties exactly with Shift 1 (07:00) — Shift 5 hadn't hit this
+since 19:00 was otherwise unique. Caught by testing *before* applying
+the patch (same discipline as every other shift-inference change this
+project has made), not discovered live: with the tie, the old
+`next.startMin - current.startMin` window-length calculation produces a
+literal 0, and the `|| MINUTES_PER_DAY` fallback (meant only for the
+single-shift-in-pool case) turned that into a **full 24-hour window** —
+whichever of Shift 1/Shift 4 happened to sort first would silently
+swallow every other shift's inference window for the *entire pool*, not
+just around 7am. A test script confirmed this exactly: with the tie
+present and unfixed, 17:00 and 23:44 both wrongly resolved to "Shift 1."
+Fixed in `lib/shiftInference.ts`: (1) sort ties deterministically by
+shift name (`a.shift.name.localeCompare(b.shift.name)` as a tiebreak on
+equal `startMin`, since Postgres gives no ordering guarantee among equal
+`start_time` rows on its own); (2) each shift's window now extends to
+the next **distinct** `start_time`, skipping over any shift sharing its
+own start, instead of naively using the next array slot. Re-verified with
+a 12-case sweep covering the tie, the original Shift-1-vs-General
+examples, and the Security pool — all passed, no regressions.
 
 **Two places updated for the 12h no-checkout default** (a person who
-checks into Shift 5 but never checks out should default to 12h worked,
-not the generic 8.5h floor meant for 8h shifts):
-- `lib/workingHours.ts`'s `defaultHoursForShift()` — added a `Shift 5` →
-  `12` case, same pattern as the existing `General` → `9` case.
+checks into Shift 4 or Shift 5 but never checks out should default to
+12h worked, not the generic 8.5h floor meant for 8h shifts):
+- `lib/workingHours.ts`'s `defaultHoursForShift()` — `Shift 4`/`Shift 5`
+  → `12`, same pattern as the existing `General` → `9` case.
   `MIN_WORKING_HOURS` (the 8.5h short-hours floor) is **unchanged** and
-  still applies uniformly — that's a different question from the
-  no-checkout default.
+  still applies uniformly — a different question from the no-checkout
+  default.
 - `scripts/AttendanceReport.gs`'s hand-replicated copy (Apps Script can't
-  import the shared lib) — added the same `Shift 5` → `12` case. **Keep
+  import the shared lib) — same `Shift 4`/`Shift 5` → `12` case. **Keep
   both in sync by hand if this rule ever changes** — same duplication risk
   already flagged for the IST helpers.
 
 Allowed in both shift-allocation UIs now: `app/(hr-admin)/shifts.tsx`'s
 `rotatingShifts` filter and `hooks/useShiftAllocation.ts`'s
-`ALLOCATABLE_SHIFT_NAMES` both include `'Shift 5'` alongside Shift 1/2/3
-(and General, for the new allocator screens).
+`ALLOCATABLE_SHIFT_NAMES` both include `'Shift 4'` and `'Shift 5'`
+alongside Shift 1/2/3 (and General, for the new allocator screens).
 
-**Not built:** "Shift 4" (7am–7pm, the day-shift equivalent Yash also
-named when proposing this). No concrete scenario described a need for it
-yet — only Shift 5 (the night OT pattern) has a real, described use case.
-Same pattern (one `shifts` row, add the name to both allow-lists) if a
-day-shift OT need ever comes up.
+**HR's master shift screen no longer filters by role at all — decision
+from Yash, 29 Sep 2026.** The earlier same-day fix (widening to `role IN
+(member,supervisor,security_guard)`) was still wrong: Yash explicitly
+said to "remove that logic... follow allocation as per csv even if they
+of different role" — and the CSV itself proves the point, since its
+Quality group includes VFL5461, whose role is `manager`. Confirmed live:
+1 person across all `shift_allocator_id` groups has role `manager`.
+`app/(hr-admin)/shifts.tsx`'s employee query is now just `.eq('is_active',
+true)` — no role/category filter of any kind. The existing
+worker-vs-security section split (by `role === 'security_guard'`) still
+works unchanged; it now just draws from a broader pool.
 
 **Verified:** `npx tsc --noEmit` — still exactly 7 errors, the pre-existing
 baseline. `node scripts/check-i18n.mjs` — clean (shift names are

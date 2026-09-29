@@ -30,13 +30,14 @@ export interface ShiftAllocationTeamMember {
   name: string
 }
 
-// Shift 1/2/3/5/General only — no Security options, since no security guard
+// Shift 1/2/3/4/5/General — no Security options, since no security guard
 // in the CSV that drove this feature has an allocator outside HR's own
 // group (HR keeps using the existing, unscoped app/(hr-admin)/shifts.tsx).
-// Shift 5 (19:00-07:00, PATCH_63, 29 Sep 2026) is the OT variant of
-// Shift 3 — allocators pick it week-by-week for people doing the 7pm
-// early-arrival OT pattern, coexisting with Shift 3, not replacing it.
-const ALLOCATABLE_SHIFT_NAMES = ['General', 'Shift 1', 'Shift 2', 'Shift 3', 'Shift 5']
+// Shift 4 (07:00-19:00, PATCH_64) and Shift 5 (19:00-07:00, PATCH_63),
+// both 29 Sep 2026, are the day/night OT variants of Shift 1/Shift 3 —
+// allocators pick them week-by-week for people doing that OT pattern,
+// coexisting with Shift 1/3, not replacing them.
+const ALLOCATABLE_SHIFT_NAMES = ['General', 'Shift 1', 'Shift 2', 'Shift 3', 'Shift 4', 'Shift 5']
 
 export function useShiftAllocation(allocatorId: string | undefined) {
   const [weekOffset, setWeekOffset] = useState(0)

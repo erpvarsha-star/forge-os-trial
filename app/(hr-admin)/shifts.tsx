@@ -56,10 +56,10 @@ export default function ShiftsScreen() {
   const weekDays = getWeekDays(weekStart)
   const weekEnd = weekDays[weekDays.length - 1]
 
-  // Shift 5 (PATCH_63, 29 Sep 2026) = the OT variant of Shift 3 (19:00-07:00,
-  // 7pm early arrival for OT through to the 7am Shift 3 end) — coexists
-  // with Shift 3, chosen week-by-week, not a replacement.
-  const rotatingShifts = shifts.filter(s => ['Shift 1', 'Shift 2', 'Shift 3', 'Shift 5'].includes(s.name))
+  // Shift 4 (PATCH_64) and Shift 5 (PATCH_63), both 29 Sep 2026, are the
+  // day/night OT variants of Shift 1/Shift 3 (07:00-19:00 / 19:00-07:00)
+  // — coexist with Shift 1/3, chosen week-by-week, not a replacement.
+  const rotatingShifts = shifts.filter(s => ['Shift 1', 'Shift 2', 'Shift 3', 'Shift 4', 'Shift 5'].includes(s.name))
   const securityShifts = shifts.filter(s => ['Security Day', 'Security Night'].includes(s.name))
 
   const loadData = useCallback(async () => {
@@ -67,11 +67,15 @@ export default function ShiftsScreen() {
 
     const [{ data: sData }, { data: eData }, { data: assignData }] = await Promise.all([
       supabase.from('shifts').select('*').order('start_time'),
+      // No role filter (Yash, 29 Sep 2026: "remove that logic... follow
+      // allocation as per csv even if they of different role" — the CSV's
+      // own allocation lists include a manager, VFL5461, so restricting by
+      // role was wrong, not just incomplete). Every active employee is
+      // assignable here; HR knows who actually needs a shift.
       supabase
         .from('employees')
         .select('id, name, emp_code, role, category')
-        .eq('is_active', true)
-        .in('role', ['member', 'supervisor', 'security_guard']),
+        .eq('is_active', true),
       // Load first day of week to pre-populate selections
       supabase
         .from('employee_shifts')

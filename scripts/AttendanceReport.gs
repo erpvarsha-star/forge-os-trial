@@ -102,10 +102,11 @@ var ATTENDANCE_MONTHLY_HEADERS =
   ['_key', 'Month', 'Emp Code', 'Name', 'Department', 'Total Present Days', 'Avg Working Hrs/Day', 'Times Late (>grace)'];
 
 // Same rule as lib/workingHours.ts's defaultHoursForShift() — General = 9h,
-// Shift 5 (PATCH_63, 29 Sep 2026, the Shift-3 OT variant, 19:00-07:00) = 12h,
-// everything else = 8.5h floor. Keep in sync by hand if that rule ever changes.
+// Shift 4 (PATCH_64, 07:00-19:00) and Shift 5 (PATCH_63, 19:00-07:00),
+// both 29 Sep 2026 (the Shift-1/Shift-3 OT variants) = 12h, everything
+// else = 8.5h floor. Keep in sync by hand if that rule ever changes.
 var ATTENDANCE_DEFAULT_HOURS_GENERAL = 9;
-var ATTENDANCE_DEFAULT_HOURS_SHIFT5 = 12;
+var ATTENDANCE_DEFAULT_HOURS_12H = 12;
 var ATTENDANCE_DEFAULT_HOURS_OTHER = 8.5;
 
 function attendanceReportRecipients_() {
@@ -138,7 +139,7 @@ function fetchShiftDefaultsById_() {
   var byId = {};
   shifts.forEach(function(s) {
     byId[s.id] = (s.name === 'General') ? ATTENDANCE_DEFAULT_HOURS_GENERAL
-      : (s.name === 'Shift 5') ? ATTENDANCE_DEFAULT_HOURS_SHIFT5
+      : (s.name === 'Shift 4' || s.name === 'Shift 5') ? ATTENDANCE_DEFAULT_HOURS_12H
       : ATTENDANCE_DEFAULT_HOURS_OTHER;
   });
   return byId;

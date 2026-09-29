@@ -34,14 +34,29 @@ export function findClosestShift(nowMinutesOfDay: number, role: string | undefin
       return Number.isNaN(h) || Number.isNaN(m) ? null : { shift: s, startMin: h * 60 + m }
     })
     .filter((s): s is { shift: Shift; startMin: number } => s !== null)
-    .sort((a, b) => a.startMin - b.startMin)
+    // Tiebreak by name when two shifts share a start_time (e.g. Shift 1 and
+    // Shift 4 both 07:00) — deterministic across query runs, since Postgres
+    // gives no ordering guarantee among equal start_time rows on its own.
+    .sort((a, b) => a.startMin - b.startMin || a.shift.name.localeCompare(b.shift.name))
 
   if (withStart.length === 0) return null
   if (withStart.length === 1) return withStart[0].shift
 
   for (let i = 0; i < withStart.length; i++) {
     const current = withStart[i]
-    const next = withStart[(i + 1) % withStart.length]
+    // The window's end is the NEXT DISTINCT start_time, not just the next
+    // array slot — two shifts sharing a start_time (Shift 1/Shift 4, both
+    // 07:00) would otherwise each compute a zero-length gap to the other,
+    // which the `|| MINUTES_PER_DAY` fallback below turns into a *full
+    // 24-hour* window for whichever of the pair sorts first, silently
+    // swallowing every other shift's window for the whole pool. Skipping
+    // to the next differing start_time keeps the fallback reserved for the
+    // genuine single-shift case it was meant for.
+    let nextIndex = (i + 1) % withStart.length
+    while (withStart[nextIndex].startMin === current.startMin && nextIndex !== i) {
+      nextIndex = (nextIndex + 1) % withStart.length
+    }
+    const next = withStart[nextIndex]
     const windowStart = current.startMin - EARLY_ARRIVAL_BUFFER_MINUTES
     const windowEnd = next.startMin - EARLY_ARRIVAL_BUFFER_MINUTES
     const windowLength = mod(windowEnd - windowStart, MINUTES_PER_DAY) || MINUTES_PER_DAY
