@@ -56,7 +56,10 @@ export default function ShiftsScreen() {
   const weekDays = getWeekDays(weekStart)
   const weekEnd = weekDays[weekDays.length - 1]
 
-  const rotatingShifts = shifts.filter(s => ['Shift 1', 'Shift 2', 'Shift 3'].includes(s.name))
+  // Shift 5 (PATCH_63, 29 Sep 2026) = the OT variant of Shift 3 (19:00-07:00,
+  // 7pm early arrival for OT through to the 7am Shift 3 end) — coexists
+  // with Shift 3, chosen week-by-week, not a replacement.
+  const rotatingShifts = shifts.filter(s => ['Shift 1', 'Shift 2', 'Shift 3', 'Shift 5'].includes(s.name))
   const securityShifts = shifts.filter(s => ['Security Day', 'Security Night'].includes(s.name))
 
   const loadData = useCallback(async () => {

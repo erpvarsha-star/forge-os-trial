@@ -13,8 +13,18 @@ export const MIN_WORKING_HOURS = 8.5
 // shift they were on. General is 9h (09:00-18:00, exact); every other
 // shift (Shift 1/2/3, Security Day/Night) defaults to the 8.5h floor —
 // Yash gave only these two numbers, not a per-shift figure.
+//
+// Shift 5 (19:00-07:00, PATCH_63, 29 Sep 2026 — the OT variant of Shift 3)
+// is a genuine 12h shift, not an 8h one — Claude's own extension of the
+// same "match the shift's own nominal duration" rule already used for
+// General, not a number Yash gave. MIN_WORKING_HOURS (the 8.5h short-hours
+// floor) is unchanged and still applies uniformly per the locked decision
+// ("same floor for every shift type") — this only affects the no-checkout
+// default, a different question.
 export function defaultHoursForShift(shiftName: string | null | undefined): number {
-  return shiftName === 'General' ? 9 : MIN_WORKING_HOURS
+  if (shiftName === 'General') return 9
+  if (shiftName === 'Shift 5') return 12
+  return MIN_WORKING_HOURS
 }
 
 // Resolves the hours a day should count as for reporting: the real

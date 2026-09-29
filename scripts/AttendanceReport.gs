@@ -101,8 +101,11 @@ var ATTENDANCE_DAILY_HEADERS =
 var ATTENDANCE_MONTHLY_HEADERS =
   ['_key', 'Month', 'Emp Code', 'Name', 'Department', 'Total Present Days', 'Avg Working Hrs/Day', 'Times Late (>grace)'];
 
-// Same rule as lib/workingHours.ts — General = 9h, everything else = 8.5h floor.
+// Same rule as lib/workingHours.ts's defaultHoursForShift() — General = 9h,
+// Shift 5 (PATCH_63, 29 Sep 2026, the Shift-3 OT variant, 19:00-07:00) = 12h,
+// everything else = 8.5h floor. Keep in sync by hand if that rule ever changes.
 var ATTENDANCE_DEFAULT_HOURS_GENERAL = 9;
+var ATTENDANCE_DEFAULT_HOURS_SHIFT5 = 12;
 var ATTENDANCE_DEFAULT_HOURS_OTHER = 8.5;
 
 function attendanceReportRecipients_() {
@@ -134,7 +137,9 @@ function fetchShiftDefaultsById_() {
   var shifts = supabaseGet_('/rest/v1/shifts?select=id,name');
   var byId = {};
   shifts.forEach(function(s) {
-    byId[s.id] = (s.name === 'General') ? ATTENDANCE_DEFAULT_HOURS_GENERAL : ATTENDANCE_DEFAULT_HOURS_OTHER;
+    byId[s.id] = (s.name === 'General') ? ATTENDANCE_DEFAULT_HOURS_GENERAL
+      : (s.name === 'Shift 5') ? ATTENDANCE_DEFAULT_HOURS_SHIFT5
+      : ATTENDANCE_DEFAULT_HOURS_OTHER;
   });
   return byId;
 }
