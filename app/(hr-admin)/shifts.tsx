@@ -68,7 +68,7 @@ export default function ShiftsScreen() {
         .from('employees')
         .select('id, name, emp_code, role, category')
         .eq('is_active', true)
-        .or("category.in.(worker),role.in.(supervisor,security_guard)"),
+        .in('role', ['member', 'supervisor', 'security_guard']),
       // Load first day of week to pre-populate selections
       supabase
         .from('employee_shifts')
