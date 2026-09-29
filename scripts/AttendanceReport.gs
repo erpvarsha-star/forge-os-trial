@@ -92,8 +92,9 @@ var ATTENDANCE_MONTHLY_TAB = 'Monthly Attendance Summary';
 
 // Comma-separated email addresses. Script Property ATTENDANCE_REPORT_RECIPIENTS
 // wins if set (same inline-or-Script-Properties pattern as TELEGRAM_BOT_TOKEN_INLINE
-// elsewhere in this project). Left blank until Yash provides addresses.
-var ATTENDANCE_REPORT_RECIPIENTS_INLINE = '';
+// elsewhere in this project). Provided by Yash, 29 Sep 2026 — same
+// not-a-secret treatment as OWNER_EMAIL in ALERT.gs, committed directly.
+var ATTENDANCE_REPORT_RECIPIENTS_INLINE = 'hr@varshaforgings.com,ea@varshaforgings.com,yash.munot@gmail.com';
 
 // First column is a hidden dedup key, not shown to Yash/HR.
 var ATTENDANCE_DAILY_HEADERS =
