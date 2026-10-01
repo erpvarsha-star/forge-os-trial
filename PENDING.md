@@ -3,7 +3,18 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 30 Sep 2026 (session 19) — CON24 (Shriram Pawar) couldn't
+**Last updated:** 1 Oct 2026 (session 20) — Found every pg_cron job in this
+project (not just the new Fazal one) had never had its placeholder
+Authorization header replaced, ever — confirmed live, and confirmed harmless
+since every edge function is deployed `--no-verify-jwt` so the gateway never
+checks it (mrm-reminder had run successfully 227 times on the placeholder
+alone). Yash pasted a real key into `plant-head-form-reminder`'s job by
+hand; `PATCH_68_cron_keys_01Oct2026.sql` offers the same fix for the other
+6 jobs (cosmetic hygiene, not a functional fix — ⏳ not yet run). One
+incidental exposure: the real key Yash pasted showed up in a `cron.job`
+query result used to diagnose this, reaching the chat transcript the same
+way a direct paste would — flagged to him, rotation optional. Session 19
+recap: CON24 (Shriram Pawar) couldn't
 log in; root-caused to `HR_reset_pin.sql` silently resetting his PIN with
 the wrong (VFL-style) formula instead of the consultant formula — fixed his
 PIN (PATCH_67) and fixed the script itself so it can't recur for any other

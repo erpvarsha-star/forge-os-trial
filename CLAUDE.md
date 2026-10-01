@@ -651,6 +651,7 @@ explicit and correct rather than incidental.
 | `PATCH_65_admin_hr_attendance_forms_30Sep2026.sql` | 4 `form_links` rows for Google Forms Yash provided: Administration dept (Kajal, Monthly + Daily Attendance) and Human Resource dept (existing HR team, Monthly + Daily Attendance) | ✅ Applied 30 Sep 2026 |
 | `PATCH_66_plant_head_monthly_form_30Sep2026.sql` | New `form_links` row (MANAGEMENT dept) for Fazal's monthly form (due 5th) + pg_cron schedule for the new `plant-head-form-reminder` edge function. See "Plant Head monthly form reminder" section below | form_links row ✅ Applied 30 Sep 2026 (via MCP) — **cron.schedule() step still ⏳, needs Yash to paste a real key in the SQL editor** |
 | `PATCH_67_con24_pin_fix_30Sep2026.sql` | Restores CON24's (Shriram Pawar) password to the documented consultant-formula starting PIN (`200024`), after `HR_reset_pin.sql` had silently overwritten it with the wrong (VFL-style) formula on 30 Sep. See "Employee data" below | ✅ Applied 30 Sep 2026 — verified matches `200024` |
+| `PATCH_68_cron_keys_01Oct2026.sql` | Replaces the placeholder Authorization header on the 6 cron jobs that still had it (see "Cron jobs never had real keys" below) | ⏳ Not yet run — cosmetic/hardening only, every job already works without it |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
@@ -1340,12 +1341,52 @@ connector and added to `supabase/functions/deploy.sh`'s `FUNCTIONS` array
 CI's Deploy Edge Functions workflow will never pick it up, same lesson as
 `send-push-notification` silently staying undeployed for a week).
 
-**Still open — same "paste one script" pattern as PATCH_18/PATCH_20 — Yash
-must run `PATCH_66_plant_head_monthly_form_30Sep2026.sql`'s
-`cron.schedule(...)` block himself in the Supabase SQL Editor, pasting a
-real key over `PASTE_YOUR_KEY_HERE`.** The form_links row is already live;
-only the daily cron trigger needs this manual step (the service-role key
-is never typed into chat with Claude, per this project's standing rule).
+**Done — Yash ran `PATCH_66_plant_head_monthly_form_30Sep2026.sql`'s
+`cron.schedule(...)` block 1 Oct 2026.** The cron job (`plant-head-form-
+reminder`, jobid 13) is live; first real fire is the next 09:00 IST window.
+
+## Cron jobs never had real keys — found and explained 1 Oct 2026
+
+**Every pg_cron job in this project (PATCH_18, PATCH_20, and
+`plant-head-form-reminder` before Yash fixed it) had the literal string
+`'Bearer PASTE_YOUR_KEY_HERE'` as its Authorization header — confirmed live
+via `select jobname, command from cron.job`, never actually replaced by
+anyone, for any of them, since they were first scheduled.** This did not
+break anything and never had: every edge function here is deployed with
+`--no-verify-jwt` (`supabase/functions/deploy.sh`), so Supabase's API
+gateway never validates that header at all — it's not read inside the
+function code either (`supabaseAdmin()` uses the `SUPABASE_SERVICE_ROLE_KEY`
+*edge function secret*, set separately in the dashboard, never the inbound
+request header). Proof: `mrm-reminder` had 227 successful daily
+notification sends on the placeholder text alone before this was noticed.
+
+**Consequence worth knowing, not acted on yet:** because the gateway skips
+auth entirely, these 7 function URLs are effectively public —
+`POST .../functions/v1/mrm-reminder` (etc.) executes for anyone who calls
+it, not just the cron job. Not a data-exposure bug (it only does what the
+function already does — no RLS bypass is readable back to the caller), but
+it is an unauthenticated trigger surface. Revisit only if Yash wants it
+tightened (a shared-secret check inside each function body would close it
+without re-enabling `--verify-jwt`, which would also block the cron calls
+unless they carry a real key — the two are linked).
+
+**`PATCH_68_cron_keys_01Oct2026.sql`** — cosmetic/hardening hygiene pass,
+not a functional fix: replaces the placeholder on the other 6 jobs
+(`five-s-challenge-generator`, `forms-due-reminder`, `mrm-reminder`,
+`mrm-reminder-escalation`, `nightly-scoring`, `shift-reminder-default`) to
+match what Yash already did for `plant-head-form-reminder`, so the header
+is correct if `--no-verify-jwt` is ever turned off. ⏳ Not yet run.
+
+**⚠ Incidental key exposure, 1 Oct 2026:** the real key Yash pasted into
+`plant-head-form-reminder`'s job appeared in a `select ... from cron.job`
+query result run to diagnose this — i.e. it reached this chat transcript,
+the same exposure the "never type a key into chat" rule exists to prevent,
+just via a query result instead of a direct paste. Flagged to Yash; he may
+want to rotate that key. **Lesson for future sessions: never `select
+command from cron.job` (or any query that can return a stored
+Authorization header) once a real key might be in there — list `jobname`/
+`schedule`/`active` only, never `command`, for a job that might hold a live
+key.**
 
 ---
 
