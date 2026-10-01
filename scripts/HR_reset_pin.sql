@@ -12,8 +12,20 @@
 -- HOW TO USE
 --   1. Edit the emp_code on the line marked  <<< CHANGE THIS
 --   2. Run the whole block in the Supabase SQL Editor
---   3. Tell the employee their PIN is their code padded to 6 digits
---      (VFL1066 -> 001066) and that the app will ask them to set a new one
+--   3. Tell the employee their starting PIN (the NOTICE this prints says the
+--      real value for their code — VFL-style vs consultant-style differ,
+--      see the bug note below) and that the app will ask them to set a new one
+--
+-- ⚠ REAL BUG FOUND AND FIXED 30 Sep 2026 — do not revert to a single
+-- formula. This script originally derived every starting PIN the same way
+-- (digits of emp_code, left-padded to 6 — the VFL-style formula), but
+-- PATCH_35/PATCH_62 provisioned every CON-prefixed (consultant) login with a
+-- DIFFERENT formula: '20' + last 4 digits, padded to 4 ('20' || lpad(digits,
+-- 4, '0') — CON24 -> '200024', not '000024'). Running this script on a
+-- consultant silently overwrote their real starting PIN with the wrong
+-- value and locked them out — this is exactly what happened to CON24
+-- (Shriram Pawar) on 30 Sep 2026, fixed in PATCH_67. The branch below picks
+-- the correct formula by emp_code prefix so this cannot recur.
 --
 -- Requires pgcrypto, already enabled by PATCH_10.
 -- ============================================================================
@@ -34,8 +46,13 @@ begin
       target_code;
   end if;
 
-  -- Same derivation PATCH_10 used: digits of emp_code, left-padded to 6.
-  starting_pin := lpad(regexp_replace(target_code, '\D', '', 'g'), 6, '0');
+  -- CON-prefixed (consultant) logins use PATCH_35/PATCH_62's formula;
+  -- everyone else (VFL-prefixed) uses PATCH_10's digits-padded-to-6 formula.
+  if upper(target_code) like 'CON%' then
+    starting_pin := '20' || lpad(regexp_replace(target_code, '\D', '', 'g'), 4, '0');
+  else
+    starting_pin := lpad(regexp_replace(target_code, '\D', '', 'g'), 6, '0');
+  end if;
 
   update auth.users
      set encrypted_password = crypt(starting_pin, gen_salt('bf')),
@@ -59,7 +76,10 @@ end $$;
 -- it cannot be read back, only reset with the block above.
 -- ----------------------------------------------------------------------------
 -- select emp_code, name, role,
---        lpad(regexp_replace(emp_code,'\D','','g'),6,'0') as starting_pin,
+--        case when upper(emp_code) like 'CON%'
+--             then '20' || lpad(regexp_replace(emp_code,'\D','','g'),4,'0')
+--             else lpad(regexp_replace(emp_code,'\D','','g'),6,'0')
+--        end as starting_pin,
 --        must_change_pin as still_on_starting_pin
 -- from employees
 -- where is_active = true

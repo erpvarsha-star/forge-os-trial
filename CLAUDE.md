@@ -649,7 +649,9 @@ explicit and correct rather than incidental.
 | `PATCH_63_shift5_ot_29Sep2026.sql` | New `shifts` row: Shift 5 (19:00-07:00, 12h) — the night OT variant of Shift 3, coexists with it, chosen week-by-week. See "Shift 4 & Shift 5" section below | ✅ Applied 29 Sep 2026 |
 | `PATCH_64_shift4_day_ot_29Sep2026.sql` | New `shifts` row: Shift 4 (07:00-19:00, 12h) — the day OT variant of Shift 1. Required a real tie-handling bug fix in `lib/shiftInference.ts` first (Shift 4 ties Shift 1's start_time) — see "Shift 4 & Shift 5" section below | ✅ Applied 29 Sep 2026 |
 | `PATCH_65_admin_hr_attendance_forms_30Sep2026.sql` | 4 `form_links` rows for Google Forms Yash provided: Administration dept (Kajal, Monthly + Daily Attendance) and Human Resource dept (existing HR team, Monthly + Daily Attendance) | ✅ Applied 30 Sep 2026 |
-| `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee | ♾️ On demand |
+| `PATCH_66_plant_head_monthly_form_30Sep2026.sql` | New `form_links` row (MANAGEMENT dept) for Fazal's monthly form (due 5th) + pg_cron schedule for the new `plant-head-form-reminder` edge function. See "Plant Head monthly form reminder" section below | form_links row ✅ Applied 30 Sep 2026 (via MCP) — **cron.schedule() step still ⏳, needs Yash to paste a real key in the SQL editor** |
+| `PATCH_67_con24_pin_fix_30Sep2026.sql` | Restores CON24's (Shriram Pawar) password to the documented consultant-formula starting PIN (`200024`), after `HR_reset_pin.sql` had silently overwritten it with the wrong (VFL-style) formula on 30 Sep. See "Employee data" below | ✅ Applied 30 Sep 2026 — verified matches `200024` |
+| `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
 
@@ -866,6 +868,7 @@ Script Property, not two — every send function reads that same one).
 | `shift-reminder` | Weekly shift notify (Thursday) + daily check-in reminder (hourly) + `forms_due_reminder`, which nudges a department's supervisors/managers 15 min before each shift's form deadline | Thursday + hourly + every 15 min (`{"mode":"forms_due_reminder"}`, needs its own cron entry — mode inference never picks it) |
 | `five-s-challenge-generator` | Generate daily 5S challenge via Gemini | Daily |
 | `send-push-notification` | HTTP dispatcher — write notification row + push (FCM v1 direct for Android, Expo relay for anything else — see `_shared/fcm.ts` and `_shared/push.ts`) | On-demand |
+| `plant-head-form-reminder` | New 30 Sep 2026. Notifies every active plant_head (today: just Fazal) on the 1st-5th IST of each month for any `form_links` row with `department='MANAGEMENT'` and `send_in_reminder=true` still outstanding. De-duplicated against `notifications` per form per day. See "Plant Head monthly form reminder" below | Daily 09:00 IST (PATCH_66's cron job) — **function deployed and ACTIVE; the cron.schedule() itself still needs Yash to run it with a real key, same manual-paste pattern as PATCH_18/20** |
 
 **Shared helpers** (`supabase/functions/_shared/`):
 - `push.ts` — `notifyEmployees()` inserts `notifications` rows (`user_id` column) + Expo push batch. ⚠ It also writes `related_entity_type` / `related_entity_id`, which existed only in the OLD schema until PATCH_14 added them — before that every insert was rejected by PostgREST and the error was discarded, so no server-side notification ever reached anyone. It now throws on insert failure.
@@ -1261,6 +1264,88 @@ data-driven from the DB, not looked up via i18n keys, so none were
 needed). `node --check` on the updated `AttendanceReport.gs`. **Not yet
 exercised on a real device.** New APK build needed (this touches `app/`,
 `hooks/`, `lib/`).
+
+---
+
+## Consultant PIN formula bug — found and fixed 30 Sep 2026 (CON24 could not log in)
+
+**Root cause**: every CON-prefixed (consultant) login was provisioned by
+PATCH_35/PATCH_62 with starting PIN `'20' + last 4 digits padded to 4`
+(CON24 → `200024`) — deliberately different from the VFL-style formula
+(digits padded to 6) used for everyone else. `scripts/HR_reset_pin.sql`
+only ever implemented the VFL-style formula. Someone ran it for CON24
+(Shriram Pawar) on 30 Sep 2026 (`auth.users.updated_at` moved to that day),
+silently overwriting his real starting PIN `200024` with the wrong value
+`000024` — he then tried the documented `200024` (correct per CLAUDE.md,
+wrong per the DB after the reset) and could not get in.
+
+**Fixed:**
+- `PATCH_67_con24_pin_fix_30Sep2026.sql` — restored his password to
+  `200024` (safe since `must_change_pin` was still true — he had never
+  completed a first login, so nothing of his own was lost).
+- `scripts/HR_reset_pin.sql` itself — now branches on emp_code prefix
+  (`CON%` → consultant formula, everything else → VFL formula) so this
+  cannot silently corrupt a consultant's PIN again. **Any CON-prefixed
+  employee reset before 30 Sep 2026 via the old version of this script may
+  have the same wrong-PIN problem** — not re-audited against every
+  historical run, only confirmed and fixed for CON24, the one Yash
+  reported.
+
+## Who has never signed in — active employees, checked live 30 Sep 2026
+
+**Always re-run this before quoting it — do not treat this list as current
+the way the headcount-staleness rule above already warns about.**
+`SELECT emp_code, name, department FROM employees WHERE is_active = true AND must_change_pin = true;`
+
+As of 30 Sep 2026, 10 active employees had never completed a first login
+(`must_change_pin = true`):
+
+| Emp code | Name | Department | Category |
+|---|---|---|---|
+| CON01 | Chhagan D Dehade | Die Shop | consultant |
+| VFL4011 | Banwari Harihar Yadav | Forge Shop | worker |
+| VFL4025 | Raghav Harihar Yadav | Forge Shop | worker |
+| VFL4026 | Parbhansh Tameshwar Yadav | Forge Shop | worker |
+| VFL5272 | Ramesh Narayan Gote | Machine Shop | staff |
+| VFL5382 | Vitthal Uddhav Tekale | Machine Shop | staff |
+| CON24 | Shriram Pawar | Maintenance | consultant (PIN just fixed — see above) |
+| VFL4012 | Kailas Ramdas Darandale | Maintenance | worker |
+| VFL5457 | Sandip Tryambak Landage | Maintenance | staff |
+| VFL5463 | Manoj Anantrao Wagh | Maintenance | staff (the VFL5337 rejoin) |
+
+## Plant Head monthly form reminder — built 30 Sep 2026
+
+Yash: a new Google Form "for Fazal to be filled by 5th of every month" plus
+a notification sent to him from the 1st to the 5th. Registered into
+`form_links` (PATCH_66, `department='MANAGEMENT'`, same pattern PATCH_50
+used for Overtime Form / Worker Monthly Efficiency — already live in
+Fazal's existing Forms tab, no new APK needed). Could not read the form's
+own title (docs.google.com blocked by this sandbox's egress proxy, same
+restriction as every other Google Forms link this project has handled) —
+`form_name` is the placeholder "Plant Head Monthly Form"; **ask Yash to
+confirm/rename it** if that doesn't match what the form is actually called.
+
+New edge function `supabase/functions/plant-head-form-reminder/index.ts`:
+on the 1st-5th IST of each month, notifies every active `role='plant_head'`
+employee for every `form_links` row with `department='MANAGEMENT'` and
+`send_in_reminder=true` still outstanding — scoped generally (not
+hardcoded to Fazal or this one form) so a second plant_head or a second
+monthly MANAGEMENT form later needs only a `form_links` row, not a new
+function. De-duplicated against `notifications`
+(`related_entity_id = '<form_links.id>:<istDateStr()>'`), the same pattern
+`mrm-reminder`'s escalation already uses, so a cron misfire or more-than-
+once-daily run cannot double-notify. Deployed live via the Supabase MCP
+connector and added to `supabase/functions/deploy.sh`'s `FUNCTIONS` array
+(deploy.sh is NOT auto-discovery — a new function must be added there or
+CI's Deploy Edge Functions workflow will never pick it up, same lesson as
+`send-push-notification` silently staying undeployed for a week).
+
+**Still open — same "paste one script" pattern as PATCH_18/PATCH_20 — Yash
+must run `PATCH_66_plant_head_monthly_form_30Sep2026.sql`'s
+`cron.schedule(...)` block himself in the Supabase SQL Editor, pasting a
+real key over `PASTE_YOUR_KEY_HERE`.** The form_links row is already live;
+only the daily cron trigger needs this manual step (the service-role key
+is never typed into chat with Claude, per this project's standing rule).
 
 ---
 

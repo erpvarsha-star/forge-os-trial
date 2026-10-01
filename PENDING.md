@@ -3,7 +3,19 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 30 Sep 2026 (session 18) — 4 Google Forms Yash provided
+**Last updated:** 30 Sep 2026 (session 19) — CON24 (Shriram Pawar) couldn't
+log in; root-caused to `HR_reset_pin.sql` silently resetting his PIN with
+the wrong (VFL-style) formula instead of the consultant formula — fixed his
+PIN (PATCH_67) and fixed the script itself so it can't recur for any other
+consultant. Checked live who among active employees has never signed in
+(10 people — see CLAUDE.md "Who has never signed in"). Registered Fazal's
+new monthly Google Form into `form_links` (PATCH_66, MANAGEMENT dept) and
+built+deployed a new edge function (`plant-head-form-reminder`) that
+notifies him daily from the 1st-5th IST while it's outstanding — **one
+manual step left for Yash: paste a real key into PATCH_66's
+`cron.schedule()` block in the Supabase SQL Editor to actually turn the
+daily trigger on** (the form itself is already visible in his Forms tab
+either way). Session 18 recap: 4 Google Forms Yash provided
 registered into `form_links` (PATCH_65): Administration dept (Kajal, Monthly
 + Daily Attendance) and Human Resource dept (existing HR team, Monthly +
 Daily Attendance). Could not read the forms' own content (docs.google.com
