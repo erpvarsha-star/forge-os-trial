@@ -658,7 +658,7 @@ explicit and correct rather than incidental.
 
 ---
 
-## App screen map (56 screens, 7 role groups — 27 Sep 2026: +1 (hr-admin)/approvals.tsx, +3 late-review.tsx across owner/plant-head/hr-admin; 28 Sep 2026: +1 shifts.tsx each in (manager)/(supervisor), reached via More, not a bottom tab — see "Shift allocation tabs" below)
+## App screen map (60 screens, 7 role groups — 27 Sep 2026: +1 (hr-admin)/approvals.tsx, +3 late-review.tsx across owner/plant-head/hr-admin; 28 Sep 2026: +1 shifts.tsx each in (manager)/(supervisor), reached via More, not a bottom tab — see "Shift allocation tabs" below; 1 Oct 2026: +1 shift-checkin-summary.tsx each in owner/plant-head/hr-admin/worker — see "Shift Check-in Summary screen" below)
 
 ```
 app/
@@ -679,6 +679,7 @@ app/
 │   ├── notifications.tsx  — in-app notification bell
 │   ├── qr.tsx             — QR scan check-in
 │   ├── profile.tsx        — employee profile
+│   ├── shift-checkin-summary.tsx — named-individual access only (Kajal, VFL1567), not role-gated (1 Oct 2026)
 │   └── more.tsx           — language toggle, logout
 ├── (supervisor)/
 │   ├── dashboard.tsx      — team attendance summary
@@ -708,6 +709,7 @@ app/
 │   ├── shifts.tsx         — shift assignment (master + per-employee)
 │   ├── missing-data.tsx   — employees missing phone/dept/supervisor
 │   ├── late-review.tsx    — chronic latecomers (>3x/month), grouped by shift (27 Sep 2026)
+│   ├── shift-checkin-summary.tsx — today/yesterday check-in matrix by shift × category (1 Oct 2026)
 │   └── more.tsx
 ├── (plant-head)/
 │   ├── dashboard.tsx      — plant-wide attendance + low-attendance alert
@@ -715,6 +717,7 @@ app/
 │   ├── mrm.tsx            — view MRM submission status per dept
 │   ├── email.tsx          — priority email task inbox
 │   ├── late-review.tsx    — chronic latecomers (>3x/month), grouped by shift (27 Sep 2026)
+│   ├── shift-checkin-summary.tsx — today/yesterday check-in matrix by shift × category (1 Oct 2026)
 │   └── more.tsx
 ├── (owner)/
 │   ├── dashboard.tsx      — top-level KPIs
@@ -722,6 +725,7 @@ app/
 │   ├── alerts.tsx         — open fraud alerts
 │   ├── eotm.tsx           — Employee of the Month per category
 │   ├── late-review.tsx    — chronic latecomers (>3x/month), grouped by shift (27 Sep 2026)
+│   ├── shift-checkin-summary.tsx — today/yesterday check-in matrix by shift × category (1 Oct 2026)
 │   └── more.tsx
 └── (security)/
     ├── dashboard.tsx      — vehicle log (inward/outward)
@@ -1390,6 +1394,116 @@ command from cron.job` (or any query that can return a stored
 Authorization header) once a real key might be in there — list `jobname`/
 `schedule`/`active` only, never `command`, for a job that might hold a live
 key.**
+
+---
+
+## shift-reminder was spamming "Your shift plan is ready" hourly — found and fixed 1 Oct 2026
+
+**Root cause.** The `shift-reminder-default` cron (`0 * * * *`, PATCH_20) sends
+no body, so the function infers its mode from `istNow().getUTCDay() === 4`
+(Thursday) alone — true on **every** hourly tick of a Thursday, not just
+once. Confirmed live via `notifications`: Yash got "Your shift plan is
+ready" 11 times between 03:00 and 13:00 IST on 1 Oct 2026 alone, and would
+have kept getting it every hour all day. Two real effects, both live bugs
+until this fix:
+1. Everyone with an `employee_shifts` row for the upcoming week got
+   re-notified every hour, all Thursday — not a one-time weekly notify as
+   designed.
+2. `daily_checkin_reminder` (pre-shift + missed-checkin alerts) **silently
+   never ran on Thursdays at all**, since the mode always resolved to
+   weekly. This had been true since PATCH_20 first scheduled the hourly
+   cron — not a new regression.
+
+Separately, Yash himself was in the notified set despite being owner —
+the code's own comment said "everyone except the owner is expected to have
+a shift assignment," but that exclusion only applied to the *missing-shift*
+alert, never to the notify-list itself. He has `employee_shifts` rows
+(General shift, likely from testing check-ins), so he qualified.
+
+**Fixed in `supabase/functions/shift-reminder/index.ts`, deployed live via
+the Supabase MCP connector (not yet pushed through CI at time of fix, given
+the active spam):**
+- Mode inference now gates `weekly_shift_notify` to a single IST hour
+  (`getUTCDay() === 4 && getUTCHours() === 9`) instead of the whole
+  Thursday — fires once per week, and restores `daily_checkin_reminder` for
+  the rest of Thursday's hourly ticks. 09:00 IST matches this project's
+  other daily-at-09:00-IST jobs (mrm-reminder, plant-head-form-reminder) —
+  Claude's judgment call on the exact hour, not something Yash specified.
+- `weeklyShiftNotify()` now explicitly strips every `role='owner'` employee
+  id out of the notify set before sending, regardless of whether they have
+  an `employee_shifts` row — closes the loophole the comment already
+  claimed was closed.
+
+Not yet done: push this fix through the normal git/CI path (it was deployed
+directly to unblock the live spam) — see PENDING.md.
+
+---
+
+## Shift Check-in Summary screen — built 1 Oct 2026, decisions from Yash
+
+A prior session attempted this screen and crashed before finishing (branch/
+container error, never committed — nothing to recover, this session rebuilt
+it from scratch). Three open questions from that attempt were put to Yash
+via `AskUserQuestion` and answered:
+
+1. **Security guards (Security Day/Night) in the matrix — "they will be 4
+   and 5 as they work 12 hrs, allocated by HR."** Read as: going forward HR
+   allocates security guards' 12-hour shifts as Shift 4 (day OT variant) /
+   Shift 5 (night OT variant) rather than the separate Security Day/Night
+   shift rows. **Not implemented as a migration of existing Security
+   Day/Night assignments** — that's a bigger workflow change nobody asked
+   for yet. The screen itself needed no special-casing either way: its
+   matrix rows are driven directly by whatever shift names actually appear
+   in `employee_shifts` for the selected date, so Security Day/Night,
+   Shift 4/5, or anything else all show up correctly without hardcoding a
+   fixed row list.
+2. **Unassigned check-ins — "they get allocated shift closest to their
+   check in time... also I get notification that you have been allotted a
+   shift, why?"** Confirms the existing 27/28 Sep shift-inference rule
+   (`lib/shiftInference.ts`) already handles this at check-in time by
+   writing a real `employee_shifts` row — so by the time this screen reads
+   data, there's normally no "Unassigned" bucket to show. The screen still
+   defensively buckets any truly missing row under "Unassigned" (never
+   silently drops a check-in from the matrix), but this should be rare.
+   The "why am I getting a shift notification" half of this answer led to
+   finding and fixing the `shift-reminder` bug above — not a question about
+   this screen, but asked in the same turn and worth running down
+   immediately per the locked "record a decision now" rule.
+3. **Screen access — "1 + kajal."** Option 1 was Owner + Plant Head + HR
+   Admin (role-gated, same pattern as `late-review.tsx`/`shifts.tsx`: an
+   `href: null` tab reached via each role's More menu). "+ Kajal" is Kajal
+   Balkrishna Sutar (VFL1567, `role='member'`, department Administration —
+   already documented elsewhere in this file for the attendance forms she
+   owns) — named individually because her role doesn't fit any of the
+   three gated groups. Implemented as a new
+   `SHIFT_CHECKIN_SUMMARY_ALLOWED_EMP_CODES` constant
+   (`constants/index.ts`) checked inside `app/(worker)/shift-checkin-summary.tsx`
+   (redirects home if the signed-in employee's `emp_code` isn't on the
+   list) and conditionally shown in `(worker)/more.tsx` only for employees
+   on that list — this is the first screen in the app gated by named
+   individual rather than role, so if more people need one-off access to a
+   screen later, extend that same constant rather than inventing a new
+   mechanism per screen.
+
+**Built:** `hooks/useShiftCheckinSummary.ts` + `components/ShiftCheckinSummary.tsx`
+(shared, same "thin per-role wrapper" pattern as Payslips/Late Comers
+Review/Shift Allocation), with thin wrapper screens in `(owner)`,
+`(plant-head)`, `(hr-admin)` (all `href: null`, reached via More, matching
+`late-review.tsx`) and the named-access wrapper in `(worker)`. Today/
+Yesterday toggle uses the business-date rollover (06:45 IST, Shift 3 filed
+under the previous day — see "Shift 3 belongs to the previous working day"
+above), not plain IST midnight, so an in-progress Shift 3 isn't split
+across two days in the matrix. Matrix rows = shift name (sorted by
+start_time, Unassigned last); columns = worker/staff/consultant/other ×
+in/out, with a Total row and column; an orange badge on the "In" count
+shows how many of that cell are checked in but not yet checked out.
+
+**Verified:** `npx tsc --noEmit` — same pre-existing 7-error baseline
+(`permissions-onboarding.tsx`/`FormsScreen.tsx` icon typing), none in the
+new files. `node scripts/check-i18n.mjs` — clean, Hindi covers every new
+`shiftCheckin.*` key. **Not yet exercised on a real device** — type-checked
+only. New APK build needed (touches `app/`, `components/`, `hooks/`,
+`constants/`).
 
 ---
 

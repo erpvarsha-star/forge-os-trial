@@ -3,7 +3,29 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 1 Oct 2026 (session 20) — Found every pg_cron job in this
+**Last updated:** 1 Oct 2026 (session 21) — A prior session attempting to
+build the Shift Check-in Summary screen crashed mid-build (container/branch
+error, nothing committed — see "Shift Check-in Summary screen" below for
+the full rebuild). While answering Yash's follow-up questions about that
+screen, found and fixed a real live bug: `shift-reminder`'s hourly cron
+sends no body, so on Thursdays the mode-inference (`getUTCDay() === 4`
+alone) resolved to `weekly_shift_notify` on **every** hourly tick, not just
+once — Yash got "Your shift plan is ready" 11 times between 03:00 and
+13:00 IST, and `daily_checkin_reminder` silently never ran at all on
+Thursdays. Fixed (gated to one IST hour, 09:00) and deployed live via the
+Supabase MCP connector to stop the active spam immediately; also closed a
+related gap where the owner could land in the notify list despite the
+code's own comment saying otherwise. Full detail in CLAUDE.md
+("shift-reminder was spamming..."). **Not yet pushed through the normal
+CI path** — deployed directly given the active spam; the local commit
+still needs to go up. Then built the Shift Check-in Summary screen for
+real: `hooks/useShiftCheckinSummary.ts` + `components/ShiftCheckinSummary.tsx`,
+thin wrapper screens in owner/plant-head/hr-admin (role-gated, via More)
+and a new named-individual-access pattern for Kajal (VFL1567) in the worker
+group — the first screen in this app gated by specific employee rather
+than role. Full detail in CLAUDE.md ("Shift Check-in Summary screen").
+**Not yet exercised on a real device** — type-checked and i18n-checked
+only; needs a new APK build. Session 20 recap: Found every pg_cron job in this
 project (not just the new Fazal one) had never had its placeholder
 Authorization header replaced, ever — confirmed live, and confirmed harmless
 since every edge function is deployed `--no-verify-jwt` so the gateway never
