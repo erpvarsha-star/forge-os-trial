@@ -701,5 +701,19 @@
     "shortHoursSectionLabel": "Short Working Hours",
     "shortHoursHint": "Days worked below the {{hours}}h minimum, more than 3 times this month",
     "noShortHours": "No employee has worked short hours more than the threshold this month"
+  },
+  "shiftCheckin": {
+    "title": "Shift Check-in Summary",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "totalIn": "Total In",
+    "totalOut": "Total Out",
+    "stillIn": "Still Checked In",
+    "byCategory": "By Category",
+    "matrixTitle": "Check-ins by Shift",
+    "shift": "Shift",
+    "total": "Total",
+    "noCheckins": "No check-ins recorded for this date",
+    "badgeHint": "Orange badge = checked in but not yet checked out"
   }
 }

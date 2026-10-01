@@ -70,6 +70,14 @@ async function weeklyShiftNotify(db: ReturnType<typeof supabaseAdmin>) {
 
   const employeesWithShift = new Set<string>((assignments ?? []).map((s: { employee_id: string }) => s.employee_id));
 
+  // Owner is never expected to have a shift assignment, but a test check-in
+  // (or any employee_shifts row ever written for them) can still land them
+  // in the query above — strip them out so "Your shift plan is ready" is
+  // never sent to the owner. Found 1 Oct 2026: Yash was getting this exact
+  // notification because of a General-shift row, not because of a real gap.
+  const { data: owners } = await db.from('employees').select('id').eq('role', 'owner');
+  for (const o of (owners ?? []) as { id: string }[]) employeesWithShift.delete(o.id);
+
   if (employeesWithShift.size > 0) {
     await notifyEmployees(db, {
       employeeIds: Array.from(employeesWithShift),
@@ -361,7 +369,22 @@ Deno.serve(async (req: Request) => {
   }
 
   if (!mode) {
-    mode = istNow().getUTCDay() === 4 ? 'weekly_shift_notify' : 'daily_checkin_reminder';
+    // ⚠ FIXED 1 Oct 2026. This used to be `getUTCDay() === 4` alone — true for
+    // EVERY hourly tick of the `shift-reminder-default` cron (0 * * * *) on a
+    // Thursday, not just once. Two real effects, found live: (1) everyone with
+    // a shift row for next week got "Your shift plan is ready" once per hour,
+    // all day — confirmed via `notifications`, 11 duplicate sends by 18:30 IST
+    // alone; (2) `daily_checkin_reminder` (pre-shift + missed-checkin alerts)
+    // silently never ran on Thursdays at all, since the mode always resolved
+    // to weekly. Gating to one IST hour makes weekly_shift_notify fire once
+    // per Thursday and restores the hourly check-in reminder for the rest of
+    // Thursday's hours. 09:00 IST matches this project's other daily 09:00
+    // IST jobs (mrm-reminder, plant-head-form-reminder) — Claude's judgment
+    // call on the exact hour, not something Yash specified; change the
+    // constant below if he wants it earlier/later relative to HR's planning.
+    const nowIst = istNow();
+    const isWeeklyNotifyHour = nowIst.getUTCDay() === 4 && nowIst.getUTCHours() === 9;
+    mode = isWeeklyNotifyHour ? 'weekly_shift_notify' : 'daily_checkin_reminder';
   }
 
   const db = supabaseAdmin();

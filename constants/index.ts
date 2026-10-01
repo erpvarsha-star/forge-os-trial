@@ -54,6 +54,17 @@ export const ATTENDANCE_STATUS_LABELS: Record<string, string> = {
   HL: 'Half Day',
 }
 
+// Named individuals given access to a screen outside their role group, where
+// the role-gate system (app/(role)/_layout.tsx + RoleGate) doesn't fit because
+// the person needs it but isn't owner/plant_head/hr_admin themselves.
+// Decision from Yash, 1 Oct 2026: Shift Check-in Summary goes to Owner +
+// Plant Head + HR Admin (role-gated, normal screens in each of those groups)
+// "+ Kajal" by name — Kajal Balkrishna Sutar (VFL1567), role='member',
+// department='Administration'. Checked against emp_code, not employee_id,
+// since emp_code is what this file documents and what a future session can
+// verify without a DB round trip.
+export const SHIFT_CHECKIN_SUMMARY_ALLOWED_EMP_CODES = ['VFL1567']
+
 export const ROLE_ROUTES: Record<string, string> = {
   member: '/(worker)/home',
   supervisor: '/(supervisor)/dashboard',

@@ -21,6 +21,7 @@ export default function HrAdminLayout() {
         <Tabs.Screen name="salary-request" options={{ href: null }} />
         <Tabs.Screen name="approvals" options={{ href: null }} />
         <Tabs.Screen name="late-review" options={{ href: null }} />
+        <Tabs.Screen name="shift-checkin-summary" options={{ href: null }} />
         <Tabs.Screen name="payslips" options={{ href: null }} />
         <Tabs.Screen name="payslip" options={{ href: null }} />
       </Tabs>
