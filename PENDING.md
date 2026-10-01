@@ -9,8 +9,9 @@ Authorization header replaced, ever — confirmed live, and confirmed harmless
 since every edge function is deployed `--no-verify-jwt` so the gateway never
 checks it (mrm-reminder had run successfully 227 times on the placeholder
 alone). Yash pasted a real key into `plant-head-form-reminder`'s job by
-hand; `PATCH_68_cron_keys_01Oct2026.sql` offers the same fix for the other
-6 jobs (cosmetic hygiene, not a functional fix — ⏳ not yet run). One
+hand; `PATCH_68_cron_keys_01Oct2026.sql` offered the same fix for the other
+6 jobs (cosmetic hygiene, not a functional fix) — **Yash ran it; verified
+all 7 cron jobs now hold a real key, none on the placeholder.** One
 incidental exposure: the real key Yash pasted showed up in a `cron.job`
 query result used to diagnose this, reaching the chat transcript the same
 way a direct paste would — flagged to him, rotation optional. Session 19

@@ -651,7 +651,7 @@ explicit and correct rather than incidental.
 | `PATCH_65_admin_hr_attendance_forms_30Sep2026.sql` | 4 `form_links` rows for Google Forms Yash provided: Administration dept (Kajal, Monthly + Daily Attendance) and Human Resource dept (existing HR team, Monthly + Daily Attendance) | ✅ Applied 30 Sep 2026 |
 | `PATCH_66_plant_head_monthly_form_30Sep2026.sql` | New `form_links` row (MANAGEMENT dept) for Fazal's monthly form (due 5th) + pg_cron schedule for the new `plant-head-form-reminder` edge function. See "Plant Head monthly form reminder" section below | form_links row ✅ Applied 30 Sep 2026 (via MCP) — **cron.schedule() step still ⏳, needs Yash to paste a real key in the SQL editor** |
 | `PATCH_67_con24_pin_fix_30Sep2026.sql` | Restores CON24's (Shriram Pawar) password to the documented consultant-formula starting PIN (`200024`), after `HR_reset_pin.sql` had silently overwritten it with the wrong (VFL-style) formula on 30 Sep. See "Employee data" below | ✅ Applied 30 Sep 2026 — verified matches `200024` |
-| `PATCH_68_cron_keys_01Oct2026.sql` | Replaces the placeholder Authorization header on the 6 cron jobs that still had it (see "Cron jobs never had real keys" below) | ⏳ Not yet run — cosmetic/hardening only, every job already works without it |
+| `PATCH_68_cron_keys_01Oct2026.sql` | Replaces the placeholder Authorization header on the 6 cron jobs that still had it (see "Cron jobs never had real keys" below) | ✅ Applied 1 Oct 2026 — verified all 7 cron jobs have a real key, none on the placeholder |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
@@ -1375,7 +1375,10 @@ not a functional fix: replaces the placeholder on the other 6 jobs
 (`five-s-challenge-generator`, `forms-due-reminder`, `mrm-reminder`,
 `mrm-reminder-escalation`, `nightly-scoring`, `shift-reminder-default`) to
 match what Yash already did for `plant-head-form-reminder`, so the header
-is correct if `--no-verify-jwt` is ever turned off. ⏳ Not yet run.
+is correct if `--no-verify-jwt` is ever turned off. **✅ Applied 1 Oct
+2026** — verified via `select jobname, command like '%PASTE_YOUR_KEY_HERE%'
+...` (boolean only, never selecting the raw `command` column now that a
+real key is stored in it): all 7 jobs show `false`, all `active = true`.
 
 **⚠ Incidental key exposure, 1 Oct 2026:** the real key Yash pasted into
 `plant-head-form-reminder`'s job appeared in a `select ... from cron.job`
