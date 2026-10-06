@@ -332,6 +332,12 @@ export interface FraudAlert {
   severity: 'low' | 'medium' | 'high'
   status: 'open' | 'investigating' | 'resolved'
   created_at: string
+  occurrence_count: number
+  last_occurred_at: string
+  resolution?: 'confirmed' | 'false_positive' | 'needs_investigation' | null
+  resolution_note?: string | null
+  resolved_by?: string | null
+  resolved_at?: string | null
 }
 
 export interface EmailTask {

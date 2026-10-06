@@ -36,7 +36,51 @@ import { handleOptions, jsonResponse } from '../_shared/cors.ts';
 import { supabaseAdmin, getPlantConfig } from '../_shared/supabaseAdmin.ts';
 import { notifyEmployees } from '../_shared/push.ts';
 import { distanceMeters } from '../_shared/geo.ts';
-import { istStartOfDayUTC } from '../_shared/istDate.ts';
+import { istStartOfDayUTC, istDateStr } from '../_shared/istDate.ts';
+
+// Logs one fraud_alerts row per employee+type+IST-day, incrementing
+// occurrence_count on repeat triggers instead of inserting a new row every
+// time -- found 6 Oct 2026 (Yash: "if the alert is of same person it needs
+// to be clubbed as one alert rather than different ones bringing the count
+// high") that a single flaky device could write 20 separate rows in a
+// 10-minute window, making the alert count look far worse than the real
+// number of distinct incidents. Returns true on the FIRST occurrence of the
+// day only, so the caller can skip re-notifying management on every repeat.
+async function logFraudAlert(
+  db: ReturnType<typeof supabaseAdmin>,
+  params: { type: 'mock_location' | 'buddy_punching' | 'bulk_confirm'; employeeId: string; description: string; severity: 'low' | 'medium' | 'high' }
+): Promise<boolean> {
+  const dayStartUTC = istStartOfDayUTC(istDateStr());
+  const nowIso = new Date().toISOString();
+
+  const { data: existing } = await db
+    .from('fraud_alerts')
+    .select('id, occurrence_count')
+    .eq('employee_id', params.employeeId)
+    .eq('type', params.type)
+    .eq('status', 'open')
+    .gte('created_at', dayStartUTC)
+    .maybeSingle();
+
+  if (existing) {
+    await db
+      .from('fraud_alerts')
+      .update({ occurrence_count: (existing.occurrence_count ?? 1) + 1, last_occurred_at: nowIso })
+      .eq('id', existing.id);
+    return false;
+  }
+
+  await db.from('fraud_alerts').insert({
+    type: params.type,
+    employee_id: params.employeeId,
+    description: params.description,
+    severity: params.severity,
+    status: 'open',
+    occurrence_count: 1,
+    last_occurred_at: nowIso,
+  });
+  return true;
+}
 
 type GpsCheckBody = {
   action: 'gps_check';
@@ -101,22 +145,25 @@ async function handleGpsCheck(db: ReturnType<typeof supabaseAdmin>, body: GpsChe
   if (mockLocation) {
     const { data: emp } = await db.from('employees').select('name').eq('id', body.employeeId).single();
 
-    await db.from('fraud_alerts').insert({
+    const isFirstToday = await logFraudAlert(db, {
       type: 'mock_location',
-      employee_id: body.employeeId,
+      employeeId: body.employeeId,
       description: `${emp?.name ?? 'An employee'}'s check-in was flagged for a mock-location app (${Math.round(distance)}m from plant)`,
       severity: 'high',
-      status: 'open',
     });
 
-    const managementIds = await getManagementIds(db, ['plant_head', 'owner']);
-    await notifyEmployees(db, {
-      employeeIds: managementIds,
-      type: 'fraud_alert',
-      title: 'Mock location detected',
-      body: `${emp?.name ?? 'An employee'}'s check-in was flagged for a mock-location app`,
-      relatedEntityType: 'fraud_alerts',
-    });
+    // Only notify on the first occurrence of the day -- a flaky device
+    // retriggering repeatedly should not page management once per retry.
+    if (isFirstToday) {
+      const managementIds = await getManagementIds(db, ['plant_head', 'owner']);
+      await notifyEmployees(db, {
+        employeeIds: managementIds,
+        type: 'fraud_alert',
+        title: 'Mock location detected',
+        body: `${emp?.name ?? 'An employee'}'s check-in was flagged for a mock-location app`,
+        relatedEntityType: 'fraud_alerts',
+      });
+    }
   }
 
   return jsonResponse({
@@ -157,22 +204,23 @@ async function handleBulkConfirmationCheck(db: ReturnType<typeof supabaseAdmin>,
   // reads. fraud_flags is reserved for the buddy-device check only (see the
   // "SECTION O" comment in FINAL_SCHEMA) — writing bulk-confirm flags there
   // made them invisible everywhere management looks for them.
-  await db.from('fraud_alerts').insert({
+  const isFirstToday = await logFraudAlert(db, {
     type: 'bulk_confirm',
-    employee_id: body.supervisorId,
+    employeeId: body.supervisorId,
     description: `${supervisor?.name ?? 'A supervisor'} confirmed ${count} workers in ${threshold.seconds} seconds`,
     severity: 'high',
-    status: 'open',
   });
 
-  const plantHeadIds = await getManagementIds(db, ['plant_head']);
-  await notifyEmployees(db, {
-    employeeIds: plantHeadIds,
-    type: 'fraud_alert',
-    title: 'Fraud alert',
-    body: `${supervisor?.name ?? 'A supervisor'} confirmed ${count} workers in ${threshold.seconds} seconds`,
-    relatedEntityType: 'fraud_alerts',
-  });
+  if (isFirstToday) {
+    const plantHeadIds = await getManagementIds(db, ['plant_head']);
+    await notifyEmployees(db, {
+      employeeIds: plantHeadIds,
+      type: 'fraud_alert',
+      title: 'Fraud alert',
+      body: `${supervisor?.name ?? 'A supervisor'} confirmed ${count} workers in ${threshold.seconds} seconds`,
+      relatedEntityType: 'fraud_alerts',
+    });
+  }
 
   // Escalation tiers based on this supervisor's bulk-confirm alert count this month.
   // body.shiftDate is an IST calendar date (YYYY-MM-DD); the month boundary

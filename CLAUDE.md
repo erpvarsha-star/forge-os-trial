@@ -601,11 +601,14 @@ against real data, both scoped to `service_role`/dashboard access only
 (not exposed to `anon`/`authenticated`, so none of this touches the app's
 own RLS-gated client queries):**
 
-1. **`daily_attendance_report`** (`PATCH_74`, 6 Oct 2026) — one row per
-   active employee for *today* (IST), re-evaluated on every read: Check
-   In/Out (HH:MM), Working Hrs (with the no-checkout default already
-   applied), Late Mins, Overtime Hrs. Built originally for the
-   Whalesync/Sheet plan, still useful standalone.
+1. **`daily_attendance_report`** (`PATCH_74`, widened to 2 days by
+   `PATCH_77`, 6 Oct 2026) — one row per active employee for *today and
+   yesterday* (IST), re-evaluated on every read: Check In/Out (HH:MM),
+   Working Hrs (with the no-checkout default already applied), Late
+   Mins, Overtime Hrs. Built originally for the Whalesync/Sheet plan,
+   still useful standalone. Two days, not just today, because Shift 3
+   belongs to the previous working day and "today" alone would always
+   be mid-flight — matches the original `AttendanceReport.gs` design.
 2. **`monthly_attendance_summary`** (`PATCH_75`, 6 Oct 2026) — one row per
    employee per calendar month that has at least one attendance row:
    `days_present`, `days_absent`, `days_late`, `days_short_hours`,
@@ -774,6 +777,11 @@ explicit and correct rather than incidental.
 | `PATCH_70_gps_radius_45m_06Oct2026.sql` | Raises `plant_locations.radius_meters` 25m → 45m on all 12 real campus points (third change to this value — 15m, then 25m, now 45m) | ✅ Applied 6 Oct 2026 |
 | `PATCH_71_kajal_pune_schedule_06Oct2026.sql` | New `employees.default_shift_id`/`weekly_off_day` columns + "General (Pune)" shift (10:00–19:00) + Kajal (VFL1567) set to both. See "12-point request, 6 Oct 2026" below | ✅ Applied 6 Oct 2026 |
 | `PATCH_72_overtime_hours_and_auto_checkout_06Oct2026.sql` | New `attendance_records.overtime_hours` column + hourly cron for the new `auto-checkout` edge function. See "12-point request, 6 Oct 2026" below | ✅ Applied 6 Oct 2026 |
+| `PATCH_73_fix_reset_employee_pin_con_formula_06Oct2026.sql` | Fixes the real CON24 root cause — `reset_employee_pin()` RPC (HR's own self-service tool, `missing-data.tsx`) only ever implemented the VFL-style PIN formula; added the missing CON-prefix branch | ✅ Applied 6 Oct 2026 |
+| `PATCH_74_daily_attendance_report_view_06Oct2026.sql` | Read-only `daily_attendance_report` view (today + yesterday, PATCH_77 widened it from today-only) for self-serve Table Editor/SQL Editor review — see "Self-serve data review" below | ✅ Applied 6 Oct 2026 |
+| `PATCH_75_monthly_attendance_summary_view_06Oct2026.sql` | Read-only `monthly_attendance_summary` view — late/overtime/short-hours per employee per month, same rules the app uses, for self-serve review without Claude | ✅ Applied 6 Oct 2026 |
+| `PATCH_76_fraud_alert_resolution_and_dedup_06Oct2026.sql` | Adds `resolve_fraud_alert()` RPC (Confirmed/False Positive/Investigate) + occurrence-count dedup to `fraud_alerts` — collapsed 39 inflated rows to 4 real incidents. See "Fraud alerts" below | ✅ Applied 6 Oct 2026 |
+| `PATCH_77_daily_attendance_report_two_day_06Oct2026.sql` | Widens `daily_attendance_report` (PATCH_74) from today-only to today+yesterday, matching the originally-agreed design | ✅ Applied 6 Oct 2026 |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
@@ -1197,6 +1205,65 @@ spoofing app or a device/OS quirk (some Android OEMs flag `mocked:true`
 spuriously) is not answerable from data alone — **needs the same
 one-screenshot check as VFL4057: what does their check-in screen actually
 say when it fails.** Not yet resolved as of this note.
+
+**Fixed 6 Oct 2026 — resolution finally exists, and the 39-row count was
+itself a bug.** Yash: "you have not given me option to resolve or
+escalate the alert. so what is it for? ... if the alert is of same person
+it needs to be clubbed as one alert rather than different ones bringing
+the count high." Both true — confirmed by re-reading `alerts.tsx`: it was
+(and had always been) 100% read-only, no action of any kind; the only
+resolution ever done was PATCH_52's one-off raw SQL `UPDATE`, never
+through the app, because `fraud_alerts` had no UPDATE RLS policy at all.
+And the "39 open alerts" figure was itself an artifact — `gps_check`
+inserted a brand-new row on every single flagged check-in with zero
+dedup, so one flaky device retriggering 20 times in 10 minutes counted as
+20 alerts, not one incident.
+
+**`PATCH_76_fraud_alert_resolution_and_dedup_06Oct2026.sql`** fixes both:
+- `fraud_alerts` gains `occurrence_count`/`last_occurred_at` (incremented
+  on a same-employee/same-type/same-IST-day repeat instead of a new row —
+  `logFraudAlert()` in `supabase/functions/fraud-detector/index.ts` does
+  the increment-or-insert; a partial unique index,
+  `fraud_alerts_open_daily_dedup`, is a safety net if that logic is ever
+  bypassed) and `resolution`/`resolution_note`/`resolved_by`/`resolved_at`.
+  One-time cleanup collapsed the historical 39 rows to 4 (VFL5442: 20,
+  VFL4036: 13 on 26 Sep + 1 on 27 Sep — correctly kept as 2 rows since
+  they're different IST days, VFL5446: 5) — same 3 employees, same
+  underlying incidents, just not inflated into 39 rows.
+- **`resolve_fraud_alert(p_id, p_resolution, p_note)`** — `SECURITY
+  DEFINER`, owner-only (matches where `alerts.tsx` has always lived).
+  Three resolutions, exactly the "what decision is needed from me"
+  answer: **Confirmed** (real issue → `status='resolved'`, closed out as
+  a genuine incident), **False Positive** (device/OS quirk, not fraud →
+  `status='resolved'`), **Investigate** (not sure yet → stays
+  `status='investigating'`, visible on `alerts.tsx` with a different
+  badge next time the read query is widened past `status='open'` — not
+  done this pass, `alerts.tsx` still filters to `open` only). No new
+  UPDATE RLS policy — RPC-only, same pattern this project already uses
+  for leave/advance review and salary-change approval.
+- `app/(owner)/alerts.tsx` now shows an "Nx today" badge when
+  `occurrence_count > 1` and three per-alert buttons (Confirmed / False
+  Positive / Investigate), each opening a shared note modal, calling the
+  RPC, refetching after. Push notifications to plant_head/owner also now
+  fire only on the first occurrence of a given day, not once per retry —
+  the same spam this fix addresses was also paging management repeatedly
+  for one incident.
+- Edge function redeployed (version 13) via `mcp__Supabase__deploy_edge_function`.
+- Verified: `npx tsc --noEmit` still exactly 7 (pre-existing baseline),
+  `node scripts/check-i18n.mjs` clean, live row count confirmed 39→4.
+- **Not done this pass, deliberately out of scope:** `fraud_flags` (the
+  separate buddy-device-check table) still has no resolution path either
+  — not raised by Yash, not touched.
+
+**A broader "Needs Your Call" design exists but was NOT built this
+pass** — a second, wider feature (same session) for `employee_shifts`
+rows the system guessed on (inferred/reclassified, not HR-allocated),
+with a third resolution option ("flag this logic for Claude to review")
+meant to feed Claude's periodic review of `lib/shiftInference.ts`/
+`lib/workingHours.ts`. Fully designed (schema, RPCs, UI, i18n, open
+decisions) but not implemented — build only if Yash asks for it
+specifically; the fraud-alert fix above was the narrower, immediately-
+asked-for piece.
 
 ---
 

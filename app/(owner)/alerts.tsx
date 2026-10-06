@@ -1,30 +1,47 @@
-import React, { useState, useEffect } from 'react'
-import { View, Text, ScrollView } from 'react-native'
+import React, { useState, useCallback, useEffect } from 'react'
+import { View, Text, ScrollView, Modal } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/hooks/useAuth'
 import { Header } from '@/components/Header'
 import { Card } from '@/components/Card'
+import { Button } from '@/components/Button'
+import { Input } from '@/components/Input'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import { FraudAlert } from '@/types'
-import { AlertTriangle, MapPin, Users, Zap, ShieldCheck } from 'lucide-react-native'
+import { AlertTriangle, MapPin, Users, Zap, ShieldCheck, CheckCircle2, XCircle, Search } from 'lucide-react-native'
 import { STATUS } from '@/components/theme'
+
+type Resolution = 'confirmed' | 'false_positive' | 'needs_investigation'
 
 export default function OwnerAlerts() {
   const { t } = useTranslation()
   const { employee } = useAuth()
   const [alerts, setAlerts] = useState<FraudAlert[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [actingId, setActingId] = useState<string | null>(null)
+  const [pending, setPending] = useState<{ id: string; resolution: Resolution } | null>(null)
+  const [note, setNote] = useState('')
+
+  const fetchAlerts = useCallback(async () => {
+    const { data } = await supabase.from('fraud_alerts').select('*').eq('status', 'open').order('occurrence_count', { ascending: false })
+    if (data) setAlerts(data as FraudAlert[])
+    setIsLoading(false)
+  }, [])
 
   useEffect(() => {
-    const fetch = async () => {
-      if (!employee) return
-      const { data } = await supabase.from('fraud_alerts').select('*').eq('status', 'open').order('created_at', { ascending: false })
-      if (data) setAlerts(data as FraudAlert[])
-      setIsLoading(false)
-    }
-    fetch()
-  }, [employee])
+    if (employee) fetchAlerts()
+  }, [employee, fetchAlerts])
+
+  const confirmResolution = async () => {
+    if (!pending) return
+    setActingId(pending.id)
+    const { error } = await supabase.rpc('resolve_fraud_alert', { p_id: pending.id, p_resolution: pending.resolution, p_note: note || null })
+    setActingId(null)
+    setPending(null)
+    setNote('')
+    if (!error) await fetchAlerts()
+  }
 
   const getIcon = (type: string) => {
     const color = STATUS.rejected.fg
@@ -75,11 +92,47 @@ export default function OwnerAlerts() {
                   <View className="flex-1">
                     <View className="flex-row items-center justify-between">
                       <Text className="text-sm font-bold text-status-rejected flex-1 pr-2">{t(`owner.${alert.type}`)}</Text>
-                      <View className={`px-2 py-0.5 rounded-full ${badge.bg}`}>
-                        <Text className={`text-xs font-bold capitalize ${badge.text}`}>{alert.severity}</Text>
+                      <View className="flex-row items-center gap-1.5">
+                        {alert.occurrence_count > 1 && (
+                          <View className="px-2 py-0.5 rounded-full bg-white">
+                            <Text className="text-xs font-bold text-status-rejected">{t('owner.alertOccurrences', { count: alert.occurrence_count })}</Text>
+                          </View>
+                        )}
+                        <View className={`px-2 py-0.5 rounded-full ${badge.bg}`}>
+                          <Text className={`text-xs font-bold capitalize ${badge.text}`}>{alert.severity}</Text>
+                        </View>
                       </View>
                     </View>
                     <Text className="text-xs text-ink-700 mt-1">{alert.description}</Text>
+                    <View className="flex-row gap-2 mt-3">
+                      <Button
+                        title="owner.alertConfirmed"
+                        onPress={() => setPending({ id: alert.id, resolution: 'confirmed' })}
+                        loading={actingId === alert.id}
+                        variant="danger"
+                        size="sm"
+                        className="flex-1"
+                        icon={<CheckCircle2 size={14} color="white" />}
+                      />
+                      <Button
+                        title="owner.alertFalsePositive"
+                        onPress={() => setPending({ id: alert.id, resolution: 'false_positive' })}
+                        loading={actingId === alert.id}
+                        variant="secondary"
+                        size="sm"
+                        className="flex-1"
+                        icon={<XCircle size={14} color="#374151" />}
+                      />
+                      <Button
+                        title="owner.alertNeedsInvestigation"
+                        onPress={() => setPending({ id: alert.id, resolution: 'needs_investigation' })}
+                        loading={actingId === alert.id}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        icon={<Search size={14} color="#1D4ED8" />}
+                      />
+                    </View>
                   </View>
                 </View>
               </Card>
@@ -87,6 +140,21 @@ export default function OwnerAlerts() {
           })
         )}
       </ScrollView>
+
+      <Modal visible={!!pending} transparent animationType="slide">
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className="bg-white rounded-t-2xl p-6">
+            <Text className="text-lg font-bold text-ink-900 mb-3">
+              {pending?.resolution === 'confirmed' ? t('owner.alertConfirmed')
+                : pending?.resolution === 'false_positive' ? t('owner.alertFalsePositive')
+                : t('owner.alertNeedsInvestigation')}
+            </Text>
+            <Input value={note} onChangeText={setNote} placeholder={t('owner.alertNotePlaceholder')} multiline numberOfLines={3} className="mb-4" />
+            <Button title="common.confirm" onPress={confirmResolution} variant="primary" className="mb-2" />
+            <Button title="common.cancel" onPress={() => { setPending(null); setNote('') }} variant="ghost" />
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 }
