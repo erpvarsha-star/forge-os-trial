@@ -783,6 +783,8 @@ explicit and correct rather than incidental.
 | `PATCH_76_fraud_alert_resolution_and_dedup_06Oct2026.sql` | Adds `resolve_fraud_alert()` RPC (Confirmed/False Positive/Investigate) + occurrence-count dedup to `fraud_alerts` — collapsed 39 inflated rows to 4 real incidents. See "Fraud alerts" below | ✅ Applied 6 Oct 2026 |
 | `PATCH_77_daily_attendance_report_two_day_06Oct2026.sql` | Widens `daily_attendance_report` (PATCH_74) from today-only to today+yesterday, matching the originally-agreed design | ✅ Applied 6 Oct 2026 |
 | `PATCH_78_needs_your_call_shift_assignments_06Oct2026.sql` | Adds `employee_shifts` provenance (`assignment_source`/`review_outcome`) + `resolve_shift_assignment()` RPC — the shift-assignment half of "Needs Your Call". See "Fraud alerts" section below | ✅ Applied 6 Oct 2026 |
+| `PATCH_79_fix_new_hire_pin_formula_06Oct2026.sql` | `approve_salary_change_request()` had the same VFL-only PIN bug PATCH_73 fixed in `reset_employee_pin()` — never fired yet (no new consultant has ever gone through this RPC), found while verifying "is the CON24 fix applicable to all new additions" | ✅ Applied 6 Oct 2026 |
+| `PATCH_80_weekly_off_worked_hours_view_06Oct2026.sql` | New `weekly_off_worked_hours` view — anyone who worked on their own weekly-off day (Friday by default), full hours reported as OT per Yash's "just a count for now" answer | ✅ Applied 6 Oct 2026 |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
@@ -1757,6 +1759,69 @@ the first pass.
 **Verified end-to-end**: `apk-85` (commit `4ba72ee`) built successfully and
 contains every code change from this session. Confirmed via
 `mcp__github__actions_list`/`get_latest_release`, not assumed from the push.
+
+## Verification pass, 6 Oct 2026 evening — Yash's 8-point status check
+
+Yash asked to confirm 8 things were actually working, not just claimed.
+Checked live (code + DB) rather than from memory, per the locked rule:
+
+1. **No one is force-checked-out early** — `auto-checkout` only touches a
+   row 24h+ after `check_in_time` with no checkout (confirmed its own
+   cutoff logic). This is the no-checkout convention Yash himself asked
+   for, not an early cutoff.
+2. **GPS 45m** — confirmed live: all 12 real campus points at 45m, Pune
+   Office correctly untouched at 200m.
+3. **QR slowness** — confirmed `buildQrValue()` truncates the salt to 16
+   chars, already shipped (apk-85+, before today).
+4. **Early check-in (06:00/06:30) correctly resolves to Shift 1, not
+   Shift 3** — traced `findClosestShift()` by hand against the live
+   shift set: Shift 1's window now starts at 06:00 (60-min buffer at the
+   Shift3→Shift1/4 handoff), so a 06:00/06:30 check-in lands in Shift 1's
+   window and is on time, never late against Shift 3 or Shift 5.
+5. **CON24 fix scope** — `reset_employee_pin()`'s CON% branch is generic
+   (any CON-prefixed code), not hardcoded to CON24, confirmed via
+   `pg_get_functiondef`. **But found a real gap while checking this**:
+   `approve_salary_change_request()` (the RPC that provisions login for
+   a brand-new hire) had the *same* VFL-only bug, never fixed by PATCH_73
+   because it's a different function. Never actually fired (no consultant
+   has been added through this RPC — all added via direct SQL to date),
+   but it would have set the wrong starting PIN the first time a new
+   consultant was approved through the app. Fixed, `PATCH_79`.
+   **Who assigns `emp_code` today, regardless of category**: nobody in
+   the app does — there is no in-app screen that submits a new-hire
+   request (`salary_change_requests.is_new_hire=true`); every employee
+   added this project ever has been inserted via direct SQL, using the
+   real code Yash/HR provides from the salary sheet, never auto-generated
+   or fabricated (same rule that's been blocking Shakeel Sayyad's
+   insertion). That hasn't changed.
+6. **Friday check-in** — already confirmed working (nothing blocks it).
+   **"Query will be raised to treat as OT"** — did not exist before;
+   built now, `PATCH_80`'s `weekly_off_worked_hours` view, verified live
+   against real 2 Oct 2026 (a Friday) data.
+7. **Kajal / "no shift scheduled" blocking check-in"** — grepped both
+   check-in call sites and found **no code path blocks check-in for a
+   missing shift, for anyone, ever** — check-in always proceeds and a
+   shift gets inferred or defaulted. What actually changed for Kajal
+   specifically is `default_shift_id` (PATCH_71): before it existed she
+   would have been *misclassified* into the general 9am pool and shown
+   late at a 10am arrival — never blocked outright. Confirmed both
+   `CheckInCard.tsx` and `home.tsx` check `employee.default_shift_id`
+   before the generic inference.
+8. **"Some people showing 1 present, previous dates missing"** —
+   investigated, not fully resolved. Ruled out: no duplicate
+   `auth_user_id` across employees (would cause check-ins to land on the
+   wrong person); daily `attendance_records` row counts are healthy and
+   steady across 26 Sep–6 Oct (60–79/day, Friday correctly lower); Yash's
+   own account (`VFL1001`) showing 1 October row is **not a bug** — his
+   September history shows the same sporadic, non-daily pattern. **Did**
+   find two employees (VFL1543, VFL1549) who checked in every single day
+   26 Sep–1 Oct and then have zero rows 2–6 Oct, breaking an otherwise
+   perfectly consistent pattern — worth Yash confirming whether they're
+   genuinely on leave/not working this week, since the data alone can't
+   distinguish that from a real problem. **Still need from Yash**: one
+   specific emp_code (or which exact screen he's looking at) where he is
+   certain a check-in happened but isn't showing — without that, this
+   can't be narrowed further than "no systemic data loss found."
 
 ---
 
