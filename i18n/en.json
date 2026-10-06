@@ -617,6 +617,20 @@
     "myTeam": "My Team",
     "noTeam": "You are not set as the shift allocator for any employees yet"
   },
+  "shiftCheckinSummary": {
+    "tab": "Shift Check-in Summary",
+    "title": "Shift Check-in Summary",
+    "subtitle": "Check-in and check-out counts by shift and category",
+    "totalCheckedIn": "Total Checked In",
+    "totalCheckedOut": "Total Checked Out",
+    "stillCheckedIn": "Still Checked In",
+    "tableTitle": "By shift and category",
+    "shiftColumn": "Shift",
+    "unassigned": "Unassigned",
+    "in": "In",
+    "out": "Out",
+    "securityFootnote": "Security Day and Security Night shifts are not included in this view."
+  },
   "owner": {
     "kpiDashboard": "KPI Dashboard",
     "attendanceKpi": "Attendance %",
