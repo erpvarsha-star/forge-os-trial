@@ -512,6 +512,61 @@ still Yash/HR's step.
    Summary" don't collide with anything already there before the first
    real run.
 
+**⚠ SUPERSEDED 6 Oct 2026 — Apps Script approach abandoned, see below.**
+Yash: "your code .gs for pulling from supabase into sheet is not working."
+(Root cause was almost certainly that the one-time paste-into-editor +
+`installAttendanceReportTrigger()` step above was never done, not a bug in
+the script — but Yash wants a different method either way, so this file
+no longer tracks `AttendanceReport.gs` as the live path forward. The file
+itself is left in `scripts/` but should not be pasted into Apps Script
+going forward; the sections above are kept only as a record of what was
+built and why, not as a to-do.)
+
+## Daily attendance in Google Sheets — Whalesync, not Apps Script (6 Oct 2026)
+
+**Decision from Yash, 6 Oct 2026**: no Apps Script, no Claude-orchestrated
+automation tool (Make/Zapier) either — "you need connectors that supabase
+can use and not you," i.e. a tool that connects directly to Supabase and
+Google Sheets on its own, continuously, rather than Claude scripting a
+daily batch job through a third-party automation platform.
+
+**Chosen tool: Whalesync** (not a Supabase product, but a well-known
+third-party continuous-sync tool many Supabase users pair with it for
+exactly this — DB table/view → Google Sheet, kept live, no cron needed).
+
+**What's ready on the Supabase side, done 6 Oct 2026**: Whalesync syncs
+tables/views as-is — it cannot run custom SQL — but the daily attendance
+report is a computed join (formatted check-in/out times, default hours
+for a no-checkout day, department sort), not a raw table. So
+`PATCH_74_daily_attendance_report_view_06Oct2026.sql` adds a Postgres
+**view**, `public.daily_attendance_report`, with exactly that shape —
+Date, Emp Code, Name, Department, Check In, Check Out, Working Hrs, Late
+Mins, Overtime Hrs, one row per active employee per day (absent employees
+get a blank row, never dropped, same "never silently drop people" rule as
+the in-app dashboards) — so Whalesync has one clean source to point at.
+Re-evaluates `now()` on every read, so "today" is always actually today in
+IST, no stored/stale date. **Not granted to `anon`/`authenticated`** —
+only readable via the `service_role` key, same key this project's other
+admin-side integrations already use, never the app's own client queries.
+Verified live: 99 rows on creation, matching the active headcount that day.
+
+**Still Yash's own step, not done yet**: sign up at whalesync.com, connect
+Supabase (needs the project's `service_role` key — pasted directly into
+Whalesync's own connection form, never into this chat, same rule as every
+other key in this file), connect the Google account that owns the "Forge
+OS - Daily Attendance - 2026-10-06" sheet (OAuth, no key to paste), then
+create a one-way sync: source = `daily_attendance_report` view → that
+sheet's "Daily Attendance" tab. Whalesync keeps it continuously current
+after that — no daily cron, no scenario to maintain, nothing further for
+Claude to build unless Yash wants the Monthly Attendance Summary tab done
+the same way (a second view, same pattern, not yet built — ask before
+building it).
+
+**Abandoned for this**: the Make.com scenario (scheduler → Postgres query
+→ Google Sheets bulk-write) that was mid-build before Yash's "connectors
+that supabase can use and not you" clarification — no Make credential
+request was created, nothing to undo.
+
 ## Owner has no KPI tab — decision from Yash, 28 Sep 2026
 
 Redundant with `dashboard/index.html` (the plant HTML dashboard, which
