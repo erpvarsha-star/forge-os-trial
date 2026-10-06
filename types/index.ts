@@ -18,6 +18,13 @@ export interface Employee {
   must_change_pin?: boolean
   /** False for owner and remote-office employees who have no gate QR to scan. */
   requires_qr: boolean
+  /** PATCH_71. Used when no employee_shifts row exists for a date, checked
+   *  before the generic closest-shift inference — e.g. Kajal's "General
+   *  (Pune)" 10am shift, not every General employee's 9am. */
+  default_shift_id?: string
+  /** PATCH_71. 0=Sunday..6=Saturday. Null means the company default,
+   *  Friday, for everyone except the few people this has been set for. */
+  weekly_off_day?: number | null
   created_at: string
   updated_at: string
 }

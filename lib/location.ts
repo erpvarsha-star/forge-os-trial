@@ -121,7 +121,19 @@ export function istQrKey(): { date: string; bucket: number } {
   return { date, bucket }
 }
 
+// Only the first 16 hex chars (64 bits) of the salt go into the QR itself —
+// 6 Oct 2026, after "scans are taking 10 minutes" turned out to be the
+// camera struggling to read the code, not GPS or server latency. The full
+// value was plant_code(~7) + date(10) + bucket(2) + the FULL 48-char salt
+// (PATCH_16) ≈ 70 characters, dense enough to need a larger QR version that
+// a factory-floor phone camera reads slowly or not at all. A code that
+// rotates every 30 minutes doesn't need the salt's full 192 bits of
+// entropy — 64 is already far more than enough to resist guessing inside
+// one 30-min window, and this shrinks the encoded string to ~38 characters.
+const QR_SALT_CHARS = 16
+
 export function buildQrValue(plant: PlantConfig): string {
   const { date, bucket } = istQrKey()
-  return `${plant.id}-${date}-${bucket}-${plant.qr_secret_salt}`
+  const shortSalt = plant.qr_secret_salt.slice(0, QR_SALT_CHARS)
+  return `${plant.id}-${date}-${bucket}-${shortSalt}`
 }
