@@ -785,6 +785,7 @@ explicit and correct rather than incidental.
 | `PATCH_78_needs_your_call_shift_assignments_06Oct2026.sql` | Adds `employee_shifts` provenance (`assignment_source`/`review_outcome`) + `resolve_shift_assignment()` RPC — the shift-assignment half of "Needs Your Call". See "Fraud alerts" section below | ✅ Applied 6 Oct 2026 |
 | `PATCH_79_fix_new_hire_pin_formula_06Oct2026.sql` | `approve_salary_change_request()` had the same VFL-only PIN bug PATCH_73 fixed in `reset_employee_pin()` — never fired yet (no new consultant has ever gone through this RPC), found while verifying "is the CON24 fix applicable to all new additions" | ✅ Applied 6 Oct 2026 |
 | `PATCH_80_weekly_off_worked_hours_view_06Oct2026.sql` | New `weekly_off_worked_hours` view — anyone who worked on their own weekly-off day (Friday by default), full hours reported as OT per Yash's "just a count for now" answer | ✅ Applied 6 Oct 2026 |
+| `PATCH_81_kajal_general_pune_shift_fix_06Oct2026.sql` | VFL1567 (Kajal) had 85 `employee_shifts` rows (24 Sep–31 Dec) bulk-allocated to plain `General` (09:00) before her Pune schedule existed — HR-allocated rows always beat `default_shift_id`, so she was marked late every day against the wrong shift. Fixed 79 rows (1 Oct onward) + recomputed her 1/3/5/6 Oct attendance | ✅ Applied 6 Oct 2026 |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
@@ -1822,6 +1823,24 @@ Checked live (code + DB) rather than from memory, per the locked rule:
    specific emp_code (or which exact screen he's looking at) where he is
    certain a check-in happened but isn't showing — without that, this
    can't be narrowed further than "no systemic data loss found."
+
+   **Resolved for VFL1567 (Kajal) specifically, once Yash named her.**
+   Not data loss at all — she checked in every day, but 85
+   `employee_shifts` rows (24 Sep–31 Dec 2026) had her bulk-allocated to
+   plain `General` (09:00, `assignment_source='hr_allocated'`) before
+   her "General (Pune)" (10:00) schedule existed (`PATCH_71`, same day).
+   An HR-allocated row always wins over `default_shift_id` by design
+   (correct for everyone else), so her real 10am shift never got a
+   chance to apply — she showed up "late" by 64–95 minutes every day for
+   arriving exactly on time for her actual shift. `PATCH_81`: corrected
+   79 rows (1 Oct onward; pre-1-Oct test-mode rows left alone) +
+   recomputed her already-recorded 1/3/5/6 Oct attendance against the
+   real 10:00+30min grace (1/5/6 Oct: L→P; 3 Oct: L 95min→L 35min — she
+   really was 5 min over grace, not 95). **Not fixed, flagged instead**:
+   nothing stops a future bulk/master shift allocation from silently
+   overwriting a `default_shift_id` employee's special schedule again —
+   she's the only one today, so this can only recur for her specifically
+   until a second such employee exists.
 
 ---
 
