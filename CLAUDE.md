@@ -524,6 +524,12 @@ built and why, not as a to-do.)
 
 ## Daily attendance in Google Sheets — Whalesync, not Apps Script (6 Oct 2026)
 
+**⚠ SUPERSEDED same day — Whalesync dropped, too expensive (Yash's own
+words).** See "Self-serve data review" below for the final answer: Table
+Editor + SQL views directly in Supabase, no sync tool at all. The
+`daily_attendance_report` view this section built is still live and still
+useful — just browsed directly, not synced anywhere.
+
 **Decision from Yash, 6 Oct 2026**: no Apps Script, no Claude-orchestrated
 automation tool (Make/Zapier) either — "you need connectors that supabase
 can use and not you," i.e. a tool that connects directly to Supabase and
@@ -566,6 +572,63 @@ building it).
 → Google Sheets bulk-write) that was mid-build before Yash's "connectors
 that supabase can use and not you" clarification — no Make credential
 request was created, nothing to undo.
+
+## Self-serve data review — Table Editor + SQL views, no Claude needed (6 Oct 2026)
+
+**🔒 LOCKED decision from Yash, 6 Oct 2026.** Dropped Whalesync (cost) and
+every other sync-tool idea above. Yash's own framing, direct quote: "who
+is overtime, who is late can be answered by me to supabase than going
+through you" — reviewing data must not depend on Claude, month after
+month. Only **changing the app** (features, bugs, schema, screens) should
+still need Claude — same as any running software needs a developer for
+changes, not for being read.
+
+**What this means in practice, and where the line actually is:**
+- **Routine HR questions ("who's late," "who's on overtime," "who's short
+  on hours," "show me September")** → Yash runs a query himself in
+  Supabase's **SQL Editor** (dashboard → SQL Editor) or browses a **view**
+  directly in **Table Editor** (dashboard → Table Editor → Views). No
+  Claude round-trip needed for any of this, starting now.
+- **A brand-new kind of question nothing already answers** (e.g. "who's
+  never submitted a 5S form this month") → still needs Claude once, to
+  build the view — after that, it's a standing, self-serve tool exactly
+  like the two below, forever.
+- **Changing the app itself** → always needs Claude. Not a dependency
+  problem — that's what "the app has a developer" means for any software.
+
+**Two views built so far, both already live, both already verified
+against real data, both scoped to `service_role`/dashboard access only
+(not exposed to `anon`/`authenticated`, so none of this touches the app's
+own RLS-gated client queries):**
+
+1. **`daily_attendance_report`** (`PATCH_74`, 6 Oct 2026) — one row per
+   active employee for *today* (IST), re-evaluated on every read: Check
+   In/Out (HH:MM), Working Hrs (with the no-checkout default already
+   applied), Late Mins, Overtime Hrs. Built originally for the
+   Whalesync/Sheet plan, still useful standalone.
+2. **`monthly_attendance_summary`** (`PATCH_75`, 6 Oct 2026) — one row per
+   employee per calendar month that has at least one attendance row:
+   `days_present`, `days_absent`, `days_late`, `days_short_hours`,
+   `avg_hours_worked`, `total_overtime_hours`, `total_late_minutes`. Uses
+   the *exact same rules* the app's own Late Comers Review and dashboards
+   use (`PRESENT_STATUSES`, the 8.5h floor, `overtime_hours`) so a number
+   Yash gets from SQL Editor and a number the app shows can never
+   disagree. Ready-to-run queries are in the patch file's own comments —
+   copy-paste into SQL Editor, no editing needed beyond the month date:
+   - Late this month: `select emp_code, name, department, days_late from monthly_attendance_summary where month = date_trunc('month', now())::date and days_late > 3 order by days_late desc;`
+   - Overtime this month: swap `days_late > 3` for `total_overtime_hours > 0`, order by that column.
+   - Short hours this month: swap for `days_short_hours > 3`.
+   - Any past month: `where month = '2026-09-01'` (first of that month).
+   Verified live 6 Oct 2026 against real October data before handing this
+   over — top late-days results matched expectation (two employees at 5
+   late days each, correctly above the >3 bar).
+
+**Exporting a result**: both SQL Editor and Table Editor have a built-in
+Export-to-CSV button on any result set — free, no setup, no connector.
+Emailing a result to himself instead of downloading: Gmail is already
+connected in this environment at no cost — ask Claude on-demand ("email
+me this month's late list") or ask for a standing daily/weekly scheduled
+email; neither needs a new signup or a paid tool.
 
 ## Owner has no KPI tab — decision from Yash, 28 Sep 2026
 
