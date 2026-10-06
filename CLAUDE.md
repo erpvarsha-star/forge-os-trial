@@ -1416,12 +1416,21 @@ Yash sent 12 items in one message. Each one below, with outcome:
    day reclassifies to the OT shift (Shift 1→4, Shift 3→5) with overtime
    = hours − 12. Applies regardless of HR-assigned vs inferred. No
    symmetric "under 8.5h → reclassify down" rule (not asked for).
-2. **CON24 login + who's pending** — fixed again (`PATCH_69`, this is the
-   **second** time his PIN broke the same way; root cause of the *repeat*
-   still open, flagged to Yash, not yet chased down). As of 6 Oct only
-   CON24 and VFL5457 remained on the never-logged-in list (down from 10 a
-   week earlier). HR still has no self-service way to reset a PIN — only
-   Yash, via chat + raw SQL — flagged as a real gap, not yet built.
+2. **CON24 login + who's pending** — root cause actually found and fixed
+   `PATCH_73`, same day, once Yash's hint ("only a problem for him, he's a
+   later addition") pointed at it. **Correction to this file's own
+   morning entry below**: it wrongly guessed "HR has no self-service way"
+   — she does, and always did: `reset_employee_pin()` (`PATCH_45`/`46`,
+   26 Sep 2026), wired into `missing-data.tsx`'s "type an emp_code, reset
+   their PIN" box, a real shipped feature. It only ever implemented the
+   VFL-style formula; CON24 was added 2 days after it shipped (`PATCH_62`)
+   and is the only consultant who's needed it since — every time HR used
+   it on him, it silently set the wrong PIN. Fixed in `PATCH_73` with the
+   same CON%-branch already applied to `HR_reset_pin.sql` on 30 Sep — this
+   is the one that actually mattered, since it's the one real humans
+   click, not a SQL file only Claude runs. As of 6 Oct only CON24 and
+   VFL5457 remained on the never-logged-in list (down from 10 a week
+   earlier).
 3. **QR scan slowness** — Yash confirmed it's the scan itself, not GPS.
    Root cause found: the QR payload was `plant_code-date-bucket-<full
    48-char salt>` (~70 characters), dense enough to slow down a
