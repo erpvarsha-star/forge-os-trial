@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { AttendanceRecord } from '@/types'
 import { attendanceDateStr, istMonthYear, getMonthEndDay } from '@/lib/istDate'
+import { finalizeShiftAndOvertime } from '@/lib/workingHours'
 
 export function useAttendance(employeeId: string, month?: string, year?: number) {
   const [records, setRecords] = useState<AttendanceRecord[]>([])
@@ -107,7 +108,11 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
   // shiftEndTime: the shift's end_time (HH:MM). Used for:
   //   1. Computing hours_worked
   //   2. Half-day rule: arrived 3+ hrs late AND checks out at or before shift end → HL
-  const checkOut = async (lat: number, lng: number, shiftEndTime?: string) => {
+  // shiftName: today's resolved shift name (HR-assigned or inferred,
+  // doesn't matter which — see lib/workingHours.ts's finalizeShiftAndOvertime),
+  // used once hours_worked is final to compute overtime and, if the day
+  // crossed 12h on Shift 1/Shift 3, reclassify it to Shift 4/Shift 5.
+  const checkOut = async (lat: number, lng: number, shiftEndTime?: string, shiftName?: string) => {
     if (!todayRecord) return { data: null, error: new Error('No open attendance record') }
     const now = new Date()
     const time = now.toISOString()
@@ -137,6 +142,32 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     }
     if (halfDay) {
       updatePayload.status = 'HL'
+    }
+
+    // Finalize the day's shift + overtime now that hours_worked is final
+    // (Yash, 6 Oct 2026 — see lib/workingHours.ts's finalizeShiftAndOvertime,
+    // the single source of truth also ported into the 24h auto-checkout
+    // edge function). Reclassifying the day's shift (Shift 1->4, Shift
+    // 3->5 at 12h+) goes through set_my_shift_for_date, the same
+    // SECURITY DEFINER RPC the check-in flow already uses — a direct
+    // employee_shifts write is management-only under RLS (PATCH_59).
+    if (typeof hours_worked === 'number') {
+      const { reclassifyToShiftName, overtimeHours } = finalizeShiftAndOvertime(shiftName, hours_worked)
+      updatePayload.overtime_hours = overtimeHours
+      if (reclassifyToShiftName) {
+        const { data: newShift } = await supabase
+          .from('shifts')
+          .select('id')
+          .eq('name', reclassifyToShiftName)
+          .maybeSingle()
+        if (newShift?.id) {
+          const { error: reclassifyError } = await supabase.rpc('set_my_shift_for_date', {
+            p_date: todayRecord.date,
+            p_shift_id: newShift.id,
+          })
+          if (reclassifyError) console.warn('set_my_shift_for_date (overtime reclassify) failed', reclassifyError.message)
+        }
+      }
     }
 
     const { data, error } = await supabase

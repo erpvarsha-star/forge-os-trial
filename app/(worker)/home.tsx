@@ -160,7 +160,15 @@ export default function WorkerHome() {
     const { data: allShifts } = await supabase.from('shifts').select('*')
     const istNowForShift = istNow()
     const nowMinutesOfDay = istNowForShift.getUTCHours() * 60 + istNowForShift.getUTCMinutes()
-    const resolved = resolveShiftForCheckIn(activeShift?.shift, nowMinutesOfDay, employee.role, (allShifts || []) as Shift[])
+    // No employee_shifts row for today — fall back to this employee's own
+    // default_shift_id (PATCH_71, e.g. Kajal/VFL1567's "General (Pune)" 10am
+    // start) before the generic closest-shift inference, so it gets the
+    // same 60-min-early + grace treatment as an HR-assigned shift would,
+    // instead of competing in findClosestShift()'s shared pool against
+    // General's own window.
+    const assignedShift =
+      activeShift?.shift ?? ((allShifts || []) as Shift[]).find(s => s.id === employee.default_shift_id) ?? null
+    const resolved = resolveShiftForCheckIn(assignedShift, nowMinutesOfDay, employee.role, (allShifts || []) as Shift[])
     if (resolved && resolved.id !== activeShift?.shift_id) {
       const { error: shiftError } = await supabase.rpc('set_my_shift_for_date', { p_date: todayStr, p_shift_id: resolved.id })
       if (shiftError) console.warn('set_my_shift_for_date failed', shiftError.message)
@@ -245,7 +253,7 @@ export default function WorkerHome() {
       return
     }
 
-    await checkOut(location.coords.latitude, location.coords.longitude, shift?.shift?.end_time)
+    await checkOut(location.coords.latitude, location.coords.longitude, shift?.shift?.end_time, shift?.shift?.name)
     await refresh()
     setIsLoading(false)
 

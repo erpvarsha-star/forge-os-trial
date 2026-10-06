@@ -17,6 +17,7 @@ FUNCTIONS=(
   "five-s-challenge-generator"
   "send-push-notification"
   "plant-head-form-reminder"
+  "auto-checkout"
 )
 
 # Deliberately NOT `set -e` around the loop: with it, the first bad function

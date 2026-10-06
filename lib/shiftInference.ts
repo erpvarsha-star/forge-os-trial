@@ -9,9 +9,56 @@ import { Shift } from '@/types'
 // to; `late_grace_minutes` (read separately, after this) decides whether
 // that check-in counts as late once assigned.
 const EARLY_ARRIVAL_BUFFER_MINUTES = 15
+
+// Widened early-arrival buffer, used ONLY at a true zero-gap shift handoff
+// (today: Shift 3's 07:00 end handing straight into Shift 1/Shift 4's
+// 07:00 start) — Yash, 6 Oct 2026: someone arriving 06:00/06:30 for a 7am
+// shift was wrongly landing on Shift 3's tail (00:00-07:00, window still
+// open until 06:45) and getting flagged ~6h late for a midnight shift he
+// was never on. Every other junction (General<->Shift1/2, Shift5's own
+// boundaries, Security's pool) keeps the flat 15-min buffer — see
+// detectWidenedStartBuffers() below for exactly which boundary qualifies,
+// verified against the live shift set before shipping (06 Oct 2026
+// boundary-sweep script, not committed — see CLAUDE.md/PENDING.md).
+const WIDENED_HANDOFF_BUFFER_MINUTES = 60
 const MINUTES_PER_DAY = 1440
 
 const mod = (n: number, m: number) => ((n % m) + m) % m
+
+type ShiftWithStart = { shift: Shift; startMin: number }
+
+// For each shift in `withStart` (already sorted + tie-broken by
+// findClosestShift), returns the early-arrival buffer to use for THAT
+// shift's own window start: WIDENED_HANDOFF_BUFFER_MINUTES only when its
+// immediately-preceding shift (previous distinct start_time, skipping any
+// shift that ties its own start) hands off into it with zero gap —
+// predecessor.end_time === this shift's start_time — otherwise the normal
+// EARLY_ARRIVAL_BUFFER_MINUTES.
+//
+// This is deliberately generic (no shift names hardcoded) so it keeps
+// working if the live shift set changes, but today it resolves to exactly
+// one widened junction: Shift 3 (ends 07:00) -> Shift 1 and Shift 4 (both
+// start 07:00). Every other pair of adjacent entries in the sorted list —
+// including General -> General (Pune) -> Shift 2 -> Shift 5, none of which
+// line up end-to-end — keeps the flat 15-minute buffer. Shift 2's end
+// (00:00) numerically equals Shift 3's start (00:00) too, but they are NOT
+// "immediately preceding" each other in this sorted-by-start-time circular
+// list (Shift 5, starting later at 19:00, sits between them going forward
+// and wraps around before Shift 3), so that boundary is correctly left
+// untouched. Verified against the live shift set with a standalone sweep
+// before this was wired in (06 Oct 2026) — see PENDING.md.
+function detectWidenedStartBuffers(withStart: ShiftWithStart[]): number[] {
+  return withStart.map((entry, i) => {
+    let prevIndex = (i - 1 + withStart.length) % withStart.length
+    while (withStart[prevIndex].startMin === entry.startMin && prevIndex !== i) {
+      prevIndex = (prevIndex - 1 + withStart.length) % withStart.length
+    }
+    const predecessor = withStart[prevIndex]
+    return predecessor.shift.end_time === entry.shift.start_time
+      ? WIDENED_HANDOFF_BUFFER_MINUTES
+      : EARLY_ARRIVAL_BUFFER_MINUTES
+  })
+}
 
 // When an employee has no shift allotted for today, each shift "owns" the
 // window from (its own start - 15min) up to (the next shift's start - 15min)
@@ -42,6 +89,13 @@ export function findClosestShift(nowMinutesOfDay: number, role: string | undefin
   if (withStart.length === 0) return null
   if (withStart.length === 1) return withStart[0].shift
 
+  // Per-shift start buffer — 60min at the one Shift-3->Shift-1/4 handoff,
+  // 15min everywhere else. A window's END uses the BUFFER OF THE SHIFT
+  // THAT WINDOW HANDS OFF TO (see windowEnd below), not its own start
+  // buffer, so adjacent windows always partition the day with no gap or
+  // overlap even where the buffer changes mid-boundary.
+  const startBuffer = detectWidenedStartBuffers(withStart)
+
   for (let i = 0; i < withStart.length; i++) {
     const current = withStart[i]
     // The window's end is the NEXT DISTINCT start_time, not just the next
@@ -57,8 +111,8 @@ export function findClosestShift(nowMinutesOfDay: number, role: string | undefin
       nextIndex = (nextIndex + 1) % withStart.length
     }
     const next = withStart[nextIndex]
-    const windowStart = current.startMin - EARLY_ARRIVAL_BUFFER_MINUTES
-    const windowEnd = next.startMin - EARLY_ARRIVAL_BUFFER_MINUTES
+    const windowStart = current.startMin - startBuffer[i]
+    const windowEnd = next.startMin - startBuffer[nextIndex]
     const windowLength = mod(windowEnd - windowStart, MINUTES_PER_DAY) || MINUTES_PER_DAY
     const elapsedSinceWindowStart = mod(nowMinutesOfDay - windowStart, MINUTES_PER_DAY)
     if (elapsedSinceWindowStart < windowLength) return current.shift

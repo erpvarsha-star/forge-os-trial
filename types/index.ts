@@ -43,6 +43,11 @@ export interface AttendanceRecord {
   late_reason?: string
   late_minutes?: number
   hours_worked?: number
+  /** PATCH_72. Visibility-only ("just a count for now", Yash 6 Oct 2026) —
+   *  never fed into payroll. Set once the day is finalized (manual
+   *  checkout or the 24h auto-checkout job) via
+   *  lib/workingHours.ts's finalizeShiftAndOvertime(). */
+  overtime_hours?: number
   qr_verified: boolean
   check_out_qr_verified?: boolean
   checkpoint2_confirmed_by?: string
