@@ -72,12 +72,35 @@ export interface Shift {
   late_grace_minutes?: number
 }
 
+export type ShiftAssignmentSource = 'hr_allocated' | 'system_inferred' | 'system_reclassified' | 'employee_override'
+export type ShiftReviewOutcome = 'confirmed_correct' | 'corrected' | 'flagged_for_logic_review'
+
 export interface EmployeeShift {
   id: string
   employee_id: string
   shift_id: string
   date: string
   shift: Shift
+  assignment_source?: ShiftAssignmentSource
+  review_outcome?: ShiftReviewOutcome | null
+  review_note?: string | null
+  reviewed_by?: string | null
+  reviewed_at?: string | null
+}
+
+// Row shape returned by needs_your_call_shifts_for_me() — shift
+// assignments the system guessed on (inferred or reclassified) rather
+// than HR allocating, awaiting the owner's call. See
+// app/(owner)/needs-your-call.tsx.
+export interface NeedsYourCallShiftItem {
+  item_id: string
+  employee_id: string
+  emp_code: string
+  employee_name: string
+  subtype: ShiftAssignmentSource
+  description: string
+  occurred_date: string
+  shift_id: string
 }
 
 export interface LeaveBalance {

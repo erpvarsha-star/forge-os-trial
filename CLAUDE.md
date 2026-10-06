@@ -782,6 +782,7 @@ explicit and correct rather than incidental.
 | `PATCH_75_monthly_attendance_summary_view_06Oct2026.sql` | Read-only `monthly_attendance_summary` view — late/overtime/short-hours per employee per month, same rules the app uses, for self-serve review without Claude | ✅ Applied 6 Oct 2026 |
 | `PATCH_76_fraud_alert_resolution_and_dedup_06Oct2026.sql` | Adds `resolve_fraud_alert()` RPC (Confirmed/False Positive/Investigate) + occurrence-count dedup to `fraud_alerts` — collapsed 39 inflated rows to 4 real incidents. See "Fraud alerts" below | ✅ Applied 6 Oct 2026 |
 | `PATCH_77_daily_attendance_report_two_day_06Oct2026.sql` | Widens `daily_attendance_report` (PATCH_74) from today-only to today+yesterday, matching the originally-agreed design | ✅ Applied 6 Oct 2026 |
+| `PATCH_78_needs_your_call_shift_assignments_06Oct2026.sql` | Adds `employee_shifts` provenance (`assignment_source`/`review_outcome`) + `resolve_shift_assignment()` RPC — the shift-assignment half of "Needs Your Call". See "Fraud alerts" section below | ✅ Applied 6 Oct 2026 |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
@@ -849,9 +850,10 @@ app/
 ├── (owner)/
 │   ├── dashboard.tsx      — top-level KPIs
 │   ├── approvals.tsx      — final salary/new-hire sign-off + leave/advance at owner's stage (PATCH_53)
-│   ├── alerts.tsx         — open fraud alerts
+│   ├── alerts.tsx         — open fraud alerts + resolve (Confirmed/False Positive/Investigate, PATCH_76, 6 Oct 2026)
 │   ├── eotm.tsx           — Employee of the Month per category
 │   ├── late-review.tsx    — chronic latecomers (>3x/month), grouped by shift (27 Sep 2026)
+│   ├── needs-your-call.tsx — resolve system-guessed shift assignments (PATCH_78, 6 Oct 2026)
 │   └── more.tsx
 └── (security)/
     ├── dashboard.tsx      — vehicle log (inward/outward)
@@ -1255,15 +1257,80 @@ dedup, so one flaky device retriggering 20 times in 10 minutes counted as
   separate buddy-device-check table) still has no resolution path either
   — not raised by Yash, not touched.
 
-**A broader "Needs Your Call" design exists but was NOT built this
-pass** — a second, wider feature (same session) for `employee_shifts`
-rows the system guessed on (inferred/reclassified, not HR-allocated),
-with a third resolution option ("flag this logic for Claude to review")
-meant to feed Claude's periodic review of `lib/shiftInference.ts`/
-`lib/workingHours.ts`. Fully designed (schema, RPCs, UI, i18n, open
-decisions) but not implemented — build only if Yash asks for it
-specifically; the fraud-alert fix above was the narrower, immediately-
-asked-for piece.
+**Built same day, once confirmed — the shift-assignment half of "Needs
+Your Call".** Yash: "yes build it to work without any bugs" (after the
+current build finished, per his own sequencing). `PATCH_78_needs_your_call_shift_assignments_06Oct2026.sql`
+adds what `employee_shifts` never had: provenance. A row now records
+whether it was `hr_allocated`, `system_inferred` (no shift assigned,
+guessed from check-in time), `system_reclassified` (12h+ overtime
+bump), or `employee_override` (the owner corrected it) — plus
+`review_outcome`/`review_note`/`reviewed_by`/`reviewed_at` and a
+`logic_reviewed_at` column for Claude's own close-out, separate from
+when Yash acted.
+
+- **`set_my_shift_for_date(p_date, p_shift_id, p_source)`** — widened
+  from 2 to 3 args. The conflict branch now resets `assignment_source`
+  (and clears any pending review) on every call, not just on first
+  insert — the common case is overriding an existing row, and the old
+  code would have silently left a stale source on it. **The original
+  2-arg overload was kept, not dropped** (the Supabase MCP tool treated
+  every `DROP FUNCTION` as destructive and silently cancelled it,
+  repeatedly, even via `execute_sql` directly — not a lock, confirmed via
+  `pg_locks`) — it now just delegates to the 3-arg version with
+  `'system_inferred'`, so no caller bypasses provenance tracking even
+  before being updated. All three real call sites
+  (`hooks/useAttendance.ts`'s overtime-reclassify branch,
+  `components/CheckInCard.tsx`, `app/(worker)/home.tsx`) now pass
+  `p_source` explicitly (`'system_reclassified'` / `'system_inferred'`).
+- **`allocate_team_shift_week()`** — same conflict-branch fix, reasserting
+  `'hr_allocated'` so a week HR re-allocates can't keep a stale flag.
+- **`resolve_shift_assignment(p_employee_shift_id, p_outcome, p_corrected_shift_id, p_note)`**
+  — owner-only, three outcomes: **Looks right** (`confirmed_correct`, no
+  change), **Change the shift** (`corrected`, writes the real `shift_id`
+  and flips `assignment_source` to `employee_override` so it's never
+  re-flagged), **Flag this logic for review** (`flagged_for_logic_review`
+  — doesn't change the shift, just marks it for Claude's periodic review;
+  UI requires a non-empty note for this one specifically, since a blank
+  flag gives Claude nothing to act on).
+- **`auto-checkout`'s direct upsert** (service-role, not the RPC — see
+  its own comment) now sets `assignment_source: 'system_reclassified'`
+  explicitly. Redeployed, version 2.
+- **Read surface**: `needs_your_call_shifts` view (service_role/SQL-Editor
+  only, same revoke pattern as every other view this session —
+  Postgres views run with the *owner's* privileges for RLS, not the
+  caller's, so granting this to `authenticated` would let any employee
+  read every other employee's flagged items) + `needs_your_call_shifts_for_me()`,
+  a SECURITY DEFINER RPC gated to `role = 'owner'`, which is what the app
+  actually calls. Windowed to the last 7 days — every `employee_shifts`
+  row older than this migration defaults to `hr_allocated` by the column
+  default (including a handful of genuinely system-set rows from the
+  days just before this shipped), so that blind spot ages itself out
+  within a week; not worth retroactively replaying
+  `lib/shiftInference.ts`'s logic to backfill it correctly.
+- **UI**: `hooks/useNeedsYourCall.ts` + `components/NeedsYourCallReview.tsx`
+  + thin wrapper `app/(owner)/needs-your-call.tsx` (owner-only — fraud
+  alert resolution is the other half of "Needs Your Call" and stays in
+  `alerts.tsx`, already shipped separately). Wired via `href: null` +
+  a `more.tsx` row, same locked pattern as every other menu-only screen.
+  New `needsYourCall.*` i18n namespace in both `en.json`/`hi.json`.
+- **Verified before shipping**: `npx tsc --noEmit` still exactly 7
+  (pre-existing baseline), `node scripts/check-i18n.mjs` clean. Live SQL
+  test against a real (disposable, reverted after) `employee_shifts` row:
+  flipped to `system_inferred` → appeared in the view with a correct
+  description → resolved via the RPC → disappeared from the view →
+  re-resolving the same row correctly raised the already-reviewed guard
+  → reverted to its original state, no real data left altered.
+- **The Claude-side close-out process, for a future session**: query
+  `select * from employee_shifts where review_outcome = 'flagged_for_logic_review' and logic_reviewed_at is null`
+  to see what Yash flagged, fix the relevant rule in
+  `lib/shiftInference.ts`/`lib/workingHours.ts`, then
+  `update employee_shifts set logic_reviewed_at = now() where id in (...)`
+  for the rows that prompted it, and write the decision into this file —
+  same "record immediately" rule as everywhere else.
+- **Not yet exercised on a real device** — type-checked and verified
+  against live RPC calls directly, no UI walkthrough yet. New APK build
+  needed (this touches `app/`, `hooks/`, `components/`, `types/`,
+  `i18n/`).
 
 ---
 

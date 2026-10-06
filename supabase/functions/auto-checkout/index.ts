@@ -141,10 +141,15 @@ Deno.serve(async (req: Request) => {
             // Service-role client — bypasses the employee_shifts_write RLS
             // policy (management-only), unlike the client-side checkout
             // flow which goes through set_my_shift_for_date() instead.
+            // assignment_source is set explicitly here (not via the RPC's
+            // conflict-branch reset logic, PATCH_78) since this is a plain
+            // upsert, not set_my_shift_for_date() — Needs Your Call
+            // (app/(owner)/needs-your-call.tsx) reads this column to find
+            // shifts the system guessed on rather than HR allocating.
             await db
               .from('employee_shifts')
               .upsert(
-                { employee_id: record.employee_id, date: record.date, shift_id: newShift.id },
+                { employee_id: record.employee_id, date: record.date, shift_id: newShift.id, assignment_source: 'system_reclassified' },
                 { onConflict: 'employee_id,date' }
               );
           }

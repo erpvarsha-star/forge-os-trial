@@ -164,6 +164,7 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
           const { error: reclassifyError } = await supabase.rpc('set_my_shift_for_date', {
             p_date: todayRecord.date,
             p_shift_id: newShift.id,
+            p_source: 'system_reclassified',
           })
           if (reclassifyError) console.warn('set_my_shift_for_date (overtime reclassify) failed', reclassifyError.message)
         }

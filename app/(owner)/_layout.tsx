@@ -18,6 +18,7 @@ export default function OwnerLayout() {
         <Tabs.Screen name="bulk-salary" options={{ href: null }} />
         <Tabs.Screen name="late-review" options={{ href: null }} />
         <Tabs.Screen name="shift-summary" options={{ href: null }} />
+        <Tabs.Screen name="needs-your-call" options={{ href: null }} />
         <Tabs.Screen name="payslips" options={{ href: null }} />
         <Tabs.Screen name="payslip" options={{ href: null }} />
       </Tabs>

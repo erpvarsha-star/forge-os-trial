@@ -631,6 +631,24 @@
     "out": "Out",
     "securityFootnote": "Security Day and Security Night shifts are not included in this view."
   },
+  "needsYourCall": {
+    "tab": "Needs Your Call",
+    "title": "Needs Your Call",
+    "subtitle": "Shift assignments the system guessed on — pick an outcome",
+    "menuLabel": "Needs Your Call",
+    "empty": "Nothing needs your call right now",
+    "emptyBody": "Shift assignments the app had to guess on, instead of HR allocating, will show up here for the last 7 days.",
+    "looksRight": "Looks right",
+    "changeShift": "Change the shift",
+    "flagForReview": "Flag this logic for review",
+    "flagForReviewHint": "This won't change anything automatically — it's logged for Claude to review the underlying rule later. Say what looks wrong.",
+    "notePlaceholder": "Add a note",
+    "pickShift": "Pick the correct shift",
+    "sourceLabels": {
+      "system_inferred": "System-guessed — no shift was assigned",
+      "system_reclassified": "System-reclassified — overtime, 12h+"
+    }
+  },
   "owner": {
     "kpiDashboard": "KPI Dashboard",
     "attendanceKpi": "Attendance %",

@@ -249,7 +249,7 @@ export function CheckInCard() {
         current?.shift ?? ((allShifts || []) as Shift[]).find(s => s.id === employee.default_shift_id) ?? null
       const resolved = resolveShiftForCheckIn(assignedShift, nowMinutesOfDay, employee.role, (allShifts || []) as Shift[])
       if (resolved && resolved.id !== current?.shift_id) {
-        const { error: shiftError } = await supabase.rpc('set_my_shift_for_date', { p_date: todayStr, p_shift_id: resolved.id })
+        const { error: shiftError } = await supabase.rpc('set_my_shift_for_date', { p_date: todayStr, p_shift_id: resolved.id, p_source: 'system_inferred' })
         if (shiftError) console.warn('set_my_shift_for_date failed', shiftError.message)
         shiftData = { ...(current ?? {}), employee_id: employee.id, date: todayStr, shift_id: resolved.id, shift: resolved } as any
       }
