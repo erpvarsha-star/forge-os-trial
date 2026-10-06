@@ -3,6 +3,31 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
+**Last updated:** 6 Oct 2026 (session 21) — Yash sent a 12-point request in
+one message; full breakdown is in CLAUDE.md ("12-point request, 6 Oct
+2026"). Shipped: 60-min early-arrival buffer at the Shift3→Shift1/4
+boundary only (doesn't reopen the 27 Sep 08:15/General fix); overtime
+computed everywhere hours_worked exceeds a shift's nominal hours, with
+12h+ on Shift 1/3 reclassifying to Shift 4/5 (visibility only, never
+payroll); a new hourly 24h-auto-checkout edge function; GPS radius 25m→45m
+(third change to this value); QR payload shrunk ~70→~38 chars (root cause
+of "scans take 10 minutes" — confirmed by Yash as "the scan itself," not
+GPS); Kajal (VFL1567) given a 10am "General (Pune)" shift + Sunday
+weekly-off, scoped to just her; the real Shift Check-in Summary screen
+(Owner/Plant Head/HR Admin via More) — the 1 Oct mockup's 3 open questions
+had never actually been answered, found and resolved this session rather
+than left stale again. **Two real gaps found and flagged, not fixed**:
+(a) no live code anywhere excludes ANY weekly-off day — not even the
+company-wide Friday, for anyone — from attendance-percentage denominators;
+storing Kajal's `weekly_off_day` alone does nothing until this is decided
+and built properly. (b) CON24's PIN broke a **second** time (PATCH_69) —
+root cause of the repeat still open; HR has no self-service PIN-reset tool,
+which is probably why. Two of the four builds (shift-inference/overtime/
+auto-checkout, and the dashboard screen) were delegated to separate Sonnet
+subagents with complete, pre-worked-out specs; both diffs were
+independently re-verified (tsc, i18n) before committing, not trusted as
+reported. `apk-85` confirmed built successfully, contains everything.
+
 **Last updated:** 1 Oct 2026 (session 20) — Found every pg_cron job in this
 project (not just the new Fazal one) had never had its placeholder
 Authorization header replaced, ever — confirmed live, and confirmed harmless

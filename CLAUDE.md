@@ -652,6 +652,10 @@ explicit and correct rather than incidental.
 | `PATCH_66_plant_head_monthly_form_30Sep2026.sql` | New `form_links` row (MANAGEMENT dept) for Fazal's monthly form (due 5th) + pg_cron schedule for the new `plant-head-form-reminder` edge function. See "Plant Head monthly form reminder" section below | form_links row ✅ Applied 30 Sep 2026 (via MCP) — **cron.schedule() step still ⏳, needs Yash to paste a real key in the SQL editor** |
 | `PATCH_67_con24_pin_fix_30Sep2026.sql` | Restores CON24's (Shriram Pawar) password to the documented consultant-formula starting PIN (`200024`), after `HR_reset_pin.sql` had silently overwritten it with the wrong (VFL-style) formula on 30 Sep. See "Employee data" below | ✅ Applied 30 Sep 2026 — verified matches `200024` |
 | `PATCH_68_cron_keys_01Oct2026.sql` | Replaces the placeholder Authorization header on the 6 cron jobs that still had it (see "Cron jobs never had real keys" below) | ✅ Applied 1 Oct 2026 — verified all 7 cron jobs have a real key, none on the placeholder |
+| `PATCH_69_con24_pin_refix_06Oct2026.sql` | CON24's PIN broke a second time (reset to `000024` again on 4 Oct) — restored to `200024` again. Root cause of the repeat still open | ✅ Applied 6 Oct 2026 |
+| `PATCH_70_gps_radius_45m_06Oct2026.sql` | Raises `plant_locations.radius_meters` 25m → 45m on all 12 real campus points (third change to this value — 15m, then 25m, now 45m) | ✅ Applied 6 Oct 2026 |
+| `PATCH_71_kajal_pune_schedule_06Oct2026.sql` | New `employees.default_shift_id`/`weekly_off_day` columns + "General (Pune)" shift (10:00–19:00) + Kajal (VFL1567) set to both. See "12-point request, 6 Oct 2026" below | ✅ Applied 6 Oct 2026 |
+| `PATCH_72_overtime_hours_and_auto_checkout_06Oct2026.sql` | New `attendance_records.overtime_hours` column + hourly cron for the new `auto-checkout` edge function. See "12-point request, 6 Oct 2026" below | ✅ Applied 6 Oct 2026 |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
@@ -869,7 +873,8 @@ Script Property, not two — every send function reads that same one).
 | `shift-reminder` | Weekly shift notify (Thursday) + daily check-in reminder (hourly) + `forms_due_reminder`, which nudges a department's supervisors/managers 15 min before each shift's form deadline | Thursday + hourly + every 15 min (`{"mode":"forms_due_reminder"}`, needs its own cron entry — mode inference never picks it) |
 | `five-s-challenge-generator` | Generate daily 5S challenge via Gemini | Daily |
 | `send-push-notification` | HTTP dispatcher — write notification row + push (FCM v1 direct for Android, Expo relay for anything else — see `_shared/fcm.ts` and `_shared/push.ts`) | On-demand |
-| `plant-head-form-reminder` | New 30 Sep 2026. Notifies every active plant_head (today: just Fazal) on the 1st-5th IST of each month for any `form_links` row with `department='MANAGEMENT'` and `send_in_reminder=true` still outstanding. De-duplicated against `notifications` per form per day. See "Plant Head monthly form reminder" below | Daily 09:00 IST (PATCH_66's cron job) — **function deployed and ACTIVE; the cron.schedule() itself still needs Yash to run it with a real key, same manual-paste pattern as PATCH_18/20** |
+| `plant-head-form-reminder` | New 30 Sep 2026. Notifies every active plant_head (today: just Fazal) on the 1st-5th IST of each month for any `form_links` row with `department='MANAGEMENT'` and `send_in_reminder=true` still outstanding. De-duplicated against `notifications` per form per day. See "Plant Head monthly form reminder" below | Daily 09:00 IST (PATCH_66's cron job) — ✅ live, Yash ran the cron.schedule() 1 Oct 2026 |
+| `auto-checkout` | New 6 Oct 2026. Finds any `attendance_records` row still checked in with no checkout 24h+ after `check_in_time`, fills `check_out_time`/`hours_worked` per the existing no-checkout convention, then runs the same shift-finalization + overtime logic a manual checkout uses. See "12-point request, 6 Oct 2026" below | Hourly (PATCH_72's cron job) — ✅ live |
 
 **Shared helpers** (`supabase/functions/_shared/`):
 - `push.ts` — `notifyEmployees()` inserts `notifications` rows (`user_id` column) + Expo push batch. ⚠ It also writes `related_entity_type` / `related_entity_id`, which existed only in the OLD schema until PATCH_14 added them — before that every insert was rejected by PostgREST and the error was discarded, so no server-side notification ever reached anyone. It now throws on insert failure.
@@ -1390,6 +1395,107 @@ command from cron.job` (or any query that can return a stored
 Authorization header) once a real key might be in there — list `jobname`/
 `schedule`/`active` only, never `command`, for a job that might hold a live
 key.**
+
+---
+
+## 12-point request, 6 Oct 2026 — session summary
+
+Yash sent 12 items in one message. Each one below, with outcome:
+
+1. **60-min early-arrival buffer + overtime** — done. `lib/shiftInference.ts`'s
+   `findClosestShift()` now widens the early-arrival window to 60 minutes
+   ONLY at the one true zero-gap handoff (Shift 3 ends 07:00 = Shift 1/4's
+   start) — every other boundary, including the 08:15/General case fixed
+   27 Sep 2026, keeps the original 15-minute buffer untouched. Verified
+   with a boundary sweep before shipping. Yash's exact overtime rule —
+   *"he could be working 2 hrs overtime also so will not be shift 4 but
+   given 2 hrs overtime. if he works 12 hrs or more than 12 hrs. shift
+   4/5 plus the extra hrs"* — is `lib/workingHours.ts`'s
+   `finalizeShiftAndOvertime()`: under 12h stays on the original shift
+   with overtime = hours over that shift's own nominal; at/above 12h the
+   day reclassifies to the OT shift (Shift 1→4, Shift 3→5) with overtime
+   = hours − 12. Applies regardless of HR-assigned vs inferred. No
+   symmetric "under 8.5h → reclassify down" rule (not asked for).
+2. **CON24 login + who's pending** — fixed again (`PATCH_69`, this is the
+   **second** time his PIN broke the same way; root cause of the *repeat*
+   still open, flagged to Yash, not yet chased down). As of 6 Oct only
+   CON24 and VFL5457 remained on the never-logged-in list (down from 10 a
+   week earlier). HR still has no self-service way to reset a PIN — only
+   Yash, via chat + raw SQL — flagged as a real gap, not yet built.
+3. **QR scan slowness** — Yash confirmed it's the scan itself, not GPS.
+   Root cause found: the QR payload was `plant_code-date-bucket-<full
+   48-char salt>` (~70 characters), dense enough to slow down a
+   factory-floor phone camera. Fixed in `lib/location.ts`'s
+   `buildQrValue()` — only the first 16 hex chars of the salt (64 bits,
+   still far more than enough for a 30-minute-rotating code) go into the
+   QR now, cutting it to ~38 characters. Single shared function, used
+   identically by both `gate-qr.tsx` (generate) and `qr.tsx` (compare).
+4/5. **Answered directly in chat** — no DB/code change needed. (4) Nothing
+   further needed on CON24. (5) `gate-qr.tsx` already has a manual
+   "Refresh" button plus an automatic re-render every minute on bucket
+   rollover — this already existed.
+6. **Same feature as #1** — see above.
+7. **Kajal (VFL1567), Pune** — scoped to just her, per Yash's answer. New
+   `employees.default_shift_id` column (general-purpose: the shift to use
+   when no `employee_shifts` row exists for a date, checked before the
+   generic closest-shift inference) points her at a new "General (Pune)"
+   shift (10:00–19:00). New `employees.weekly_off_day` column (nullable,
+   0=Sunday..6=Saturday) set to `0` for her. **Real caveat, not silently
+   papered over**: storing `weekly_off_day` does not by itself change
+   anything she sees — a full-repo search found that **no live code
+   anywhere excludes ANY weekly-off day, including the company-wide
+   Friday, for ANYONE**, from attendance-percentage denominators or
+   lateness flags. `'WO'` status exists only in one-time demo seed data,
+   never written by live app or edge-function code. This is a separate,
+   pre-existing, company-wide gap — not fixed in this pass, needs its own
+   decision from Yash before touching the 6+ dashboards/`nightly-scoring`
+   that would need to change.
+8. **24h auto-checkout** — new edge function `supabase/functions/
+   auto-checkout/index.ts`, hourly cron (`PATCH_72`). Finds any
+   `attendance_records` row still open 24h+ after check-in, fills
+   `check_out_time`/`hours_worked` via the existing no-checkout
+   convention, runs it through the same `finalizeShiftAndOvertime()`
+   logic a manual checkout uses. Hand-replicated in Deno (can't import
+   `lib/`) — same duplication-accepted pattern as `AttendanceReport.gs`'s
+   copy of `defaultHoursForShift()`; keep all three copies in sync by
+   hand if the 8.5/9/12 numbers or the 12h threshold ever change.
+9. **GPS radius 45m** — done (`PATCH_70`), all 12 real campus points.
+   Pune Office untouched at 200m (deliberate, unrelated).
+10. **Friday-called-in overtime** — Yash's answer was "just a count for
+    now," so this folds into #1/#8's `overtime_hours` column (visibility
+    only, never read by payroll). No separate Friday-specific code —
+    the hours a person works on their weekly-off day are already counted
+    as overtime by the same general mechanism once they check in/out,
+    regardless of which day it is.
+11. **Shift Check-in Summary screen** — the real screen was never actually
+    built before this session (only a mockup artifact shown 1 Oct 2026,
+    whose 3 open questions were never answered — found and corrected
+    this session). Built now: `hooks/useShiftCheckinSummary.ts` +
+    `components/ShiftCheckinSummary.tsx`, thin wrapper screens for
+    Owner/Plant Head/HR Admin, reached via More (`href: null` pattern).
+    Rows: Shift 1–5, General, Unassigned (never dropped). Security
+    Day/Night excluded with a footnote. These 3 defaults were Claude's own
+    call (confirmed-by-silence, not re-asked a third time) — correct if
+    Yash doesn't say otherwise.
+12. **Supabase → Sheets/Excel** — not built this session (would need a
+    clear scope: which tables, on-demand vs recurring). Already partly
+    solved for attendance specifically — `scripts/AttendanceReport.gs`
+    already pushes daily/monthly attendance into the "VFL HR OS 2026 27"
+    sheet automatically (28 Sep 2026). For anything else, the same
+    Apps-Script-pulls-from-Supabase pattern extends cleanly; needs Yash to
+    say which tables/calculations before building it.
+
+**Delegation note**: items 1/6/8 (shift-inference/overtime/auto-checkout)
+and item 11 (the dashboard screen) were each built by a separate Sonnet
+subagent, given a complete, pre-worked-out design rather than an open brief
+— Claude reviewed every diff (including independently re-running
+`tsc --noEmit` and `check-i18n.mjs` rather than trusting the agents'
+self-reported numbers) before committing either. Both came back clean on
+the first pass.
+
+**Verified end-to-end**: `apk-85` (commit `4ba72ee`) built successfully and
+contains every code change from this session. Confirmed via
+`mcp__github__actions_list`/`get_latest_release`, not assumed from the push.
 
 ---
 
