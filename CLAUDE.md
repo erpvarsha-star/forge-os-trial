@@ -721,6 +721,60 @@ of the `typeof === 'number'` check, not an intentional design), so its
 behavior is unchanged; the code comment there now makes that exclusion
 explicit and correct rather than incidental.
 
+**🔒 Half-day is decided by hours worked, not lateness — and absent is
+never applied after a check-in. Decision from Yash, 6 Oct 2026.** His exact
+words, prompted by the Kajal/VFL1567 fix above (she'd been wrongly shown
+late every day against the wrong shift): "yes even though considering she
+was allocated general shift, and she was late did not mean she was not
+present. now we have corrected the time, so she wont be marked late, but
+being late is being marked absent is not a rule or logic we have decided,
+the decision should be based on working hours. if hours worked is 4 or
+less then half day, but marking absent after checkin is dimotivsting."
+
+Two separate fixes, both same day:
+
+1. **Half-day rule replaced.** `hooks/useAttendance.ts`'s `checkOut()` used
+   to set `status='HL'` from lateness (`late_minutes >= 180` AND checked out
+   at/before shift end) — a rule Yash says was never actually decided.
+   Replaced with `HALF_DAY_MAX_HOURS = 4` in `lib/workingHours.ts`:
+   `hours_worked <= 4` → `'HL'`, otherwise the check-in-time status (`'P'`/
+   `'L'`) stands, regardless of how late the arrival was. Lateness no longer
+   has any role in present/half-day/absent — it only ever affects whether
+   `status` was `'P'` or `'L'` at check-in time, which is a separate
+   question `late_comers`/dashboards already treat correctly (both count as
+   present).
+2. **Searched the whole codebase for every writer of `attendance_records.status`**
+   to answer "marking absent after checkin" directly, not from memory —
+   `checkIn()`/`checkOut()` (`hooks/useAttendance.ts`), `nightly-scoring`
+   (reads status, never writes it), `auto-checkout` (never sets `'A'`,
+   only fills `check_out_time`/`hours_worked`/`overtime_hours`). **Found
+   exactly one real path**: `app/(supervisor)/team.tsx`'s checkpoint-3
+   "Mark Absent" button (supervisor confirmation) — it `upsert()`s
+   `status: 'A'` unconditionally, with no check for whether the employee
+   had already self-checked-in via GPS/QR. Since Supabase upsert only
+   touches the columns in the payload, a tap on "Mark Absent" for someone
+   who'd already checked in would flip their row from `'P'`/`'L'` to `'A'`
+   while leaving `check_in_time`/`late_minutes`/etc. untouched — exactly
+   "marking absent after checkin." **Checked live data: zero existing rows
+   have `status='A'` with `check_in_time` set** — this had not actually
+   happened to anyone yet, but was a real, live, reachable bug, not a
+   hypothetical. Fixed: the "Mark Absent" button is now disabled (with a
+   `supervisor.alreadyCheckedInHint` label) whenever
+   `item.attendance?.check_in_time` is set, and `confirmAttendance()` itself
+   refuses the same case as defense in depth — once a self check-in exists,
+   checkpoint-3 can only ever confirm present, never override to absent.
+3. **Not retroactively applied to existing data.** A live query for
+   1-6 Oct 2026 rows that would newly qualify as half-day under the new
+   `<=4h` rule surfaced ~20 rows, but nearly all have `hours_worked` in the
+   0.00-0.03h range (a handful up to ~3.9h) with a `check_out_time` seconds
+   to minutes after check-in — these read as app-testing check-in/
+   check-out pairs (several by Fazal, Sarang, and other known testers),
+   not genuine half-day attendance. Bulk-flipping real people's already-
+   recorded `'P'`/`'L'` status to `'HL'` on that basis risked creating
+   confusing, wrong-looking records rather than fixing anything — left
+   untouched. Flag to Yash if any of these need a manual look; the new
+   rule is correct going forward for every real checkout from now on.
+
 ---
 
 ## SQL Patches applied (run in Supabase SQL Editor in order)

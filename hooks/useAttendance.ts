@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { AttendanceRecord } from '@/types'
 import { attendanceDateStr, istMonthYear, getMonthEndDay } from '@/lib/istDate'
-import { finalizeShiftAndOvertime } from '@/lib/workingHours'
+import { finalizeShiftAndOvertime, HALF_DAY_MAX_HOURS } from '@/lib/workingHours'
 
 export function useAttendance(employeeId: string, month?: string, year?: number) {
   const [records, setRecords] = useState<AttendanceRecord[]>([])
@@ -105,9 +105,9 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     return { data, error }
   }
 
-  // shiftEndTime: the shift's end_time (HH:MM). Used for:
-  //   1. Computing hours_worked
-  //   2. Half-day rule: arrived 3+ hrs late AND checks out at or before shift end → HL
+  // shiftEndTime: no longer used for the half-day decision (see HALF_DAY_MAX_HOURS
+  // below, Yash's 6 Oct 2026 correction) — kept in the signature only because both
+  // call sites already pass it and it costs nothing to leave in place.
   // shiftName: today's resolved shift name (HR-assigned or inferred,
   // doesn't matter which — see lib/workingHours.ts's finalizeShiftAndOvertime),
   // used once hours_worked is final to compute overtime and, if the day
@@ -123,16 +123,15 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
       hours_worked = Math.round((elapsed / 3600000) * 100) / 100
     }
 
-    // Half-day: came 3+ hours late AND checked out at or before the shift end time.
-    // "00:00" as an end time means midnight (end of shift), treated as 24:00 = 1440 min.
-    let halfDay = false
-    if (todayRecord?.late_minutes && todayRecord.late_minutes >= 180 && shiftEndTime) {
-      const [sh, sm] = shiftEndTime.split(':').map(Number)
-      const shiftEndMins = sh === 0 && sm === 0 ? 24 * 60 : sh * 60 + sm
-      const istNow = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
-      const checkoutMins = istNow.getUTCHours() * 60 + istNow.getUTCMinutes()
-      halfDay = checkoutMins <= shiftEndMins
-    }
+    // Half-day — Yash, 6 Oct 2026: "being late is being marked absent is not
+    // a rule or logic we have decided, the decision should be based on
+    // working hours. if hours worked is 4 or less then half day." This
+    // REPLACES the old late-minutes-based half-day rule (3+ hrs late AND
+    // checked out at/before shift end) — lateness no longer has any role in
+    // deciding present vs half-day vs absent. Someone who has checked in is
+    // never downgraded further than half-day here, regardless of how late
+    // they arrived — see HALF_DAY_MAX_HOURS below.
+    const halfDay = typeof hours_worked === 'number' && hours_worked <= HALF_DAY_MAX_HOURS
 
     const updatePayload: Record<string, unknown> = {
       check_out_time: time,

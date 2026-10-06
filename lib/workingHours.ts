@@ -6,6 +6,17 @@
 // "min working hrs for each is 8.30 hrs" (8 hours 30 minutes).
 export const MIN_WORKING_HOURS = 8.5
 
+// Half-day threshold — Yash, 6 Oct 2026: "being late is being marked absent
+// is not a rule or logic we have decided, the decision should be based on
+// working hours. if hours worked is 4 or less then half day, but marking
+// absent after checkin is demotivating." Replaces the previous
+// lateness-based half-day rule (3+ hrs late AND checked out at/before shift
+// end) in hooks/useAttendance.ts's checkOut() — present/half-day is now
+// decided purely from hours actually worked, same for every shift type, and
+// an employee who has checked in is never marked 'A' (absent) regardless of
+// how late or how few hours they worked.
+export const HALF_DAY_MAX_HOURS = 4
+
 // "IF THERE IS NO CHECK OUT PERSON SHOULD BE CONSIDERED AS WORKED NORMAL
 // SHIFT HRS. 8.5/9 HRS AS PER ROLE" — a day where the employee checked in
 // but never checked out (attendance_records.hours_worked is null) is NOT

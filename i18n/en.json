@@ -410,6 +410,7 @@
     "confirmAttendance": "Tap Present or Absent to confirm each team member",
     "markPresent": "Present",
     "markAbsent": "Absent",
+    "alreadyCheckedInHint": "Already checked in — can't be marked absent",
     "unskilledCount": "Unskilled Count",
     "skilledCount": "Skilled Count",
     "operatorCount": "Operator Count",

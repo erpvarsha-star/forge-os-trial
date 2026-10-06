@@ -71,8 +71,14 @@ export default function SupervisorTeam() {
     )
   }, [employee, t])
 
-  const confirmAttendance = async (member: Employee, status: 'P' | 'A') => {
+  const confirmAttendance = async (member: Employee & { attendance?: AttendanceRecord }, status: 'P' | 'A') => {
     if (!employee) return
+    // Yash, 6 Oct 2026: marking someone absent after they've already
+    // checked in is demotivating and is never the right call — once a
+    // self check-in exists, checkpoint-3 can only confirm present, never
+    // override it to absent. This guard matches the one on the button
+    // itself (disabled below) so a stale/cached press can't bypass it.
+    if (status === 'A' && member.attendance?.check_in_time) return
     setConfirmingId(member.id)
     const today = istDateStr()
 
@@ -139,12 +145,15 @@ export default function SupervisorTeam() {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => confirmAttendance(item, 'A')}
-                disabled={confirmingId === item.id}
-                className={`flex-1 rounded-lg py-3 items-center justify-center min-h-touch ${item.attendance?.status === 'A' ? 'bg-status-absent' : 'bg-status-absent-bg'}`}
+                disabled={confirmingId === item.id || !!item.attendance?.check_in_time}
+                className={`flex-1 rounded-lg py-3 items-center justify-center min-h-touch ${item.attendance?.status === 'A' ? 'bg-status-absent' : 'bg-status-absent-bg'} ${item.attendance?.check_in_time ? 'opacity-40' : ''}`}
               >
                 <Text className={`text-sm font-semibold ${item.attendance?.status === 'A' ? 'text-white' : 'text-status-absent'}`}>{t('supervisor.markAbsent')}</Text>
               </TouchableOpacity>
             </View>
+            {item.attendance?.check_in_time ? (
+              <Text className="text-xs text-ink-400 mt-2">{t('supervisor.alreadyCheckedInHint')}</Text>
+            ) : null}
           </Card>
         )}
         ListEmptyComponent={

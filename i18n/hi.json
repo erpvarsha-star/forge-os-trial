@@ -410,6 +410,7 @@
     "confirmAttendance": "प्रत्येक टीम सदस्य की पुष्टि के लिए उपस्थित या अनुपस्थित दबाएं",
     "markPresent": "उपस्थित",
     "markAbsent": "अनुपस्थित",
+    "alreadyCheckedInHint": "पहले से चेक-इन है — अनुपस्थित नहीं किया जा सकता",
     "unskilledCount": "अकुशल संख्या",
     "skilledCount": "कुशल संख्या",
     "operatorCount": "ऑपरेटर संख्या",
