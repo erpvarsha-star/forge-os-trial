@@ -234,6 +234,8 @@
   },
   "worker": {
     "safetyTip": "दिन की सुरक्षा सलाह",
+    "quoteOfTheDay": "आज का सुविचार",
+    "quoteMeaning": "अर्थ",
     "todaysShift": "आज की शिफ्ट",
     "gpsCheckIn": "GPS चेक-इन",
     "gpsCheckOut": "GPS चेक-आउट",

@@ -234,6 +234,8 @@
   },
   "worker": {
     "safetyTip": "Safety Tip of the Day",
+    "quoteOfTheDay": "Quote of the Day",
+    "quoteMeaning": "Meaning",
     "todaysShift": "Today's Shift",
     "gpsCheckIn": "GPS Check-In",
     "gpsCheckOut": "GPS Check-Out",

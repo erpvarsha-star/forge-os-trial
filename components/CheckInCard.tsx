@@ -6,6 +6,7 @@ import { useAttendance } from '@/hooks/useAttendance'
 import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { Card } from '@/components/Card'
+import { QuoteOfTheDay } from '@/components/QuoteOfTheDay'
 import {
   getCurrentLocation,
   getPlantConfig,
@@ -472,6 +473,13 @@ export function CheckInCard() {
           </View>
         )}
       </View>
+
+      {/* Quote of the Day — shown once checked in, for every role (Yash, 6 Oct 2026) */}
+      {(isCheckedIn || isCheckedOut) && (
+        <View className="mb-5">
+          <QuoteOfTheDay />
+        </View>
+      )}
 
       {/* Entry QR — shown while checked in */}
       {employee?.requires_qr && isCheckedIn && (

@@ -1898,6 +1898,72 @@ Checked live (code + DB) rather than from memory, per the locked rule:
 
 ---
 
+## Quote of the Day — built 6/7 Oct 2026, decision from Yash
+
+Yash: a banner, like the existing Safety Tip, but a motivational quote
+shown after check-in — "motivational, team building, one new person they
+bond with, quotes of hanuman, sarasvati, laxmi, trust, commitment to the
+company, commitment to not let their coworkers down... from maharbharat,
+gita... same quotes for everyone is fine, but the english and hindi
+translation and meaning shuld be correct." Explicitly authorized to build
+and ship end-to-end without reporting back first ("your the architect...
+if you are confident you can deploy").
+
+**Content — `constants/dailyQuotes.ts`, 24 entries.** 15 scripture-based
+(8 Bhagavad Gita, 1 Mahabharata/Yaksha Prashna, 3 Hanuman Chalisa/
+Ramcharitmanas, 2 Saraswati, 2 Lakshmi/Hitopadesha) + 9 original
+Forge-OS-written secular ones (team trust, not letting coworkers down,
+bonding with a new teammate, commitment to the company). **Deliberately
+kept to the handful of the MOST famous, least-contested verse per
+deity/theme** rather than a longer but riskier list — a wrong translation
+of someone's faith is worse than a shorter rotation. Every scripture
+entry's `en`/`hi` field is the standard, widely published text/translation
+(not a paraphrase, not an invented shloka); `meaning_en`/`meaning_hi` is a
+deliberately separate "how this applies to today's shift" line, so the
+literal translation itself is never stretched to make an application
+point. The 9 secular entries are Claude's own original EN+HI text (not a
+third-party religious text), so the only translation risk there is plain
+contemporary Hindi, not scripture.
+
+**Same quote for everyone, every day — never device-local.** `lib/istDate.ts`
+gained `istDayIndex()` (a day count built from `istDateStr()`, re-anchored
+through `Date.UTC` — timezone-invariant arithmetic, not a fresh "what day
+is it" read of its own) specifically so this never regresses into a
+`new Date().getDay()` read, the exact bug class the locked IST rule exists
+to prevent. `components/SafetyTip.tsx`'s own `new Date().getDay()` was
+found while building this (already flagged in PENDING.md as "cosmetic,
+no changes") — left as-is since it's a separate, already-reviewed, already
+out-of-scope item; the new component was just built correctly from the
+start instead of copying that pattern.
+
+**Where it shows — after check-in, every role including the owner.**
+`components/QuoteOfTheDay.tsx` (modeled on `SafetyTip.tsx`'s bilingual
+card pattern) is rendered:
+- in `components/CheckInCard.tsx` — the shared check-in component already
+  used by owner/plant-head/hr-admin/manager/supervisor/security dashboards,
+  so one change covers 6 of 7 roles at once — gated on
+  `isCheckedIn || isCheckedOut` (appears right after a successful
+  check-in, stays visible through checkout);
+- in `app/(worker)/home.tsx` — the member role's own check-in flow
+  (doesn't use `CheckInCard`), same gating.
+
+New i18n keys `worker.quoteOfTheDay`/`worker.quoteMeaning` (EN "Quote of
+the Day"/"Meaning", HI "आज का सुविचार"/"अर्थ") in both `en.json`/`hi.json`.
+The quote's own `source` attribution (e.g. "Bhagavad Gita 2.47") is shown
+as plain text, not translated — same precedent as shift names being
+data-driven rather than i18n-keyed.
+
+**Verified before pushing**: `npx tsc --noEmit` — still exactly 7
+pre-existing baseline errors, none new. `node scripts/check-i18n.mjs` —
+clean, Hindi covers every new key. `npx expo export --platform web` —
+bundled cleanly (2949 modules), confirmed `QuoteOfTheDay`/`quoteOfTheDay`
+present in the output bundle. **Not yet exercised on a real device** —
+screen behind auth, so the login-screen-only headless-browser check this
+project sometimes runs wouldn't have exercised it anyway. New APK build
+needed (touches `app/`, `components/`, `constants/`, `lib/`, `i18n/`).
+
+---
+
 ## What Claude must NEVER do
 
 - Commit `.env` or any file containing `service_role` key
