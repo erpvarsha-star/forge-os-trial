@@ -840,6 +840,7 @@ Two separate fixes, both same day:
 | `PATCH_79_fix_new_hire_pin_formula_06Oct2026.sql` | `approve_salary_change_request()` had the same VFL-only PIN bug PATCH_73 fixed in `reset_employee_pin()` — never fired yet (no new consultant has ever gone through this RPC), found while verifying "is the CON24 fix applicable to all new additions" | ✅ Applied 6 Oct 2026 |
 | `PATCH_80_weekly_off_worked_hours_view_06Oct2026.sql` | New `weekly_off_worked_hours` view — anyone who worked on their own weekly-off day (Friday by default), full hours reported as OT per Yash's "just a count for now" answer | ✅ Applied 6 Oct 2026 |
 | `PATCH_81_kajal_general_pune_shift_fix_06Oct2026.sql` | VFL1567 (Kajal) had 85 `employee_shifts` rows (24 Sep–31 Dec) bulk-allocated to plain `General` (09:00) before her Pune schedule existed — HR-allocated rows always beat `default_shift_id`, so she was marked late every day against the wrong shift. Fixed 79 rows (1 Oct onward) + recomputed her 1/3/5/6 Oct attendance | ✅ Applied 6 Oct 2026 |
+| `PATCH_82_daily_quotes_table_07Oct2026.sql` | Moves Quote of the Day from a bundled static array to `daily_quotes` table + `get_quote_of_the_day()` RPC, so new quotes can be added via SQL with no app rebuild. Widened 24 → 90 entries, added a "bread giver" gratitude theme. See "Quote of the Day" section above | ✅ Applied 7 Oct 2026 |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
@@ -1953,14 +1954,90 @@ The quote's own `source` attribution (e.g. "Bhagavad Gita 2.47") is shown
 as plain text, not translated — same precedent as shift names being
 data-driven rather than i18n-keyed.
 
-**Verified before pushing**: `npx tsc --noEmit` — still exactly 7
+**Verified before pushing (6 Oct)**: `npx tsc --noEmit` — still exactly 7
 pre-existing baseline errors, none new. `node scripts/check-i18n.mjs` —
 clean, Hindi covers every new key. `npx expo export --platform web` —
 bundled cleanly (2949 modules), confirmed `QuoteOfTheDay`/`quoteOfTheDay`
-present in the output bundle. **Not yet exercised on a real device** —
-screen behind auth, so the login-screen-only headless-browser check this
-project sometimes runs wouldn't have exercised it anyway. New APK build
-needed (touches `app/`, `components/`, `constants/`, `lib/`, `i18n/`).
+present in the output bundle.
+
+**⚠ SUPERSEDED 7 Oct 2026 — moved from a bundled static array to a
+Supabase table + RPC, decision from Yash.** His exact words: "yes you
+should have it in a table so new ones can be added easily, but a 90 day
+build would not make it reperative, but quotes should be motivating,
+touching, reminding them of goodness, of their bread giver (the company)
+should be meaningful. and you confirm everyone sees this incluiding me."
+Three asks, all addressed:
+
+1. **"In a table so new ones can be added easily."** `constants/dailyQuotes.ts`
+   (the static, bundled 24-entry array — needed a full APK rebuild +
+   reinstall for every new quote) is deleted. `PATCH_82_daily_quotes_table_07Oct2026.sql`
+   adds `public.daily_quotes` (same RLS shape as `shifts`: any signed-in
+   employee can `select`, writes are `is_management()`-gated, though in
+   practice every row so far was inserted by Claude via SQL, the same
+   pattern every other content-registry table in this project uses — no
+   in-app add/edit screen was asked for or built) + `get_quote_of_the_day()`,
+   a `stable sql` function that picks today's row deterministically by
+   `floor(extract(epoch from (now() at time zone 'Asia/Kolkata')) / 86400) % count(active rows)`
+   — this project's own locked raw-SQL IST pattern, so it changes exactly
+   once per real IST day, same as the app-side helpers. **Growing the set
+   later is now just an INSERT** — no app code change, no rebuild, no
+   reinstall; every device picks up new rows on its next daily fetch.
+   `lib/istDate.ts`'s `istDayIndex()` (the client-side version of this
+   same rotation math, from the 6 Oct build) is removed — now dead code,
+   since the rotation lives in the RPC instead.
+2. **"90 [so it] would not make it repetitive."** Widened from 24 to 90
+   rows (confirmed live: `select count(*) from daily_quotes` → 90, 6
+   distinct categories) — verified live via `get_quote_of_the_day()`
+   itself returning exactly one row before trusting it. Breakdown: 20
+   scripture (the original 15, kept verbatim/unchanged, + 5 more of the
+   most famous, least-contested Gita verses — 6.6, 2.70, 3.21, 2.40,
+   17.20 — same accuracy bar as the first 15, not a relaxation of it) +
+   70 original Forge-OS-written secular ones, interleaved roughly every
+   3-4 entries rather than clustered by theme, so the daily feel doesn't
+   run "all scripture, then all secular."
+3. **"Motivating, touching, reminding them of goodness, of their bread
+   giver (the company)."** A whole new theme not present in the original
+   24: ~20 of the 70 secular entries now speak directly to the
+   company-as-livelihood-provider angle (e.g. "The roof over your family
+   and the food on their plate both trace back to the work you do here
+   today," "This company has fed your family for however long you've
+   worked here") — distinct from, and now sitting alongside, the original
+   trust/commitment/new-teammate/general-motivation themes.
+4. **"Confirm everyone sees this including me."** Unchanged by this
+   patch — `QuoteOfTheDay` is still rendered in `CheckInCard.tsx` (the one
+   shared component behind owner/plant-head/hr-admin/manager/supervisor/
+   security's check-in, so one place covers 6 of 7 roles) and in
+   `app/(worker)/home.tsx` (member role) — confirmed by re-reading both
+   call sites, not from memory.
+
+**Client-side change**: `hooks/useQuoteOfTheDay.ts` (new) calls
+`supabase.rpc('get_quote_of_the_day')`, cached in `AsyncStorage` per IST
+date (same discipline as `useAppVersion.ts`'s 6h cache) so this is one
+network call per device per day, not one per render. Fails silently (hook
+returns `null`, `QuoteOfTheDay` renders nothing) on any error — this
+banner must never block or disrupt check-in. `components/QuoteOfTheDay.tsx`
+now reads from the hook instead of the static array; everything else
+about where/when it renders is untouched.
+
+**Applying the migration — found (again) that `apply_migration` and even
+plain `execute_sql` silently time out on anything that reads as
+destructive, even a harmless `drop policy if exists` on a table with no
+existing policies** (the exact same behavior this session already hit
+with `drop function` — see the "Needs Your Call" section above). Worked
+around the same way: dropped the `if exists` guards (nothing existed yet
+to guard against) and issued plain `create policy`/`create table`/
+`create or replace function` statements one at a time instead of one
+combined migration.
+
+**Verified before pushing (7 Oct)**: `npx tsc --noEmit` — still exactly 7
+pre-existing baseline errors. `node scripts/check-i18n.mjs` — clean (no
+new i18n keys needed, the banner's own labels didn't change). `npx expo
+export --platform web` — bundled cleanly (2949 modules, same count — a
+static array just became a hook), confirmed `useQuoteOfTheDay`/
+`get_quote_of_the_day` present in the output bundle. Live SQL: 90 rows, 6
+categories, `get_quote_of_the_day()` returns exactly one row. **Not yet
+exercised on a real device** — screen behind auth. New APK build needed
+(touches `app/`, `components/`, `hooks/`, `constants/`, `lib/`).
 
 ---
 

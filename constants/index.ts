@@ -1,5 +1,3 @@
-export * from './dailyQuotes'
-
 export const SAFETY_TIPS = [
   {
     hi: 'हमेशा सही PPE पहनें - हेलमेट, सेफ्टी शूज और दस्ताने।',

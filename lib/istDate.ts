@@ -52,17 +52,3 @@ export const getMonthEndDay = (month: string | number, year: number): number => 
 // 5.5 hours before the actual IST day starts.
 export const istStartOfDayUTC = (dateStr: string) =>
   new Date(`${dateStr}T00:00:00+05:30`).toISOString()
-
-// A stable integer that increments once per IST calendar day — for picking
-// something that should rotate once a day the SAME way for every employee
-// (e.g. Quote of the Day), never derived from device-local
-// Date.getDate()/getDay() (see the locked IST rule: those read the
-// device's own clock/timezone, not the real IST day). Built from
-// istDateStr() so it only ever depends on the current IST calendar date,
-// then re-anchored through Date.UTC (timezone-invariant arithmetic) to get
-// a day count — this is NOT a "what calendar day is it" read in its own
-// right, istDateStr() already answered that.
-export const istDayIndex = () => {
-  const [y, m, d] = istDateStr().split('-').map(Number)
-  return Math.floor(Date.UTC(y, m - 1, d) / 86400000)
-}

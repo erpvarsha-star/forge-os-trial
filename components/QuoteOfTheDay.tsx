@@ -1,23 +1,27 @@
 import React from 'react'
 import { View, Text } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import { DAILY_QUOTES } from '@/constants'
-import { istDayIndex } from '@/lib/istDate'
+import { useQuoteOfTheDay } from '@/hooks/useQuoteOfTheDay'
 import { Card } from './Card'
 import { Sparkles } from 'lucide-react-native'
 
-// Yash, 6 Oct 2026: a motivational/spiritual quote shown to everyone, every
-// role (including the owner), right after check-in — same quote for
-// everyone on a given day. Picked from the IST calendar day, never a
-// device-local Date.getDay()/getDate() read (the locked IST rule) — so
-// every employee sees the identical quote on the same real day regardless
-// of device clock/timezone. See constants/dailyQuotes.ts for the quote set
-// and the accuracy notes on each one.
+// Yash, 6 Oct 2026, widened 7 Oct 2026: a motivational/spiritual quote
+// shown to everyone, every role (including the owner), right after
+// check-in — same quote for everyone on a given day. The quote set lives
+// in the daily_quotes table (PATCH_82), picked once per real IST calendar
+// day by get_quote_of_the_day() — never a device-local
+// Date.getDay()/getDate() read — so Claude can add more quotes any time
+// via SQL with no app rebuild, and every employee still sees the
+// identical quote on the same real day. See hooks/useQuoteOfTheDay.ts.
 export function QuoteOfTheDay() {
   const { t, i18n } = useTranslation()
-  const index = istDayIndex() % DAILY_QUOTES.length
-  const quote = DAILY_QUOTES[index]
+  const quote = useQuoteOfTheDay()
   const isHindi = i18n.language === 'hi'
+
+  // Fails silently (no banner) rather than showing a loading spinner or
+  // broken state — this is a decorative extra, never something that should
+  // draw attention to itself failing.
+  if (!quote) return null
 
   return (
     <Card variant="flat" className="bg-brand-50 border-brand-200">
