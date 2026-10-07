@@ -61,6 +61,7 @@ export default function WorkerLayout() {
         <Tabs.Screen name="notifications" options={{ href: null }} />
         <Tabs.Screen name="qr" options={{ href: null }} />
         <Tabs.Screen name="profile" options={{ href: null }} />
+        <Tabs.Screen name="shift-summary" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )

@@ -868,6 +868,7 @@ app/
 │   ├── notifications.tsx  — in-app notification bell
 │   ├── qr.tsx             — QR scan check-in
 │   ├── profile.tsx        — employee profile
+│   ├── shift-summary.tsx  — named-individual access only (Kajal, VFL1567), not role-gated (7 Oct 2026)
 │   └── more.tsx           — language toggle, logout
 ├── (supervisor)/
 │   ├── dashboard.tsx      — team attendance summary
@@ -1786,16 +1787,31 @@ Yash sent 12 items in one message. Each one below, with outcome:
     the hours a person works on their weekly-off day are already counted
     as overtime by the same general mechanism once they check in/out,
     regardless of which day it is.
-11. **Shift Check-in Summary screen** — the real screen was never actually
-    built before this session (only a mockup artifact shown 1 Oct 2026,
-    whose 3 open questions were never answered — found and corrected
-    this session). Built now: `hooks/useShiftCheckinSummary.ts` +
+11. **Shift Check-in Summary screen** — built 6 Oct 2026: `hooks/useShiftCheckinSummary.ts` +
     `components/ShiftCheckinSummary.tsx`, thin wrapper screens for
     Owner/Plant Head/HR Admin, reached via More (`href: null` pattern).
     Rows: Shift 1–5, General, Unassigned (never dropped). Security
-    Day/Night excluded with a footnote. These 3 defaults were Claude's own
-    call (confirmed-by-silence, not re-asked a third time) — correct if
-    Yash doesn't say otherwise.
+    Day/Night excluded with a footnote.
+    **🔒 CORRECTED 7 Oct 2026 — the "3 open questions never answered" claim
+    above was wrong, and the "Claude's own call, confirmed-by-silence" line
+    was a guess made without knowing the real answer existed.** A separate
+    session on 1 Oct 2026 had already put those exact 3 questions to Yash
+    via `AskUserQuestion` and gotten real answers — including "+ Kajal"
+    (VFL1567) as a named addition to the Owner/Plant Head/HR Admin access
+    list — but that work was sitting in an open PR the 6 Oct session never
+    saw, so it re-asked nothing and defaulted instead. Two lessons, not just
+    one gap: (a) **run `SELECT ... FROM employees` and check open PRs/recent
+    commits before declaring a decision "never answered"** — the locked
+    "verify against live data" rule applies to decision history, not just
+    employee facts; (b) a decision landing only in an unmerged PR is exactly
+    as fragile as the locked rule's original VFL5463 incident — "recorded"
+    means committed to the branch everyone actually reads next, not sitting
+    in review. The Kajal gap itself is closed same day: `app/(worker)/shift-summary.tsx`
+    (named-access only, via the new `SHIFT_CHECKIN_SUMMARY_ALLOWED_EMP_CODES`
+    constant in `constants/index.ts` — the first screen in this app gated by
+    specific employee rather than role) + wiring in `(worker)/_layout.tsx`/`more.tsx`.
+    The Shift 1–5/General/Unassigned row set and the Security Day/Night
+    exclusion are left as this screen's shipped behavior, not reopened.
 12. **Supabase → Sheets/Excel** — not built this session (would need a
     clear scope: which tables, on-demand vs recurring). Already partly
     solved for attendance specifically — `scripts/AttendanceReport.gs`
