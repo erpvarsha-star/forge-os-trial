@@ -54,6 +54,20 @@ export const ATTENDANCE_STATUS_LABELS: Record<string, string> = {
   HL: 'Half Day',
 }
 
+// Named individuals given access to a screen outside their role group, where
+// the role-gate system (app/(role)/_layout.tsx + RoleGate) doesn't fit because
+// the person needs it but isn't owner/plant_head/hr_admin themselves.
+// Decision from Yash, 1 Oct 2026 (AskUserQuestion, this exact screen): Shift
+// Check-in Summary goes to Owner + Plant Head + HR Admin (role-gated, the
+// screens already built 6 Oct 2026) "+ Kajal" by name — Kajal Balkrishna
+// Sutar (VFL1567), role='member', department='Administration'. The 6 Oct
+// build of this screen didn't have this answer and defaulted to
+// Owner/Plant Head/HR Admin only — this constant is what closes that gap.
+// Checked against emp_code, not employee_id, since emp_code is what this
+// file documents and what a future session can verify without a DB round
+// trip.
+export const SHIFT_CHECKIN_SUMMARY_ALLOWED_EMP_CODES = ['VFL1567']
+
 export const ROLE_ROUTES: Record<string, string> = {
   member: '/(worker)/home',
   supervisor: '/(supervisor)/dashboard',

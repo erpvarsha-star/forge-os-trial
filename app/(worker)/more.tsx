@@ -11,9 +11,10 @@ import { UpdateAppLink } from '@/components/UpdateAppLink'
 import { removePushToken } from '@/lib/notifications'
 import { router } from 'expo-router'
 import {
-  FileText, User, Bell, Globe, LogOut, ChevronRight, Wallet, QrCode
+  FileText, User, Bell, Globe, LogOut, ChevronRight, Wallet, QrCode, Table2
 } from 'lucide-react-native'
 import { TouchableOpacity } from 'react-native'
+import { SHIFT_CHECKIN_SUMMARY_ALLOWED_EMP_CODES } from '@/constants'
 
 export default function WorkerMore() {
   const { t } = useTranslation()
@@ -35,6 +36,11 @@ export default function WorkerMore() {
     { icon: <Wallet size={20} color="#E65C00" />, label: 'common.advance', onPress: () => router.push('/(worker)/advance') },
     { icon: <QrCode size={20} color="#E65C00" />, label: 'worker.qrCheckIn', onPress: () => router.push('/(worker)/qr') },
     { icon: <Globe size={20} color="#E65C00" />, label: 'common.language', onPress: () => setShowLangModal(true), value: language === 'hi' ? 'हिंदी' : 'English' },
+    // Named-individual access, not role-based — see the constant's own
+    // comment. Hidden from every other 'member' unless they're on the list.
+    ...(SHIFT_CHECKIN_SUMMARY_ALLOWED_EMP_CODES.includes(employee.emp_code)
+      ? [{ icon: <Table2 size={20} color="#E65C00" />, label: 'shiftCheckinSummary.tab', onPress: () => router.push('/(worker)/shift-summary') }]
+      : []),
   ]
 
   return (
