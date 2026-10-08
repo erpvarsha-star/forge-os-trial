@@ -22,6 +22,23 @@ GitHub, Figma, Gamma, Wix, Mem.
 frequently at this site; a failure must never cost more than the step in
 progress.
 
+**🔒 LOCKED RULE — delegate research and build/deploy work to subagents,
+verify before reporting done. Decision from Yash, 8 Oct 2026.** "you will
+use sonnet 4.6 and haiku 5.5 for every research or deployment as per
+their skills you will delegate and they will report back to you. set
+this as rule." (The harness's real model names are Opus 5.5 / Sonnet 5.5
+/ Haiku 4.5 / Fable 5.1 — Yash's own naming doesn't match exactly, but
+the intent is unambiguous: use Sonnet-class models for reasoning-heavy
+research/build work and Haiku-class models for simpler, clearly-directed
+file-review tasks, via the Agent tool, rather than doing everything
+in-session.) Concretely: brief the agent with the specific files/lines
+and the root cause already understood (never delegate the *understanding*
+step — that stays with Claude), let it do the research or
+implementation, then independently verify its work (re-run tsc/i18n
+checks, re-read the diff, re-check live data) before telling Yash
+something is done. This doesn't apply retroactively to work already in
+flight — apply it going forward.
+
 **Keep `PENDING.md` current** — it is the shared checklist of what is
 outstanding, blocked, or untested. Update it before the final push of any
 session.

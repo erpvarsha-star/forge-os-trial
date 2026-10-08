@@ -183,6 +183,7 @@
     <div>
       <h1>Plant Dashboard</h1>
       <div class="dim" id="whoami"></div>
+      <div class="dim" id="dataAsOf"></div>
     </div>
     <div class="spacer"></div>
     <select id="deptFilter" style="width:auto;min-width:160px"><option value="">All departments</option></select>
@@ -302,6 +303,17 @@ const istNow = () => new Date(Date.now() + 5.5 * 3600 * 1000);
 const istDate = (d = istNow()) => d.toISOString().slice(0, 10);
 const daysAgoIST = (n) => { const d = istNow(); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
 
+/* Human-readable "<day> <mon> <year>" / "HH:MM" from an IST-shifted Date,
+   read via its getUTC* methods — same rule as every other IST computation
+   in this file: never .getDate()/.getHours(), which would read the
+   browser's own local timezone instead of IST. Used only for the "Data as
+   of" freshness line below; does not affect any date-boundary logic. */
+const IST_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const formatISTStamp = (d) => ({
+  date: `${d.getUTCDate()} ${IST_MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`,
+  time: `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`,
+});
+
 /* ---------- REST ---------- */
 async function api(path, opts = {}) {
   const res = await fetch(SUPABASE_URL + path, {
@@ -383,7 +395,12 @@ async function loadAll() {
       safe(select('production_records', `date=gte.${monthStart}&select=department,qty`)),
     ]);
 
-  DATA = { employees, todayAtt, monthAtt, scores, leaves, advances, alerts, tokens, formSubs, production, today };
+  // Recorded fresh on every successful load (initial load AND every manual
+  // Refresh click) — never frozen at page-open time — so the "Data as of"
+  // line always reflects the most recent fetch, not just the first one.
+  const fetchedAt = istNow();
+
+  DATA = { employees, todayAtt, monthAtt, scores, leaves, advances, alerts, tokens, formSubs, production, today, fetchedAt };
   fillDepartments();
   render();
 }
@@ -398,6 +415,16 @@ function fillDepartments() {
 
 /* ---------- RENDER ---------- */
 function render() {
+  // Shows both when the data was fetched and which calendar date "today"
+  // means in every stat below (Present Today, Late Today, department
+  // breakdown) — so a legitimately-empty early-morning state (e.g. 1 AM
+  // IST, before the day shift starts) reads as "fresh, just early" rather
+  // than looking broken or stale.
+  if (DATA.fetchedAt) {
+    const stamp = formatISTStamp(DATA.fetchedAt);
+    $('dataAsOf').textContent = `Today = ${stamp.date} · Data as of ${stamp.time} IST`;
+  }
+
   const dept = $('deptFilter').value;
   const emps = dept ? DATA.employees.filter(e => e.department === dept) : DATA.employees;
   const ids = new Set(emps.map(e => e.id));
