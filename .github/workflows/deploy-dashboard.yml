@@ -43,3 +43,22 @@ jobs:
           # in this repo.
           NETLIFY_SITE_ID: c798623a-6d59-48cc-b98f-486fa7a2ff8d
         run: netlify deploy --build --prod
+
+      # The agent sandbox that normally commits this workflow cannot reach
+      # any netlify.app domain to check the result itself (confirmed 8 Oct
+      # 2026 -- blocked at the network-policy level, not just a slow proxy),
+      # so this step does that verification here instead, on a runner that
+      # actually has internet access: confirm the page is live and that
+      # netlify.toml's build command really substituted APPS_SCRIPT_URL
+      # (the dashboard ships with the literal __APPS_SCRIPT_URL__ placeholder
+      # in git -- a deploy that skipped the build step would publish that
+      # placeholder verbatim and the production/collections panel would
+      # silently stay blank).
+      - name: Verify the deploy actually went live
+        run: |
+          page="$(curl -fsS https://forge-os-review.netlify.app)"
+          if echo "$page" | grep -q "__APPS_SCRIPT_URL__"; then
+            echo "::error::Deployed page still contains the __APPS_SCRIPT_URL__ placeholder -- the netlify.toml build command did not run or APPS_SCRIPT_URL is not set on this site."
+            exit 1
+          fi
+          echo "OK: page is live and the Apps Script URL placeholder was substituted."
