@@ -37,7 +37,7 @@ jobs:
 
       - name: Deploy dashboard to Netlify
         env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY }}
           # Not a secret -- an opaque project ID, same treatment as the
           # Supabase project ref already committed in plain text elsewhere
           # in this repo.
