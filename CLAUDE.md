@@ -654,11 +654,12 @@ own RLS-gated client queries):**
    comes in what time on average and goes when; then for November we build
    better shift allocations."** Query:
    `select emp_code, name, department, avg_check_in_ist, avg_check_out_ist from checkin_checkout_pattern where month = date_trunc('month', now())::date order by department, avg_check_in_ist;`
-   **Open, not yet confirmed with Yash:** whether his accompanying "let
-   everyone check in instead of assuming they are late or early" means
-   suspending the late/early flag for October, or just reaffirms the 28 Sep
-   "check-in time decides the shift" rule. Nothing changed in late-marking
-   until he answers.
+   **🔒 Late marking stays exactly as is through October — decision from
+   Yash, 11 Oct 2026:** "keep late marking as is, we will review it first
+   week November to decide if the late markings stand correct." Do not
+   suspend or change late/early logic before that review; in the first week
+   of November, bring the October late data + `checkin_checkout_pattern`
+   to Yash for that review.
 
 **Exporting a result**: both SQL Editor and Table Editor have a built-in
 Export-to-CSV button on any result set — free, no setup, no connector.
