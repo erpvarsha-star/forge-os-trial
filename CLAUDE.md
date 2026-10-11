@@ -764,6 +764,35 @@ screens each built by a Sonnet agent, reviewed and live-tested by Claude.
    automatically when it grows. Ranks follow the current late rules (which
    Yash reviews in November).
 
+**Built same day (apk-93+), all by Sonnet agents, reviewed + live-tested:**
+- **Counts (`PATCH_84`, `my_action_counts()` → jsonb):** `tasks_todo`,
+  `tasks_to_confirm`, `approvals` (my_turn leave + advance + salary changes
+  at my stage), `needs_your_call` + `fraud_alerts` (owner only). Each key
+  mirrors its screen exactly — verified live 11 Oct (owner NYC 4 = screen
+  4; HR approvals 2; Kajal todo 1). `hooks/useAssignedTasks.ts`
+  `computeBadges()` places them: a count sits on the tab where the item
+  lives, More's badge = sum of rows inside More, each decision row has a
+  red `CountPill`. The Tasks tab counts only `tasks_to_confirm` (that
+  screen lists tasks awaiting your confirmation; own to-dos are under My
+  Tasks in More). Counts refresh on mount, foreground, every 2 min, and
+  after every approve/resolve/task action.
+- **Tabs now:** owner = Dashboard, Tasks, Fraud Alerts, More (Approvals +
+  Needs Your Call at the top of More); plant-head = Dashboard, Approvals,
+  MRM, Tasks, Forms, More (Email → More); hr-admin gains a Tasks tab.
+- **On-time race (`PATCH_85`):** `employees.work_location` (Pune: VFL1567,
+  VFL5439); `ontime_race_standings()` internal (not callable by users);
+  `my_ontime_rank()` own row only; `ontime_race_leaders()` owner only.
+  Card after check-in (`components/OntimeRaceCard.tsx`, hidden for owner /
+  unranked); owner screen More → On-time Race. Ties share #1. Live-tested:
+  worker sees only "#9 of 19", Kajal unranked (Pune 2 < 3), Fazal refused
+  names, owner sees 6 leaders.
+- **Clipped labels:** `lib/androidTextFix.ts` (imported first in
+  `app/_layout.tsx`) patches Android `Text`/`TextInput` render: Roboto
+  family, `textBreakStrategy: 'simple'`, `maxFontSizeMultiplier` 1.3.
+  Explicit fontFamily still wins; no-op on iOS/web. **Moderate
+  confidence only — needs confirming on Yash's phone.** If labels still
+  clip, next step is per-row `paddingRight` or asking the phone model.
+
 ## Owner has no KPI tab — decision from Yash, 28 Sep 2026
 
 Redundant with `dashboard/index.html` (the plant HTML dashboard, which
@@ -973,6 +1002,8 @@ Two separate fixes, both same day:
 | `PATCH_81_kajal_general_pune_shift_fix_06Oct2026.sql` | VFL1567 (Kajal) had 85 `employee_shifts` rows (24 Sep–31 Dec) bulk-allocated to plain `General` (09:00) before her Pune schedule existed — HR-allocated rows always beat `default_shift_id`, so she was marked late every day against the wrong shift. Fixed 79 rows (1 Oct onward) + recomputed her 1/3/5/6 Oct attendance | ✅ Applied 6 Oct 2026 |
 | `PATCH_82_daily_quotes_table_07Oct2026.sql` | Moves Quote of the Day from a bundled static array to `daily_quotes` table + `get_quote_of_the_day()` RPC, so new quotes can be added via SQL with no app rebuild. Widened 24 → 90 entries, added a "bread giver" gratitude theme. See "Quote of the Day" section above | ✅ Applied 7 Oct 2026 |
 | `PATCH_83_assigned_tasks_11Oct2026.sql` | Task delegation: `assigned_tasks` + events, select-only RLS, assignment/confirmation RPCs, badge count, `task_people()` names. See "Task delegation" section | ✅ Applied 11 Oct 2026 — live-tested as 7 real roles, positive + negative |
+| `PATCH_84_action_counts_11Oct2026.sql` | `my_action_counts()` — one RPC behind every red count (tasks, approvals, Needs Your Call, fraud alerts) | ✅ Applied 11 Oct 2026 — counts verified against each screen as 4 roles |
+| `PATCH_85_ontime_race_11Oct2026.sql` | Monthly on-time race: `employees.work_location`, own-rank + owner-only leaders RPCs | ✅ Applied 11 Oct 2026 — tested as worker, Kajal, plant head, owner |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.

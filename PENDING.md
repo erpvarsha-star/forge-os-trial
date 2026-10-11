@@ -25,6 +25,17 @@ real device. Also open: Yash's "let everyone check in instead of assuming
 late or early" for October still needs clarifying (see CLAUDE.md
 `checkin_checkout_pattern`).
 
+**Later same session, 11 Oct 2026 — Yash's apk-92 feedback.** Built and
+live-tested (details in CLAUDE.md "Follow-up decisions"): red counts for
+every pending decision (PATCH_84) — he'd missed 4 days of Needs Your Call;
+Tasks as a bottom tab for owner / plant head / HR, owner's Approvals
+moved into More; monthly on-time race (PATCH_85; employees see only their
+own rank, owner sees #1 per group); Android clipped-label fix. ⏳ Needs:
+(1) install the new APK and confirm on Yash's phone that labels are no
+longer cut off — the fix is moderate-confidence; (2) confirm "member" in
+his race request meant the **worker** category; (3) Yash still has 4
+Needs Your Call decisions pending.
+
 **Task delegation built, 11 Oct 2026 (session 22).** Was never built
 before (only an orphan `tasks` table). Now live: PATCH_83 + My Tasks /
 Team Tasks screens + More-tab badge + tasks in monthly score — details in
