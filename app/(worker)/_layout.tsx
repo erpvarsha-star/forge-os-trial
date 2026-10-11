@@ -7,7 +7,7 @@ import { Home, Calendar, Trophy, ClipboardCheck, MoreHorizontal } from 'lucide-r
 export default function WorkerLayout() {
   const { t } = useTranslation()
   // One badge sync per layout (not per screen) — drives the More tab count.
-  const taskBadge = useTaskBadgeSync()
+  const badges = useTaskBadgeSync('worker')
 
   return (
     <RoleGate allow={['member']}>
@@ -50,7 +50,7 @@ export default function WorkerLayout() {
         <Tabs.Screen
           name="more"
           options={{
-            tabBarBadge: taskBadge, title: t('common.more'),
+            tabBarBadge: badges.more, title: t('common.more'),
             tabBarIcon: ({ color }) => <MoreHorizontal size={22} color={color} />,
           }}
         />

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { refreshActionCounts } from '@/hooks/useAssignedTasks'
 import { NeedsYourCallShiftItem, Shift, ShiftReviewOutcome } from '@/types'
 
 // Owner-only review queue for employee_shifts rows the system guessed on
@@ -41,7 +42,7 @@ export function useNeedsYourCall() {
       p_note: note || null,
     })
     setActingId(null)
-    if (!error) await fetchItems()
+    if (!error) { await fetchItems(); refreshActionCounts() }
     return { error }
   }
 

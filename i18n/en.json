@@ -634,6 +634,24 @@
     "out": "Out",
     "securityFootnote": "Security Day and Security Night shifts are not included in this view."
   },
+  "ontimeRace": {
+    "title": "On-Time Race",
+    "subtitle": "Who is #1 in each group this month",
+    "menuLabel": "On-Time Race",
+    "cardTitle": "This month's on-time race",
+    "youAre": "You're #{{rank}} of {{size}} in {{category}}",
+    "onTimeDays": "{{days}} on-time days",
+    "keepGoing": "Keep it up — every on-time day counts!",
+    "leading": "You're leading the race — stay on time!",
+    "categoryStaff": "Staff",
+    "categoryWorker": "Worker",
+    "categoryConsultant": "Consultant",
+    "month": "Month",
+    "empty": "No group has enough people for a race yet",
+    "lateDays": "Late days",
+    "groupSize": "Group size",
+    "error": "Could not load the race"
+  },
   "needsYourCall": {
     "tab": "Needs Your Call",
     "title": "Needs Your Call",
@@ -744,6 +762,7 @@
   },
   "delegatedTasks": {
     "myTasks": "My Tasks",
+    "tabLabel": "Tasks",
     "teamTasks": "Team Tasks",
     "assignTask": "Assign task",
     "assign": "Assign",

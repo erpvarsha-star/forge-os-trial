@@ -7,6 +7,7 @@ import { Header } from '@/components/Header'
 import { FactoryOsLink } from '@/components/FactoryOsLink'
 import { SafetyTip } from '@/components/SafetyTip'
 import { QuoteOfTheDay } from '@/components/QuoteOfTheDay'
+import { OntimeRaceCard } from '@/components/OntimeRaceCard'
 import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
@@ -520,6 +521,7 @@ export default function WorkerHome() {
 
           {/* Quote of the Day — shown once checked in (Yash, 6 Oct 2026) */}
           {(isCheckedIn || isCheckedOut) && <QuoteOfTheDay />}
+          {(isCheckedIn || isCheckedOut) && <OntimeRaceCard refreshKey={isCheckedOut ? 'out' : 'in'} />}
 
           {/* SECONDARY — quick actions, clearly lower visual weight than the hero */}
           <View>

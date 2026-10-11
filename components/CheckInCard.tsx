@@ -7,6 +7,7 @@ import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { Card } from '@/components/Card'
 import { QuoteOfTheDay } from '@/components/QuoteOfTheDay'
+import { OntimeRaceCard } from '@/components/OntimeRaceCard'
 import {
   getCurrentLocation,
   getPlantConfig,
@@ -473,6 +474,9 @@ export function CheckInCard() {
       {(isCheckedIn || isCheckedOut) && (
         <View className="mb-5">
           <QuoteOfTheDay />
+          <View className="mt-3">
+            <OntimeRaceCard refreshKey={isCheckedOut ? 'out' : 'in'} />
+          </View>
         </View>
       )}
 

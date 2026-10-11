@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { refreshActionCounts } from '@/hooks/useAssignedTasks'
 
 export interface MyTurnLeaveRequest {
   id: string
@@ -61,7 +62,7 @@ export function useLeaveAdvanceApprovals() {
     setActingId(id)
     const { error } = await supabase.rpc('review_leave_request', { p_id: id, p_approve: approve, p_note: note || null })
     setActingId(null)
-    if (!error) await fetchApprovals()
+    if (!error) { await fetchApprovals(); refreshActionCounts() }
     return { error }
   }
 
@@ -69,7 +70,7 @@ export function useLeaveAdvanceApprovals() {
     setActingId(id)
     const { error } = await supabase.rpc('review_advance_request', { p_id: id, p_approve: approve, p_note: note || null })
     setActingId(null)
-    if (!error) await fetchApprovals()
+    if (!error) { await fetchApprovals(); refreshActionCounts() }
     return { error }
   }
 

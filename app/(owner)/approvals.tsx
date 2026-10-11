@@ -10,6 +10,7 @@ import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
+import { refreshActionCounts } from '@/hooks/useAssignedTasks'
 import { CheckCircle, XCircle, Inbox, Upload, ChevronRight } from 'lucide-react-native'
 import { INK, BRAND } from '@/components/theme'
 
@@ -62,6 +63,7 @@ export default function OwnerApprovals() {
       )
     }
     fetchSalary()
+    refreshActionCounts()
   }
 
   const rejectSalary = async (req: SalaryChangeRequest) => {
@@ -70,6 +72,7 @@ export default function OwnerApprovals() {
     setSalaryActingId(null)
     if (error) Alert.alert(t('common.error'), t('common.somethingWentWrong'))
     fetchSalary()
+    refreshActionCounts()
   }
 
   const waitingLabel = (createdAt: string) => {

@@ -7,7 +7,7 @@ import { BarChart3, Users, ClipboardList, CheckCircle, ClipboardCheck, MoreHoriz
 export default function SupervisorLayout() {
   const { t } = useTranslation()
   // One badge sync per layout (not per screen) — drives the More tab count.
-  const taskBadge = useTaskBadgeSync()
+  const badges = useTaskBadgeSync('supervisor')
   return (
     <RoleGate allow={['supervisor']}>
   <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: '#E65C00', tabBarInactiveTintColor: '#9CA3AF', tabBarStyle: { paddingBottom: 8, height: 64 } }}>
@@ -16,7 +16,7 @@ export default function SupervisorLayout() {
         <Tabs.Screen name="tasks" options={{ title: t('common.tasks'), tabBarIcon: ({ color }) => <ClipboardList size={22} color={color} /> }} />
         <Tabs.Screen name="approvals" options={{ title: t('common.approvals'), tabBarIcon: ({ color }) => <CheckCircle size={22} color={color} /> }} />
         <Tabs.Screen name="forms" options={{ title: t('forms.tab'), tabBarIcon: ({ color }) => <ClipboardCheck size={22} color={color} /> }} />
-        <Tabs.Screen name="more" options={{ tabBarBadge: taskBadge, title: t('common.more'), tabBarIcon: ({ color }) => <MoreHorizontal size={22} color={color} /> }} />
+        <Tabs.Screen name="more" options={{ tabBarBadge: badges.more, title: t('common.more'), tabBarIcon: ({ color }) => <MoreHorizontal size={22} color={color} /> }} />
         <Tabs.Screen name="shift-report" options={{ href: null }} />
         <Tabs.Screen name="casual-workers" options={{ href: null }} />
         <Tabs.Screen name="5s-verify" options={{ href: null }} />

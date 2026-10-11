@@ -62,27 +62,75 @@ export interface NewTaskInput {
   priority: TaskPriority
 }
 
-// ─── Badge store ────────────────────────────────────────────────────────────
-// One shared count, read by every group's More tab badge and More-menu rows.
-interface TaskBadgeState {
-  count: number
-  setCount: (n: number) => void
+// ─── Action-counts store ────────────────────────────────────────────────────
+// Fed by my_action_counts() (PATCH_84). Read by every group's tab badges and
+// More-menu row pills so a pending decision is never invisible.
+export interface ActionCounts {
+  tasks_todo: number
+  tasks_to_confirm: number
+  approvals: number
+  needs_your_call: number
+  fraud_alerts: number
 }
-export const useTaskBadgeStore = create<TaskBadgeState>(set => ({
-  count: 0,
-  setCount: n => set({ count: n }),
+const ZERO_COUNTS: ActionCounts = { tasks_todo: 0, tasks_to_confirm: 0, approvals: 0, needs_your_call: 0, fraud_alerts: 0 }
+
+interface ActionCountsState {
+  counts: ActionCounts
+  setCounts: (c: ActionCounts) => void
+}
+export const useActionCountsStore = create<ActionCountsState>(set => ({
+  counts: ZERO_COUNTS,
+  setCounts: c => set({ counts: c }),
 }))
 
-/** Re-reads my_task_action_count(). Keeps the old count on error (a flaky
- *  signal must not wipe a badge the person still needs to see). */
-export async function refreshTaskBadge(): Promise<void> {
+const toN = (v: unknown) => {
+  const n = Number(v)
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
+}
+
+/** Re-reads my_action_counts(). Keeps the old counts on error (a flaky signal
+ *  must not wipe a badge the person still needs to see). */
+export async function refreshActionCounts(): Promise<void> {
   try {
-    const { data, error } = await supabase.rpc('my_task_action_count')
-    if (error) return
-    const n = typeof data === 'number' ? data : Number(data)
-    useTaskBadgeStore.getState().setCount(Number.isFinite(n) && n > 0 ? n : 0)
+    const { data, error } = await supabase.rpc('my_action_counts')
+    if (error || !data || typeof data !== 'object') return
+    const d = data as Record<string, unknown>
+    useActionCountsStore.getState().setCounts({
+      tasks_todo: toN(d.tasks_todo),
+      tasks_to_confirm: toN(d.tasks_to_confirm),
+      approvals: toN(d.approvals),
+      needs_your_call: toN(d.needs_your_call),
+      fraud_alerts: toN(d.fraud_alerts),
+    })
   } catch {
     // ignore — badge is a convenience, never blocks a screen
+  }
+}
+/** Old name, kept so existing call sites keep working. */
+export const refreshTaskBadge = refreshActionCounts
+
+export type BadgeGroup = 'worker' | 'supervisor' | 'manager' | 'hr-admin' | 'plant-head' | 'owner' | 'security'
+const n0 = (n: number) => (n > 0 ? n : undefined)
+
+/** Pure: which counts sit on which tab for a role group. `more` = sum of the
+ *  counts of rows that live inside that group's More screen. */
+export function computeBadges(group: BadgeGroup, c: ActionCounts) {
+  // The Tasks tab is the team-tasks screen, which lists tasks awaiting MY
+  // confirmation — not my own to-dos (those live under My Tasks in More).
+  const tasksTab = c.tasks_to_confirm
+  switch (group) {
+    case 'owner':
+      return { more: n0(c.approvals + c.needs_your_call + c.tasks_todo), approvals: undefined, tasks: n0(tasksTab), alerts: n0(c.fraud_alerts) }
+    case 'plant-head':
+      return { more: n0(c.tasks_todo), approvals: n0(c.approvals), tasks: n0(tasksTab), alerts: undefined }
+    case 'hr-admin':
+      return { more: n0(c.approvals + c.tasks_todo), approvals: undefined, tasks: n0(tasksTab), alerts: undefined }
+    case 'manager':
+      return { more: n0(c.tasks_todo + c.tasks_to_confirm), approvals: n0(c.approvals), tasks: undefined, alerts: undefined }
+    case 'supervisor':
+      return { more: n0(c.tasks_todo + c.tasks_to_confirm), approvals: undefined, tasks: undefined, alerts: undefined }
+    default:
+      return { more: n0(c.tasks_todo), approvals: undefined, tasks: undefined, alerts: undefined }
   }
 }
 
@@ -91,32 +139,32 @@ const BADGE_POLL_MS = 2 * 60 * 1000
 /**
  * Mount ONCE per role-group `_layout.tsx`. Refreshes on mount, whenever the
  * app returns to the foreground, and every 2 minutes while it is active.
- * Returns the count for tabBarBadge (undefined when 0).
+ * Returns tabBarBadge values for that group (undefined when 0).
  */
-export function useTaskBadgeSync(): number | undefined {
+export function useTaskBadgeSync(group: BadgeGroup) {
   const { employee } = useAuth()
   const empId = employee?.id
-  const count = useTaskBadgeStore(s => s.count)
+  const counts = useActionCountsStore(s => s.counts)
 
   useEffect(() => {
     if (!empId) return
     let timer: ReturnType<typeof setInterval> | null = null
     const start = () => {
       if (timer) return
-      timer = setInterval(refreshTaskBadge, BADGE_POLL_MS)
+      timer = setInterval(refreshActionCounts, BADGE_POLL_MS)
     }
     const stop = () => {
       if (timer) { clearInterval(timer); timer = null }
     }
-    refreshTaskBadge()
+    refreshActionCounts()
     if (AppState.currentState === 'active') start()
     const sub = AppState.addEventListener('change', next => {
-      if (next === 'active') { refreshTaskBadge(); start() } else stop()
+      if (next === 'active') { refreshActionCounts(); start() } else stop()
     })
     return () => { stop(); sub.remove() }
   }, [empId])
 
-  return count > 0 ? count : undefined
+  return computeBadges(group, counts)
 }
 
 // ─── Data helpers ───────────────────────────────────────────────────────────

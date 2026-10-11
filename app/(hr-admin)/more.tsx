@@ -9,6 +9,8 @@ import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { UpdateAppLink } from '@/components/UpdateAppLink'
+import { CountPill } from '@/components/CountPill'
+import { useActionCountsStore } from '@/hooks/useAssignedTasks'
 import { TaskMenuRows } from '@/components/TaskMenuRows'
 import { removePushToken } from '@/lib/notifications'
 import { LogOut, Globe, Settings, ChevronRight, AlertCircle, CreditCard, Users, Eye, Clock, CheckSquare, FileText, Table2 } from 'lucide-react-native'
@@ -20,6 +22,7 @@ export default function HRAdminMore() {
   const router = useRouter()
   const { employee, logout } = useAuth()
   const { language, toggleLanguage } = useLanguage(employee)
+  const approvalsCount = useActionCountsStore(s => s.counts.approvals)
   if (!employee) return <LoadingScreen />
   const handleLogout = async () => { if (employee) await removePushToken(employee.id); await logout() }
 
@@ -48,14 +51,17 @@ export default function HRAdminMore() {
           </View>
         </Card>
 
-        <TaskMenuRows group="hr-admin" canAssign={true} />
+        <TaskMenuRows group="hr-admin" canAssign={true} teamTasksIsTab />
 
         <Text className="text-xs font-semibold uppercase tracking-wider text-ink-400 mb-2">{t('common.quickActions')}</Text>
         {links.map(link => (
           <TouchableOpacity key={link.key} onPress={() => router.push(link.path as any)} className="mb-2 min-h-touch">
             <Card className="flex-row items-center justify-between">
               <View className="flex-row items-center gap-3">{link.icon}<Text className="text-base text-ink-900">{link.label}</Text></View>
-              <ChevronRight size={16} color="#B9C0CC" />
+              <View className="flex-row items-center gap-2">
+                {link.key === 'approvals' ? <CountPill count={approvalsCount} /> : null}
+                <ChevronRight size={16} color="#B9C0CC" />
+              </View>
             </Card>
           </TouchableOpacity>
         ))}

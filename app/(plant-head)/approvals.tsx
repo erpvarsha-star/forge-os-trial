@@ -9,6 +9,7 @@ import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
+import { refreshActionCounts } from '@/hooks/useAssignedTasks'
 import { CheckCircle, XCircle, Inbox } from 'lucide-react-native'
 import { INK } from '@/components/theme'
 
@@ -57,6 +58,7 @@ export default function PlantHeadApprovals() {
       return
     }
     fetchSalary()
+    refreshActionCounts()
   }
 
   if (!employee) return <LoadingScreen />

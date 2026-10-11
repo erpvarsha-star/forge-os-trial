@@ -11,7 +11,7 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { UpdateAppLink } from '@/components/UpdateAppLink'
 import { TaskMenuRows } from '@/components/TaskMenuRows'
 import { removePushToken } from '@/lib/notifications'
-import { LogOut, Globe, Shield, ChevronRight, Eye, Clock, FileText, Table2 } from 'lucide-react-native'
+import { LogOut, Globe, Shield, ChevronRight, Eye, Clock, FileText, Table2, Mail } from 'lucide-react-native'
 import { BRAND } from '@/components/theme'
 
 export default function PlantHeadMore() {
@@ -36,7 +36,15 @@ export default function PlantHeadMore() {
           </View>
         </Card>
 
-        <TaskMenuRows group="plant-head" canAssign={true} />
+        <TaskMenuRows group="plant-head" canAssign={true} teamTasksIsTab />
+
+        <TouchableOpacity onPress={() => router.push('/(plant-head)/email')} className="mb-2 min-h-touch">
+          <Card className="flex-row items-center justify-between">
+            <View className="flex-row items-center gap-3"><Mail size={20} color={BRAND[600]} /><Text className="text-base text-ink-900">{t('plantHead.emailDashboard')}</Text></View>
+            <View className="flex-row items-center gap-2"><ChevronRight size={18} color="#9CA3AF" /></View>
+          </Card>
+        </TouchableOpacity>
+
 
         <TouchableOpacity onPress={toggleLanguage} className="mb-2 min-h-touch">
           <Card className="flex-row items-center justify-between">

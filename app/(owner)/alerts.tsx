@@ -8,6 +8,7 @@ import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
+import { refreshActionCounts } from '@/hooks/useAssignedTasks'
 import { FraudAlert } from '@/types'
 import { AlertTriangle, MapPin, Users, Zap, ShieldCheck, CheckCircle2, XCircle, Search } from 'lucide-react-native'
 import { STATUS } from '@/components/theme'
@@ -40,7 +41,7 @@ export default function OwnerAlerts() {
     setActingId(null)
     setPending(null)
     setNote('')
-    if (!error) await fetchAlerts()
+    if (!error) { await fetchAlerts(); refreshActionCounts() }
   }
 
   const getIcon = (type: string) => {
