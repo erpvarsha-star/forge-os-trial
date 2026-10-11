@@ -757,7 +757,7 @@ screens each built by a Sonnet agent, reviewed and live-tested by Claude.
    again." So: every employee sees only their OWN rank in their group this
    IST month (no other names, ever); only the owner sees who is #1 in each
    group. Groups = `employees.category` (staff / worker / consultant —
-   Claude read "member" as the worker category; confirm if wrong) per
+   **"member" = the worker category, confirmed by Yash 11 Oct 2026**) per
    work location. Location is a new `employees.work_location` column
    (Aurangabad default; Kajal VFL1567 + VFL5439 = Pune); a group shows ranks
    only once it has enough people, so Pune is skipped today and starts
@@ -789,9 +789,9 @@ screens each built by a Sonnet agent, reviewed and live-tested by Claude.
 - **Clipped labels:** `lib/androidTextFix.ts` (imported first in
   `app/_layout.tsx`) patches Android `Text`/`TextInput` render: Roboto
   family, `textBreakStrategy: 'simple'`, `maxFontSizeMultiplier` 1.3.
-  Explicit fontFamily still wins; no-op on iOS/web. **Moderate
-  confidence only — needs confirming on Yash's phone.** If labels still
-  clip, next step is per-row `paddingRight` or asking the phone model.
+  Explicit fontFamily still wins; no-op on iOS/web. **✅ Confirmed fixed
+  on Yash's phone (apk-94), 11 Oct 2026** — keep this patch; if a future
+  screen clips again, check it isn't overriding fontFamily first.
 
 ## Owner has no KPI tab — decision from Yash, 28 Sep 2026
 
