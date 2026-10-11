@@ -329,6 +329,19 @@ assigns shifts for, same as any other day; a Friday off is one with none.
 
 ---
 
+**🔒 Weekly-off rule — decision from Yash, 11 Oct 2026** (answering the
+open "weekly off is never excluded" gap): **a weekly-off day is not an
+absence** — it must be left out of attendance counts/denominators, never
+marked or scored absent. **If someone works on their weekly off, it is a
+normal working day** ("normal day if work Friday") — counted as present
+like any other day. Weekly off = **Friday for everyone, except Kajal
+(VFL1567), whose weekly off is Sunday instead of Friday** (so Friday is a
+normal working day for her). Her `employees.weekly_off_day = 0` (Sunday)
+already encodes this; everyone else is Friday by default. Note:
+`PATCH_80`'s `weekly_off_worked_hours` view reports full hours on a
+worked weekly off as OT — that predates this rule; check with Yash
+before changing it.
+
 ## Shift inference for unassigned check-ins — decision from Yash, 27 Sep 2026
 
 **Decision:** "if there is no shift allotment done for anyone consider the
