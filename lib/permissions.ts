@@ -1,4 +1,4 @@
-import { BarCodeScanner } from 'expo-barcode-scanner'
+import { Camera } from 'expo-camera'
 import * as Location from 'expo-location'
 import * as Notifications from 'expo-notifications'
 import { Platform } from 'react-native'
@@ -26,7 +26,7 @@ export async function requestAllPermissions(): Promise<void> {
 
   // Camera — QR scanner and 5S photo submissions
   try {
-    await BarCodeScanner.requestPermissionsAsync()
+    await Camera.requestCameraPermissionsAsync()
   } catch {}
 
   // Notifications — shift reminders, leave/advance status, HR alerts

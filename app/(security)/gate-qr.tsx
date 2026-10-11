@@ -91,7 +91,8 @@ export default function GateQrScreen() {
             <View className="p-4 bg-white rounded-2xl border border-ink-100">
               <QRCode
                 value={qrValue ?? ''}
-                size={220}
+                size={260}
+                quietZone={24}
                 // Near-black, not brand orange: a QR scanner needs strong
                 // luminance contrast, and orange-on-white reads far worse to
                 // a camera than it does to an eye.

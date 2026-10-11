@@ -13,14 +13,14 @@ import {
   isInsideGeofence,
   getPlantLocations,
   isInsideAnyGeofence,
-  buildQrValue,
+  isValidGateQr,
 } from '@/lib/location'
 import { supabase } from '@/lib/supabase'
 import { getDeviceId } from '@/lib/deviceId'
 import { resolveShiftForCheckIn } from '@/lib/shiftInference'
 import { EmployeeShift, Shift } from '@/types'
 import { MapPin, CheckCircle2, QrCode, Star, X } from 'lucide-react-native'
-import { BarCodeScanner } from 'expo-barcode-scanner'
+import { CameraView, Camera } from 'expo-camera'
 import { isPresentStatus } from '@/constants'
 import { attendanceDateStr, istNow, lateMinutesAgainst } from '@/lib/istDate'
 
@@ -71,7 +71,7 @@ export function CheckInCard() {
 
   useEffect(() => {
     if (!(showQrModal || showExitQrModal) || hasCameraPermission !== null) return
-    BarCodeScanner.requestPermissionsAsync().then(({ status }) => setHasCameraPermission(status === 'granted'))
+    Camera.requestCameraPermissionsAsync().then(({ status }) => setHasCameraPermission(status === 'granted'))
   }, [showQrModal, showExitQrModal])
 
   const openQrModal = () => {
@@ -86,14 +86,20 @@ export function CheckInCard() {
 
     const plant = await getPlantConfig()
     if (!plant) {
-      Alert.alert(t('common.error'), 'Plant config not found')
+      Alert.alert(t('common.error'), 'Plant config not found', [{ text: 'OK', onPress: () => setScanned(false) }])
+      setQrLoading(false)
+      return
+    }
+
+    if (!isValidGateQr(data, plant)) {
+      Alert.alert(t('common.error'), t('worker.invalidQr'), [{ text: 'OK', onPress: () => setScanned(false) }])
       setQrLoading(false)
       return
     }
 
     const location = await getCurrentLocation()
     if (!location) {
-      Alert.alert(t('common.error'), 'Location required')
+      Alert.alert(t('common.error'), 'Location required', [{ text: 'OK', onPress: () => setScanned(false) }])
       setQrLoading(false)
       return
     }
@@ -111,17 +117,8 @@ export function CheckInCard() {
           )
 
     if (!inside) {
-      Alert.alert(t('common.warning'), t('worker.outsidePlant'))
+      Alert.alert(t('common.warning'), t('worker.outsidePlant'), [{ text: 'OK', onPress: () => setScanned(false) }])
       setQrLoading(false)
-      return
-    }
-
-    const expectedQr = buildQrValue(plant)
-
-    if (data !== expectedQr) {
-      Alert.alert(t('common.error'), t('worker.invalidQr'))
-      setQrLoading(false)
-      setScanned(false)
       return
     }
 
@@ -345,14 +342,20 @@ export function CheckInCard() {
 
     const plant = await getPlantConfig()
     if (!plant) {
-      Alert.alert(t('common.error'), 'Plant config not found')
+      Alert.alert(t('common.error'), 'Plant config not found', [{ text: 'OK', onPress: () => setExitQrScanned(false) }])
+      setExitQrLoading(false)
+      return
+    }
+
+    if (!isValidGateQr(data, plant)) {
+      Alert.alert(t('common.error'), t('worker.invalidQr'), [{ text: 'OK', onPress: () => setExitQrScanned(false) }])
       setExitQrLoading(false)
       return
     }
 
     const location = await getCurrentLocation()
     if (!location) {
-      Alert.alert(t('common.error'), 'Location required')
+      Alert.alert(t('common.error'), 'Location required', [{ text: 'OK', onPress: () => setExitQrScanned(false) }])
       setExitQrLoading(false)
       return
     }
@@ -370,15 +373,7 @@ export function CheckInCard() {
           )
 
     if (!inside) {
-      Alert.alert(t('common.warning'), t('worker.outsidePlant'))
-      setExitQrLoading(false)
-      return
-    }
-
-    const expectedQr = buildQrValue(plant)
-    if (data !== expectedQr) {
-      Alert.alert(t('common.error'), t('worker.invalidQr'))
-      setExitQrScanned(false)
+      Alert.alert(t('common.warning'), t('worker.outsidePlant'), [{ text: 'OK', onPress: () => setExitQrScanned(false) }])
       setExitQrLoading(false)
       return
     }
@@ -566,8 +561,10 @@ export function CheckInCard() {
               <Text className="text-xs text-ink-500 text-center mb-3 px-2">{t('worker.qrHint')}</Text>
               <Card className="flex-1 items-center justify-center">
                 <View className="w-full h-full">
-                  <BarCodeScanner
-                    onBarCodeScanned={scanned ? undefined : handleQrScanned}
+                  <CameraView
+                    facing="back"
+                    barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                    onBarcodeScanned={scanned ? undefined : handleQrScanned}
                     style={StyleSheet.absoluteFillObject}
                   />
                   <View className="absolute inset-0 items-center justify-center">
@@ -629,8 +626,10 @@ export function CheckInCard() {
               <Text className="text-xs text-ink-500 text-center mb-3 px-2">{t('worker.exitQrHint')}</Text>
               <Card className="flex-1 items-center justify-center">
                 <View className="w-full h-full">
-                  <BarCodeScanner
-                    onBarCodeScanned={exitQrScanned ? undefined : handleExitQrScanned}
+                  <CameraView
+                    facing="back"
+                    barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                    onBarcodeScanned={exitQrScanned ? undefined : handleExitQrScanned}
                     style={StyleSheet.absoluteFillObject}
                   />
                   <View className="absolute inset-0 items-center justify-center">

@@ -3,7 +3,29 @@
 Living checklist. Updated at the end of every work session, before the final
 push. `[x]` only when verified, not merely written.
 
-**Last updated:** 6 Oct 2026 (session 21) — Yash sent a 12-point request in
+**Last updated:** 11 Oct 2026 (session 22) — QR scan failures root-caused
+and fixed in code. Live data: QR-verified check-ins ~90% through 6 Oct,
+then 79% → 55% → 56% → 55% from 7 Oct, falling a little more each day.
+Main cause was a version mismatch, not QR complexity: apk-85 (6 Oct)
+shortened the salt in the QR text, and scanners compared with exact
+equality, so an old-APK phone and a new-APK phone never matched. The fall
+deepened as more workers updated while the gate phone presumably stayed
+on the old build. Fixed (Sonnet agent build, diff + tsc + i18n re-verified
+independently): new `isValidGateQr()` accepts both salt lengths and the
+previous/next 30-min bucket (clock skew, guard-screen refresh lag); every
+scan failure path now re-arms the scanner (before this, one failed scan
+left it on "Loading…" forever, and on the member QR tab only an app
+restart cleared it); the QR is validated before the slow GPS fix; all
+scanning moved off deprecated `expo-barcode-scanner` to `expo-camera`'s
+QR-only `CameraView`; gate QR drawn larger (260) with a proper quiet zone;
+`getCurrentLocation()` can no longer throw. **Payload format deliberately
+unchanged.** ⏳ **Needs: everyone, guard phones first, installs the new
+APK.** Then watch `qr_verified` recover to ~90%. Not yet exercised on a
+real device. Also open: Yash's "let everyone check in instead of assuming
+late or early" for October still needs clarifying (see CLAUDE.md
+`checkin_checkout_pattern`).
+
+**Earlier:** 6 Oct 2026 (session 21) — Yash sent a 12-point request in
 one message; full breakdown is in CLAUDE.md ("12-point request, 6 Oct
 2026"). Shipped: 60-min early-arrival buffer at the Shift3→Shift1/4
 boundary only (doesn't reopen the 27 Sep 08:15/General fix); overtime

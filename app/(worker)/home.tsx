@@ -11,14 +11,14 @@ import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { LoadingScreen } from '@/components/LoadingScreen'
-import { getCurrentLocation, getPlantConfig, isInsideGeofence, getPlantLocations, isInsideAnyGeofence, buildQrValue } from '@/lib/location'
+import { getCurrentLocation, getPlantConfig, isInsideGeofence, getPlantLocations, isInsideAnyGeofence, isValidGateQr } from '@/lib/location'
 import { supabase } from '@/lib/supabase'
 import { getDeviceId } from '@/lib/deviceId'
 import { resolveShiftForCheckIn } from '@/lib/shiftInference'
 import { EmployeeShift, Shift } from '@/types'
 import { MAX_DAILY_OBSERVATIONS } from '@/constants'
 import { MapPin, Clock, CheckSquare, AlertCircle, Camera, QrCode, CheckCircle2, Calendar, ChevronRight, Star, X, LogOut } from 'lucide-react-native'
-import { BarCodeScanner } from 'expo-barcode-scanner'
+import { CameraView, Camera as ExpoCamera } from 'expo-camera'
 import { router } from 'expo-router'
 import { attendanceDateStr, istDateStr, istNow, istStartOfDayUTC, lateMinutesAgainst } from '@/lib/istDate'
 
@@ -262,7 +262,7 @@ export default function WorkerHome() {
     if (employee.requires_qr) {
       setExitQrScanned(false)
       if (hasCameraPermission === null) {
-        const { status } = await BarCodeScanner.requestPermissionsAsync()
+        const { status } = await ExpoCamera.requestCameraPermissionsAsync()
         setHasCameraPermission(status === 'granted')
       }
       setShowExitQrModal(true)
@@ -276,14 +276,20 @@ export default function WorkerHome() {
 
     const plant = await getPlantConfig()
     if (!plant) {
-      Alert.alert(t('common.error'), 'Plant config not found')
+      Alert.alert(t('common.error'), 'Plant config not found', [{ text: 'OK', onPress: () => setExitQrScanned(false) }])
+      setExitQrLoading(false)
+      return
+    }
+
+    if (!isValidGateQr(data, plant)) {
+      Alert.alert(t('common.error'), t('worker.invalidQr'), [{ text: 'OK', onPress: () => setExitQrScanned(false) }])
       setExitQrLoading(false)
       return
     }
 
     const location = await getCurrentLocation()
     if (!location) {
-      Alert.alert(t('common.error'), 'Location required')
+      Alert.alert(t('common.error'), 'Location required', [{ text: 'OK', onPress: () => setExitQrScanned(false) }])
       setExitQrLoading(false)
       return
     }
@@ -301,15 +307,7 @@ export default function WorkerHome() {
           )
 
     if (!inside) {
-      Alert.alert(t('common.warning'), t('worker.outsidePlant'))
-      setExitQrLoading(false)
-      return
-    }
-
-    const expectedQr = buildQrValue(plant)
-    if (data !== expectedQr) {
-      Alert.alert(t('common.error'), t('worker.invalidQr'))
-      setExitQrScanned(false)
+      Alert.alert(t('common.warning'), t('worker.outsidePlant'), [{ text: 'OK', onPress: () => setExitQrScanned(false) }])
       setExitQrLoading(false)
       return
     }
@@ -613,8 +611,10 @@ export default function WorkerHome() {
             <View className="flex-1 p-4">
               <Text className="text-xs text-ink-500 text-center mb-3 px-2">{t('worker.exitQrHint')}</Text>
               <View className="flex-1 rounded-2xl overflow-hidden">
-                <BarCodeScanner
-                  onBarCodeScanned={exitQrScanned ? undefined : handleExitQrScanned}
+                <CameraView
+                  facing="back"
+                  barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                  onBarcodeScanned={exitQrScanned ? undefined : handleExitQrScanned}
                   style={StyleSheet.absoluteFillObject}
                 />
                 <View className="absolute inset-0 items-center justify-center">

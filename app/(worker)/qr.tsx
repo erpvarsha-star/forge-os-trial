@@ -12,9 +12,9 @@ import {
   getPlantLocations,
   isInsideAnyGeofence,
   isInsideGeofence,
-  buildQrValue,
+  isValidGateQr,
 } from '@/lib/location'
-import { BarCodeScanner } from 'expo-barcode-scanner'
+import { CameraView, Camera } from 'expo-camera'
 import { QrCode, CameraOff, MapPin, Star } from 'lucide-react-native'
 
 export default function QRScreen() {
@@ -27,7 +27,7 @@ export default function QRScreen() {
 
   useEffect(() => {
     const getBarCodeScannerPermissions = async () => {
-      const { status } = await BarCodeScanner.requestPermissionsAsync()
+      const { status } = await Camera.requestCameraPermissionsAsync()
       setHasPermission(status === 'granted')
     }
     getBarCodeScannerPermissions()
@@ -40,14 +40,20 @@ export default function QRScreen() {
 
     const plant = await getPlantConfig()
     if (!plant) {
-      Alert.alert(t('common.error'), 'Plant config not found')
+      Alert.alert(t('common.error'), 'Plant config not found', [{ text: 'OK', onPress: () => setScanned(false) }])
+      setIsLoading(false)
+      return
+    }
+
+    if (!isValidGateQr(data, plant)) {
+      Alert.alert(t('common.error'), t('worker.invalidQr'), [{ text: 'OK', onPress: () => setScanned(false) }])
       setIsLoading(false)
       return
     }
 
     const location = await getCurrentLocation()
     if (!location) {
-      Alert.alert(t('common.error'), 'Location required')
+      Alert.alert(t('common.error'), 'Location required', [{ text: 'OK', onPress: () => setScanned(false) }])
       setIsLoading(false)
       return
     }
@@ -65,15 +71,7 @@ export default function QRScreen() {
           )
 
     if (!inside) {
-      Alert.alert(t('common.warning'), t('worker.outsidePlant'))
-      setIsLoading(false)
-      return
-    }
-
-    const expectedQr = buildQrValue(plant)
-
-    if (data !== expectedQr) {
-      Alert.alert(t('common.error'), t('worker.invalidQr'))
+      Alert.alert(t('common.warning'), t('worker.outsidePlant'), [{ text: 'OK', onPress: () => setScanned(false) }])
       setIsLoading(false)
       return
     }
@@ -149,8 +147,10 @@ export default function QRScreen() {
         <Text className="text-xs text-ink-500 text-center mb-3 px-2">{t('worker.qrHint')}</Text>
         <Card className="flex-1 items-center justify-center">
           <View className="w-full h-full">
-            <BarCodeScanner
-              onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+            <CameraView
+              facing="back"
+              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+              onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
               style={StyleSheet.absoluteFillObject}
             />
             <View className="absolute inset-0 items-center justify-center">

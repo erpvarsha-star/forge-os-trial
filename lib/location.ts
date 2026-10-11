@@ -43,10 +43,13 @@ export async function getCurrentLocation(): Promise<Location.LocationObject | nu
   const { status } = await Location.requestForegroundPermissionsAsync()
   if (status !== 'granted') return null
 
-  const location = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.BestForNavigation,
-  })
-  return location
+  try {
+    return await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.BestForNavigation,
+    })
+  } catch {
+    return null
+  }
 }
 
 export function isInsideGeofence(
@@ -136,4 +139,25 @@ export function buildQrValue(plant: PlantConfig): string {
   const { date, bucket } = istQrKey()
   const shortSalt = plant.qr_secret_salt.slice(0, QR_SALT_CHARS)
   return `${plant.id}-${date}-${bucket}-${shortSalt}`
+}
+
+// Accepts both salt lengths (APKs before/after 6 Oct differ) and the
+// previous/next 30-min bucket (guard screen refresh lag, worker clock skew).
+export function isValidGateQr(data: string, plant: PlantConfig): boolean {
+  const salt = plant.qr_secret_salt
+  if (!salt) return false
+  const scanned = (data ?? '').trim()
+  if (!scanned) return false
+
+  const { date, bucket } = istQrKey()
+  const DAY_MS = 24 * 60 * 60 * 1000
+  const shiftDate = (days: number) =>
+    new Date(Date.parse(`${date}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10)
+
+  const keys: { date: string; bucket: number }[] = [{ date, bucket }]
+  keys.push(bucket === 0 ? { date: shiftDate(-1), bucket: 47 } : { date, bucket: bucket - 1 })
+  keys.push(bucket === 47 ? { date: shiftDate(1), bucket: 0 } : { date, bucket: bucket + 1 })
+
+  const salts = [salt.slice(0, QR_SALT_CHARS), salt]
+  return keys.some((k) => salts.some((s) => scanned === `${plant.id}-${k.date}-${k.bucket}-${s}`))
 }
