@@ -49,7 +49,7 @@
 
 import { handleOptions, jsonResponse } from '../_shared/cors.ts';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
-import { istMonthYear } from '../_shared/istDate.ts';
+import { istMonthYear, istDateStr, istStartOfDayUTC } from '../_shared/istDate.ts';
 
 // Every row must total 100 before brownie points; asserted at boot below.
 const SCORE_WEIGHTS: Record<
@@ -127,35 +127,62 @@ async function computeAttendanceAndOnTime(
 }
 
 /**
- * Task completion, sourced from maintenance_observations — the only per-employee
- * work-item table that exists, and the one supervisor/tasks.tsx already presents
- * as the task list.
+ * Task completion = maintenance_observations (resolved / raised) combined with
+ * assigned_tasks (task delegation, PATCH_83), as one ratio:
+ *   (maintenanceResolved + assignedOnTime) / (maintenanceTotal + assignedCounted)
  *
- * maintenance_observations has no `points` or `due_date`, so this is a plain
- * resolved/raised ratio rather than the old points-weighted one. Raising nothing
- * scores neutral full credit (as before): most employees are not expected to
- * file observations, and penalising them for that would make the score mostly a
- * measure of how often someone reports problems.
+ * Assigned tasks counted this month: not cancelled, and either due this month
+ * (and already due-by-today-IST or completed) or undated and created this
+ * month (IST). On time = completed and submitted on/before due_date (IST).
+ * Nothing counted at all scores neutral full credit (most employees are not
+ * expected to file observations or be assigned tasks).
+ * Month boundaries use IST midnight, never UTC.
  */
 async function computeTaskRatio(db: ReturnType<typeof supabaseAdmin>, employeeId: string, start: string, end: string) {
+  const startTs = istStartOfDayUTC(start);
+  const nextDay = new Date(`${end}T00:00:00Z`);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  const endExclusiveTs = istStartOfDayUTC(nextDay.toISOString().slice(0, 10));
+
   const { data: rows } = await db
     .from('maintenance_observations')
     .select('status')
     .eq('employee_id', employeeId)
-    .gte('created_at', `${start}T00:00:00Z`)
-    .lte('created_at', `${end}T23:59:59Z`);
+    .gte('created_at', startTs)
+    .lt('created_at', endExclusiveTs);
 
   const all = rows ?? [];
-  if (all.length === 0) return { ratio: 1, onTimeAll: true, total: 0 };
+  const maintResolved = all.filter((o: { status: string }) => o.status === 'resolved').length;
 
-  const resolved = all.filter((o: { status: string }) => o.status === 'resolved').length;
+  type AT = { status: string; due_date: string | null; submitted_at: string | null; created_at: string };
+  const { data: taskRows } = await db
+    .from('assigned_tasks')
+    .select('status, due_date, submitted_at, created_at')
+    .eq('assigned_to', employeeId)
+    .neq('status', 'cancelled');
 
+  const todayIst = istDateStr();
+  const istDay = (ts: string) => new Date(new Date(ts).getTime() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const counted = ((taskRows ?? []) as AT[]).filter((t) => {
+    if (t.due_date) {
+      return t.due_date >= start && t.due_date <= end && (t.due_date <= todayIst || t.status === 'completed');
+    }
+    const c = istDay(t.created_at);
+    return c >= start && c <= end;
+  });
+  const tasksOnTime = counted.filter(
+    (t) => t.status === 'completed' && (!t.due_date || (t.submitted_at != null && istDay(t.submitted_at) <= t.due_date))
+  ).length;
+
+  const total = all.length + counted.length;
+  if (total === 0) return { ratio: 1, onTimeAll: true, total: 0 };
+
+  const done = maintResolved + tasksOnTime;
   return {
-    ratio: resolved / all.length,
-    // No due dates exist on observations, so "on time" degrades to "everything
-    // raised this month was seen through to resolved".
-    onTimeAll: resolved === all.length,
-    total: all.length,
+    ratio: done / total,
+    // "On time" degrades to "resolved" for observations (no due dates); tasks use due_date.
+    onTimeAll: done === total,
+    total,
   };
 }
 

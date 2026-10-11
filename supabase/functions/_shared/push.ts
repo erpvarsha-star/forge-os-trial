@@ -8,6 +8,8 @@ export interface NotifyInput {
   body: string;
   relatedEntityType?: string;
   relatedEntityId?: string;
+  /** Push only; the caller already wrote the in-app notifications row (e.g. a SQL RPC). */
+  skipInApp?: boolean;
 }
 
 interface ExpoMessage {
@@ -26,7 +28,7 @@ interface ExpoMessage {
  * the same logic `send-push-notification` exposes over HTTP for the app.
  */
 export async function notifyEmployees(db: ReturnType<typeof supabaseAdmin>, input: NotifyInput) {
-  const { employeeIds, type, title, body, relatedEntityType, relatedEntityId } = input;
+  const { employeeIds, type, title, body, relatedEntityType, relatedEntityId, skipInApp } = input;
   if (employeeIds.length === 0) return { notified: 0, pushed: 0 };
 
   const rows = employeeIds.map((user_id) => ({
@@ -43,10 +45,12 @@ export async function notifyEmployees(db: ReturnType<typeof supabaseAdmin>, inpu
   // the deployed schema (FINAL_SCHEMA) had neither column — PostgREST
   // rejected the insert with PGRST204 and nobody saw it. PATCH_14 adds the
   // columns; this check is what stops the next such mismatch from hiding.
-  const { error: insertError } = await db.from('notifications').insert(rows);
-  if (insertError) {
-    console.error('notifications insert failed', { type, count: rows.length, error: insertError });
-    throw new Error(`notifications insert failed: ${insertError.message}`);
+  if (!skipInApp) {
+    const { error: insertError } = await db.from('notifications').insert(rows);
+    if (insertError) {
+      console.error('notifications insert failed', { type, count: rows.length, error: insertError });
+      throw new Error(`notifications insert failed: ${insertError.message}`);
+    }
   }
 
   const { data: tokens } = await db

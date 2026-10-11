@@ -14,6 +14,7 @@
  *   "body": "Fill weekly shift plan by Thursday 18:00",
  *   "relatedEntityType": "tasks",   // optional
  *   "relatedEntityId": "uuid"       // optional
+ *   "skipInApp": true               // optional: push only, caller already wrote the row
  * }
  */
 
@@ -63,6 +64,7 @@ Deno.serve(async (req: Request) => {
       body,
       relatedEntityType: payload.relatedEntityType as string | undefined,
       relatedEntityId: payload.relatedEntityId as string | undefined,
+      skipInApp: payload.skipInApp === true,
     });
     return jsonResponse({ success: true, ...result });
   } catch (err) {
