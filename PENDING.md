@@ -25,6 +25,18 @@ real device. Also open: Yash's "let everyone check in instead of assuming
 late or early" for October still needs clarifying (see CLAUDE.md
 `checkin_checkout_pattern`).
 
+**Task delegation built, 11 Oct 2026 (session 22).** Was never built
+before (only an orphan `tasks` table). Now live: PATCH_83 + My Tasks /
+Team Tasks screens + More-tab badge + tasks in monthly score — details in
+CLAUDE.md "Task delegation". Live-tested as owner, plant head, HR,
+Accounts manager, supervisor and two members (allowed + refused cases,
+full assign → submit → send back → approve flow, RLS, push queueing,
+names); one real security bug found and fixed before release. ⏳ Still
+needed: (1) install the new APK and try it on a real phone; (2) HR links
+supervisors' teams (`supervisor_id`/`shift_allocator_id`) — most
+supervisors currently have nobody to assign to; (3) watch the first
+nightly-scoring run after tasks exist.
+
 **Full audit of this file, 11 Oct 2026 (session 22, Sonnet agent,
 read-only, checked against live code + DB).** The middle of this file is
 2–6 weeks stale; this block is the current truth until it's cleaned up.

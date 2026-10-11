@@ -187,8 +187,10 @@ the user operates on IST, never UTC, and never "whatever the device thinks."
 ### Tables that DO exist (FINAL_SCHEMA)
 `employees`, `departments`, `plant_config`, `attendance_records`, `shifts`, `employee_shifts`, `leave_balances`, `leave_requests`, `advance_requests`, `payroll_records`, `monthly_scores`, `maintenance_observations`, `"5s_challenges"`, `"5s_submissions"`, `casual_workers`, `data_collection_submissions`, `mrm_reviews`, `fraud_alerts`, `fraud_flags`, `vehicle_log`, `eod_confirmations`, `email_tasks`, `notifications`, `push_tokens`, `form_links` (PATCH_14), `form_submissions` + `production_records` (PATCH_15)
 
+`assigned_tasks` + `assigned_task_events` (PATCH_83, task delegation)
+
 ### Tables that do NOT exist (referenced in old code)
-`tasks`, `hourly_production`, `shift_reports`, `salary_advances`, `five_s_challenges`, `five_s_challenge_completions`
+`tasks` (⚠ an orphan, unused `public.tasks` does exist live from the early schema.sql — never build on it; use `assigned_tasks`), `hourly_production`, `shift_reports`, `salary_advances`, `five_s_challenges`, `five_s_challenge_completions`
 
 ---
 
@@ -689,6 +691,44 @@ Yash's answers (AskUserQuestion, 11 Oct 2026):
    `task_completion_score` alongside maintenance observations.
 Owner and plant head see every person's tasks and completions.
 
+**Built 11 Oct 2026 (`PATCH_83`, applied live; `apk-92+`).** Backend and
+screens each built by a Sonnet agent, reviewed and live-tested by Claude.
+- **Tables:** `assigned_tasks` (status open → in_progress → submitted →
+  completed / cancelled; `returned_count` for send-backs) and
+  `assigned_task_events` (audit trail). The orphan `public.tasks` table is
+  untouched and still unused — don't build on it.
+- **RLS is SELECT-only** (assignee, assigner, or owner/plant_head). Every
+  write is a SECURITY DEFINER RPC: `create_assigned_task`,
+  `update_assigned_task` (start / submit / approve / send_back (note
+  required) / cancel), `list_assignable_employees`, `team_task_summary`,
+  `my_task_action_count` (badge), `task_people` (names — needed because
+  `employees` RLS hides colleagues' rows from members). Rule lives in
+  `can_assign_task()`: owner → anyone; plant_head → rank < plant head;
+  hr_admin → company-wide below manager rank; manager → below, in own
+  department or `manager_id`/`shift_allocator_id`; supervisor → below, via
+  `supervisor_id`/`shift_allocator_id`. Approve/send back/cancel: the
+  assigner, or the owner.
+- **Bug caught by live tests before release:** `can_assign_task` returned
+  NULL (not false) when a manager/supervisor's link fields were unset, and
+  `not NULL` let `create_assigned_task` through — any manager could have
+  assigned company-wide. Fixed with `coalesce(..., false)`, re-tested.
+- **Notifications:** `notify_task_event()` writes the in-app row, then
+  pushes via `pg_net` → `send-push-notification` with `skipInApp: true`
+  (new flag in `_shared/push.ts`) so there's never a duplicate row. A push
+  failure can't roll back a task action.
+- **Scoring:** `nightly-scoring`'s `computeTaskRatio` = (maintenance
+  resolved + assigned tasks done on/before due date) / (both totals); also
+  switched its month boundary from UTC to IST.
+- **Screens:** `my-tasks.tsx` in all 7 groups; `team-tasks.tsx` (assign,
+  "awaiting your confirmation", per-person drill-down) for owner,
+  plant-head, hr-admin, manager, supervisor — all `href: null` + More rows.
+  More tab carries `tabBarBadge` = `my_task_action_count()`, refreshed on
+  mount, foreground and every 2 min (`useTaskBadgeSync`, once per layout).
+  Due dates are IST quick chips (no date-picker dependency).
+- **Known gap:** most supervisors have no `supervisor_id`/
+  `shift_allocator_id` links, so their assign list is empty until HR links
+  their teams. Not yet exercised on a real device.
+
 ## Owner has no KPI tab — decision from Yash, 28 Sep 2026
 
 Redundant with `dashboard/index.html` (the plant HTML dashboard, which
@@ -897,6 +937,7 @@ Two separate fixes, both same day:
 | `PATCH_80_weekly_off_worked_hours_view_06Oct2026.sql` | New `weekly_off_worked_hours` view — anyone who worked on their own weekly-off day (Friday by default), full hours reported as OT per Yash's "just a count for now" answer | ✅ Applied 6 Oct 2026 |
 | `PATCH_81_kajal_general_pune_shift_fix_06Oct2026.sql` | VFL1567 (Kajal) had 85 `employee_shifts` rows (24 Sep–31 Dec) bulk-allocated to plain `General` (09:00) before her Pune schedule existed — HR-allocated rows always beat `default_shift_id`, so she was marked late every day against the wrong shift. Fixed 79 rows (1 Oct onward) + recomputed her 1/3/5/6 Oct attendance | ✅ Applied 6 Oct 2026 |
 | `PATCH_82_daily_quotes_table_07Oct2026.sql` | Moves Quote of the Day from a bundled static array to `daily_quotes` table + `get_quote_of_the_day()` RPC, so new quotes can be added via SQL with no app rebuild. Widened 24 → 90 entries, added a "bread giver" gratitude theme. See "Quote of the Day" section above | ✅ Applied 7 Oct 2026 |
+| `PATCH_83_assigned_tasks_11Oct2026.sql` | Task delegation: `assigned_tasks` + events, select-only RLS, assignment/confirmation RPCs, badge count, `task_people()` names. See "Task delegation" section | ✅ Applied 11 Oct 2026 — live-tested as 7 real roles, positive + negative |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
