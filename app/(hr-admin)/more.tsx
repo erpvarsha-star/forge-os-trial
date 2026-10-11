@@ -9,6 +9,7 @@ import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { UpdateAppLink } from '@/components/UpdateAppLink'
+import { TaskMenuRows } from '@/components/TaskMenuRows'
 import { removePushToken } from '@/lib/notifications'
 import { LogOut, Globe, Settings, ChevronRight, AlertCircle, CreditCard, Users, Eye, Clock, CheckSquare, FileText, Table2 } from 'lucide-react-native'
 import { router } from 'expo-router'
@@ -46,6 +47,8 @@ export default function HRAdminMore() {
             </View>
           </View>
         </Card>
+
+        <TaskMenuRows group="hr-admin" canAssign={true} />
 
         <Text className="text-xs font-semibold uppercase tracking-wider text-ink-400 mb-2">{t('common.quickActions')}</Text>
         {links.map(link => (

@@ -1,10 +1,13 @@
 import { Tabs } from 'expo-router'
 import { RoleGate } from '@/components/RoleGate'
+import { useTaskBadgeSync } from '@/hooks/useAssignedTasks'
 import { useTranslation } from 'react-i18next'
 import { BarChart3, Users, ClipboardList, CheckCircle, ClipboardCheck, MoreHorizontal } from 'lucide-react-native'
 
 export default function SupervisorLayout() {
   const { t } = useTranslation()
+  // One badge sync per layout (not per screen) — drives the More tab count.
+  const taskBadge = useTaskBadgeSync()
   return (
     <RoleGate allow={['supervisor']}>
   <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: '#E65C00', tabBarInactiveTintColor: '#9CA3AF', tabBarStyle: { paddingBottom: 8, height: 64 } }}>
@@ -13,7 +16,7 @@ export default function SupervisorLayout() {
         <Tabs.Screen name="tasks" options={{ title: t('common.tasks'), tabBarIcon: ({ color }) => <ClipboardList size={22} color={color} /> }} />
         <Tabs.Screen name="approvals" options={{ title: t('common.approvals'), tabBarIcon: ({ color }) => <CheckCircle size={22} color={color} /> }} />
         <Tabs.Screen name="forms" options={{ title: t('forms.tab'), tabBarIcon: ({ color }) => <ClipboardCheck size={22} color={color} /> }} />
-        <Tabs.Screen name="more" options={{ title: t('common.more'), tabBarIcon: ({ color }) => <MoreHorizontal size={22} color={color} /> }} />
+        <Tabs.Screen name="more" options={{ tabBarBadge: taskBadge, title: t('common.more'), tabBarIcon: ({ color }) => <MoreHorizontal size={22} color={color} /> }} />
         <Tabs.Screen name="shift-report" options={{ href: null }} />
         <Tabs.Screen name="casual-workers" options={{ href: null }} />
         <Tabs.Screen name="5s-verify" options={{ href: null }} />
@@ -22,6 +25,8 @@ export default function SupervisorLayout() {
         <Tabs.Screen name="payslips" options={{ href: null }} />
         <Tabs.Screen name="payslip" options={{ href: null }} />
         <Tabs.Screen name="shifts" options={{ href: null }} />
+        <Tabs.Screen name="my-tasks" options={{ href: null }} />
+        <Tabs.Screen name="team-tasks" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )

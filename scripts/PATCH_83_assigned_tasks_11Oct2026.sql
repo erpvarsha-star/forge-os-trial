@@ -242,3 +242,25 @@ language sql stable security definer set search_path = public as $$
 $$;
 revoke execute on function public.my_task_action_count() from public, anon;
 grant execute on function public.my_task_action_count() to authenticated;
+
+-- Names for task cards. employees RLS hides colleagues' rows from members, so an
+-- assignee couldn't read who assigned the task; this returns only name/emp_code,
+-- and only for people linked to the caller through a task (owner/plant_head: all).
+create or replace function public.task_people(p_ids uuid[])
+returns table(id uuid, name text, emp_code text)
+language sql stable security definer set search_path = public as $$
+  select e.id, e.name, e.emp_code
+  from employees e
+  where e.id = any(p_ids)
+    and (
+      get_current_employee_role() in ('owner','plant_head')
+      or e.id = current_employee_id()
+      or exists (
+        select 1 from assigned_tasks t
+        where (t.assigned_to = current_employee_id() or t.assigned_by = current_employee_id())
+          and e.id in (t.assigned_to, t.assigned_by)
+      )
+    );
+$$;
+revoke execute on function public.task_people(uuid[]) from public, anon;
+grant execute on function public.task_people(uuid[]) to authenticated;

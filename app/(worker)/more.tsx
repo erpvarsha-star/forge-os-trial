@@ -8,6 +8,7 @@ import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { UpdateAppLink } from '@/components/UpdateAppLink'
+import { TaskMenuRows } from '@/components/TaskMenuRows'
 import { removePushToken } from '@/lib/notifications'
 import { router } from 'expo-router'
 import {
@@ -53,6 +54,8 @@ export default function WorkerMore() {
             </View>
           </View>
         </Card>
+
+        <TaskMenuRows group="worker" canAssign={false} />
 
         <View className="bg-white rounded-xl shadow-sm border border-ink-100 overflow-hidden">
           {menuItems.map((item, index) => (

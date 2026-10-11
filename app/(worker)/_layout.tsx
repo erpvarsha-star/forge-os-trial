@@ -1,10 +1,13 @@
 import { Tabs } from 'expo-router'
 import { RoleGate } from '@/components/RoleGate'
+import { useTaskBadgeSync } from '@/hooks/useAssignedTasks'
 import { useTranslation } from 'react-i18next'
 import { Home, Calendar, Trophy, ClipboardCheck, MoreHorizontal } from 'lucide-react-native'
 
 export default function WorkerLayout() {
   const { t } = useTranslation()
+  // One badge sync per layout (not per screen) — drives the More tab count.
+  const taskBadge = useTaskBadgeSync()
 
   return (
     <RoleGate allow={['member']}>
@@ -47,7 +50,7 @@ export default function WorkerLayout() {
         <Tabs.Screen
           name="more"
           options={{
-            title: t('common.more'),
+            tabBarBadge: taskBadge, title: t('common.more'),
             tabBarIcon: ({ color }) => <MoreHorizontal size={22} color={color} />,
           }}
         />
@@ -61,6 +64,7 @@ export default function WorkerLayout() {
         <Tabs.Screen name="notifications" options={{ href: null }} />
         <Tabs.Screen name="qr" options={{ href: null }} />
         <Tabs.Screen name="profile" options={{ href: null }} />
+        <Tabs.Screen name="my-tasks" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )

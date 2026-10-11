@@ -1,10 +1,13 @@
 import { Tabs } from 'expo-router'
 import { RoleGate } from '@/components/RoleGate'
+import { useTaskBadgeSync } from '@/hooks/useAssignedTasks'
 import { useTranslation } from 'react-i18next'
 import { BarChart3, CheckCircle, FileText, Mail, ClipboardCheck, MoreHorizontal } from 'lucide-react-native'
 
 export default function PlantHeadLayout() {
   const { t } = useTranslation()
+  // One badge sync per layout (not per screen) — drives the More tab count.
+  const taskBadge = useTaskBadgeSync()
   return (
     <RoleGate allow={['plant_head']}>
   <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: '#E65C00', tabBarInactiveTintColor: '#9CA3AF', tabBarStyle: { paddingBottom: 8, height: 64 } }}>
@@ -13,13 +16,15 @@ export default function PlantHeadLayout() {
         <Tabs.Screen name="mrm" options={{ title: 'MRM', tabBarIcon: ({ color }) => <FileText size={22} color={color} /> }} />
         <Tabs.Screen name="email" options={{ title: t('plantHead.emailDashboard'), tabBarIcon: ({ color }) => <Mail size={22} color={color} /> }} />
         <Tabs.Screen name="forms" options={{ title: t('forms.tab'), tabBarIcon: ({ color }) => <ClipboardCheck size={22} color={color} /> }} />
-        <Tabs.Screen name="more" options={{ title: t('common.more'), tabBarIcon: ({ color }) => <MoreHorizontal size={22} color={color} /> }} />
+        <Tabs.Screen name="more" options={{ tabBarBadge: taskBadge, title: t('common.more'), tabBarIcon: ({ color }) => <MoreHorizontal size={22} color={color} /> }} />
         <Tabs.Screen name="leave" options={{ href: null }} />
         <Tabs.Screen name="advance" options={{ href: null }} />
         <Tabs.Screen name="late-review" options={{ href: null }} />
         <Tabs.Screen name="shift-summary" options={{ href: null }} />
         <Tabs.Screen name="payslips" options={{ href: null }} />
         <Tabs.Screen name="payslip" options={{ href: null }} />
+        <Tabs.Screen name="my-tasks" options={{ href: null }} />
+        <Tabs.Screen name="team-tasks" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )
