@@ -81,12 +81,14 @@ begin
   if a.role = 'owner' then return true;
   elsif a.role = 'plant_head' then return er < 5;
   elsif a.role = 'hr_admin' then return er < 4;
+  -- coalesce: an unset manager_id/department makes the comparison NULL, and
+  -- `not NULL` in the caller would silently ALLOW the assignment.
   elsif a.role = 'manager' then
-    return er < 4 and (
+    return coalesce(er < 4 and (
       (e.department is not null and e.department = a.department)
-      or e.manager_id = a.id or e.shift_allocator_id = a.id);
+      or e.manager_id = a.id or e.shift_allocator_id = a.id), false);
   elsif a.role = 'supervisor' then
-    return er < 3 and (e.supervisor_id = a.id or e.shift_allocator_id = a.id);
+    return coalesce(er < 3 and (e.supervisor_id = a.id or e.shift_allocator_id = a.id), false);
   end if;
   return false;
 end $$;
@@ -131,7 +133,7 @@ returns uuid language plpgsql security definer set search_path = public as $$
 declare me uuid := current_employee_id(); v_id uuid; v_name text; v_title text := btrim(coalesce(p_title,''));
 begin
   if me is null then raise exception 'Caller is not a registered employee'; end if;
-  if not can_assign_task(me, p_assigned_to) then raise exception 'You cannot assign a task to this person'; end if;
+  if not coalesce(can_assign_task(me, p_assigned_to), false) then raise exception 'You cannot assign a task to this person'; end if;
   if char_length(v_title) = 0 or char_length(v_title) > 200 then raise exception 'Title must be 1-200 characters'; end if;
   if coalesce(p_priority,'normal') not in ('low','normal','high','urgent') then raise exception 'Invalid priority'; end if;
   if p_due_date is not null and p_due_date < (now() at time zone 'Asia/Kolkata')::date then
