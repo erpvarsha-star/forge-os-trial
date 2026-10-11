@@ -268,6 +268,7 @@ the user operates on IST, never UTC, and never "whatever the device thinks."
 - **4 more deactivated 28 Sep 2026, Yash: "these have also not working for Varsha"** (PATCH_61) — all 4 were on the never-logged-in list: **CON22 Digambar Mahadeo Todekar** and **CON23 Suresh Sopan Gawali** (Die/Final Shop), **VFL5354 Rahul Ashok Patil** (Machine Shop, already flagged this session — see the "2 staff employees" note above), **VFL4048 Babasaheb Dagadu Randive** (Forge Shop). CON22/CON23 were added earlier this same session as confirmed rejoins (PATCH_55, real pay in June 2026) — **not a contradiction**: their payroll drops sharply in July and stops entirely in August, consistent with a short second stint that also ended. None had ever logged in.
 - **VFL5439 Bhanwar Singh Rathod (Security, security_guard) — stationed at Pune Office, not the Aurangabad plant, confirmed by Yash 28 Sep 2026.** Explains the "Pune Office" `plant_locations` row (200m radius, real Pune coordinates 18.556944, 73.816361) that earlier sessions flagged as an unexplained outlier outside the documented 12-point Aurangabad campus seed — **it's deliberate, not a data error.** He is still on the never-logged-in list (`must_change_pin=true`) — being at a different location doesn't explain that; still needs a first login.
 - **VFL1391 Atul Bhata Patil (Maintenance, member) — 00:05 check-in on 28 Sep = Shift 3 of 27 Sep, decision from Yash, 28 Sep 2026.** Yash did NOT say he is a permanent night worker (an earlier version of this note wrongly said so): "if he checked in 12.05 am consider him as night shift" … "it is 3rd shift for 27th not 28th." Record stays `date=2026-09-27`, his 27 Sep shift set to Shift 3, on time. (A first correction wrongly moved it to 28 Sep — reverted same day.) See "Shift 3 belongs to the previous working day" below for the general rule.
+- **VFL1482 Brahmanand Kaduba Tajne (Human Resource) — stays on Shift 1, decision from Yash, 8 Oct 2026** ("stay shift one"). HR-allocated Shift 1 (07:00, 15-min grace); he arrives ~07:20–08:30, so his daily "L" is correct against Shift 1 — not a General-shift error.
 - **supervisor_id**: partial assignments done in PATCH_05 (Final/Die/Maintenance/Forge); rotating departments need weekly update or a supervisor_rotation table
 - Salary sheet (Jul 2026 payroll template) — used as source for dept/designation/salary of PATCH_08/09 new hires; contact list (not salary sheet) is the source of truth for phone numbers — several salary-sheet mobile numbers are misaligned/shifted
 - **PATCH_07 corrections**: VFL1463→Press Shop, VFL1556→Press Shop+supervisor, VFL1545→manager, VFL1389→manager, VFL1557→HR dept, VFL5447→Admin dept
@@ -642,6 +643,22 @@ own RLS-gated client queries):**
    Verified live 6 Oct 2026 against real October data before handing this
    over — top late-days results matched expectation (two employees at 5
    late days each, correctly above the >3 bar).
+
+3. **`checkin_checkout_pattern`** (8 Oct 2026, created live via SQL, no
+   patch file) — one row per active employee per month: `days_checked_in`,
+   `days_checked_out`, `avg_check_in_ist`, `avg_check_out_ist` (HH:MM),
+   **ignoring shift allocation entirely**. Uses a circular mean so night
+   workers average correctly across midnight (VFL4071 → 00:41, not ~12:00).
+   Verified live against 7 known employees. Built for Yash's plan, 8 Oct
+   2026: **"in October, regardless of shift allocation, get the data of who
+   comes in what time on average and goes when; then for November we build
+   better shift allocations."** Query:
+   `select emp_code, name, department, avg_check_in_ist, avg_check_out_ist from checkin_checkout_pattern where month = date_trunc('month', now())::date order by department, avg_check_in_ist;`
+   **Open, not yet confirmed with Yash:** whether his accompanying "let
+   everyone check in instead of assuming they are late or early" means
+   suspending the late/early flag for October, or just reaffirms the 28 Sep
+   "check-in time decides the shift" rule. Nothing changed in late-marking
+   until he answers.
 
 **Exporting a result**: both SQL Editor and Table Editor have a built-in
 Export-to-CSV button on any result set — free, no setup, no connector.
