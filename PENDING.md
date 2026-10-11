@@ -25,6 +25,36 @@ real device. Also open: Yash's "let everyone check in instead of assuming
 late or early" for October still needs clarifying (see CLAUDE.md
 `checkin_checkout_pattern`).
 
+**Full audit of this file, 11 Oct 2026 (session 22, Sonnet agent,
+read-only, checked against live code + DB).** The middle of this file is
+2–6 weeks stale; this block is the current truth until it's cleaned up.
+- **Real bugs still live:** (1) no code ever treats a weekly-off day
+  (Friday, or Kajal's Sunday) as off — counts as absence in dashboards and
+  `nightly-scoring`; needs Yash's rule first, then derive at read time.
+  (2) ~23 screens/hooks never read the Supabase `error`, so a network/RLS
+  failure looks like "nothing here" (owner/plant-head/HR dashboards,
+  manager reports, payslips, score, late comers). (3) `SafetyTip.tsx:14`
+  uses device-local `getDay()` (cosmetic, breaks the IST rule).
+- **Needs Yash/HR:** September payroll sheet; VFL1001's own CTC (payslip
+  empty); everyone (guards first) installs apk-91; 40 system-guessed shift
+  rows waiting in Needs Your Call; CON24 + VFL5457 never logged in; 1 leave
+  + 2 advance requests pending; Shakeel Sayyad + Ganesh Kausadkar still
+  need real emp_codes; VFL1527 + 8 others have no phone; VFL1543/VFL1549
+  stopped checking in 2 Oct (leave?); payroll engine needs VDA rate +
+  efficiency % entered before any run; `resolveFormSheets.gs` 22/28 forms
+  unmatched; dashboard production panel needs `APPS_SCRIPT_URL`;
+  Telegram supervisor onboarding unverified.
+- **Built, never exercised on a real device:** QR fix, Shift Check-in
+  Summary, Needs Your Call, fraud-alert resolve, shift allocation tabs,
+  leave/advance chain, Payslips, Quote of the Day, Shift 4/5 + 60-min
+  window, `set_my_shift_for_date`, update banner, Kajal Pune shift, 5S /
+  maintenance photos, View-as walkthrough, weekly-off-worked view.
+- **Stale entries (resolved):** "39 open fraud alerts" (all resolved);
+  "14 never logged in" (now 2); VFL1319/VFL5354 (deactivated); cron
+  "not yet run" notes (all 8 jobs active and succeeding); "`shifts` has no
+  seed"; AttendanceReport.gs install steps (superseded by SQL views);
+  "129 employees" (live: 147 total / 99 active).
+
 **Earlier:** 6 Oct 2026 (session 21) — Yash sent a 12-point request in
 one message; full breakdown is in CLAUDE.md ("12-point request, 6 Oct
 2026"). Shipped: 60-min early-arrival buffer at the Shift3→Shift1/4
