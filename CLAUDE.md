@@ -668,6 +668,27 @@ connected in this environment at no cost — ask Claude on-demand ("email
 me this month's late list") or ask for a standing daily/weekly scheduled
 email; neither needs a new signup or a paid tool.
 
+## Task delegation — decisions from Yash, 11 Oct 2026 (being built)
+
+Found 11 Oct: **never actually built.** The live `public.tasks` table (0 rows,
+enum-typed, from the early `scripts/schema.sql`, commit b13dd86) has no FKs,
+a broken RLS policy (assignee can't mark done) and no app code using it.
+`email_tasks` (Fazal's Email tab) also has 0 rows and nothing feeding it.
+The supervisor "Tasks" tab is maintenance observations — unrelated.
+
+Yash's answers (AskUserQuestion, 11 Oct 2026):
+1. **Who assigns: down the chain.** Each person assigns only to people
+   below them; members cannot assign. Owner → anyone; Fazal → anyone below
+   plant head; HR/managers → people below them; supervisors → their team.
+2. **Completion: assigner confirms.** Assignee marks done → "awaiting
+   confirmation" → assigner accepts, or sends it back with a note.
+3. **Placement: More-menu row, with a count that is visible** — "the More
+   would need to show a count for people to realise there is something
+   there they need to see" (badge on the More tab itself, not only inside).
+4. **Scoring: include now** — completed tasks feed the monthly
+   `task_completion_score` alongside maintenance observations.
+Owner and plant head see every person's tasks and completions.
+
 ## Owner has no KPI tab — decision from Yash, 28 Sep 2026
 
 Redundant with `dashboard/index.html` (the plant HTML dashboard, which
