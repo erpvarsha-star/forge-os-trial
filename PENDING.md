@@ -32,8 +32,12 @@ Tasks as a bottom tab for owner / plant head / HR, owner's Approvals
 moved into More; monthly on-time race (PATCH_85; employees see only their
 own rank, owner sees #1 per group); Android clipped-label fix. ✅ Yash
 confirmed on apk-94: labels no longer cut off; race "member" = worker
-category (as built). ⏳ Still open: Yash's 4 pending Needs Your Call
-decisions.
+category (as built). ✅ Yash cleared Needs Your Call (0 pending).
+✅ VFL1543/VFL1549 both checked in 11 Oct — not a data problem.
+✅ Weekly off live (PATCH_86): Fridays (Kajal: Sundays) written as `WO`,
+never absent; working one counts as a normal day; backfilled 1–11 Oct.
+⏳ VFL1001 payslips show ₹0 Apr–Aug because the salary sheet itself has
+CTC 0 for him — waiting on Yash for the real source/figures.
 
 **Task delegation built, 11 Oct 2026 (session 22).** Was never built
 before (only an orphan `tasks` table). Now live: PATCH_83 + My Tasks /
@@ -50,9 +54,8 @@ nightly-scoring run after tasks exist.
 **Full audit of this file, 11 Oct 2026 (session 22, Sonnet agent,
 read-only, checked against live code + DB).** The middle of this file is
 2–6 weeks stale; this block is the current truth until it's cleaned up.
-- **Real bugs still live:** (1) no code ever treats a weekly-off day
-  (Friday, or Kajal's Sunday) as off — counts as absence in dashboards and
-  `nightly-scoring`; needs Yash's rule first, then derive at read time.
+- **Real bugs still live:** (1) ~~weekly off counted as absence~~ —
+  ✅ fixed 11 Oct, PATCH_86.
   (2) ~23 screens/hooks never read the Supabase `error`, so a network/RLS
   failure looks like "nothing here" (owner/plant-head/HR dashboards,
   manager reports, payslips, score, late comers). (3) `SafetyTip.tsx:14`

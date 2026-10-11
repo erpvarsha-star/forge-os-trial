@@ -342,6 +342,17 @@ already encodes this; everyone else is Friday by default. Note:
 worked weekly off as OT — that predates this rule; check with Yash
 before changing it.
 
+**Implemented same day, `PATCH_86`.** `mark_weekly_offs(date)` (service-role
+only) pre-writes a `status='WO'` row for every active employee whose off day
+it is (`coalesce(weekly_off_day, 5)` — Friday default, Kajal Sunday);
+`on conflict do nothing`, so a real check-in row always wins, and a check-in
+on an off day upserts over the WO row to `P`/`L` (tested). Every counter
+already excluded `WO`, so no app change was needed. Cron `mark-weekly-offs`
+at 00:01 IST daily. Backfilled from go-live (1 Oct): 2 Oct 69, 9 Oct 81
+(Fridays), 4 + 11 Oct 1 each (Kajal). Known edge: a supervisor's
+checkpoint-3 "Mark Absent" can still overwrite a WO row with `A` — left
+as is, since an urgent-production Friday is a real working day.
+
 ## Shift inference for unassigned check-ins — decision from Yash, 27 Sep 2026
 
 **Decision:** "if there is no shift allotment done for anyone consider the
@@ -1017,6 +1028,7 @@ Two separate fixes, both same day:
 | `PATCH_83_assigned_tasks_11Oct2026.sql` | Task delegation: `assigned_tasks` + events, select-only RLS, assignment/confirmation RPCs, badge count, `task_people()` names. See "Task delegation" section | ✅ Applied 11 Oct 2026 — live-tested as 7 real roles, positive + negative |
 | `PATCH_84_action_counts_11Oct2026.sql` | `my_action_counts()` — one RPC behind every red count (tasks, approvals, Needs Your Call, fraud alerts) | ✅ Applied 11 Oct 2026 — counts verified against each screen as 4 roles |
 | `PATCH_85_ontime_race_11Oct2026.sql` | Monthly on-time race: `employees.work_location`, own-rank + owner-only leaders RPCs | ✅ Applied 11 Oct 2026 — tested as worker, Kajal, plant head, owner |
+| `PATCH_86_weekly_off_marking_11Oct2026.sql` | `mark_weekly_offs()` + daily cron: weekly-off days written as `WO` (Friday; Kajal Sunday), never absent; backfilled 1–11 Oct | ✅ Applied 11 Oct 2026 — verified live, check-in overwrite tested |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
