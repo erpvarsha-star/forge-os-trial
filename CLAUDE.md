@@ -729,6 +729,24 @@ screens each built by a Sonnet agent, reviewed and live-tested by Claude.
   `shift_allocator_id` links, so their assign list is empty until HR links
   their teams. Not yet exercised on a real device.
 
+**Follow-up decisions from Yash, 11 Oct 2026 (apk-92 on his phone):**
+1. **Every pending decision needs a visible count — a red dot at minimum.**
+   He missed 4 days of Needs Your Call decisions because nothing showed a
+   count, on the More tab or on the row ("even if count is difficult a red
+   dot like all other apps will be needed"). The apk-92 badge only counted
+   tasks; it must also cover pending decisions (Needs Your Call, approvals,
+   fraud alerts) on the tab or More row where they live.
+2. **Tasks become a bottom tab; Approvals moves into More for the owner.**
+   "can we move this approve with the bulk salary and bring the delegation
+   banner as a tab. do it for whoever you see this is possible as
+   delegation remains an important thing for all top management." The
+   owner's Approvals screen already links Bulk Salary, so the standalone
+   Bulk Salary More row is a duplicate and goes.
+3. Delegation confirmed working on his phone (his test task to Kajal,
+   VFL1567, went through).
+4. **More-menu labels are cut off on his phone** ("Languag", "Paysli",
+   "Needs Your", tab "Mo…") — a bug to fix, not a design choice.
+
 ## Owner has no KPI tab — decision from Yash, 28 Sep 2026
 
 Redundant with `dashboard/index.html` (the plant HTML dashboard, which
