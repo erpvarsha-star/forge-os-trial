@@ -36,6 +36,8 @@ category (as built). ✅ Yash cleared Needs Your Call (0 pending).
 ✅ VFL1543/VFL1549 both checked in 11 Oct — not a data problem.
 ✅ Weekly off live (PATCH_86): Fridays (Kajal: Sundays) written as `WO`,
 never absent; working one counts as a normal day; backfilled 1–11 Oct.
+✅ Fazal's monthly form = "Worker Monthly Efficiency"; its 1st–5th
+reminder had never fired (PATCH_66 insert skipped) — fixed, PATCH_87.
 ⏳ VFL1001 payslips show ₹0 Apr–Aug because the salary sheet itself has
 CTC 0 for him — waiting on Yash for the real source/figures.
 

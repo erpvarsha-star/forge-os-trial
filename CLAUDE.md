@@ -1029,6 +1029,7 @@ Two separate fixes, both same day:
 | `PATCH_84_action_counts_11Oct2026.sql` | `my_action_counts()` — one RPC behind every red count (tasks, approvals, Needs Your Call, fraud alerts) | ✅ Applied 11 Oct 2026 — counts verified against each screen as 4 roles |
 | `PATCH_85_ontime_race_11Oct2026.sql` | Monthly on-time race: `employees.work_location`, own-rank + owner-only leaders RPCs | ✅ Applied 11 Oct 2026 — tested as worker, Kajal, plant head, owner |
 | `PATCH_86_weekly_off_marking_11Oct2026.sql` | `mark_weekly_offs()` + daily cron: weekly-off days written as `WO` (Friday; Kajal Sunday), never absent; backfilled 1–11 Oct | ✅ Applied 11 Oct 2026 — verified live, check-in overwrite tested |
+| `PATCH_87_fazal_monthly_form_reminder_on_11Oct2026.sql` | Turns on the 1st–5th reminder for Fazal's monthly form ("Worker Monthly Efficiency") — PATCH_66's insert had been silently skipped | ✅ Applied 11 Oct 2026 |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
@@ -1844,6 +1845,15 @@ connector and added to `supabase/functions/deploy.sh`'s `FUNCTIONS` array
 CI's Deploy Edge Functions workflow will never pick it up, same lesson as
 `send-push-notification` silently staying undeployed for a week).
 
+**⚠ Correction 11 Oct 2026 — the reminder never actually fired.** The
+form link Yash gave for Fazal was already registered (PATCH_50) as
+MANAGEMENT **"Worker Monthly Efficiency"**, so PATCH_66's url-based
+`WHERE NOT EXISTS` skipped the "Plant Head Monthly Form" insert, and the
+existing row had `send_in_reminder=false` — the cron ran daily with
+nothing to send. **Fazal's monthly form = "Worker Monthly Efficiency"**
+(no placeholder name to confirm). `PATCH_87` sets `send_in_reminder=true`
+on it; first real reminder 1 Nov 2026.
+
 **Done — Yash ran `PATCH_66_plant_head_monthly_form_30Sep2026.sql`'s
 `cron.schedule(...)` block 1 Oct 2026.** The cron job (`plant-head-form-
 reminder`, jobid 13) is live; first real fire is the next 09:00 IST window.
@@ -2253,7 +2263,7 @@ exercised on a real device** — screen behind auth. New APK build needed
 1. **Worker → supervisor mapping** — CLOSED 10 Aug (Yash: "that will happen in the app") — this is an in-app assignment flow, not a DB patch task
 2. **Rotating supervisor update** — CLOSED 10 Aug (Yash: rotations are decided every Friday by HR/IR, cannot be provided in advance) — the weekly `supervisor_id` UPDATE is HR/IR's own task going forward, not tracked here
 3. **VFL1527 phone** — intentionally left NULL; correct number still unknown
-4. **Shakeel Sayyad** — confirmed 10 Aug by Yash as a real employee, phone to stay NULL. Still needs a real `emp_code` (and department/designation/salary from the salary sheet) before he can be inserted — not fabricated, per the VFL5463 lesson (see PATCH_09 correction above). Add once Yash provides the code.
+4. **Shakeel Sayyad** (and **Ganesh Laxmanrao Kausadkar**, found 24 Sep in Yash's advance-balance list) — **NOT in the app at all** (re-checked live 11 Oct 2026: no `employees` row for either; no login, no attendance, no payslip). Shakeel confirmed 10 Aug by Yash as a real employee, phone to stay NULL. Both still need a real `emp_code` (and department/designation/salary from the salary sheet) before he can be inserted — not fabricated, per the VFL5463 lesson (see PATCH_09 correction above). Add once Yash provides the code.
 5. **Nagnath Kale / Sadashiv Soddy real emp_codes** — CLOSED, stale entry found and fixed 27 Sep 2026. This used to ask Yash to provide codes; both already have real ones (CON09, CON12 — see "Employee data" above), both `is_active=true`, both have completed first login. Nothing outstanding.
 6. **Real bundle ID before Play Store submission** — **N/A as of 10 Aug**: Yash confirmed the app will NOT go on Play Store — APK will be distributed as a direct download link to all 129 employees (sideload install). `com.vfpl.forgeos` stays as-is, no further action needed on this.
 7. **EAS account for signed/production builds** — not needed given #6 (no Play Store, sideload distribution). The existing debug APK from GitHub Actions is sufficient — Android installs any signed APK (including debug-signed) directly, no Play Store signing required. Only revisit if Yash later decides to publish to Play Store.
