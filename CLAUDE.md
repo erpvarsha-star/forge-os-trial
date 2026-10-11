@@ -746,6 +746,23 @@ screens each built by a Sonnet agent, reviewed and live-tested by Claude.
    VFL1567, went through).
 4. **More-menu labels are cut off on his phone** ("Languag", "Paysli",
    "Needs Your", tab "Mo…") — a bug to fix, not a design choice.
+5. **Fazal: Tasks tab replaces his Email tab** (Email had never received a
+   single item); his Approvals stays a tab, with a count. Email moves into
+   More. Owner: Approvals → More, Tasks → tab (decision 2 above).
+6. **🔒 Monthly on-time race — decision from Yash, 11 Oct 2026.** "you will
+   show if they are number 1, 2 in the race each month. no names to show
+   anyone. only i see names ie member who is number one, staff who is no 1,
+   consultant no 1 and so on. pune we have only kajal enrolled so dont need
+   for pune but can be built so in future same does not need to be built
+   again." So: every employee sees only their OWN rank in their group this
+   IST month (no other names, ever); only the owner sees who is #1 in each
+   group. Groups = `employees.category` (staff / worker / consultant —
+   Claude read "member" as the worker category; confirm if wrong) per
+   work location. Location is a new `employees.work_location` column
+   (Aurangabad default; Kajal VFL1567 + VFL5439 = Pune); a group shows ranks
+   only once it has enough people, so Pune is skipped today and starts
+   automatically when it grows. Ranks follow the current late rules (which
+   Yash reviews in November).
 
 ## Owner has no KPI tab — decision from Yash, 28 Sep 2026
 
