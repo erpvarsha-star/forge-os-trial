@@ -7,13 +7,15 @@ import { Header } from '@/components/Header'
 import { Card } from '@/components/Card'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import {
-  getCurrentLocation,
+  getCheckInLocation,
   getPlantConfig,
   getPlantLocations,
-  isInsideAnyGeofence,
-  isInsideGeofence,
+  isWithinPlant,
   isValidGateQr,
 } from '@/lib/location'
+import { syncServerClock } from '@/lib/serverClock'
+import { withTimeout } from '@/lib/withTimeout'
+import { alertError, alertLocationFailure, invalidQrMessage } from '@/lib/alertError'
 import { CameraView, Camera } from 'expo-camera'
 import { QrCode, CameraOff, MapPin, Star } from 'lucide-react-native'
 
@@ -37,54 +39,49 @@ export default function QRScreen() {
     if (scanned || isLoading) return
     setScanned(true)
     setIsLoading(true)
+    const rearm = [{ text: 'OK', onPress: () => setScanned(false) }]
 
-    const plant = await getPlantConfig()
-    if (!plant) {
-      Alert.alert(t('common.error'), 'Plant config not found', [{ text: 'OK', onPress: () => setScanned(false) }])
+    try {
+      await syncServerClock()
+
+      const plant = await withTimeout(getPlantConfig(), 10000, 'Plant config')
+      if (!plant) {
+        Alert.alert(t('common.error'), t('worker.plantConfigMissing'), rearm)
+        return
+      }
+
+      if (!isValidGateQr(data, plant)) {
+        Alert.alert(t('common.error'), invalidQrMessage(t), rearm)
+        return
+      }
+
+      const loc = await getCheckInLocation()
+      if (!loc.ok) {
+        alertLocationFailure(t, loc.reason, rearm)
+        return
+      }
+      const location = loc.location
+
+      const plantLocations = await withTimeout(getPlantLocations(), 10000, 'Plant locations')
+      const inside = isWithinPlant(location.coords.latitude, location.coords.longitude, location.coords.accuracy, plantLocations, plant)
+
+      if (!inside) {
+        Alert.alert(t('common.warning'), t('worker.outsidePlant'), rearm)
+        return
+      }
+
+      const { error } = await confirmQr()
+      if (error) {
+        alertError(t, error, rearm)
+      } else {
+        await refresh()
+        Alert.alert(t('common.success'), t('worker.qrConfirmedBody'))
+      }
+    } catch (e) {
+      alertError(t, e, rearm)
+    } finally {
       setIsLoading(false)
-      return
     }
-
-    if (!isValidGateQr(data, plant)) {
-      Alert.alert(t('common.error'), t('worker.invalidQr'), [{ text: 'OK', onPress: () => setScanned(false) }])
-      setIsLoading(false)
-      return
-    }
-
-    const location = await getCurrentLocation()
-    if (!location) {
-      Alert.alert(t('common.error'), 'Location required', [{ text: 'OK', onPress: () => setScanned(false) }])
-      setIsLoading(false)
-      return
-    }
-
-    const plantLocations = await getPlantLocations()
-    const inside =
-      plantLocations.length > 0
-        ? isInsideAnyGeofence(location.coords.latitude, location.coords.longitude, plantLocations)
-        : isInsideGeofence(
-            location.coords.latitude,
-            location.coords.longitude,
-            plant.latitude,
-            plant.longitude,
-            plant.geofence_radius_meters
-          )
-
-    if (!inside) {
-      Alert.alert(t('common.warning'), t('worker.outsidePlant'), [{ text: 'OK', onPress: () => setScanned(false) }])
-      setIsLoading(false)
-      return
-    }
-
-    const { error } = await confirmQr()
-    if (error) {
-      Alert.alert(t('common.error'), t('common.somethingWentWrong'))
-      setScanned(false)
-    } else {
-      await refresh()
-      Alert.alert(t('common.success'), t('worker.qrConfirmedBody'))
-    }
-    setIsLoading(false)
   }
 
   if (!employee) return <LoadingScreen />

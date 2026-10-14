@@ -40,6 +40,9 @@ export interface AttendanceRecord {
   check_in_lng?: number
   check_out_lat?: number
   check_out_lng?: number
+  /** GPS accuracy (m) reported by the phone at check-in / check-out. */
+  check_in_accuracy_m?: number
+  check_out_accuracy_m?: number
   late_reason?: string
   late_minutes?: number
   hours_worked?: number

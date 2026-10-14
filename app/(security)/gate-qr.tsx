@@ -2,13 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { View, Text, TouchableOpacity } from 'react-native'
 import QRCode from 'react-native-qrcode-svg'
 import { useTranslation } from 'react-i18next'
-import { RefreshCw, ShieldAlert } from 'lucide-react-native'
+import { RefreshCw, ShieldAlert, Clock } from 'lucide-react-native'
 import { useAuth } from '@/hooks/useAuth'
 import { Header } from '@/components/Header'
 import { Card } from '@/components/Card'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { BRAND, INK } from '@/components/theme'
 import { getPlantConfig, PlantConfig, buildQrValue, istQrKey } from '@/lib/location'
+import { syncServerClock, serverNowMs, serverIstHHMM, clockSkewInfo } from '@/lib/serverClock'
 
 /**
  * The gate QR, on a guard's phone, regenerated every 30 minutes (PATCH_37).
@@ -25,16 +26,22 @@ export default function GateQrScreen() {
   const [plant, setPlant] = useState<PlantConfig | null>(null)
   const [qrKey, setQrKey] = useState(istQrKey())
   const [minutesRemaining, setMinutesRemaining] = useState(
-    () => 30 - (Math.floor((Date.now() + 5.5 * 60 * 60 * 1000) / 60000) % 30)
+    () => 30 - (Math.floor((serverNowMs() + 5.5 * 60 * 60 * 1000) / 60000) % 30)
   )
   const [isLoading, setIsLoading] = useState(true)
+  // The QR is built from server-corrected time; show it so a guard whose own
+  // phone clock is off can see the real time and be warned about it.
+  const [clock, setClock] = useState(() => ({ time: serverIstHHMM(), skew: clockSkewInfo() }))
+  const refreshClock = () => setClock({ time: serverIstHHMM(), skew: clockSkewInfo() })
 
   const load = async () => {
+    await syncServerClock(true)
     const config = await getPlantConfig()
     setPlant(config)
     const key = istQrKey()
     setQrKey(key)
-    setMinutesRemaining(30 - (Math.floor((Date.now() + 5.5 * 60 * 60 * 1000) / 60000) % 30))
+    setMinutesRemaining(30 - (Math.floor((serverNowMs() + 5.5 * 60 * 60 * 1000) / 60000) % 30))
+    refreshClock()
     setIsLoading(false)
   }
 
@@ -44,11 +51,13 @@ export default function GateQrScreen() {
     // and the countdown, so the guard sees a live "Expires in N min" that ticks
     // down each minute without needing to tap anything.
     const interval = setInterval(() => {
+      void syncServerClock()
       const next = istQrKey()
       setQrKey(current =>
         current.date === next.date && current.bucket === next.bucket ? current : next
       )
-      setMinutesRemaining(30 - (Math.floor((Date.now() + 5.5 * 60 * 60 * 1000) / 60000) % 30))
+      setMinutesRemaining(30 - (Math.floor((serverNowMs() + 5.5 * 60 * 60 * 1000) / 60000) % 30))
+      refreshClock()
     }, 60_000)
     return () => clearInterval(interval)
   }, [])
@@ -88,6 +97,13 @@ export default function GateQrScreen() {
               {t('security.qrExpiresIn', { minutes: minutesRemaining })}
             </Text>
 
+            {clock.skew && (
+              <View className="flex-row items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 mb-4 max-w-[280px]">
+                <ShieldAlert size={16} color="#DC2626" />
+                <Text className="text-xs text-red-700 flex-1">{t('worker.clockWrong', clock.skew)}</Text>
+              </View>
+            )}
+
             <View className="p-4 bg-white rounded-2xl border border-ink-100">
               <QRCode
                 value={qrValue ?? ''}
@@ -101,7 +117,12 @@ export default function GateQrScreen() {
               />
             </View>
 
-            <Text className="text-xs text-ink-500 mt-5 text-center max-w-[260px]">
+            <View className="flex-row items-center gap-1 mt-4">
+              <Clock size={13} color="#6B7280" />
+              <Text className="text-xs font-semibold text-ink-600">{t('security.gateTimeNow', { time: clock.time })}</Text>
+            </View>
+
+            <Text className="text-xs text-ink-500 mt-3 text-center max-w-[260px]">
               {t('security.qrHint')}
             </Text>
 

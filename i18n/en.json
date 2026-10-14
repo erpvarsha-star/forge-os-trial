@@ -136,7 +136,9 @@
     "new": "NEW",
     "factoryOs": "Factory OS Dashboard",
     "factoryOsHint": "Opens the operations dashboard in your browser",
-    "cannotOpenLink": "Could not open the link on this device."
+    "cannotOpenLink": "Could not open the link on this device.",
+    "networkSlow": "Network is slow. Please try again.",
+    "loadFailedRetry": "Could not load. Tap to retry."
   },
   "viewAs": {
     "title": "View as",
@@ -378,7 +380,12 @@
     "exitQrDone": "Exit QR Confirmed",
     "exitQrDoneHint": "Your departure from the plant has been recorded",
     "scanExitQr": "Scan Exit Gate QR",
-    "scanExitQrHint": "Tap to confirm your departure at the gate"
+    "scanExitQrHint": "Tap to confirm your departure at the gate",
+    "locationPermissionNeeded": "Location permission is needed. Allow it in Settings → Apps → Forge OS → Permissions.",
+    "gpsOff": "GPS is off. Turn on Location and try again.",
+    "gpsNoFix": "Could not get a GPS signal. Step near a door or window and try again.",
+    "plantConfigMissing": "Plant location is not configured. Please contact HR.",
+    "clockWrong": "Your phone's clock is wrong (shows {{phone}}, actual {{actual}}). Turn on automatic date & time."
   },
   "supervisor": {
     "teamStatus": "Team Status",
@@ -749,7 +756,8 @@
     "qrHint": "Show this screen at the gate. It refreshes every 30 minutes — a photo cannot be reused.",
     "qrExpiresIn": "Expires in {{minutes}} min",
     "qrNotConfigured": "No gate code available",
-    "qrNotConfiguredHint": "The plant QR secret has not been set up yet. Contact HR."
+    "qrNotConfiguredHint": "The plant QR secret has not been set up yet. Contact HR.",
+    "gateTimeNow": "Current time (IST): {{time}}"
   },
   "reports": {
     "lateComersReview": "Late Comers Review",

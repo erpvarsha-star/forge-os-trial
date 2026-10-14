@@ -1,5 +1,6 @@
 import * as Location from 'expo-location'
 import { supabase } from './supabase'
+import { serverNowMs } from './serverClock'
 
 export interface PlantConfig {
   id: string
@@ -52,6 +53,82 @@ export async function getCurrentLocation(): Promise<Location.LocationObject | nu
   }
 }
 
+export type CheckInLocationFailure = 'permission' | 'services_off' | 'no_fix'
+export type CheckInLocationResult =
+  | { ok: true; location: Location.LocationObject }
+  | { ok: false; reason: CheckInLocationFailure }
+
+const GOOD_FIX_ACCURACY_M = 20
+const FIX_WINDOW_MS = 12000
+
+// Samples the GPS for up to 12 s and keeps the most accurate fix — a single
+// getCurrentPositionAsync often returns a coarse first fix (or hangs) inside
+// the steel-frame shops. Always releases the subscription.
+function sampleBestFix(maxMs: number): Promise<Location.LocationObject | null> {
+  return new Promise((resolve) => {
+    let best: Location.LocationObject | null = null
+    let sub: Location.LocationSubscription | null = null
+    let done = false
+    const timer = setTimeout(() => finish(), maxMs)
+    function finish() {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      try {
+        sub?.remove()
+      } catch {}
+      resolve(best)
+    }
+    Location.watchPositionAsync(
+      { accuracy: Location.Accuracy.High, timeInterval: 1000, distanceInterval: 0 },
+      (loc) => {
+        const acc = loc.coords.accuracy ?? Infinity
+        if (!best || acc < (best.coords.accuracy ?? Infinity)) best = loc
+        if (acc <= GOOD_FIX_ACCURACY_M) finish()
+      }
+    )
+      .then((s) => {
+        sub = s
+        if (done) {
+          try {
+            s.remove()
+          } catch {}
+        }
+      })
+      .catch(() => finish())
+  })
+}
+
+export async function getCheckInLocation(): Promise<CheckInLocationResult> {
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync()
+    if (status !== 'granted') return { ok: false, reason: 'permission' }
+    if (!(await Location.hasServicesEnabledAsync())) return { ok: false, reason: 'services_off' }
+
+    const fix = await sampleBestFix(FIX_WINDOW_MS)
+    if (fix) return { ok: true, location: fix }
+
+    const last = await Location.getLastKnownPositionAsync({ maxAge: 120000, requiredAccuracy: 100 })
+    if (last) return { ok: true, location: last }
+    return { ok: false, reason: 'no_fix' }
+  } catch {
+    return { ok: false, reason: 'no_fix' }
+  }
+}
+
+function distanceBetween(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLng = ((lng2 - lng1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2)
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
 export function isInsideGeofence(
   userLat: number,
   userLng: number,
@@ -59,18 +136,7 @@ export function isInsideGeofence(
   plantLng: number,
   radiusMeters: number
 ): boolean {
-  const R = 6371000
-  const dLat = ((plantLat - userLat) * Math.PI) / 180
-  const dLng = ((plantLng - userLng) * Math.PI) / 180
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((userLat * Math.PI) / 180) *
-      Math.cos((plantLat * Math.PI) / 180) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  const distance = R * c
-  return distance <= radiusMeters
+  return distanceBetween(userLat, userLng, plantLat, plantLng) <= radiusMeters
 }
 
 export interface PlantLocation {
@@ -107,6 +173,26 @@ export function isInsideAnyGeofence(
   return locations.some((loc) => isInsideGeofence(userLat, userLng, loc.latitude, loc.longitude, loc.radius_meters))
 }
 
+// Inside steel shops a true-inside fix can read 30-80 m off. The reported
+// accuracy is added to the radius, capped so a garbage fix can't pass from
+// far away. Same cap is applied server-side in fraud-detector.
+export const GPS_ACCURACY_TOLERANCE_MAX_M = 25
+
+export function isWithinPlant(
+  lat: number,
+  lng: number,
+  accuracyM: number | null | undefined,
+  locations: PlantLocation[],
+  plant: PlantConfig
+): boolean {
+  const acc = typeof accuracyM === 'number' && Number.isFinite(accuracyM) ? accuracyM : 0
+  const tolerance = Math.min(Math.max(acc, 0), GPS_ACCURACY_TOLERANCE_MAX_M)
+  if (locations.length > 0) {
+    return locations.some((loc) => distanceBetween(lat, lng, loc.latitude, loc.longitude) <= loc.radius_meters + tolerance)
+  }
+  return distanceBetween(lat, lng, plant.latitude, plant.longitude) <= plant.geofence_radius_meters + tolerance
+}
+
 /**
  * Returns the current IST date string (YYYY-MM-DD) and 30-minute bucket
  * index (0–47). The QR value is `${plant.id}-${date}-${bucket}-${salt}`.
@@ -116,7 +202,8 @@ export function isInsideAnyGeofence(
  * future day entirely (date component changes).
  */
 export function istQrKey(): { date: string; bucket: number } {
-  const now = Date.now() + 5.5 * 60 * 60 * 1000          // shift to IST
+  // Server-corrected clock: a wrong phone clock must not shift the QR bucket.
+  const now = serverNowMs() + 5.5 * 60 * 60 * 1000          // shift to IST
   const ist = new Date(now)
   const date = ist.toISOString().slice(0, 10)
   const minutesSinceMidnight = ist.getUTCHours() * 60 + ist.getUTCMinutes()

@@ -1,59 +1,86 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { AttendanceRecord } from '@/types'
-import { attendanceDateStr, istMonthYear, getMonthEndDay } from '@/lib/istDate'
+import { istMonthYear, getMonthEndDay } from '@/lib/istDate'
+import { serverNowMs, serverAttendanceDateStr } from '@/lib/serverClock'
+import { withTimeout } from '@/lib/withTimeout'
 import { finalizeShiftAndOvertime, HALF_DAY_MAX_HOURS } from '@/lib/workingHours'
+
+// Stored to one decimal; null when the phone reported no accuracy.
+const roundAccuracy = (m?: number | null) =>
+  typeof m === 'number' && Number.isFinite(m) ? Math.round(m * 10) / 10 : null
 
 export function useAttendance(employeeId: string, month?: string, year?: number) {
   const [records, setRecords] = useState<AttendanceRecord[]>([])
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [loadError, setLoadError] = useState<Error | null>(null)
 
   const fetchRecords = useCallback(async () => {
     if (!employeeId) return
     setIsLoading(true)
+    setLoadError(null)
 
-    const { month: istMonth, year: istYear } = istMonthYear()
-    const targetMonth = month || istMonth
-    const targetYear = year || istYear
-    const monthEndDay = getMonthEndDay(targetMonth, targetYear)
+    try {
+      const { month: istMonth, year: istYear } = istMonthYear()
+      const targetMonth = month || istMonth
+      const targetYear = year || istYear
+      const monthEndDay = getMonthEndDay(targetMonth, targetYear)
 
-    const { data, error } = await supabase
-      .from('attendance_records')
-      .select('*')
-      .eq('employee_id', employeeId)
-      .gte('date', `${targetYear}-${targetMonth}-01`)
-      .lte('date', `${targetYear}-${targetMonth}-${String(monthEndDay).padStart(2, '0')}`)
-      .order('date', { ascending: true })
+      const { data, error } = await withTimeout(
+        supabase
+          .from('attendance_records')
+          .select('*')
+          .eq('employee_id', employeeId)
+          .gte('date', `${targetYear}-${targetMonth}-01`)
+          .lte('date', `${targetYear}-${targetMonth}-${String(monthEndDay).padStart(2, '0')}`)
+          .order('date', { ascending: true }),
+        15000,
+        'Attendance load'
+      )
 
-    if (!error && data) {
-      setRecords(data as AttendanceRecord[])
+      if (!error && data) {
+        setRecords(data as AttendanceRecord[])
+      }
+
+      const { data: todayData, error: todayError } = await withTimeout(
+        supabase
+          .from('attendance_records')
+          .select('*')
+          .eq('employee_id', employeeId)
+          .eq('date', serverAttendanceDateStr())
+          .maybeSingle(),
+        15000,
+        'Attendance load'
+      )
+      if (error || todayError) throw new Error((error || todayError)!.message)
+
+      // Night shifts (Shift 3, Security Night) check out after the 06:45 rollover,
+      // so fall back to a still-open record from the last 14h (the max sane shift).
+      let current = todayData as AttendanceRecord | null
+      if (!current) {
+        const { data: open } = await withTimeout(
+          supabase
+            .from('attendance_records')
+            .select('*')
+            .eq('employee_id', employeeId)
+            .is('check_out_time', null)
+            .gte('check_in_time', new Date(serverNowMs() - 14 * 60 * 60 * 1000).toISOString())
+            .order('check_in_time', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          15000,
+          'Attendance load'
+        )
+        current = open as AttendanceRecord | null
+      }
+      setTodayRecord(current)
+    } catch (e) {
+      // Surface the failure so the screen can offer a retry instead of an endless spinner.
+      setLoadError(e instanceof Error ? e : new Error(String(e)))
+    } finally {
+      setIsLoading(false)
     }
-
-    const { data: todayData } = await supabase
-      .from('attendance_records')
-      .select('*')
-      .eq('employee_id', employeeId)
-      .eq('date', attendanceDateStr())
-      .maybeSingle()
-
-    // Night shifts (Shift 3, Security Night) check out after the 06:45 rollover,
-    // so fall back to a still-open record from the last 14h (the max sane shift).
-    let current = todayData as AttendanceRecord | null
-    if (!current) {
-      const { data: open } = await supabase
-        .from('attendance_records')
-        .select('*')
-        .eq('employee_id', employeeId)
-        .is('check_out_time', null)
-        .gte('check_in_time', new Date(Date.now() - 14 * 60 * 60 * 1000).toISOString())
-        .order('check_in_time', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      current = open as AttendanceRecord | null
-    }
-    setTodayRecord(current)
-    setIsLoading(false)
   }, [employeeId, month, year])
 
   useEffect(() => {
@@ -69,33 +96,48 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     lateMinutes: number,
     lateReason?: string,
     mockDetected?: boolean,
-    deviceId?: string
+    deviceId?: string,
+    accuracyM?: number | null
   ) => {
-    const now = new Date()
-    const date = attendanceDateStr()
+    // Server-corrected time: a wrong phone clock must not become the recorded check-in.
+    const now = new Date(serverNowMs())
+    const date = serverAttendanceDateStr()
     const time = now.toISOString()
     const status = lateMinutes > 0 ? 'L' : 'P'
 
-    const { data, error } = await supabase
-      .from('attendance_records')
-      .upsert(
-        {
-          employee_id: employeeId,
-          date,
-          status,
-          check_in_time: time,
-          check_in_lat: lat,
-          check_in_lng: lng,
-          late_minutes: lateMinutes > 0 ? lateMinutes : null,
-          late_reason: lateReason || null,
-          qr_verified: false,
-          mock_location_detected: mockDetected || false,
-          device_id: deviceId || null,
-        },
-        { onConflict: 'employee_id,date' }
+    let data: any = null
+    let error: any = null
+    try {
+      const res = await withTimeout(
+        supabase
+          .from('attendance_records')
+          .upsert(
+            {
+              employee_id: employeeId,
+              date,
+              status,
+              check_in_time: time,
+              check_in_lat: lat,
+              check_in_lng: lng,
+              check_in_accuracy_m: roundAccuracy(accuracyM),
+              late_minutes: lateMinutes > 0 ? lateMinutes : null,
+              late_reason: lateReason || null,
+              qr_verified: false,
+              mock_location_detected: mockDetected || false,
+              device_id: deviceId || null,
+            },
+            { onConflict: 'employee_id,date' }
+          )
+          .select()
+          .single(),
+        15000,
+        'Check-in save'
       )
-      .select()
-      .single()
+      data = res.data
+      error = res.error
+    } catch (e) {
+      error = e
+    }
 
     if (!error && data) {
       setTodayRecord(data as AttendanceRecord)
@@ -112,9 +154,9 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
   // doesn't matter which — see lib/workingHours.ts's finalizeShiftAndOvertime),
   // used once hours_worked is final to compute overtime and, if the day
   // crossed 12h on Shift 1/Shift 3, reclassify it to Shift 4/Shift 5.
-  const checkOut = async (lat: number, lng: number, shiftEndTime?: string, shiftName?: string) => {
+  const checkOut = async (lat: number, lng: number, shiftEndTime?: string, shiftName?: string, accuracyM?: number | null) => {
     if (!todayRecord) return { data: null, error: new Error('No open attendance record') }
-    const now = new Date()
+    const now = new Date(serverNowMs())
     const time = now.toISOString()
 
     let hours_worked: number | undefined
@@ -137,6 +179,7 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
       check_out_time: time,
       check_out_lat: lat,
       check_out_lng: lng,
+      check_out_accuracy_m: roundAccuracy(accuracyM),
       hours_worked,
     }
     if (halfDay) {
@@ -154,28 +197,44 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
       const { reclassifyToShiftName, overtimeHours } = finalizeShiftAndOvertime(shiftName, hours_worked)
       updatePayload.overtime_hours = overtimeHours
       if (reclassifyToShiftName) {
-        const { data: newShift } = await supabase
-          .from('shifts')
-          .select('id')
-          .eq('name', reclassifyToShiftName)
-          .maybeSingle()
-        if (newShift?.id) {
-          const { error: reclassifyError } = await supabase.rpc('set_my_shift_for_date', {
-            p_date: todayRecord.date,
-            p_shift_id: newShift.id,
-            p_source: 'system_reclassified',
-          })
-          if (reclassifyError) console.warn('set_my_shift_for_date (overtime reclassify) failed', reclassifyError.message)
+        // Non-fatal: the checkout itself must still go through.
+        try {
+          const { data: newShift } = await withTimeout(
+            supabase.from('shifts').select('id').eq('name', reclassifyToShiftName).maybeSingle(),
+            8000,
+            'Shift lookup'
+          )
+          if (newShift?.id) {
+            const { error: reclassifyError } = await withTimeout(
+              supabase.rpc('set_my_shift_for_date', {
+                p_date: todayRecord.date,
+                p_shift_id: newShift.id,
+                p_source: 'system_reclassified',
+              }),
+              8000,
+              'Shift update'
+            )
+            if (reclassifyError) console.warn('set_my_shift_for_date (overtime reclassify) failed', reclassifyError.message)
+          }
+        } catch (e) {
+          console.warn('overtime reclassify skipped', e instanceof Error ? e.message : e)
         }
       }
     }
 
-    const { data, error } = await supabase
-      .from('attendance_records')
-      .update(updatePayload)
-      .eq('id', todayRecord.id)
-      .select()
-      .single()
+    let data: any = null
+    let error: any = null
+    try {
+      const res = await withTimeout(
+        supabase.from('attendance_records').update(updatePayload).eq('id', todayRecord.id).select().single(),
+        15000,
+        'Check-out save'
+      )
+      data = res.data
+      error = res.error
+    } catch (e) {
+      error = e
+    }
 
     if (!error && data) {
       setTodayRecord(data as AttendanceRecord)
@@ -187,12 +246,19 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
 
   const confirmQr = async () => {
     if (!todayRecord) return { data: null, error: new Error('No open attendance record') }
-    const { data, error } = await supabase
-      .from('attendance_records')
-      .update({ qr_verified: true })
-      .eq('id', todayRecord.id)
-      .select()
-      .single()
+    let data: any = null
+    let error: any = null
+    try {
+      const res = await withTimeout(
+        supabase.from('attendance_records').update({ qr_verified: true }).eq('id', todayRecord.id).select().single(),
+        15000,
+        'QR confirm save'
+      )
+      data = res.data
+      error = res.error
+    } catch (e) {
+      error = e
+    }
 
     if (!error && data) {
       setTodayRecord(data as AttendanceRecord)
@@ -204,12 +270,19 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
 
   const confirmQrOut = async () => {
     if (!todayRecord) return { data: null, error: new Error('No open attendance record') }
-    const { data, error } = await supabase
-      .from('attendance_records')
-      .update({ check_out_qr_verified: true })
-      .eq('id', todayRecord.id)
-      .select()
-      .single()
+    let data: any = null
+    let error: any = null
+    try {
+      const res = await withTimeout(
+        supabase.from('attendance_records').update({ check_out_qr_verified: true }).eq('id', todayRecord.id).select().single(),
+        15000,
+        'QR confirm save'
+      )
+      data = res.data
+      error = res.error
+    } catch (e) {
+      error = e
+    }
 
     if (!error && data) {
       setTodayRecord(data as AttendanceRecord)
@@ -219,5 +292,5 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     return { data, error }
   }
 
-  return { records, todayRecord, isLoading, checkIn, checkOut, confirmQr, confirmQrOut, refresh: fetchRecords }
+  return { records, todayRecord, isLoading, loadError, checkIn, checkOut, confirmQr, confirmQrOut, refresh: fetchRecords }
 }

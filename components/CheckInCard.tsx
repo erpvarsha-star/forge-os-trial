@@ -9,13 +9,15 @@ import { Card } from '@/components/Card'
 import { QuoteOfTheDay } from '@/components/QuoteOfTheDay'
 import { OntimeRaceCard } from '@/components/OntimeRaceCard'
 import {
-  getCurrentLocation,
+  getCheckInLocation,
   getPlantConfig,
-  isInsideGeofence,
   getPlantLocations,
-  isInsideAnyGeofence,
+  isWithinPlant,
   isValidGateQr,
 } from '@/lib/location'
+import { syncServerClock, serverIstNow, serverLateMinutesAgainst, serverAttendanceDateStr } from '@/lib/serverClock'
+import { withTimeout } from '@/lib/withTimeout'
+import { alertError, alertLocationFailure, invalidQrMessage } from '@/lib/alertError'
 import { supabase } from '@/lib/supabase'
 import { getDeviceId } from '@/lib/deviceId'
 import { resolveShiftForCheckIn } from '@/lib/shiftInference'
@@ -23,7 +25,7 @@ import { EmployeeShift, Shift } from '@/types'
 import { MapPin, CheckCircle2, QrCode, Star, X } from 'lucide-react-native'
 import { CameraView, Camera } from 'expo-camera'
 import { isPresentStatus } from '@/constants'
-import { attendanceDateStr, istNow, lateMinutesAgainst } from '@/lib/istDate'
+import { attendanceDateStr } from '@/lib/istDate'
 
 /**
  * Every non-worker role (manager, hr-admin, supervisor, plant-head,
@@ -40,7 +42,7 @@ import { attendanceDateStr, istNow, lateMinutesAgainst } from '@/lib/istDate'
 export function CheckInCard() {
   const { t } = useTranslation()
   const { employee } = useAuth()
-  const { records, todayRecord, checkIn, checkOut, confirmQr, confirmQrOut, refresh, isLoading: attendanceLoading } = useAttendance(
+  const { records, todayRecord, checkIn, checkOut, confirmQr, confirmQrOut, refresh, isLoading: attendanceLoading, loadError } = useAttendance(
     employee?.id || ''
   )
   const presentDaysThisMonth = records.filter(r => isPresentStatus(r.status)).length
@@ -71,8 +73,10 @@ export function CheckInCard() {
   }, [employee?.id])
 
   useEffect(() => {
-    if (!(showQrModal || showExitQrModal) || hasCameraPermission !== null) return
-    Camera.requestCameraPermissionsAsync().then(({ status }) => setHasCameraPermission(status === 'granted'))
+    if (!(showQrModal || showExitQrModal) || hasCameraPermission === true) return
+    Camera.requestCameraPermissionsAsync()
+      .then(({ status }) => setHasCameraPermission(status === 'granted'))
+      .catch(() => setHasCameraPermission(false))
   }, [showQrModal, showExitQrModal])
 
   const openQrModal = () => {
@@ -80,259 +84,294 @@ export function CheckInCard() {
     setShowQrModal(true)
   }
 
+  // Shared by entry and exit QR scans: clock sync, QR validity, GPS fix and
+  // geofence. Returns false (after alerting) when the scan must not be confirmed.
+  const validateQrScan = async (data: string, rearm: { text: string; onPress: () => void }[]) => {
+    await syncServerClock()
+
+    const plant = await withTimeout(getPlantConfig(), 10000, 'Plant config')
+    if (!plant) {
+      Alert.alert(t('common.error'), t('worker.plantConfigMissing'), rearm)
+      return false
+    }
+
+    if (!isValidGateQr(data, plant)) {
+      Alert.alert(t('common.error'), invalidQrMessage(t), rearm)
+      return false
+    }
+
+    const loc = await getCheckInLocation()
+    if (!loc.ok) {
+      alertLocationFailure(t, loc.reason, rearm)
+      return false
+    }
+    const location = loc.location
+
+    const plantLocations = await withTimeout(getPlantLocations(), 10000, 'Plant locations')
+    const inside = isWithinPlant(location.coords.latitude, location.coords.longitude, location.coords.accuracy, plantLocations, plant)
+
+    if (!inside) {
+      Alert.alert(t('common.warning'), t('worker.outsidePlant'), rearm)
+      return false
+    }
+    return true
+  }
+
   const handleQrScanned = async ({ data }: { data: string }) => {
     if (scanned || qrLoading || !employee) return
     setScanned(true)
     setQrLoading(true)
+    const rearm = [{ text: 'OK', onPress: () => setScanned(false) }]
 
-    const plant = await getPlantConfig()
-    if (!plant) {
-      Alert.alert(t('common.error'), 'Plant config not found', [{ text: 'OK', onPress: () => setScanned(false) }])
+    try {
+      if (!(await validateQrScan(data, rearm))) return
+
+      const { error } = await confirmQr()
+      if (error) {
+        alertError(t, error, rearm)
+      } else {
+        await refresh()
+        setShowQrModal(false)
+        Alert.alert(t('common.success'), t('worker.qrConfirmedBody'))
+      }
+    } catch (e) {
+      alertError(t, e, rearm)
+    } finally {
       setQrLoading(false)
-      return
     }
-
-    if (!isValidGateQr(data, plant)) {
-      Alert.alert(t('common.error'), t('worker.invalidQr'), [{ text: 'OK', onPress: () => setScanned(false) }])
-      setQrLoading(false)
-      return
-    }
-
-    const location = await getCurrentLocation()
-    if (!location) {
-      Alert.alert(t('common.error'), 'Location required', [{ text: 'OK', onPress: () => setScanned(false) }])
-      setQrLoading(false)
-      return
-    }
-
-    const plantLocations = await getPlantLocations()
-    const inside =
-      plantLocations.length > 0
-        ? isInsideAnyGeofence(location.coords.latitude, location.coords.longitude, plantLocations)
-        : isInsideGeofence(
-            location.coords.latitude,
-            location.coords.longitude,
-            plant.latitude,
-            plant.longitude,
-            plant.geofence_radius_meters
-          )
-
-    if (!inside) {
-      Alert.alert(t('common.warning'), t('worker.outsidePlant'), [{ text: 'OK', onPress: () => setScanned(false) }])
-      setQrLoading(false)
-      return
-    }
-
-    const { error } = await confirmQr()
-    if (error) {
-      Alert.alert(t('common.error'), t('common.somethingWentWrong'))
-      setScanned(false)
-    } else {
-      await refresh()
-      setShowQrModal(false)
-      Alert.alert(t('common.success'), t('worker.qrConfirmedBody'))
-    }
-    setQrLoading(false)
   }
 
   const handleCheckIn = async () => {
     if (!employee) return
     setIsLoading(true)
+    try {
+      await syncServerClock()
 
-    const location = await getCurrentLocation()
-    if (!location) {
-      Alert.alert(t('common.error'), 'Location permission required')
-      setIsLoading(false)
-      return
-    }
+      const loc = await getCheckInLocation()
+      if (!loc.ok) {
+        alertLocationFailure(t, loc.reason)
+        return
+      }
+      const location = loc.location
+      const accuracy = location.coords.accuracy
 
-    const plant = await getPlantConfig()
-    if (!plant) {
-      Alert.alert(t('common.error'), 'Plant config not found')
-      setIsLoading(false)
-      return
-    }
+      const plant = await withTimeout(getPlantConfig(), 10000, 'Plant config')
+      if (!plant) {
+        Alert.alert(t('common.error'), t('worker.plantConfigMissing'))
+        return
+      }
 
-    const plantLocations = await getPlantLocations()
-    const inside =
-      plantLocations.length > 0
-        ? isInsideAnyGeofence(
-            location.coords.latitude,
-            location.coords.longitude,
-            plantLocations
-          )
-        : isInsideGeofence(
-            location.coords.latitude,
-            location.coords.longitude,
-            plant.latitude,
-            plant.longitude,
-            plant.geofence_radius_meters
-          )
+      const plantLocations = await withTimeout(getPlantLocations(), 10000, 'Plant locations')
+      const inside = isWithinPlant(location.coords.latitude, location.coords.longitude, accuracy, plantLocations, plant)
 
-    if (!inside) {
-      Alert.alert(t('common.warning'), t('worker.outsidePlant'))
-      setIsLoading(false)
-      return
-    }
+      if (!inside) {
+        Alert.alert(t('common.warning'), t('worker.outsidePlant'))
+        return
+      }
 
-    // `location.mocked` — see the matching note in worker/home.tsx.
-    // Location.getProviderStatusAsync().gpsAvailable was being used here as
-    // a mock-GPS proxy; it isn't one, and was falsely flagging real check-ins
-    // with no GPS satellite fix (indoors, weak signal) as fraud. Fixed 27
-    // Sep 2026 — this was the confirmed root cause of VFL4057's blocked
-    // check-in. See PENDING.md.
-    const mockDetected = location.mocked === true
-    const deviceId = await getDeviceId()
+      // `location.mocked` — see the matching note in worker/home.tsx.
+      // Location.getProviderStatusAsync().gpsAvailable was being used here as
+      // a mock-GPS proxy; it isn't one, and was falsely flagging real check-ins
+      // with no GPS satellite fix (indoors, weak signal) as fraud. Fixed 27
+      // Sep 2026 — this was the confirmed root cause of VFL4057's blocked
+      // check-in. See PENDING.md.
+      const mockDetected = location.mocked === true
+      const deviceId = await getDeviceId()
 
-    const { data: fraudCheck, error: fraudCheckError } = await supabase.functions.invoke(
-      'fraud-detector',
+      // Fail open on a network error or timeout (see worker/home.tsx).
+      let fraudCheck: any = null
+      try {
+        const res = await withTimeout(
+          supabase.functions.invoke('fraud-detector', {
+            body: {
+              action: 'gps_check',
+              employeeId: employee.id,
+              lat: location.coords.latitude,
+              lng: location.coords.longitude,
+              mockLocationDetected: mockDetected,
+              accuracyMeters: accuracy,
+            },
+          }),
+          8000,
+          'Fraud check'
+        )
+        if (!res.error) fraudCheck = res.data
+      } catch {
+        // fail open
+      }
+
+      if (fraudCheck?.allowed === false && fraudCheck?.reason === 'mock_location_detected') {
+        Alert.alert(t('common.warning'), t('worker.mockLocationDetected'))
+        return
+      }
+
+      const todayStr = serverAttendanceDateStr()
+      try {
+        const { data: buddyCheck } = await withTimeout(
+          supabase
+            .from('attendance_records')
+            .select('employee_id')
+            .eq('device_id', deviceId)
+            .eq('date', todayStr)
+            .neq('employee_id', employee.id)
+            .maybeSingle(),
+          5000,
+          'Buddy check'
+        )
+        if (buddyCheck) {
+          await supabase.from('fraud_flags').insert({
+            employee_id: employee.id,
+            flag_type: 'BUDDY_DEVICE',
+            description: 'Same device used by another employee today',
+          })
+        }
+      } catch {
+        // buddy check is best-effort
+      }
+
+      // Read shift for today using IST date (already loaded in state, but re-fetch for freshness)
+      let shiftData: any = null
+      try {
+        const res = await withTimeout(
+          supabase
+            .from('employee_shifts')
+            .select('*, shift:shifts(*)')
+            .eq('employee_id', employee.id)
+            .eq('date', todayStr)
+            .maybeSingle(),
+          8000,
+          'Shift lookup'
+        )
+        shiftData = res.data
+      } catch {
+        // non-fatal: falls back to inference below
+      }
+
+      // Check-in time decides the shift, even over HR's allocation (Yash, 28 Sep 2026).
       {
-        body: {
-          action: 'gps_check',
-          employeeId: employee.id,
-          lat: location.coords.latitude,
-          lng: location.coords.longitude,
-          mockLocationDetected: mockDetected,
-        },
+        const current = shiftData as EmployeeShift | null
+        let allShifts: Shift[] = []
+        try {
+          const { data } = await withTimeout(supabase.from('shifts').select('*'), 8000, 'Shift lookup')
+          allShifts = (data || []) as Shift[]
+        } catch {
+          // non-fatal: lateness is simply not evaluated, as before
+        }
+        const istNowForShift = serverIstNow()
+        const nowMinutesOfDay = istNowForShift.getUTCHours() * 60 + istNowForShift.getUTCMinutes()
+        // No employee_shifts row for today — fall back to this employee's own
+        // default_shift_id (PATCH_71, e.g. Kajal/VFL1567's "General (Pune)"
+        // 10am start) before the generic closest-shift inference, so it gets
+        // the same 60-min-early + grace treatment as an HR-assigned shift
+        // would, instead of competing in findClosestShift()'s shared pool
+        // against General's own window.
+        const assignedShift =
+          current?.shift ?? allShifts.find(s => s.id === employee.default_shift_id) ?? null
+        const resolved = resolveShiftForCheckIn(assignedShift, nowMinutesOfDay, employee.role, allShifts)
+        if (resolved && resolved.id !== current?.shift_id) {
+          try {
+            const { error: shiftError } = await withTimeout(
+              supabase.rpc('set_my_shift_for_date', { p_date: todayStr, p_shift_id: resolved.id, p_source: 'system_inferred' }),
+              8000,
+              'Shift update'
+            )
+            if (shiftError) console.warn('set_my_shift_for_date failed', shiftError.message)
+          } catch (e) {
+            console.warn('set_my_shift_for_date failed', e instanceof Error ? e.message : e)
+          }
+          shiftData = { ...(current ?? {}), employee_id: employee.id, date: todayStr, shift_id: resolved.id, shift: resolved } as any
+        }
       }
-    )
 
-    if (
-      !fraudCheckError &&
-      fraudCheck?.allowed === false &&
-      fraudCheck?.reason === 'mock_location_detected'
-    ) {
-      Alert.alert(t('common.warning'), t('worker.mockLocationDetected'))
-      setIsLoading(false)
-      return
-    }
+      if (shiftData) setShift(shiftData as EmployeeShift)
 
-    const todayStr = attendanceDateStr()
-    const { data: buddyCheck } = await supabase
-      .from('attendance_records')
-      .select('employee_id')
-      .eq('device_id', deviceId)
-      .eq('date', todayStr)
-      .neq('employee_id', employee.id)
-      .maybeSingle()
-
-    if (buddyCheck) {
-      await supabase.from('fraud_flags').insert({
-        employee_id: employee.id,
-        flag_type: 'BUDDY_DEVICE',
-        description: 'Same device used by another employee today',
-      })
-    }
-
-    // Read shift for today using IST date (already loaded in state, but re-fetch for freshness)
-    let { data: shiftData } = await supabase
-      .from('employee_shifts')
-      .select('*, shift:shifts(*)')
-      .eq('employee_id', employee.id)
-      .eq('date', todayStr)
-      .maybeSingle()
-
-    // Check-in time decides the shift, even over HR's allocation (Yash, 28 Sep 2026).
-    {
-      const current = shiftData as EmployeeShift | null
-      const { data: allShifts } = await supabase.from('shifts').select('*')
-      const istNowForShift = istNow()
-      const nowMinutesOfDay = istNowForShift.getUTCHours() * 60 + istNowForShift.getUTCMinutes()
-      // No employee_shifts row for today — fall back to this employee's own
-      // default_shift_id (PATCH_71, e.g. Kajal/VFL1567's "General (Pune)"
-      // 10am start) before the generic closest-shift inference, so it gets
-      // the same 60-min-early + grace treatment as an HR-assigned shift
-      // would, instead of competing in findClosestShift()'s shared pool
-      // against General's own window.
-      const assignedShift =
-        current?.shift ?? ((allShifts || []) as Shift[]).find(s => s.id === employee.default_shift_id) ?? null
-      const resolved = resolveShiftForCheckIn(assignedShift, nowMinutesOfDay, employee.role, (allShifts || []) as Shift[])
-      if (resolved && resolved.id !== current?.shift_id) {
-        const { error: shiftError } = await supabase.rpc('set_my_shift_for_date', { p_date: todayStr, p_shift_id: resolved.id, p_source: 'system_inferred' })
-        if (shiftError) console.warn('set_my_shift_for_date failed', shiftError.message)
-        shiftData = { ...(current ?? {}), employee_id: employee.id, date: todayStr, shift_id: resolved.id, shift: resolved } as any
+      const grace = (shiftData as EmployeeShift | null)?.shift?.late_grace_minutes ?? 15
+      let rawLateMinutes = 0
+      if ((shiftData as EmployeeShift | null)?.shift?.start_time) {
+        rawLateMinutes = serverLateMinutesAgainst((shiftData as EmployeeShift).shift.start_time as string)
       }
-    }
 
-    if (shiftData) setShift(shiftData as EmployeeShift)
+      const effectiveLateMinutes = rawLateMinutes > grace ? rawLateMinutes : 0
 
-    const grace = (shiftData as EmployeeShift | null)?.shift?.late_grace_minutes ?? 15
-    let rawLateMinutes = 0
-    if ((shiftData as EmployeeShift | null)?.shift?.start_time) {
-      rawLateMinutes = lateMinutesAgainst((shiftData as EmployeeShift).shift.start_time as string)
-    }
+      if (rawLateMinutes > grace && !lateReason) {
+        setShowLateModal(true)
+        return
+      }
 
-    const effectiveLateMinutes = rawLateMinutes > grace ? rawLateMinutes : 0
-
-    if (rawLateMinutes > grace && !lateReason) {
-      setShowLateModal(true)
+      const { error: checkInError } = await checkIn(
+        location.coords.latitude,
+        location.coords.longitude,
+        effectiveLateMinutes,
+        lateReason || undefined,
+        mockDetected,
+        deviceId,
+        accuracy
+      )
+      if (checkInError) alertError(t, checkInError)
+      await refresh()
+      if (!checkInError) setLateReason('')
+    } catch (e) {
+      alertError(t, e)
+    } finally {
       setIsLoading(false)
-      return
     }
-
-    await checkIn(
-      location.coords.latitude,
-      location.coords.longitude,
-      effectiveLateMinutes,
-      lateReason || undefined,
-      mockDetected,
-      deviceId
-    )
-    await refresh()
-    setLateReason('')
-    setIsLoading(false)
   }
 
   const handleCheckOut = async () => {
     if (!employee) return
     setIsLoading(true)
+    try {
+      await syncServerClock()
 
-    const location = await getCurrentLocation()
-    if (!location) {
-      Alert.alert(t('common.error'), 'Location permission required')
+      const loc = await getCheckInLocation()
+      if (!loc.ok) {
+        alertLocationFailure(t, loc.reason)
+        return
+      }
+      const location = loc.location
+
+      const plant = await withTimeout(getPlantConfig(), 10000, 'Plant config')
+      if (!plant) {
+        Alert.alert(t('common.error'), t('worker.plantConfigMissing'))
+        return
+      }
+
+      const plantLocations = await withTimeout(getPlantLocations(), 10000, 'Plant locations')
+      const inside = isWithinPlant(location.coords.latitude, location.coords.longitude, location.coords.accuracy, plantLocations, plant)
+
+      if (!inside) {
+        Alert.alert(t('common.warning'), t('worker.outsidePlant'))
+        return
+      }
+
+      const mockDetected = location.mocked === true
+      if (mockDetected) {
+        Alert.alert(t('common.warning'), t('worker.mockLocationDetected'))
+        return
+      }
+
+      const { error: checkOutError } = await checkOut(
+        location.coords.latitude,
+        location.coords.longitude,
+        shift?.shift?.end_time,
+        shift?.shift?.name,
+        location.coords.accuracy
+      )
+      if (checkOutError) {
+        alertError(t, checkOutError)
+        await refresh()
+        return
+      }
+      await refresh()
+
+      if (employee.requires_qr) {
+        setExitQrScanned(false)
+        setShowExitQrModal(true)
+      }
+    } catch (e) {
+      alertError(t, e)
+    } finally {
       setIsLoading(false)
-      return
-    }
-
-    const plant = await getPlantConfig()
-    if (!plant) {
-      Alert.alert(t('common.error'), 'Plant config not found')
-      setIsLoading(false)
-      return
-    }
-
-    const plantLocations = await getPlantLocations()
-    const inside =
-      plantLocations.length > 0
-        ? isInsideAnyGeofence(location.coords.latitude, location.coords.longitude, plantLocations)
-        : isInsideGeofence(
-            location.coords.latitude,
-            location.coords.longitude,
-            plant.latitude,
-            plant.longitude,
-            plant.geofence_radius_meters
-          )
-
-    if (!inside) {
-      Alert.alert(t('common.warning'), t('worker.outsidePlant'))
-      setIsLoading(false)
-      return
-    }
-
-    const mockDetected = location.mocked === true
-    if (mockDetected) {
-      Alert.alert(t('common.warning'), t('worker.mockLocationDetected'))
-      setIsLoading(false)
-      return
-    }
-
-    await checkOut(location.coords.latitude, location.coords.longitude, shift?.shift?.end_time, shift?.shift?.name)
-    await refresh()
-    setIsLoading(false)
-
-    if (employee.requires_qr) {
-      setExitQrScanned(false)
-      setShowExitQrModal(true)
     }
   }
 
@@ -340,55 +379,24 @@ export function CheckInCard() {
     if (exitQrScanned || exitQrLoading || !employee) return
     setExitQrScanned(true)
     setExitQrLoading(true)
+    const rearm = [{ text: 'OK', onPress: () => setExitQrScanned(false) }]
 
-    const plant = await getPlantConfig()
-    if (!plant) {
-      Alert.alert(t('common.error'), 'Plant config not found', [{ text: 'OK', onPress: () => setExitQrScanned(false) }])
+    try {
+      if (!(await validateQrScan(data, rearm))) return
+
+      const { error } = await confirmQrOut()
+      if (error) {
+        alertError(t, error, rearm)
+      } else {
+        await refresh()
+        setShowExitQrModal(false)
+        Alert.alert(t('common.success'), t('worker.exitQrConfirmed'))
+      }
+    } catch (e) {
+      alertError(t, e, rearm)
+    } finally {
       setExitQrLoading(false)
-      return
     }
-
-    if (!isValidGateQr(data, plant)) {
-      Alert.alert(t('common.error'), t('worker.invalidQr'), [{ text: 'OK', onPress: () => setExitQrScanned(false) }])
-      setExitQrLoading(false)
-      return
-    }
-
-    const location = await getCurrentLocation()
-    if (!location) {
-      Alert.alert(t('common.error'), 'Location required', [{ text: 'OK', onPress: () => setExitQrScanned(false) }])
-      setExitQrLoading(false)
-      return
-    }
-
-    const plantLocations = await getPlantLocations()
-    const inside =
-      plantLocations.length > 0
-        ? isInsideAnyGeofence(location.coords.latitude, location.coords.longitude, plantLocations)
-        : isInsideGeofence(
-            location.coords.latitude,
-            location.coords.longitude,
-            plant.latitude,
-            plant.longitude,
-            plant.geofence_radius_meters
-          )
-
-    if (!inside) {
-      Alert.alert(t('common.warning'), t('worker.outsidePlant'), [{ text: 'OK', onPress: () => setExitQrScanned(false) }])
-      setExitQrLoading(false)
-      return
-    }
-
-    const { error } = await confirmQrOut()
-    if (error) {
-      Alert.alert(t('common.error'), t('common.somethingWentWrong'))
-      setExitQrScanned(false)
-    } else {
-      await refresh()
-      setShowExitQrModal(false)
-      Alert.alert(t('common.success'), t('worker.exitQrConfirmed'))
-    }
-    setExitQrLoading(false)
   }
 
   const submitLateReason = async () => {
@@ -412,6 +420,11 @@ export function CheckInCard() {
               <ActivityIndicator color="#E65C00" />
               <Text className="text-sm text-ink-400 mt-3">{t('worker.checkingStatus')}</Text>
             </View>
+          ) : loadError && !todayRecord ? (
+            <TouchableOpacity onPress={refresh} className="py-3 items-center">
+              <Text className="text-sm text-ink-500 text-center">{t('common.loadFailedRetry')}</Text>
+              <Text className="text-xs text-ink-400 mt-1 text-center">{loadError.message}</Text>
+            </TouchableOpacity>
           ) : isCheckedOut ? (
             <View className="items-center">
               <View className="w-14 h-14 rounded-full bg-green-100 items-center justify-center mb-3">
@@ -558,7 +571,8 @@ export function CheckInCard() {
             </View>
           ) : hasCameraPermission === false ? (
             <View className="flex-1 items-center justify-center p-6">
-              <Text className="text-sm text-ink-500 text-center">{t('worker.cameraPermissionRequired')}</Text>
+              <Text className="text-sm text-ink-500 text-center mb-4">{t('worker.cameraPermissionRequired')}</Text>
+              <Button title="common.close" onPress={() => setShowQrModal(false)} variant="ghost" />
             </View>
           ) : (
             <View className="flex-1 p-4">
@@ -623,7 +637,8 @@ export function CheckInCard() {
             </View>
           ) : hasCameraPermission === false ? (
             <View className="flex-1 items-center justify-center p-6">
-              <Text className="text-sm text-ink-500 text-center">{t('worker.cameraPermissionRequired')}</Text>
+              <Text className="text-sm text-ink-500 text-center mb-4">{t('worker.cameraPermissionRequired')}</Text>
+              <Button title="common.close" onPress={() => setShowExitQrModal(false)} variant="ghost" />
             </View>
           ) : (
             <View className="flex-1 p-4">
