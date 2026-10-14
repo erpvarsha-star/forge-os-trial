@@ -353,6 +353,24 @@ at 00:01 IST daily. Backfilled from go-live (1 Oct): 2 Oct 69, 9 Oct 81
 checkpoint-3 "Mark Absent" can still overwrite a WO row with `A` — left
 as is, since an urgent-production Friday is a real working day.
 
+## Check-in reliability fixes — decision from Yash, 14 Oct 2026 (being built)
+
+"go fix the gaps so we dont come back to review gps and qr check ins
+again." Approved fixing every gap from the 14 Oct health check (PENDING.md):
+surface every check-in/out failure (CheckInCard ignored `checkIn()` errors —
+non-member roles saw "nothing happens"); GPS with a time limit, best-fix
+sampling and a fallback instead of an unbounded `BestForNavigation` wait;
+geofence tolerance from the phone's reported `coords.accuracy`, **capped at
+25m** (Claude's call: 45m radius + ≤25m ≈ 70m max, still inside the 134.7m
+campus span and short of the old 100m street-corner problem); timeouts on
+every network step; "Turn on GPS" separate from "permission required";
+QR/check-in time taken from the **server clock** (`server_now()` RPC) so a
+wrong phone clock can't break QR or lateness; exit-QR camera-permission
+spinner fixed. `attendance_records.check_in_accuracy_m` stores the reported
+accuracy so future complaints can be checked from data. **Not changed:** a
+mock-location flag still hard-blocks (security policy, no false flags seen
+since 27 Sep) — revisit only if it recurs.
+
 ## Shift inference for unassigned check-ins — decision from Yash, 27 Sep 2026
 
 **Decision:** "if there is no shift allotment done for anyone consider the
