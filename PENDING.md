@@ -25,6 +25,23 @@ real device. Also open: Yash's "let everyone check in instead of assuming
 late or early" for October still needs clarifying (see CLAUDE.md
 `checkin_checkout_pattern`).
 
+**Check-in health check, 14 Oct 2026 (live DB + Sonnet code review, verified).**
+Working: 72–82 check-ins/day (of 99 active) 7–14 Oct, 64% via QR, 0 mock
+flags, 0 fraud alerts in 10 days; all 12 campus points at 45m. 11 people
+with ≤2 check-ins since 7 Oct, no leave on file — VFL1520 + VFL1527
+(security) and VFL4072 opened the app in the last 2 days but have no
+check-in; CON24 + VFL5457 never logged in; VFL5439 (Pune). Code gaps found,
+⏳ awaiting Yash's go-ahead to fix: (1) `CheckInCard.tsx:273` ignores the
+`checkIn()` error → non-member roles (security, supervisors, managers) see
+"nothing happens"; same for both `checkOut` calls; (2) GPS uses
+`BestForNavigation` with no timeout/fallback and ignores
+`coords.accuracy` → indoor fixes fail 45m or spin forever; (3) no
+timeouts/try-catch on the check-in network calls → endless spinner on bad
+signal; (4) "Location permission required" also shown when GPS is simply
+off; (5) QR fails if the guard's or employee's phone clock is >~30 min
+wrong; (6) worker exit-QR modal can spin forever (camera permission never
+requested on that path).
+
 **Later same session, 11 Oct 2026 — Yash's apk-92 feedback.** Built and
 live-tested (details in CLAUDE.md "Follow-up decisions"): red counts for
 every pending decision (PATCH_84) — he'd missed 4 days of Needs Your Call;
