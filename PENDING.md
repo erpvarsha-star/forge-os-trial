@@ -30,8 +30,10 @@ Working: 72–82 check-ins/day (of 99 active) 7–14 Oct, 64% via QR, 0 mock
 flags, 0 fraud alerts in 10 days; all 12 campus points at 45m. 11 people
 with ≤2 check-ins since 7 Oct, no leave on file — VFL1520 + VFL1527
 (security) and VFL4072 opened the app in the last 2 days but have no
-check-in; CON24 + VFL5457 never logged in; VFL5439 (Pune). Code gaps found,
-⏳ awaiting Yash's go-ahead to fix: (1) `CheckInCard.tsx:273` ignores the
+check-in; CON24 + VFL5457 never logged in; VFL5439 (Pune). Code gaps found —
+✅ ALL FIXED 14 Oct (commit bf747f3, PATCH_88, see CLAUDE.md "Check-in
+reliability fixes"); ⏳ needs everyone on the new APK, then re-check the
+stragglers list above: (1) `CheckInCard.tsx:273` ignores the
 `checkIn()` error → non-member roles (security, supervisors, managers) see
 "nothing happens"; same for both `checkOut` calls; (2) GPS uses
 `BestForNavigation` with no timeout/fallback and ignores

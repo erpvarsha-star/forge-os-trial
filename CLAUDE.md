@@ -353,7 +353,7 @@ at 00:01 IST daily. Backfilled from go-live (1 Oct): 2 Oct 69, 9 Oct 81
 checkpoint-3 "Mark Absent" can still overwrite a WO row with `A` — left
 as is, since an urgent-production Friday is a real working day.
 
-## Check-in reliability fixes — decision from Yash, 14 Oct 2026 (being built)
+## Check-in reliability fixes — decision from Yash, 14 Oct 2026 (built same day, commit bf747f3)
 
 "go fix the gaps so we dont come back to review gps and qr check ins
 again." Approved fixing every gap from the 14 Oct health check (PENDING.md):
@@ -370,6 +370,19 @@ spinner fixed. `attendance_records.check_in_accuracy_m` stores the reported
 accuracy so future complaints can be checked from data. **Not changed:** a
 mock-location flag still hard-blocks (security policy, no false flags seen
 since 27 Sep) — revisit only if it recurs.
+
+**Built 14 Oct (Sonnet agent, reviewed by Claude; tsc still 7, i18n clean,
+web bundle OK).** New: `lib/serverClock.ts` (`syncServerClock`,
+`serverNowMs`), `lib/withTimeout.ts`, `lib/alertError.ts`;
+`lib/location.ts` `getCheckInLocation()` (12 s best-fix sampling, early
+exit ≤20 m, last-known ≤2 min fallback) + `isWithinPlant()` (radius +
+min(accuracy, 25 m)); same tolerance in `fraud-detector` (`accuracyMeters`).
+**Diagnosing a future "can't check in" complaint:** ask for the alert
+screenshot (every failure now names its cause), and read
+`check_in_accuracy_m` on their recent rows. Found during the check: no
+failed attendance writes in server logs, so the 14 Oct stragglers (incl.
+both Aurangabad security guards) were failing before the save — GPS,
+geofence or spinner — which these fixes target.
 
 ## Shift inference for unassigned check-ins — decision from Yash, 27 Sep 2026
 
@@ -1047,6 +1060,7 @@ Two separate fixes, both same day:
 | `PATCH_84_action_counts_11Oct2026.sql` | `my_action_counts()` — one RPC behind every red count (tasks, approvals, Needs Your Call, fraud alerts) | ✅ Applied 11 Oct 2026 — counts verified against each screen as 4 roles |
 | `PATCH_85_ontime_race_11Oct2026.sql` | Monthly on-time race: `employees.work_location`, own-rank + owner-only leaders RPCs | ✅ Applied 11 Oct 2026 — tested as worker, Kajal, plant head, owner |
 | `PATCH_86_weekly_off_marking_11Oct2026.sql` | `mark_weekly_offs()` + daily cron: weekly-off days written as `WO` (Friday; Kajal Sunday), never absent; backfilled 1–11 Oct | ✅ Applied 11 Oct 2026 — verified live, check-in overwrite tested |
+| `PATCH_88_checkin_reliability_14Oct2026.sql` | `check_in/out_accuracy_m` columns + `server_now()` RPC for the check-in reliability fixes | ✅ Applied 14 Oct 2026 |
 | `PATCH_87_fazal_monthly_form_reminder_on_11Oct2026.sql` | Turns on the 1st–5th reminder for Fazal's monthly form ("Worker Monthly Efficiency") — PATCH_66's insert had been silently skipped | ✅ Applied 11 Oct 2026 |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
 
