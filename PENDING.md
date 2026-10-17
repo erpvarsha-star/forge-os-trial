@@ -25,6 +25,32 @@ real device. Also open: Yash's "let everyone check in instead of assuming
 late or early" for October still needs clarifying (see CLAUDE.md
 `checkin_checkout_pattern`).
 
+**Production sync fix, 17 Oct 2026 (Sonnet agent build, re-verified by Claude).**
+Found: every Forge/Press/Machine Shop `qty` in `production_records` was
+null since April (0 of ~7,000 rows). Cause: `syncProductionToSupabase()`
+(`scripts/ALERT.gs`) read RAW_* tabs by column position, but RAW_FORGE /
+RAW_PRESS / RAW_MACHINE have an extra Prod_Type / Process column, so
+`vf_no` got "Forging Production"/"First Side" and `qty` got the VF number
+(NaN → null). Its "keep last" dedup also dropped genuine repeated rows
+(e.g. 10 Oct Hammer 2 Ton, Shift 2, VF1050 entered twice: 378 + 409).
+Fixed: columns mapped by header name, repeats kept with `|#2` suffix,
+new `process` + `dropout_qty` columns (PATCH_89, ✅ applied live 17 Oct).
+- [ ] ⏳ **Yash: paste the new function into the live Apps Script** —
+  `scripts/PASTE_syncProductionToSupabase_17Oct2026.gs` replaces
+  `syncProductionToSupabase()` in the live ALERT.gs (one function only —
+  do not paste the whole file, the live copy may hold inline tokens),
+  then run `testSupabaseSync` once.
+- [ ] ⏳ **Claude, after that run:** run PATCH_89's commented cleanup
+  (count first) to delete the old mis-mapped rows, then confirm Forge/
+  Press/Machine qty is populated April → today.
+- [ ] **Ask Yash:** Machine Shop logs First Side and Second Side as
+  separate rows for the same part, so summing `qty` (Production Summary
+  card, plant dashboard) counts each part twice. Which should a "Machine
+  Shop total" mean — sides machined, or finished parts (Second Side only)?
+- Not sync bugs, in the Sheet itself: RAW_FINAL has no rows after April
+  (Final Shop data stopped being entered); no production rows for 1 Oct
+  in any RAW tab (2 Oct was a holiday + Friday).
+
 **Check-in health check, 14 Oct 2026 (live DB + Sonnet code review, verified).**
 Working: 72–82 check-ins/day (of 99 active) 7–14 Oct, 64% via QR, 0 mock
 flags, 0 fraud alerts in 10 days; all 12 campus points at 45m. 11 people
