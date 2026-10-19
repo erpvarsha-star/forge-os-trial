@@ -78,9 +78,10 @@ export interface PayrollResult {
 }
 
 export interface EngineConfig {
-  /** Worker OT rate VDA basis:
-   *  'CURRENT_RATE'    -> VDA = 103 x wd  (new HR OS code behaviour; default)
-   *  'MASTER_SNAPSHOT' -> VDA = master VDA frozen in old sheets (2,790 for Sep-2026)
+  /** Worker OT rate VDA basis — DECIDED 20 Oct 2026: use 'CURRENT_RATE'.
+   *  'CURRENT_RATE'    -> VDA = 103 x wd  (correct, per current HR OS sheet)
+   *  'MASTER_SNAPSHOT' -> VDA = master VDA frozen in old sheets (2,790 for Sep-2026);
+   *                       regression-testing only, never for live runs.
    */
   workerOtVdaBasis: 'CURRENT_RATE' | 'MASTER_SNAPSHOT';
   workerVdaRatePerDay: number;   // 103
