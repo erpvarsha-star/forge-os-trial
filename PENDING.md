@@ -25,6 +25,21 @@ real device. Also open: Yash's "let everyone check in instead of assuming
 late or early" for October still needs clarifying (see CLAUDE.md
 `checkin_checkout_pattern`).
 
+**Review of PATCH_89/90/91/92, 19 Oct 2026 (Sonnet review + Claude spot-check).**
+Not on this branch: payroll PATCH_89/91/92 live on `claude/payroll-lifecycle`;
+a second, unrelated PATCH_89 (production_records process/dropout) on
+`claude/rea-installation-hpbxti`. **No PATCH_90 exists anywhere — number 89
+used twice.** All four are already applied live; neither branch undoes the
+check-in build (both are based on it). ⏳ Awaiting Yash's call on:
+(1) 🔴 `attach_arrears_sep26_30()` is SECURITY DEFINER, no role check,
+executable by anon/authenticated → can alter `pay_run_items` net pay;
+(2) 🔴 `payroll-run` edge function (not deployed) has no caller auth;
+(3) 🔴 `lib/payroll/feedSync.ts` reads status as 'present'/'week_off'/…
+but the DB stores P/L/HL/WO/H/A → everyone would get 0 present days;
+(4) `payroll-run` reads `salary_advances`, app writes `advance_requests`;
+(5) payroll tables open to every manager via `is_management()`;
+(6) `audit_row_change` actor always NULL; (7) renumber payroll 89 → 90.
+
 **Check-in health check, 14 Oct 2026 (live DB + Sonnet code review, verified).**
 Working: 72–82 check-ins/day (of 99 active) 7–14 Oct, 64% via QR, 0 mock
 flags, 0 fraud alerts in 10 days; all 12 campus points at 45m. 11 people
