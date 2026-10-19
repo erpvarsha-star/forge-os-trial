@@ -37,7 +37,7 @@ export interface PayrollInput {
   category: PayCategory;
   month: number;          // 1-12
   year: number;
-  workingDays: number;    // wd: staff/consultants = calendar days; workers = days excl. Sundays
+  workingDays: number;    // wd: staff/consultants = calendar days; workers = days excl. site weekly-off
   masters?: SalaryMasters;        // STAFF / PERMANENT_WORKER
   rateProfile?: RateProfile;      // CONSULTANT / PUNE_STAFF
   days: DayCounts;
@@ -127,4 +127,34 @@ export function ptAmount(gross: number, month: number, cfg: EngineConfig): numbe
   if (gross <= 7500) return 0;
   if (gross <= 10000) return 175;
   return month === 2 ? cfg.ptFebAmount : 200;
+}
+
+/**
+ * Weekly-off weekday per site (JS convention: 0 = Sunday … 6 = Saturday).
+ * Waluj plant: FRIDAY is the weekly off. Pune office: SUNDAY is the weekly off.
+ * If a Waluj employee is called in for Friday maintenance, that day is entered
+ * as PRESENT (it is not a week-off for them) — the attendance feed handles it;
+ * the engine just never sees it as an off day.
+ */
+export const WEEKLY_OFF_WEEKDAY = { WALUJ: 5, PUNE: 0 } as const;
+export type Site = keyof typeof WEEKLY_OFF_WEEKDAY;
+
+/** How many times `weekday` occurs in the given calendar month. */
+export function countWeekdayInMonth(year: number, month: number, weekday: number): number {
+  const daysInMonth = new Date(year, month, 0).getDate(); // month is 1-12
+  let n = 0;
+  for (let d = 1; d <= daysInMonth; d++) if (new Date(year, month - 1, d).getDay() === weekday) n++;
+  return n;
+}
+
+/**
+ * Working days (wd) for a month.
+ * - PERMANENT_WORKER: calendar days minus the site's weekly-off days
+ *   (e.g. Waluj Oct-2026 = 31 - 5 Fridays = 26; Pune = 31 - 4 Sundays = 27).
+ * - STAFF / CONSULTANT / PUNE_STAFF on monthly proration: full calendar days
+ *   (pass weeklyOffWeekday = null).
+ */
+export function workingDaysInMonth(year: number, month: number, weeklyOffWeekday: number | null): number {
+  const daysInMonth = new Date(year, month, 0).getDate();
+  return weeklyOffWeekday === null ? daysInMonth : daysInMonth - countWeekdayInMonth(year, month, weeklyOffWeekday);
 }
