@@ -30,6 +30,12 @@ People on the shop floor use it daily. Breaking it is not acceptable.
 - Working days are COMPUTED (`workingDaysInMonth`), never hand-entered.
 - Pay run lifecycle is DB-enforced; finalized runs are immutable — corrections via
   adjustment runs only.
+- Efficiency % (worker production allowance) is a MANUAL INPUT decided by the plant
+  head per the worker agreement, based on forge-shop production efficiency. It is
+  entered from the app (`payroll_efficiency_entries`, plant-wide or per-employee)
+  and must be approved before a run can calculate. Do NOT auto-derive it from
+  production or contract-labour data until a separate analysis of how HR OS
+  computed it is done and signed off. (Decided 20 Oct 2026.)
 
 ## Definition of done for any payroll PR
 - [ ] Regression suite passes (58 assertions)
