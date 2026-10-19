@@ -8,9 +8,11 @@
  *   19 PERMANENT_WORKER + 7 CONSULTANT rows reproduce paid nets exactly
  *   (see scripts/payroll-engine.sept2026.test.ts).
  *
- * Known intentional divergence: worker OT VDA basis. Old sheets froze the
- * master VDA snapshot (2,790 for Sep-26); the new HR OS code uses the current
- * rate (103 x wd). Controlled by config.workerOtVdaBasis, default CURRENT_RATE.
+ * Worker OT VDA basis — DECIDED (20 Oct 2026, confirmed by plant): OT uses the
+ * CURRENT VDA rate (103 x wd), i.e. config.workerOtVdaBasis = 'CURRENT_RATE'
+ * (the default). The legacy sheets froze a master VDA snapshot (2,790 for
+ * Sep-26); 'MASTER_SNAPSHOT' mode is kept only to reproduce historical payouts
+ * in the regression suite. Do not use it for live runs.
  */
 import {
   PayrollInput, PayrollResult, EngineConfig, DEFAULT_ENGINE_CONFIG,
