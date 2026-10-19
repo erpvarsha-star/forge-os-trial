@@ -88,10 +88,13 @@ create trigger trg_lock_items_upd before update or delete on pay_run_items
   for each row execute function lock_finalized_pay_run_items();
 
 -- 1d. Employee status history --------------------------------------------------
+-- Statuses: active | on_leave | left | terminated | retired | rehired
+-- ('draft' kept only for legacy rows). Category change is NOT a status change:
+-- close the old salary-structure row (effective_to) and open a new one.
 create table if not exists employee_status_history (
   id uuid primary key default gen_random_uuid(),
   employee_id uuid not null references employees(id),
-  status text not null check (status in ('draft','active','on_leave','terminated','rehired')),
+  status text not null check (status in ('draft','active','on_leave','left','terminated','retired','rehired')),
   effective_from date not null,
   note text,
   recorded_by uuid references employees(id),
