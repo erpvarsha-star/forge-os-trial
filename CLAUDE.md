@@ -975,6 +975,13 @@ structure), VFL5458–5462 (`ctc_annual=0`).
   (owner-approved exempt list); wired through feedSync to the engine's
   `ptExempt`; the runner's employee select gains `pt_exempt`. **Redeploy of
   `payroll-run` happens once, together with U1/U3/U4, only when Yash says.**
+  ✅ Built + applied 20 Oct, payroll-branch commit `ed8cc63` (regression
+  58/0, feedsync 16/0, tsc baseline 7); live check: exactly those 3 rows
+  true. Not deployed.
+  ⚠ **Recurring stray commits:** `d825fa1`/`e5748d4` ("noop", erpvarsha-star,
+  20 Oct 23:22–23:24 IST) blanked `payroll-run/index.ts` to `x` again, same as
+  `ab7c907`. Restored in `ed8cc63` by a normal commit. Always diff
+  `origin/claude/payroll-lifecycle` before building on it or deploying.
 - **Negative net = held, never written:** engine.ts:168 — `net < 0` →
   blocker NET_NEGATIVE, `held = true`, `netPay = null`; the runner writes no
   pay_run_item for held employees. No code change (Yash, 20 Oct).
@@ -1220,6 +1227,7 @@ Two separate fixes, both same day:
 | `PATCH_88_checkin_reliability_14Oct2026.sql` | `check_in/out_accuracy_m` columns + `server_now()` RPC for the check-in reliability fixes | ✅ Applied 14 Oct 2026 |
 | `PATCH_87_fazal_monthly_form_reminder_on_11Oct2026.sql` | Turns on the 1st–5th reminder for Fazal's monthly form ("Worker Monthly Efficiency") — PATCH_66's insert had been silently skipped | ✅ Applied 11 Oct 2026 |
 | `PATCH_93_lock_attach_arrears_20Oct2026.sql` | Revokes execute on the payroll branch's `attach_arrears_sep26_30()` from PUBLIC/anon/authenticated; service_role only (its one caller, `payroll-run`) | ✅ Applied 20 Oct 2026 — verified anon/authenticated false, service_role true |
+| `PATCH_98_employees_pt_exempt_20Oct2026.sql` (payroll branch) | `employees.pt_exempt boolean not null default false`; true for VFL4021/VFL4014/VFL4063 (U4, owner-approved PT-exempt list) | ✅ Applied 20 Oct 2026 — verified exactly 3 rows true |
 | `PATCH_95_my_payslips_rpc_20Oct2026.sql` (payroll branch) | `my_payslips()` SECURITY DEFINER — employee's own `pay_run_items` (archived/paid/finalized) with month/year, for the Payslip tab | ✅ Applied 20 Oct 2026 — verified own-rows-only as 2 employees |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
 
