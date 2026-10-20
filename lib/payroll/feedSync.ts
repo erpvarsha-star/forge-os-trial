@@ -33,6 +33,7 @@ export interface SalaryRow {
   education: number | null; heat_allow: number | null; vda: number | null; production_allow: number | null;
   medical: number | null; professional_development: number | null; communication: number | null;
   uniform: number | null; ctc_annual: number | null;
+  rate_type?: string | null; daily_rate?: number | null;   // PATCH_97 — consultant daily-rate masters
 }
 export interface AttendanceRow {
   employee_id: string; date: string; status: string; overtime_hours: number | null;
@@ -222,12 +223,25 @@ export function assemblePayrollInputs(year: number, month: number, feeds: FeedBu
       warnings.push(`${emp.emp_code}: no approved efficiency % for ${year}-${mm} — production allowance 0, flagged`);
     }
 
+    // Consultant rate profile (PATCH_97): rate_type 'daily' -> DAILY_RATE with daily_rate;
+    // a daily row with no usable rate stays rateAmount-less so the engine holds it
+    // (MISSING_RATE) — never guess a rate. Everything else keeps the monthly-gross basis.
+    let rateProfile: PayrollInput['rateProfile'];
+    if (cat === 'CONSULTANT' && (sal?.rate_type ?? '').trim().toLowerCase() === 'daily') {
+      const dr = num(sal?.daily_rate);
+      if (dr > 0) rateProfile = { basis: 'DAILY_RATE', rateAmount: dr };
+      else {
+        rateProfile = { basis: 'DAILY_RATE', rateAmount: undefined };
+        warnings.push(`${emp.emp_code}: daily rate missing`);
+      }
+    } else if (cat === 'CONSULTANT' || cat === 'PUNE_STAFF') {
+      rateProfile = { basis: 'MONTHLY_GROSS_PRORATED', monthlyGross: sal?.ctc_annual ? sal.ctc_annual / 12 : undefined };
+    }
+
     inputs.push({
       empCode: emp.emp_code, category: cat, month, year, workingDays: wd,
       masters: cat === 'STAFF' || cat === 'PERMANENT_WORKER' ? (sal ? mastersFrom(sal, cat) : undefined) : undefined,
-      rateProfile: cat === 'CONSULTANT' || cat === 'PUNE_STAFF'
-        ? { basis: 'MONTHLY_GROSS_PRORATED', monthlyGross: sal?.ctc_annual ? sal.ctc_annual / 12 : undefined }
-        : undefined,
+      rateProfile,
       days: day, otHours, efficiencyPct,
       deductions: { canteen, society, advance, other: otherDeduction || undefined },
       ptExempt: emp.pt_exempt === true,
