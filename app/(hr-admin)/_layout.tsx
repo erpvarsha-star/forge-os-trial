@@ -29,6 +29,8 @@ export default function HrAdminLayout() {
         <Tabs.Screen name="payslips" options={{ href: null }} />
         <Tabs.Screen name="payslip" options={{ href: null }} />
         <Tabs.Screen name="my-tasks" options={{ href: null }} />
+        <Tabs.Screen name="payroll-run" options={{ href: null }} />
+        <Tabs.Screen name="payroll-feeds" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )
