@@ -1059,6 +1059,27 @@ Still open (PENDING.md): payroll tables open to every manager via `is_management
 `audit_row_change` actor always NULL;
 no real-device / real pay-run test yet.
 
+## HR OS reference snapshot — `reference/hr-os/`, added 21 Oct 2026 (PR #15, `a81689f`)
+
+Yash asked to add branch `claude/hr-payroll-rebuild-nkiiky` to this project.
+Found: it lives in the **private `blank-canvas`** repo (not here), 9 commits
+from 29 Sep building the Apps Script HR OS payroll system, whose last commit
+("Move HR OS to erpvarsha-star/hr-os") deleted all 30 of its files — so the
+branch's net content is empty and merging it would add nothing. Yash chose
+"copy the code in as a reference folder". **`reference/hr-os/` is a read-only
+snapshot of the public `erpvarsha-star/hr-os` repo at commit `857baa1`
+(6 Oct 2026), 74 files, ~2 MB** — the Apps Script (Google Sheets) HR OS from
+which `lib/payroll/engine.ts` was ported and verified against Sept 2026
+payouts. It is **not** part of the app build and not deployed from here; the
+source of truth stays in the `hr-os` repo (refresh the snapshot from there,
+never edit it here). Scanned twice before committing to this public repo: no
+real secrets or personal data (the one bot-token-shaped string is Telegram's
+public docs example in a test fixture; PAN/bank test values are obvious fakes).
+`reference/` is outside `build-apk.yml`'s `paths:` filter, has no `.ts` files
+(type-check unaffected), and its nested `.github/workflows/deploy.yml` is inert.
+`blank-canvas` was attached to this session with read access only; nothing was
+changed in it.
+
 ## Owner has no KPI tab — decision from Yash, 28 Sep 2026
 
 Redundant with `dashboard/index.html` (the plant HTML dashboard, which
