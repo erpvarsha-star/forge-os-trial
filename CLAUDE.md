@@ -917,6 +917,13 @@ attendance for Sept is test-period data, so days-based lines may differ
 for that reason, not the math). **Yash triggers the calls himself** with
 his own login; Claude only prepares the request bodies and the comparison
 query, and never calls `payroll-run` or moves a run past `calculated`.
+**Changed by Yash, 20 Oct 2026:** the Sept test runs **offline** instead —
+no HTTP/curl, no pay run written to the DB. Pull the live Sept inputs via
+read-only SQL, run the vendored `assemblePayrollInputs` + `calculateOne` in
+Node from the payroll worktree, compare with the archived Sept
+`pay_run_items`, spot-check PF/ESI/PT on 3 staff (PF 12% of min(Basic,
+15000) capped 1800; ESI only if gross ≤ 21000; Maharashtra PT ₹200 in
+September), save `scripts/PAYROLL_TEST_SEP2026_RESULTS.md` (payroll branch).
 
 **Payslip tab repointed, 20 Oct 2026 (Yash's instruction; `f02fd13`, payroll
 branch).** It was blank because `hooks/usePayslips.ts` read the old
