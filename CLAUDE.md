@@ -959,6 +959,17 @@ structure), VFL5458–5462 (`ctc_annual=0`).
   0 failed.
 - **U6/U7 and the 17 held employees are HR data**, not code: HR supplies
   correct figures, applied as a small additive SQL patch.
+- **Done 20 Oct (payroll branch, see results file):** U1 + U3 fixed in
+  `lib/payroll/feedSync.ts` and re-vendored; engine untouched; regression
+  58/0 and feedsync 16/0. Staff diagnostic (archived days scaled by
+  wd/31 to isolate the frozen U2 rule): 60/68 staff match the sheet within
+  ₹2 on all five lines; the rest are 3 rounding (≤₹3: VFL1386/5347/5459)
+  and the U6 data cases. Women now get PT 0. VFL1389 is now held
+  (NET_NEGATIVE) because its master Basic is wrong (U6). **U4 blocked: no
+  PT-exempt column exists in the DB** (only `pt_slabs.pt_amount`) — needs a
+  decision where the exempt list (VFL4021/VFL4014/VFL4063) lives.
+  ⚠ The live `payroll-run` (v1) still has the old feedSync — redeploy only
+  when asked.
 
 **Payslip tab repointed, 20 Oct 2026 (Yash's instruction; `f02fd13`, payroll
 branch).** It was blank because `hooks/usePayslips.ts` read the old

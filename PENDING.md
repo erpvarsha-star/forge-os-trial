@@ -50,8 +50,10 @@ trigger (the runner now records `actor_emp_code` itself);
 `payroll-feed-sync` — not needed (Yash, 20 Oct: logic vendored in
 payroll-run). Next, in order: real pay-run test vs Sheet (Sept 2026; kit ready in
 `scripts/PAYROLL_TEST_SEP2026.md`, ⏳ Yash to run create→calculate→summary) → ✅ renumbered
-89→94 (`db81733`) → Sept offline engine test done (results on payroll branch): ⏳ fix U1
-staff gross ctc/12, U3 gender 'F' vs 'female', U4 ptExempt in feedSync;
+89→94 (`db81733`) → Sept offline engine test done (results on payroll branch): ✅ U1 + U3
+fixed (regression 58/0, 16/0; 60/68 staff match sheet); ⏳ U4 needs a
+home for the PT-exempt list (no DB column); ⏳ live payroll-run v1 not
+redeployed with the fix;
 U2/U5 = frozen engine rules, not bugs (Yash); documented
 deviation: VFL4024/VFL4033 paid full ₹8,500 prod allowance by hand on the
 Sept sheet (manual exception, not reproduced by the app); ⏳ HR to supply
