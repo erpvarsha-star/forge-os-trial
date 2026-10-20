@@ -985,10 +985,21 @@ structure), VFL5458–5462 (`ctc_annual=0`).
 - **Negative net = held, never written:** engine.ts:168 — `net < 0` →
   blocker NET_NEGATIVE, `held = true`, `netPay = null`; the runner writes no
   pay_run_item for held employees. No code change (Yash, 20 Oct).
-- **PATCH_96 (consultant historical seed) / PATCH_97 (salary masters draft):**
-  Yash referred to them on 20 Oct as already sent; **not received by this
-  session** and not present on any branch or in `supabase_migrations` as of
-  20 Oct. Numbers 96/97 are reserved for them; don't reuse.
+- **PATCH_96 / PATCH_97 — applied directly to the live DB by Yash, 21 Oct
+  2026** (not by Claude; repo files written afterwards to record them):
+  - `PATCH_96_consultant_ot_snapshot_repair_21Oct2026.sql` — one-time
+    repair: `trg_lock_items_upd` disabled, 24 consultant `pay_run_items`
+    snapshots updated to restore OT lines (otPay, otHours, earnings.OT,
+    totalEarnings; net_pay unchanged), trigger re-enabled + verified.
+  - `PATCH_97_consultant_salary_masters_21Oct2026.sql` —
+    `employee_salary_structure` gains `rate_type` ('monthly'|'daily',
+    default 'monthly') + `daily_rate`; 12 consultant rows effective
+    2026-04-01. Monthly (ctc_annual = CTC×12): CON05 240000, CON09 276000,
+    CON12 576000, CON13 660000. Daily (ctc_annual 0): CON01 700, CON16 600,
+    CON18 650, CON20 762, CON21 846, CON22 762, CON23 625, CON24 500.
+  - ⚠ feedSync does NOT yet read `rate_type`/`daily_rate` — daily
+    consultants are held (MISSING_RATE), never mispaid, until that wiring
+    lands (separate task, Yash 21 Oct).
 
 **Payslip tab repointed, 20 Oct 2026 (Yash's instruction; `f02fd13`, payroll
 branch).** It was blank because `hooks/usePayslips.ts` read the old
@@ -1227,6 +1238,8 @@ Two separate fixes, both same day:
 | `PATCH_88_checkin_reliability_14Oct2026.sql` | `check_in/out_accuracy_m` columns + `server_now()` RPC for the check-in reliability fixes | ✅ Applied 14 Oct 2026 |
 | `PATCH_87_fazal_monthly_form_reminder_on_11Oct2026.sql` | Turns on the 1st–5th reminder for Fazal's monthly form ("Worker Monthly Efficiency") — PATCH_66's insert had been silently skipped | ✅ Applied 11 Oct 2026 |
 | `PATCH_93_lock_attach_arrears_20Oct2026.sql` | Revokes execute on the payroll branch's `attach_arrears_sep26_30()` from PUBLIC/anon/authenticated; service_role only (its one caller, `payroll-run`) | ✅ Applied 20 Oct 2026 — verified anon/authenticated false, service_role true |
+| `PATCH_96_consultant_ot_snapshot_repair_21Oct2026.sql` (payroll branch) | One-time repair of 24 consultant `pay_run_items` OT lines (lock trigger disabled → updated → re-enabled) | ✅ Applied 21 Oct 2026 by Yash directly |
+| `PATCH_97_consultant_salary_masters_21Oct2026.sql` (payroll branch) | `employee_salary_structure.rate_type`/`daily_rate` + 12 consultant rate rows (4 monthly, 8 daily) | ✅ Applied 21 Oct 2026 by Yash directly — feedSync wiring pending |
 | `PATCH_98_employees_pt_exempt_20Oct2026.sql` (payroll branch) | `employees.pt_exempt boolean not null default false`; true for VFL4021/VFL4014/VFL4063 (U4, owner-approved PT-exempt list) | ✅ Applied 20 Oct 2026 — verified exactly 3 rows true |
 | `PATCH_95_my_payslips_rpc_20Oct2026.sql` (payroll branch) | `my_payslips()` SECURITY DEFINER — employee's own `pay_run_items` (archived/paid/finalized) with month/year, for the Payslip tab | ✅ Applied 20 Oct 2026 — verified own-rows-only as 2 employees |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
