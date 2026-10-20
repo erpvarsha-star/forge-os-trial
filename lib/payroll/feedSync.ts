@@ -8,6 +8,14 @@
  * input; app check-in/check-out punches are the reconciliation layer.
  * This module therefore reads attendance from attendance_records as maintained
  * by the admin forms, and emits a ReconciliationRow[] comparing against punches.
+ *
+ * Live DB attendance_records.status codes (verified 2026-10-20): P, L, HL, WO
+ *   P  = present (paid)
+ *   L  = late (paid present day; surfaced as a warning for late-review policy)
+ *   HL = half day (0.5 paid)
+ *   WO = weekly off
+ * Absence = NO ROW in attendance_records.
+ * Word forms (present/half_day/...) kept for test & legacy compat.
  */
 import { PayrollInput, PayCategory, SalaryMasters, workingDaysInMonth, WEEKLY_OFF_WEEKDAY } from './types';
 import { isPayrollEligible, EmployeeStatus } from './lifecycle';
@@ -93,6 +101,26 @@ function mastersFrom(s: SalaryRow): SalaryMasters {
 
 const num = (v: unknown) => (typeof v === 'number' && !isNaN(v) ? v : 0);
 
+/**
+ * Map one attendance status to paid days. Returns an object describing the
+ * effect; unknown statuses count as nothing (absent = no row in live DB).
+ * Live DB codes: P / L / HL / WO. Word forms kept for legacy & test compat.
+ */
+function statusEffect(st: string): { present?: number; weekOff?: number; ph?: number; el?: number; cl?: number; sl?: number; plo?: number; late?: boolean } {
+  switch (st) {
+    case 'p': case 'present': return { present: 1 };
+    case 'l': case 'late': return { present: 1, late: true };
+    case 'hl': case 'half_day': return { present: 0.5 };
+    case 'wo': case 'week_off': case 'weekly_off': return { weekOff: 1 };
+    case 'h': case 'ph': case 'holiday': return { ph: 1 };
+    case 'el': return { el: 1 };
+    case 'cl': return { cl: 1 };
+    case 'sl': return { sl: 1 };
+    case 'plo': case 'paid_layoff': return { plo: 1 };
+    default: return {}; // 'a' / 'absent' / unknown → unpaid, no bucket
+  }
+}
+
 export function assemblePayrollInputs(year: number, month: number, feeds: FeedBundle): AssembleResult {
   const mm = String(month).padStart(2, '0');
   const periodStart = `${year}-${mm}-01`;
@@ -121,18 +149,22 @@ export function assemblePayrollInputs(year: number, month: number, feeds: FeedBu
       : null;
     const wd = workingDaysInMonth(year, month, weeklyOff);
 
-    // Attendance aggregation (admin-entered statuses)
+    // Attendance aggregation (admin-entered statuses; live codes P/L/HL/WO)
     const att = feeds.attendance.filter((a) => a.employee_id === emp.id && a.date >= periodStart && a.date <= periodEnd);
     const day = { present: 0, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 };
     let otHours = 0;
+    let lateDays = 0;
     for (const a of att) {
-      const st = (a.status || '').toLowerCase();
-      if (st === 'present' || st === 'half_day') day.present += st === 'half_day' ? 0.5 : 1;
-      else if (st === 'week_off' || st === 'weekly_off') day.weekOff++;
-      else if (st === 'ph' || st === 'holiday') day.ph++;
-      else if (st === 'el') day.el++; else if (st === 'cl') day.cl++;
-      else if (st === 'sl') day.sl++; else if (st === 'plo' || st === 'paid_layoff') day.plo++;
+      const eff = statusEffect((a.status || '').toLowerCase());
+      day.present += eff.present ?? 0;
+      day.weekOff += eff.weekOff ?? 0;
+      day.ph += eff.ph ?? 0;
+      day.el += eff.el ?? 0; day.cl += eff.cl ?? 0; day.sl += eff.sl ?? 0; day.plo += eff.plo ?? 0;
+      if (eff.late) lateDays++;
       otHours += num(a.overtime_hours);
+    }
+    if (lateDays > 0) {
+      warnings.push(`${emp.emp_code}: ${lateDays} late day(s) counted as present — apply late-deduction policy separately`);
     }
     // Approved leave without an attendance row still counts:
     for (const l of feeds.leaves.filter((l) => l.employee_id === emp.id && l.status === 'approved'
@@ -149,8 +181,8 @@ export function assemblePayrollInputs(year: number, month: number, feeds: FeedBu
       const punched = !!(a.check_in_time || a.check_out_time);
       const st = (a.status || '').toLowerCase();
       let mismatch: ReconciliationRow['mismatch'] = null;
-      if ((st === 'absent') && punched) mismatch = 'ABSENT_BUT_PUNCHED';
-      else if ((st === 'present' || st === 'half_day') && !punched) mismatch = 'PRESENT_NO_PUNCH';
+      if ((st === 'a' || st === 'absent') && punched) mismatch = 'ABSENT_BUT_PUNCHED';
+      else if ((st === 'p' || st === 'l' || st === 'hl' || st === 'present' || st === 'half_day') && !punched) mismatch = 'PRESENT_NO_PUNCH';
       if (mismatch) reconciliation.push({
         empCode: emp.emp_code, date: a.date, adminStatus: a.status,
         punchIn: a.check_in_time, punchOut: a.check_out_time, mismatch,
