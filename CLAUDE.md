@@ -930,7 +930,11 @@ RLS); it returns only `auth_employee_id()`'s rows. **`PATCH_95_my_payslips_rpc` 
 ✅ applied live 20 Oct 2026 on Yash's approval** — EXECUTE: authenticated,
 postgres, service_role (Supabase default); anon/PUBLIC none. Live-checked as
 CON01 and VFL4072: 6 own slips each (Apr–Sep), 0 other employees' rows — dry-run tested in a rolled-back transaction as a
-real member (3 own months, 0 other employees' rows). The screen isn't in any APK yet (payroll branch).
+real member (3 own months, 0 other employees' rows). **Correction (Yash, 20 Oct 2026):** the Payslip row is already in More for
+all 7 roles in the installed app (apk-95). What's not shipped is the
+*repointed data source*: apk-95 still reads `payroll_records` (status
+'final', Apr–Aug 2026 only, no September). The `pay_run_items` version
+reaches phones only with an APK built after the payroll branch merges.
 
 Still open (PENDING.md): payroll tables open to every manager via `is_management()`;
 `audit_row_change` actor always NULL;
