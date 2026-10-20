@@ -1,4 +1,5 @@
 -- PATCH_91 — Monthly payroll input feeds: canteen, efficiency, society, adjustments.
+-- Applied: 2026-10-20 (live, via SQL, outside supabase_migrations)
 -- ADDITIVE ONLY. Mirrors the HR OS INPUT_* tab schemas 1:1 so history and habits carry over.
 -- Advances are NOT duplicated here: the existing advance_requests/salary_advances tables
 -- remain the source; the runner reads approved rows for the period.

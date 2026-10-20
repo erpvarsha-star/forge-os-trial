@@ -1,4 +1,5 @@
--- PATCH_89 — Pay run lifecycle, immutable results, status history, audit log.
+-- PATCH_94 — Pay run lifecycle, immutable results, status history, audit log.
+-- Renumbered 89 → 94 on 20 Oct 2026 (89 is taken by the production_records patch, 90 by the history seed, 93 by the arrears lock-down). Applied live 2026-10-20 (outside supabase_migrations).
 -- ADDITIVE ONLY: no existing table is dropped or rewritten.
 -- payroll_records stays the working table; pay runs snapshot into pay_run_items.
 

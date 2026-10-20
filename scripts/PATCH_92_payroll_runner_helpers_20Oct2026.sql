@@ -1,4 +1,5 @@
 -- PATCH_92 — Pay run runner support functions (20 Oct 2026)
+-- Applied: 2026-10-20 (live, via SQL, outside supabase_migrations)
 -- Additive only. House rules: no DELETEs, no changes to engine math.
 
 -- attach_arrears_sep26_30(item_id, amount):
