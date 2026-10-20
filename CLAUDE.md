@@ -941,6 +941,24 @@ production allowance by present days, sheet paid full ₹8,500; U6 salary
 master ≠ Sept sheet for VFL1389/1556/1566/5322/5442; U7 VFL5464 has no
 salary structure. Also held: 7 consultants (no structure), VFL1001 (all-zero
 structure), VFL5458–5462 (`ctc_annual=0`).
+**🔒 Decisions from Yash, 20 Oct 2026 on the findings:**
+- **U1 fix:** STAFF `FIXED_GROSS = basic / 0.40` (Basic is 40% of gross by
+  the decided component rule; components = gross × percentages). Never use
+  `ctc_annual` for staff gross — the DB's CTC figures are inflated vs the
+  sheet. The ~5 remaining mismatches are salary-record data issues (U6).
+- **U3 fix:** gender check accepts `female`/`f`, case-insensitive.
+- **U4 fix:** wire the PT-exempt flag through to the engine input.
+- All three in `lib/payroll/feedSync.ts` (source), then re-vendored.
+- **U2 (31- vs 30-day basis) and U5 (production allowance prorated by
+  present/working days) are frozen, ported engine rules verified against
+  real Sept 2026 payouts — never "fix" them.** The full ₹8,500 paid to
+  VFL4024 / VFL4033 were manual sheet exceptions; the app deliberately
+  doesn't reproduce one-off manual overrides. The 58-assertion regression
+  (`scripts/payroll-engine.sept2026.test.ts`, plus
+  `scripts/payroll-feedsync.test.ts`) is the arbiter — both must print
+  0 failed.
+- **U6/U7 and the 17 held employees are HR data**, not code: HR supplies
+  correct figures, applied as a small additive SQL patch.
 
 **Payslip tab repointed, 20 Oct 2026 (Yash's instruction; `f02fd13`, payroll
 branch).** It was blank because `hooks/usePayslips.ts` read the old

@@ -52,8 +52,10 @@ payroll-run). Next, in order: real pay-run test vs Sheet (Sept 2026; kit ready i
 `scripts/PAYROLL_TEST_SEP2026.md`, ⏳ Yash to run create→calculate→summary) → ✅ renumbered
 89→94 (`db81733`) → Sept offline engine test done (results on payroll branch): ⏳ fix U1
 staff gross ctc/12, U3 gender 'F' vs 'female', U4 ptExempt in feedSync;
-⏳ Yash/HR to decide U2 31-day basis, U5 prod-allowance proration, U6 5
-master mismatches, U7 VFL5464 no structure; consultants/VFL1001/VFL5458–62
+U2/U5 = frozen engine rules, not bugs (Yash); documented
+deviation: VFL4024/VFL4033 paid full ₹8,500 prod allowance by hand on the
+Sept sheet (manual exception, not reproduced by the app); ⏳ HR to supply
+correct figures for U6 (VFL1389/1556/1566/5322/5442) and U7 (VFL5464); consultants/VFL1001/VFL5458–62
 held for missing/zero masters. ✅ PATCH_95 `my_payslips()` applied + verified (payslip
 tab repointed in `f02fd13`; ⏳ needs a payroll-branch APK to see it) → payroll PR + 58-assertion regression before merge.
 
