@@ -154,7 +154,14 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease
+          # Package native libs for the two ARM ABIs only. The universal APK
+          # (armeabi-v7a + arm64-v8a + x86 + x86_64) was ~92 MB, which stalls
+          # at "Failed" in Chrome after downloading on weak connections.
+          # x86/x86_64 are emulator-only and useless on factory phones; keep
+          # BOTH ARM ABIs so 32-bit-userspace budget phones still install.
+          # -P overrides the reactNativeArchitectures that prebuild writes to
+          # android/gradle.properties (read by @react-native/gradle-plugin).
+          ./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a,arm64-v8a
 
       - name: Upload APK (workflow artifact, 14-day retention)
         uses: actions/upload-artifact@v4
