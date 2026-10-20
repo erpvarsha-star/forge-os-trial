@@ -888,7 +888,15 @@ Fixed 20 Oct 2026, on Yash's instructions, as normal commits (no rewrite):
   "--no-verify-jwt" is stale.
 - `lib/payroll/engine.ts` is frozen math — never edit.
 
-Still open (PENDING.md): `attach_arrears_sep26_30()` callable by anon;
+**Arrears helper lock-down — decision from Yash, 20 Oct 2026** ("lock down
+the arrears helper"). `attach_arrears_sep26_30()` is SECURITY DEFINER with
+no role check and was executable by PUBLIC/anon/authenticated. Its only
+caller is `payroll-run` (service-role client, after its own owner/hr_admin
+gate), so execute is revoked from PUBLIC, anon and authenticated and kept
+for service_role only (PATCH_93). Never re-grant it to app roles; if the
+app ever needs it, add a role check inside the function first.
+
+Still open (PENDING.md):
 payroll tables open to every manager via `is_management()`;
 `audit_row_change` actor always NULL; `payroll-feed-sync` not deployed;
 no real-device / real pay-run test yet.
