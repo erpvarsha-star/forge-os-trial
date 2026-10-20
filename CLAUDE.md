@@ -858,7 +858,7 @@ screens each built by a Sonnet agent, reviewed and live-tested by Claude.
 
 ## Payroll module (branch `claude/payroll-lifecycle`) — status 20 Oct 2026
 
-**✅ 21 Oct 2026 (follow-up PR): daily consultants + salary-sheet/bank-file download.**
+**✅ 21 Oct 2026 (PR #13, `aa4cb69`; `apk-97` built, published 20 Oct 22:23 UTC): daily consultants + salary-sheet/bank-file download.**
 `apk-96` (PR #9, `fe742e4`) built successfully, published 20 Oct 19:07 UTC.
 Then, on Yash's "finish everything" instruction: (1) feedSync now reads
 `rate_type`/`daily_rate` (PATCH_97) — consultants with `rate_type='daily'`

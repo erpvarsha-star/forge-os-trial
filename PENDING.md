@@ -47,7 +47,7 @@ README (`b5bb138`), i18n + payroll namespace (`ad00d1f`), engine
 vendored for Deno (`3ee6aa9`). (1) ✅ arrears RPC locked to service_role
 (PATCH_93, verified). ⏳ Still open: (5) manager-wide access; (6) audit actor NULL in the
 trigger (the runner now records `actor_emp_code` itself);
-**Payroll merged 21 Oct 2026 (PR #9, `fe742e4`, apk-96 ✅ built); follow-up PR: daily consultants wired + salary-sheet/bank-file download; `payroll-run` live v3.**
+**Payroll merged 21 Oct 2026 (PR #9, `fe742e4`, apk-96 ✅ built); PR #13 (`aa4cb69`): daily consultants wired + salary-sheet/bank-file download, `apk-97` ✅ built; `payroll-run` live v3.**
 ✅ Done: feedSync reads `rate_type`/`daily_rate` (daily consultants no longer held); `export` action + download buttons on HR Payroll Run.
 ⏳ Awaiting Yash/HR: (1) the bank's required upload format (current bank file = default layout); (2) consultants have no bank details in `employee_salary_structure` (blank cells + warning); (3) PATCH_96 repaired 23 consultant items with OT (owner said 24 — confirm the 24th); (4) U6 salary figures VFL1389/1556/1566/5322/5442 and U7 VFL5464; (5) find what keeps pushing "noop" commits that blank `payroll-run/index.ts` (4 times so far); (6) real-device test of payslip tab, Payroll Run/Feeds, Efficiency and the two downloads on the new APK; (7) manager-wide payroll table access via `is_management()`; (8) `audit_row_change` actor NULL; (9) November late-marking review.
 
