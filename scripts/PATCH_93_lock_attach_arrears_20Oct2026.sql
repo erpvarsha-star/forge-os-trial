@@ -1,4 +1,5 @@
 -- PATCH_93 -- lock attach_arrears_sep26_30 to service_role only (20 Oct 2026)
+-- Applied: 2026-10-20 (live, verified: anon/authenticated cannot execute, service_role can)
 --
 -- Why: public.attach_arrears_sep26_30(uuid, numeric) is SECURITY DEFINER with
 -- no role check and was executable by PUBLIC/anon/authenticated, so anyone

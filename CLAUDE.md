@@ -864,8 +864,14 @@ pay_periods/employee_status_history/audit_log/documents), PATCH_91 (feed
 tables) and PATCH_92 (`attach_arrears_sep26_30`) — is **already applied
 live**, outside `supabase_migrations`. ⚠ Number clash: a different,
 unrelated PATCH_89 (production_records process/dropout) lives on
-`claude/rea-installation-hpbxti`; there is no PATCH_90 — renumber the
-payroll one to 90 when the branches merge.
+`claude/rea-installation-hpbxti`. **Renumbered 20 Oct 2026 (Yash's
+instruction): payroll lifecycle is now `PATCH_94_payroll_lifecycle_20Oct2026.sql`**
+(commit `db81733`) — 89 stays with production_records (applied 17 Oct),
+90 is the history seed (`build-history-seed.ts` → `PATCH_90_history_seed.sql`,
+archived Apr–Sep runs), 93 is the arrears lock-down, 95 is the
+`my_payslips()` RPC. Old "PATCH_89" mentions in code comments
+(payroll-run, payRunStateMachine, PATCH_92, build-history-seed.ts) still
+mean the payroll lifecycle patch.
 
 Fixed 20 Oct 2026, on Yash's instructions, as normal commits (no rewrite):
 - `403f03b` — `payroll-run` restored after 7 placeholder commits + caller
@@ -902,8 +908,8 @@ deployed** — an earlier design; its logic (`feedSync`) is vendored inside
 (1) first real pay-run test — create a run for a test month, `calculate`,
 compare several employees against the Google Sheet figures, and nothing
 moves to `approved` before that comparison passes (Yash verifies the math
-with his own Supabase access); (2) renumber payroll PATCH_89 → 90 in the
-housekeeping commit; (3) payroll PR into the base branch, with the
+with his own Supabase access); (2) ✅ renumbered payroll PATCH_89 → 94
+(20 Oct, `db81733`); (3) payroll PR into the base branch, with the
 58-assertion regression run before merge.
 **Test setup — Yash's answers, 20 Oct 2026:** test month = **September
 2026** (archived sheet-imported runs exist to compare against; app

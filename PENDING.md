@@ -49,8 +49,8 @@ vendored for Deno (`3ee6aa9`). (1) ✅ arrears RPC locked to service_role
 trigger (the runner now records `actor_emp_code` itself); (7) renumber;
 `payroll-feed-sync` — not needed (Yash, 20 Oct: logic vendored in
 payroll-run). Next, in order: real pay-run test vs Sheet (Sept 2026; kit ready in
-`scripts/PAYROLL_TEST_SEP2026.md`, ⏳ Yash to run create→calculate→summary) → renumber
-89→90 → payroll PR + 58-assertion regression before merge.
+`scripts/PAYROLL_TEST_SEP2026.md`, ⏳ Yash to run create→calculate→summary) → ✅ renumbered
+89→94 (`db81733`) → payroll PR + 58-assertion regression before merge.
 
 **Check-in health check, 14 Oct 2026 (live DB + Sonnet code review, verified).**
 Working: 72–82 check-ins/day (of 99 active) 7–14 Oct, 64% via QR, 0 mock
