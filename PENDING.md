@@ -38,7 +38,7 @@ executable by anon/authenticated → can alter `pay_run_items` net pay;
 but the DB stores P/L/HL/WO/H/A → everyone would get 0 present days;
 (4) `payroll-run` reads `salary_advances`, app writes `advance_requests`;
 (5) payroll tables open to every manager via `is_management()`;
-(6) `audit_row_change` actor always NULL; (7) renumber payroll 89 → 90.
+(6) `audit_row_change` actor always NULL; (7) ✅ renumbered 89 → 94.
 **Update 20 Oct 2026:** (2) ✅ fixed — caller auth added (`403f03b`),
 `payroll-run` deployed v1 with `verify_jwt=true`, unauthenticated call
 → 401 verified. (3) ✅ fixed on the branch (`95fe94b`, P/L/HL/WO
@@ -46,11 +46,12 @@ mapping). (4) ✅ fixed — reads `advance_requests`. Branch repaired:
 README (`b5bb138`), i18n + payroll namespace (`ad00d1f`), engine
 vendored for Deno (`3ee6aa9`). (1) ✅ arrears RPC locked to service_role
 (PATCH_93, verified). ⏳ Still open: (5) manager-wide access; (6) audit actor NULL in the
-trigger (the runner now records `actor_emp_code` itself); (7) renumber;
+trigger (the runner now records `actor_emp_code` itself);
 `payroll-feed-sync` — not needed (Yash, 20 Oct: logic vendored in
 payroll-run). Next, in order: real pay-run test vs Sheet (Sept 2026; kit ready in
 `scripts/PAYROLL_TEST_SEP2026.md`, ⏳ Yash to run create→calculate→summary) → ✅ renumbered
-89→94 (`db81733`) → payroll PR + 58-assertion regression before merge.
+89→94 (`db81733`) → ⏳ apply PATCH_95 `my_payslips()` (Yash's OK; payslip
+tab repointed in `f02fd13`, dry-run tested) → payroll PR + 58-assertion regression before merge.
 
 **Check-in health check, 14 Oct 2026 (live DB + Sonnet code review, verified).**
 Working: 72–82 check-ins/day (of 99 active) 7–14 Oct, 64% via QR, 0 mock

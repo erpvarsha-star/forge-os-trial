@@ -918,6 +918,19 @@ for that reason, not the math). **Yash triggers the calls himself** with
 his own login; Claude only prepares the request bodies and the comparison
 query, and never calls `payroll-run` or moves a run past `calculated`.
 
+**Payslip tab repointed, 20 Oct 2026 (Yash's instruction; `f02fd13`, payroll
+branch).** It was blank because `hooks/usePayslips.ts` read the old
+`payroll_records` (Apr–Aug import only). Now reads `my_payslips()` →
+own `pay_run_items` for runs in **archived / paid / finalized**, mapped
+into the existing `PayrollRecord` shape (gross = totalEarnings; PF, ESI,
+PT, advance, TDS, canteen, society, MLWF lines; anything else →
+other_deduction; net = net_pay). `my_payslips()` is SECURITY DEFINER
+because employees can't read `pay_runs`/`pay_periods` (management-only
+RLS); it returns only `auth_employee_id()`'s rows. **`PATCH_95_my_payslips_rpc`
+is NOT yet applied** — dry-run tested in a rolled-back transaction as a
+real member (3 own months, 0 other employees' rows). Until it's applied
+the tab errors ("not yet issued"); the screen isn't in any APK yet.
+
 Still open (PENDING.md): payroll tables open to every manager via `is_management()`;
 `audit_row_change` actor always NULL;
 no real-device / real pay-run test yet.
