@@ -14,9 +14,9 @@
 // history runs are identified by status='archived' + pay_period month/year.
 // Feed tables (PATCH_91) are keyed by payroll_month TEXT 'YYYY-MM'.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { assemblePayrollInputs } from '../../../lib/payroll/feedSync.ts';
-import { calculateOne } from '../../../lib/payroll/engine.ts';
-import { PAY_RUN_TRANSITIONS } from '../../../lib/payroll/payRunStateMachine.ts';
+import { assemblePayrollInputs } from './lib/feedSync.ts';
+import { calculateOne } from './lib/engine.ts';
+import { PAY_RUN_TRANSITIONS } from './lib/payRunStateMachine.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
