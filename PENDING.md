@@ -47,6 +47,14 @@ README (`b5bb138`), i18n + payroll namespace (`ad00d1f`), engine
 vendored for Deno (`3ee6aa9`). (1) ✅ arrears RPC locked to service_role
 (PATCH_93, verified). ⏳ Still open: (5) manager-wide access; (6) audit actor NULL in the
 trigger (the runner now records `actor_emp_code` itself);
+**Payroll merged 21 Oct 2026 (PR #9, `fe742e4`); `payroll-run` live v2 (U1/U3/U4); `apk-96` building.**
+⏳ Next session: (1) feedSync must read `rate_type`/`daily_rate` (PATCH_97) — until then
+daily consultants (CON01/16/18/20/21/22/23/24) are held MISSING_RATE, safe not mispaid;
+(2) salary-sheet / bank-file download; (3) PATCH_96 repaired 23 consultant items with OT
+(owner said 24 — the 24th has no OT value live, confirm with owner); (4) find what keeps
+pushing "noop" commits that blank payroll-run/index.ts; (5) after apk-96 installs, test the
+payslip tab, HR Payroll Run/Feeds and plant-head Efficiency on a real device.
+
 `payroll-feed-sync` — not needed (Yash, 20 Oct: logic vendored in
 payroll-run). Next, in order: real pay-run test vs Sheet (Sept 2026; kit ready in
 `scripts/PAYROLL_TEST_SEP2026.md`, ⏳ Yash to run create→calculate→summary) → ✅ renumbered

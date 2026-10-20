@@ -858,6 +858,24 @@ screens each built by a Sonnet agent, reviewed and live-tested by Claude.
 
 ## Payroll module (branch `claude/payroll-lifecycle`) — status 20 Oct 2026
 
+**✅ MERGED 21 Oct 2026 — PR #9 squash-merged into this branch as `fe742e4`**
+(engine, runner, feeds, HR payroll-run/feeds screens, plant-head efficiency
+screen, payslip tab on `my_payslips()`, patches 91–92 and 94–98 recorded).
+Pre-merge gate on the merged tree: regression 58/0, feedsync 16/0, tsc 7
+(baseline), i18n clean, 0 conflicts. **`payroll-run` live = v2** (carries
+U1+U3+U4, `verify_jwt` true; unauthenticated call → 401). APK build
+`apk-96` queued off the merge commit. The three new screens
+(`payroll-run`, `payroll-feeds`, `efficiency`) were missing from their
+`_layout.tsx` and would have leaked as stray tabs — declared `href: null`
+before merge (the locked layout rule). **Not in this APK:** salary-sheet /
+bank-file download, and daily-consultant wiring (feedSync ignores
+`rate_type`/`daily_rate` → CON01/16/18/20/21/22/23/24 are held as
+MISSING_RATE, never mispaid). Stray "noop" commits blanking
+`payroll-run/index.ts` came from the erpvarsha-star account three times
+(`ab7c907`, `d825fa1`/`e5748d4`, `d7bc15b`); squash-merge removed them from
+this branch's history, but check the deployed function's source after any
+future redeploy.
+
 Built in other sessions on `claude/payroll-lifecycle` (not merged into
 this branch). Its SQL — payroll PATCH_89 (pay_runs/pay_run_items/
 pay_periods/employee_status_history/audit_log/documents), PATCH_91 (feed
