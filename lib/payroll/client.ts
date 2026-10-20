@@ -22,6 +22,35 @@ export interface RunSummary {
   byCategory: Record<string, { count: number; gross: number; net: number }>
 }
 
+export interface ExportSalaryRow {
+  empCode: string
+  name: string
+  category: string | null
+  worked: number | null
+  earnings: Record<string, number>
+  deductions: Record<string, number>
+  totalEarnings: number
+  totalDeductions: number
+  netPay: number
+}
+
+export interface ExportBankRow {
+  empCode: string
+  name: string
+  netPay: number
+  bankName: string | null
+  accountNo: string | null
+  ifsc: string | null
+}
+
+export interface PayRunExport {
+  month: number
+  year: number
+  runName: string
+  salaryRows: ExportSalaryRow[]
+  bankRows: ExportBankRow[]
+}
+
 export async function payrollRun<T = any>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
   const { data, error } = await supabase.functions.invoke('payroll-run', { body: { action, ...payload } })
   if (error) throw new Error(error.message)
@@ -37,3 +66,5 @@ export const PAYROLL_MONTH_LABEL = (month: number, year: number) => {
   const names = ['January','February','March','April','May','June','July','August','September','October','November','December']
   return `${names[month - 1]} ${year}`
 }
+
+export const exportPayRun = (payRunId: string) => payrollRun<PayRunExport>('export', { payRunId })

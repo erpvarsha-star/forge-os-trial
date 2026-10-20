@@ -858,6 +858,26 @@ screens each built by a Sonnet agent, reviewed and live-tested by Claude.
 
 ## Payroll module (branch `claude/payroll-lifecycle`) — status 20 Oct 2026
 
+**✅ 21 Oct 2026 (follow-up PR): daily consultants + salary-sheet/bank-file download.**
+`apk-96` (PR #9, `fe742e4`) built successfully, published 20 Oct 19:07 UTC.
+Then, on Yash's "finish everything" instruction: (1) feedSync now reads
+`rate_type`/`daily_rate` (PATCH_97) — consultants with `rate_type='daily'`
+get `DAILY_RATE`, so CON01/16/18/20/21/22/23/24 are no longer held; a daily
+row with no usable rate stays held (MISSING_RATE + warning), never guessed;
+(2) `payroll-run` has a new `export` action (owner/hr_admin only; run must be
+finalized / payment_file_generated / paid / archived) and the HR Payroll Run
+screen has "Download salary sheet" / "Download bank file" buttons
+(`lib/payroll/exportCsv.ts`, expo-file-system + expo-sharing, no new deps).
+Bank details come from `employee_salary_structure` (`bank_name`, `account_no`,
+`ifsc`; 85 of 108 rows have them — the 12 consultant rows from PATCH_97 do
+not, so consultants appear in the bank file with blank bank cells and the
+screen warns with a count). **The bank file layout is a DEFAULT (emp code,
+name, bank, account, IFSC, net pay, narration) awaiting the format Yash's bank
+requires.** `payroll-run` redeployed **v3** (`verify_jwt` true, deployed source
+byte-identical to the repo, unauthenticated call → 401). Tests: regression
+58/0, feedsync 22/0, export 15/0, tsc 7 (baseline), i18n clean. Not yet
+exercised on a real device or against a real finalized run.
+
 **✅ MERGED 21 Oct 2026 — PR #9 squash-merged into this branch as `fe742e4`**
 (engine, runner, feeds, HR payroll-run/feeds screens, plant-head efficiency
 screen, payslip tab on `my_payslips()`, patches 91–92 and 94–98 recorded).
@@ -867,10 +887,8 @@ U1+U3+U4, `verify_jwt` true; unauthenticated call → 401). APK build
 `apk-96` queued off the merge commit. The three new screens
 (`payroll-run`, `payroll-feeds`, `efficiency`) were missing from their
 `_layout.tsx` and would have leaked as stray tabs — declared `href: null`
-before merge (the locked layout rule). **Not in this APK:** salary-sheet /
-bank-file download, and daily-consultant wiring (feedSync ignores
-`rate_type`/`daily_rate` → CON01/16/18/20/21/22/23/24 are held as
-MISSING_RATE, never mispaid). Stray "noop" commits blanking
+before merge (the locked layout rule). **Not in apk-96:** salary-sheet / bank-file
+download and daily-consultant wiring (both added in the follow-up PR above). Stray "noop" commits blanking
 `payroll-run/index.ts` came from the erpvarsha-star account three times
 (`ab7c907`, `d825fa1`/`e5748d4`, `d7bc15b`); squash-merge removed them from
 this branch's history, but check the deployed function's source after any

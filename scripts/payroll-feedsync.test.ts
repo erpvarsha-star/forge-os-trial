@@ -1,5 +1,6 @@
 /** Feed sync unit test — no DB, fabricated rows. Run: npx tsx scripts/payroll-feedsync.test.ts */
-import { assemblePayrollInputs, mapCategory, FeedBundle } from '../lib/payroll/feedSync';
+import { assemblePayrollInputs, mapCategory, FeedBundle, SalaryRow } from '../lib/payroll/feedSync';
+import { calculateOne } from '../lib/payroll/engine';
 
 let pass = 0, fail = 0;
 const check = (n: string, c: boolean, d = '') => { c ? (pass++, console.log(`  ok  ${n}`)) : (fail++, console.log(`FAIL  ${n} ${d}`)); };
@@ -64,6 +65,48 @@ check('mapCategory: worker/staff/pune/consultant',
   && mapCategory(bundle.employees[1]) === 'STAFF'
   && mapCategory(bundle.employees[2]) === 'PUNE_STAFF'
   && mapCategory({ ...bundle.employees[0], category: 'consultant' }) === 'CONSULTANT');
+
+// --- Consultant daily-rate support (PATCH_97) ---
+const emptySal = { basic: null, hra: null, conveyance: null, washing: null, education: null, heat_allow: null, vda: null, production_allow: null, medical: null, professional_development: null, communication: null, uniform: null };
+const conSal = (id: string, extra: Partial<SalaryRow>): SalaryRow =>
+  ({ employee_id: id, effective_from: '2026-04-01', is_active: true, ...emptySal, ctc_annual: 0, ...extra });
+const conEmp = (id: string, code: string) =>
+  ({ id, emp_code: code, name: code, category: 'consultant', work_location: 'Aurangabad', gender: 'M', is_active: true, weekly_off_day: null });
+const presentDays = (id: string, n: number, ot = 0) =>
+  Array.from({ length: n }, (_, i) => ({
+    employee_id: id, date: `2026-10-${String(i + 1).padStart(2, '0')}`, status: 'present',
+    overtime_hours: i === 0 ? ot : 0, check_in_time: null, check_out_time: null,
+  }));
+const conBundle: FeedBundle = {
+  employees: [conEmp('c1', 'CON01'), conEmp('c2', 'CON16'), conEmp('c3', 'CON05'), conEmp('c4', 'CON18')],
+  salaries: [
+    conSal('c1', { rate_type: 'daily', daily_rate: 700 }),
+    conSal('c2', { rate_type: 'Daily', daily_rate: 700 }),
+    conSal('c3', { rate_type: 'monthly', daily_rate: null, ctc_annual: 240000 }),
+    conSal('c4', { rate_type: 'daily', daily_rate: null }),
+  ],
+  attendance: [...presentDays('c1', 20), ...presentDays('c2', 20, 2), ...presentDays('c3', 20), ...presentDays('c4', 20)],
+  punches: [], leaves: [], advances: [], canteen: [], society: [], efficiency: [], statusEvents: [],
+};
+const cr = assemblePayrollInputs(2026, 10, conBundle);
+const cIn = (code: string) => cr.inputs.find((i) => i.empCode === code)!;
+
+const c1 = cIn('CON01');
+const c1r = calculateOne(c1);
+check('daily consultant: DAILY_RATE 700', c1.rateProfile?.basis === 'DAILY_RATE' && c1.rateProfile?.rateAmount === 700);
+check('daily consultant: 20 days -> GROSS 14000, not held', c1r.earnings.GROSS === 14000 && !c1r.held, JSON.stringify(c1r));
+
+const c2r = calculateOne(cIn('CON16'));
+check('daily consultant + 2 OT hrs: not held, otPay 175', !c2r.held && c2r.otPay === 175, JSON.stringify(c2r));
+
+const c3 = cIn('CON05');
+check('monthly consultant unchanged: MONTHLY_GROSS_PRORATED 20000',
+  c3.rateProfile?.basis === 'MONTHLY_GROSS_PRORATED' && c3.rateProfile?.monthlyGross === 20000);
+
+const c4 = cIn('CON18');
+const c4r = calculateOne(c4);
+check('daily with null daily_rate -> held MISSING_RATE', c4r.held && c4r.blockers.includes('MISSING_RATE'), JSON.stringify(c4r));
+check('daily with null daily_rate -> warning', cr.warnings.includes('CON18: daily rate missing'));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

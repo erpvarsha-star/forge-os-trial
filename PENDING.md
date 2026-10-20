@@ -47,13 +47,9 @@ README (`b5bb138`), i18n + payroll namespace (`ad00d1f`), engine
 vendored for Deno (`3ee6aa9`). (1) ✅ arrears RPC locked to service_role
 (PATCH_93, verified). ⏳ Still open: (5) manager-wide access; (6) audit actor NULL in the
 trigger (the runner now records `actor_emp_code` itself);
-**Payroll merged 21 Oct 2026 (PR #9, `fe742e4`); `payroll-run` live v2 (U1/U3/U4); `apk-96` building.**
-⏳ Next session: (1) feedSync must read `rate_type`/`daily_rate` (PATCH_97) — until then
-daily consultants (CON01/16/18/20/21/22/23/24) are held MISSING_RATE, safe not mispaid;
-(2) salary-sheet / bank-file download; (3) PATCH_96 repaired 23 consultant items with OT
-(owner said 24 — the 24th has no OT value live, confirm with owner); (4) find what keeps
-pushing "noop" commits that blank payroll-run/index.ts; (5) after apk-96 installs, test the
-payslip tab, HR Payroll Run/Feeds and plant-head Efficiency on a real device.
+**Payroll merged 21 Oct 2026 (PR #9, `fe742e4`, apk-96 ✅ built); follow-up PR: daily consultants wired + salary-sheet/bank-file download; `payroll-run` live v3.**
+✅ Done: feedSync reads `rate_type`/`daily_rate` (daily consultants no longer held); `export` action + download buttons on HR Payroll Run.
+⏳ Awaiting Yash/HR: (1) the bank's required upload format (current bank file = default layout); (2) consultants have no bank details in `employee_salary_structure` (blank cells + warning); (3) PATCH_96 repaired 23 consultant items with OT (owner said 24 — confirm the 24th); (4) U6 salary figures VFL1389/1556/1566/5322/5442 and U7 VFL5464; (5) find what keeps pushing "noop" commits that blank `payroll-run/index.ts` (4 times so far); (6) real-device test of payslip tab, Payroll Run/Feeds, Efficiency and the two downloads on the new APK; (7) manager-wide payroll table access via `is_management()`; (8) `audit_row_change` actor NULL; (9) November late-marking review.
 
 `payroll-feed-sync` — not needed (Yash, 20 Oct: logic vendored in
 payroll-run). Next, in order: real pay-run test vs Sheet (Sept 2026; kit ready in
