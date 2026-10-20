@@ -44,8 +44,8 @@ but the DB stores P/L/HL/WO/H/A → everyone would get 0 present days;
 → 401 verified. (3) ✅ fixed on the branch (`95fe94b`, P/L/HL/WO
 mapping). (4) ✅ fixed — reads `advance_requests`. Branch repaired:
 README (`b5bb138`), i18n + payroll namespace (`ad00d1f`), engine
-vendored for Deno (`3ee6aa9`). ⏳ Still open: (1) 🔴 arrears RPC
-anon-callable; (5) manager-wide access; (6) audit actor NULL in the
+vendored for Deno (`3ee6aa9`). (1) ✅ arrears RPC locked to service_role
+(PATCH_93, verified). ⏳ Still open: (5) manager-wide access; (6) audit actor NULL in the
 trigger (the runner now records `actor_emp_code` itself); (7) renumber;
 `payroll-feed-sync` not deployed; first real pay run untested.
 

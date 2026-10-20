@@ -896,8 +896,7 @@ gate), so execute is revoked from PUBLIC, anon and authenticated and kept
 for service_role only (PATCH_93). Never re-grant it to app roles; if the
 app ever needs it, add a role check inside the function first.
 
-Still open (PENDING.md):
-payroll tables open to every manager via `is_management()`;
+Still open (PENDING.md): payroll tables open to every manager via `is_management()`;
 `audit_row_change` actor always NULL; `payroll-feed-sync` not deployed;
 no real-device / real pay-run test yet.
 
@@ -1115,6 +1114,7 @@ Two separate fixes, both same day:
 | `PATCH_86_weekly_off_marking_11Oct2026.sql` | `mark_weekly_offs()` + daily cron: weekly-off days written as `WO` (Friday; Kajal Sunday), never absent; backfilled 1–11 Oct | ✅ Applied 11 Oct 2026 — verified live, check-in overwrite tested |
 | `PATCH_88_checkin_reliability_14Oct2026.sql` | `check_in/out_accuracy_m` columns + `server_now()` RPC for the check-in reliability fixes | ✅ Applied 14 Oct 2026 |
 | `PATCH_87_fazal_monthly_form_reminder_on_11Oct2026.sql` | Turns on the 1st–5th reminder for Fazal's monthly form ("Worker Monthly Efficiency") — PATCH_66's insert had been silently skipped | ✅ Applied 11 Oct 2026 |
+| `PATCH_93_lock_attach_arrears_20Oct2026.sql` | Revokes execute on the payroll branch's `attach_arrears_sep26_30()` from PUBLIC/anon/authenticated; service_role only (its one caller, `payroll-run`) | ✅ Applied 20 Oct 2026 — verified anon/authenticated false, service_role true |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
