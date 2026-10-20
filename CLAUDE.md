@@ -39,6 +39,14 @@ checks, re-read the diff, re-check live data) before telling Yash
 something is done. This doesn't apply retroactively to work already in
 flight — apply it going forward.
 
+**Re-stated by Yash, 20 Oct 2026** ("agents that you use are to be in
+Sonnet") after Claude hand-edited `payroll-run/index.ts` itself instead of
+delegating. No size exception: **every** code edit, research sweep, review
+or deploy step — even a three-line fix with the exact code supplied — goes
+to an Agent call with `model: "sonnet"` (Haiku only for trivial file
+reads). Claude itself only plans, briefs, verifies (diff/tsc/live SQL), and
+does git/doc bookkeeping. Never spawn an agent without setting `model`.
+
 **Keep `PENDING.md` current** — it is the shared checklist of what is
 outstanding, blocked, or untested. Update it before the final push of any
 session.
