@@ -856,6 +856,43 @@ screens each built by a Sonnet agent, reviewed and live-tested by Claude.
   on Yash's phone (apk-94), 11 Oct 2026** — keep this patch; if a future
   screen clips again, check it isn't overriding fontFamily first.
 
+## Payroll module (branch `claude/payroll-lifecycle`) — status 20 Oct 2026
+
+Built in other sessions on `claude/payroll-lifecycle` (not merged into
+this branch). Its SQL — payroll PATCH_89 (pay_runs/pay_run_items/
+pay_periods/employee_status_history/audit_log/documents), PATCH_91 (feed
+tables) and PATCH_92 (`attach_arrears_sep26_30`) — is **already applied
+live**, outside `supabase_migrations`. ⚠ Number clash: a different,
+unrelated PATCH_89 (production_records process/dropout) lives on
+`claude/rea-installation-hpbxti`; there is no PATCH_90 — renumber the
+payroll one to 90 when the branches merge.
+
+Fixed 20 Oct 2026, on Yash's instructions, as normal commits (no rewrite):
+- `403f03b` — `payroll-run` restored after 7 placeholder commits + caller
+  auth (JWT → employee; owner/hr_admin all actions, plant_head `summary`
+  only, else 403), advances read from `advance_requests` (not the empty
+  `salary_advances`), `actor_emp_code` in every `audit_log` row.
+- `b5bb138` README restored; `ad00d1f` i18n restored from this branch's
+  files + 100-key `payroll.*` namespace (EN/HI, check-i18n clean).
+- `3ee6aa9` engine vendored into `supabase/functions/payroll-run/lib/`
+  (engine, types, lifecycle, feedSync, payRunStateMachine — header
+  comment + `.ts` import specifiers only). **`lib/payroll/` is the
+  source; never edit the vendored copies — edit the source and re-vendor.**
+- **`payroll-run` deployed live 20 Oct 2026, version 1, `verify_jwt=true`**
+  (gateway JWT check + in-function role gate). Verified: unauthenticated
+  POST → 401 (sent via `pg_net` from the DB, since this sandbox's proxy
+  blocks the functions host). Deployed via the MCP tool, not CI — it is
+  **not in `deploy.sh`**, and the Deploy workflow doesn't run for that
+  branch, so a redeploy must also go through the MCP tool (keep
+  `verify_jwt` true). The comment in its `index.ts` saying
+  "--no-verify-jwt" is stale.
+- `lib/payroll/engine.ts` is frozen math — never edit.
+
+Still open (PENDING.md): `attach_arrears_sep26_30()` callable by anon;
+payroll tables open to every manager via `is_management()`;
+`audit_row_change` actor always NULL; `payroll-feed-sync` not deployed;
+no real-device / real pay-run test yet.
+
 ## Owner has no KPI tab — decision from Yash, 28 Sep 2026
 
 Redundant with `dashboard/index.html` (the plant HTML dashboard, which

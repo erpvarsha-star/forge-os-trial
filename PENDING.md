@@ -39,6 +39,15 @@ but the DB stores P/L/HL/WO/H/A → everyone would get 0 present days;
 (4) `payroll-run` reads `salary_advances`, app writes `advance_requests`;
 (5) payroll tables open to every manager via `is_management()`;
 (6) `audit_row_change` actor always NULL; (7) renumber payroll 89 → 90.
+**Update 20 Oct 2026:** (2) ✅ fixed — caller auth added (`403f03b`),
+`payroll-run` deployed v1 with `verify_jwt=true`, unauthenticated call
+→ 401 verified. (3) ✅ fixed on the branch (`95fe94b`, P/L/HL/WO
+mapping). (4) ✅ fixed — reads `advance_requests`. Branch repaired:
+README (`b5bb138`), i18n + payroll namespace (`ad00d1f`), engine
+vendored for Deno (`3ee6aa9`). ⏳ Still open: (1) 🔴 arrears RPC
+anon-callable; (5) manager-wide access; (6) audit actor NULL in the
+trigger (the runner now records `actor_emp_code` itself); (7) renumber;
+`payroll-feed-sync` not deployed; first real pay run untested.
 
 **Check-in health check, 14 Oct 2026 (live DB + Sonnet code review, verified).**
 Working: 72–82 check-ins/day (of 99 active) 7–14 Oct, 64% via QR, 0 mock
