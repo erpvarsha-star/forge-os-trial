@@ -2529,7 +2529,13 @@ acceptable fallback. **21 Oct 2026: `apk-97` (92.26 MB, universal APK with 4
 CPU ABIs) downloaded to 100% on Yash's phone and then showed "Failed" in both
 Chrome and the GitHub app, even after freeing storage** (server side verified
 fine: checksum matches, 1,292-file valid zip, links work unauthenticated).
-Fix in progress: ship an arm64-only APK (~35–40 MB).
+**Same day, Yash: the app's own update check shows "version 97, up to date" —
+so apk-97 IS installed on his phone** (the Chrome "Failed" was not a
+blocker; the install evidently came through another route, likely the file
+sent in chat). Precautionary change still merged: PR #14 (`7cf1127`) builds
+`apk-98` with ARM ABIs only (`-PreactNativeArchitectures=armeabi-v7a,arm64-v8a`),
+a smaller download with **no app-code change** — optional update, not needed
+for the payroll features. Size of apk-98 not yet checked.
 
 **Distribution: direct download link, no Play Store.** Every successful CI run auto-publishes to a GitHub Release. Stable permanent link for WhatsApp/anywhere — always resolves to the newest build:
 `https://github.com/erpvarsha-star/forge-os-trial/releases/latest/download/app-release.apk`
