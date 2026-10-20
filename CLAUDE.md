@@ -858,6 +858,8 @@ screens each built by a Sonnet agent, reviewed and live-tested by Claude.
 
 ## Payroll module (branch `claude/payroll-lifecycle`) — status 20 Oct 2026
 
+**Consultant bank details + PAN loaded by Yash directly in the DB, 21 Oct 2026** (parsed from a PDF with mangled columns; **values deliberately not in this file or any repo file — this repo is public**): `employee_salary_structure` now has bank_name/account_no/ifsc/pan for **CON05, CON09, CON12, CON13, CON16, CON18, CON24**; **CON01, CON20, CON21, CON22, CON23 have none** and stay blank-flagged in the bank file. ⚠ **Verify those 7 account numbers against passbooks before the first real bank upload**, and spot-check 2–3 staff accounts. ⚠ **Exposure found same day:** `employee_salary_structure` SELECT policy is `employee_id = current_employee_id() OR is_management()` — so **every manager/plant_head/hr_admin/owner (including CON12, a consultant with role=manager) can read every employee's bank account, PAN and UAN**. Tightening to owner/hr_admin(/plant_head) is therefore no longer low priority (see PENDING.md); not yet done — needs a check of which screens read this table first.
+
 **✅ 21 Oct 2026 (PR #13, `aa4cb69`; `apk-97` built, published 20 Oct 22:23 UTC): daily consultants + salary-sheet/bank-file download.**
 `apk-96` (PR #9, `fe742e4`) built successfully, published 20 Oct 19:07 UTC.
 Then, on Yash's "finish everything" instruction: (1) feedSync now reads
@@ -2556,7 +2558,7 @@ blocker; the install evidently came through another route, likely the file
 sent in chat). Precautionary change still merged: PR #14 (`7cf1127`) builds
 `apk-98` with ARM ABIs only (`-PreactNativeArchitectures=armeabi-v7a,arm64-v8a`),
 a smaller download with **no app-code change** — optional update, not needed
-for the payroll features. Size of apk-98 not yet checked.
+for the payroll features. **Real size of apk-98: 88.35 MB** (vs 92.26 MB) — dropping x86/x86_64 saved only ~4 MB, so the ~55 MB estimate was wrong; the ARM libraries dominate. A materially smaller APK would need a different approach (e.g. per-ABI split APKs or trimming assets), not done.
 
 **Distribution: direct download link, no Play Store.** Every successful CI run auto-publishes to a GitHub Release. Stable permanent link for WhatsApp/anywhere — always resolves to the newest build:
 `https://github.com/erpvarsha-star/forge-os-trial/releases/latest/download/app-release.apk`
