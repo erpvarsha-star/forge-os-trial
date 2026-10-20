@@ -90,12 +90,15 @@ function pickSalary(rows: SalaryRow[], employeeId: string, asOf: string): Salary
   return mine[0] ?? null;
 }
 
-function mastersFrom(s: SalaryRow): SalaryMasters {
+function mastersFrom(s: SalaryRow, cat: PayCategory): SalaryMasters {
+  // STAFF: Basic is 40% of the fixed monthly gross (decided component rule), so gross = basic / 0.40.
+  // ctc_annual/12 is NOT used for staff (it includes employer contributions). Null/0 basic -> undefined (held).
+  const staffGross = s.basic ? s.basic / 0.40 : undefined;
   return {
     BASIC: s.basic ?? undefined, HRA: s.hra ?? undefined, CONVEYANCE: s.conveyance ?? undefined,
     WASHING: s.washing ?? undefined, EDUCATION: s.education ?? undefined,
     HEAT: s.heat_allow ?? undefined,
-    FIXED_GROSS: s.ctc_annual ? s.ctc_annual / 12 : undefined,
+    FIXED_GROSS: cat === 'STAFF' ? staffGross : (s.ctc_annual ? s.ctc_annual / 12 : undefined),
   };
 }
 
@@ -220,13 +223,13 @@ export function assemblePayrollInputs(year: number, month: number, feeds: FeedBu
 
     inputs.push({
       empCode: emp.emp_code, category: cat, month, year, workingDays: wd,
-      masters: cat === 'STAFF' || cat === 'PERMANENT_WORKER' ? (sal ? mastersFrom(sal) : undefined) : undefined,
+      masters: cat === 'STAFF' || cat === 'PERMANENT_WORKER' ? (sal ? mastersFrom(sal, cat) : undefined) : undefined,
       rateProfile: cat === 'CONSULTANT' || cat === 'PUNE_STAFF'
         ? { basis: 'MONTHLY_GROSS_PRORATED', monthlyGross: sal?.ctc_annual ? sal.ctc_annual / 12 : undefined }
         : undefined,
       days: day, otHours, efficiencyPct,
       deductions: { canteen, society, advance, other: otherDeduction || undefined },
-      gender: emp.gender === 'F' ? 'F' : 'M',
+      gender: (() => { const g = (emp.gender ?? '').trim().toLowerCase(); return g === 'female' || g === 'f' ? 'F' : 'M'; })(),
     });
   }
 
