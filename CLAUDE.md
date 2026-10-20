@@ -2520,6 +2520,17 @@ exercised on a real device** — screen behind auth. New APK build needed
 
 ## App build
 
+**🔒 Update rule — Yash, 21 Oct 2026:** "my rule is to only download the latest
+version of the app and give you feedback of the things that you have built
+before the update." Yash only ever installs the **newest** APK, then tests and
+reports back on everything built since his previous install. So the latest
+`apk-N` must always download and install cleanly — an older build is never an
+acceptable fallback. **21 Oct 2026: `apk-97` (92.26 MB, universal APK with 4
+CPU ABIs) downloaded to 100% on Yash's phone and then showed "Failed" in both
+Chrome and the GitHub app, even after freeing storage** (server side verified
+fine: checksum matches, 1,292-file valid zip, links work unauthenticated).
+Fix in progress: ship an arm64-only APK (~35–40 MB).
+
 **Distribution: direct download link, no Play Store.** Every successful CI run auto-publishes to a GitHub Release. Stable permanent link for WhatsApp/anywhere — always resolves to the newest build:
 `https://github.com/erpvarsha-star/forge-os-trial/releases/latest/download/app-release.apk`
 
