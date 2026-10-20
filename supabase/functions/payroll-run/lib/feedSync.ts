@@ -26,6 +26,7 @@ export interface EmployeeRow {
   id: string; emp_code: string; name: string; category: string; // staff|worker|consultant (lowercase in DB)
   work_location: string | null;   // 'Aurangabad' (=Waluj) | 'Pune'
   gender: string | null; is_active: boolean; weekly_off_day: number | null;
+  pt_exempt?: boolean | null;     // PATCH_98 — Maharashtra PT exemption list
 }
 export interface SalaryRow {
   employee_id: string; effective_from: string; is_active: boolean;
@@ -230,6 +231,7 @@ export function assemblePayrollInputs(year: number, month: number, feeds: FeedBu
         : undefined,
       days: day, otHours, efficiencyPct,
       deductions: { canteen, society, advance, other: otherDeduction || undefined },
+      ptExempt: emp.pt_exempt === true,
       gender: (() => { const g = (emp.gender ?? '').trim().toLowerCase(); return g === 'female' || g === 'f' ? 'F' : 'M'; })(),
     });
   }
