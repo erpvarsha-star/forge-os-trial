@@ -924,6 +924,23 @@ Node from the payroll worktree, compare with the archived Sept
 `pay_run_items`, spot-check PF/ESI/PT on 3 staff (PF 12% of min(Basic,
 15000) capped 1800; ESI only if gross ≤ 21000; Maharashtra PT ₹200 in
 September), save `scripts/PAYROLL_TEST_SEP2026_RESULTS.md` (payroll branch).
+**Result (20 Oct 2026, results file on payroll branch):** engine *calculation*
+math is sound — with the sheet's days/OT/85% efficiency injected, workers
+match the sheet (Basic 19/19, gross within ~0.2%); PF (12% of prorated
+Basic+Conveyance+Education+Medical when ≤15000, else flat 1800), ESI
+(0.75% when fixed gross ≤21000) and PT (0 ≤7500 / 175 ≤10000 / else 200;
+300 in Feb) all check out on 3 staff. **Feed-mapping defects found — nothing
+past `calculated` until U1/U3/U4 are fixed in `lib/payroll/feedSync.ts`
+(edit source, re-vendor):** U1 staff FIXED_GROSS = `ctc_annual/12`, 10–16%
+above sheet gross for 61/68 staff (Basic/0.40 matches the sheet for 63/68)
+— inflates gross/PF/OT and drops ESI; U3 code checks `gender === 'F'` but
+DB stores `female`/`male` → women's PT exemption never applies; U4
+`ptExempt` never set. **Need Yash/HR decisions:** U2 sheet uses 31-day
+basis for staff in a 30-day month (engine 30); U5 engine prorates worker
+production allowance by present days, sheet paid full ₹8,500; U6 salary
+master ≠ Sept sheet for VFL1389/1556/1566/5322/5442; U7 VFL5464 has no
+salary structure. Also held: 7 consultants (no structure), VFL1001 (all-zero
+structure), VFL5458–5462 (`ctc_annual=0`).
 
 **Payslip tab repointed, 20 Oct 2026 (Yash's instruction; `f02fd13`, payroll
 branch).** It was blank because `hooks/usePayslips.ts` read the old

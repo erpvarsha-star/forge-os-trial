@@ -50,7 +50,11 @@ trigger (the runner now records `actor_emp_code` itself);
 `payroll-feed-sync` — not needed (Yash, 20 Oct: logic vendored in
 payroll-run). Next, in order: real pay-run test vs Sheet (Sept 2026; kit ready in
 `scripts/PAYROLL_TEST_SEP2026.md`, ⏳ Yash to run create→calculate→summary) → ✅ renumbered
-89→94 (`db81733`) → ✅ PATCH_95 `my_payslips()` applied + verified (payslip
+89→94 (`db81733`) → Sept offline engine test done (results on payroll branch): ⏳ fix U1
+staff gross ctc/12, U3 gender 'F' vs 'female', U4 ptExempt in feedSync;
+⏳ Yash/HR to decide U2 31-day basis, U5 prod-allowance proration, U6 5
+master mismatches, U7 VFL5464 no structure; consultants/VFL1001/VFL5458–62
+held for missing/zero masters. ✅ PATCH_95 `my_payslips()` applied + verified (payslip
 tab repointed in `f02fd13`; ⏳ needs a payroll-branch APK to see it) → payroll PR + 58-assertion regression before merge.
 
 **Check-in health check, 14 Oct 2026 (live DB + Sonnet code review, verified).**
