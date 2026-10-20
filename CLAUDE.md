@@ -926,8 +926,8 @@ into the existing `PayrollRecord` shape (gross = totalEarnings; PF, ESI,
 PT, advance, TDS, canteen, society, MLWF lines; anything else →
 other_deduction; net = net_pay). `my_payslips()` is SECURITY DEFINER
 because employees can't read `pay_runs`/`pay_periods` (management-only
-RLS); it returns only `auth_employee_id()`'s rows. **`PATCH_95_my_payslips_rpc`
-is NOT yet applied** — dry-run tested in a rolled-back transaction as a
+RLS); it returns only `auth_employee_id()`'s rows. **`PATCH_95_my_payslips_rpc` —
+Yash approved applying it live, 20 Oct 2026** (was: not yet applied) — dry-run tested in a rolled-back transaction as a
 real member (3 own months, 0 other employees' rows). Until it's applied
 the tab errors ("not yet issued"); the screen isn't in any APK yet.
 
