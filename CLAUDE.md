@@ -970,6 +970,18 @@ structure), VFL5458–5462 (`ctc_annual=0`).
   decision where the exempt list (VFL4021/VFL4014/VFL4063) lives.
   ⚠ The live `payroll-run` (v1) still has the old feedSync — redeploy only
   when asked.
+- **U4 decision (Yash, 20 Oct 2026):** `employees.pt_exempt boolean NOT NULL
+  DEFAULT false` (additive PATCH_98), true for VFL4021, VFL4014, VFL4063
+  (owner-approved exempt list); wired through feedSync to the engine's
+  `ptExempt`; the runner's employee select gains `pt_exempt`. **Redeploy of
+  `payroll-run` happens once, together with U1/U3/U4, only when Yash says.**
+- **Negative net = held, never written:** engine.ts:168 — `net < 0` →
+  blocker NET_NEGATIVE, `held = true`, `netPay = null`; the runner writes no
+  pay_run_item for held employees. No code change (Yash, 20 Oct).
+- **PATCH_96 (consultant historical seed) / PATCH_97 (salary masters draft):**
+  Yash referred to them on 20 Oct as already sent; **not received by this
+  session** and not present on any branch or in `supabase_migrations` as of
+  20 Oct. Numbers 96/97 are reserved for them; don't reuse.
 
 **Payslip tab repointed, 20 Oct 2026 (Yash's instruction; `f02fd13`, payroll
 branch).** It was blank because `hooks/usePayslips.ts` read the old

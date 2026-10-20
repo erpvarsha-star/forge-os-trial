@@ -57,7 +57,11 @@ redeployed with the fix;
 U2/U5 = frozen engine rules, not bugs (Yash); documented
 deviation: VFL4024/VFL4033 paid full ₹8,500 prod allowance by hand on the
 Sept sheet (manual exception, not reproduced by the app); ⏳ HR to supply
-correct figures for U6 (VFL1389/1556/1566/5322/5442) and U7 (VFL5464); consultants/VFL1001/VFL5458–62
+correct figures for U6 (VFL1389/1556/1566/5322/5442 — VFL1389's master
+Basic ₹10,500 gives gross ₹26,250 vs sheet ₹29,000; with its advance the
+net goes negative, so the engine HOLDS it (NET_NEGATIVE), no item written;
+no code special-case) and U7 (VFL5464); ⏳ PATCH_96 (consultant history
+seed) + PATCH_97 (salary masters draft) — not received yet, Yash to resend; consultants/VFL1001/VFL5458–62
 held for missing/zero masters. ✅ PATCH_95 `my_payslips()` applied + verified (payslip
 tab repointed in `f02fd13`; ⏳ needs a payroll-branch APK to see it) → payroll PR + 58-assertion regression before merge.
 
