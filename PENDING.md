@@ -50,8 +50,8 @@ trigger (the runner now records `actor_emp_code` itself);
 `payroll-feed-sync` — not needed (Yash, 20 Oct: logic vendored in
 payroll-run). Next, in order: real pay-run test vs Sheet (Sept 2026; kit ready in
 `scripts/PAYROLL_TEST_SEP2026.md`, ⏳ Yash to run create→calculate→summary) → ✅ renumbered
-89→94 (`db81733`) → ⏳ apply PATCH_95 `my_payslips()` (Yash's OK; payslip
-tab repointed in `f02fd13`, dry-run tested) → payroll PR + 58-assertion regression before merge.
+89→94 (`db81733`) → ✅ PATCH_95 `my_payslips()` applied + verified (payslip
+tab repointed in `f02fd13`; ⏳ needs a payroll-branch APK to see it) → payroll PR + 58-assertion regression before merge.
 
 **Check-in health check, 14 Oct 2026 (live DB + Sonnet code review, verified).**
 Working: 72–82 check-ins/day (of 99 active) 7–14 Oct, 64% via QR, 0 mock

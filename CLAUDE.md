@@ -927,9 +927,10 @@ PT, advance, TDS, canteen, society, MLWF lines; anything else →
 other_deduction; net = net_pay). `my_payslips()` is SECURITY DEFINER
 because employees can't read `pay_runs`/`pay_periods` (management-only
 RLS); it returns only `auth_employee_id()`'s rows. **`PATCH_95_my_payslips_rpc` —
-Yash approved applying it live, 20 Oct 2026** (was: not yet applied) — dry-run tested in a rolled-back transaction as a
-real member (3 own months, 0 other employees' rows). Until it's applied
-the tab errors ("not yet issued"); the screen isn't in any APK yet.
+✅ applied live 20 Oct 2026 on Yash's approval** — EXECUTE: authenticated,
+postgres, service_role (Supabase default); anon/PUBLIC none. Live-checked as
+CON01 and VFL4072: 6 own slips each (Apr–Sep), 0 other employees' rows — dry-run tested in a rolled-back transaction as a
+real member (3 own months, 0 other employees' rows). The screen isn't in any APK yet (payroll branch).
 
 Still open (PENDING.md): payroll tables open to every manager via `is_management()`;
 `audit_row_change` actor always NULL;
@@ -1150,6 +1151,7 @@ Two separate fixes, both same day:
 | `PATCH_88_checkin_reliability_14Oct2026.sql` | `check_in/out_accuracy_m` columns + `server_now()` RPC for the check-in reliability fixes | ✅ Applied 14 Oct 2026 |
 | `PATCH_87_fazal_monthly_form_reminder_on_11Oct2026.sql` | Turns on the 1st–5th reminder for Fazal's monthly form ("Worker Monthly Efficiency") — PATCH_66's insert had been silently skipped | ✅ Applied 11 Oct 2026 |
 | `PATCH_93_lock_attach_arrears_20Oct2026.sql` | Revokes execute on the payroll branch's `attach_arrears_sep26_30()` from PUBLIC/anon/authenticated; service_role only (its one caller, `payroll-run`) | ✅ Applied 20 Oct 2026 — verified anon/authenticated false, service_role true |
+| `PATCH_95_my_payslips_rpc_20Oct2026.sql` (payroll branch) | `my_payslips()` SECURITY DEFINER — employee's own `pay_run_items` (archived/paid/finalized) with month/year, for the Payslip tab | ✅ Applied 20 Oct 2026 — verified own-rows-only as 2 employees |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
