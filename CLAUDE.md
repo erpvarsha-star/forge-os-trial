@@ -896,8 +896,18 @@ gate), so execute is revoked from PUBLIC, anon and authenticated and kept
 for service_role only (PATCH_93). Never re-grant it to app roles; if the
 app ever needs it, add a role check inside the function first.
 
+**Decisions from Yash, 20 Oct 2026:** `payroll-feed-sync` is **not to be
+deployed** — an earlier design; its logic (`feedSync`) is vendored inside
+`payroll-run`, which is live. Remaining payroll work, in this order:
+(1) first real pay-run test — create a run for a test month, `calculate`,
+compare several employees against the Google Sheet figures, and nothing
+moves to `approved` before that comparison passes (Yash verifies the math
+with his own Supabase access); (2) renumber payroll PATCH_89 → 90 in the
+housekeeping commit; (3) payroll PR into the base branch, with the
+58-assertion regression run before merge.
+
 Still open (PENDING.md): payroll tables open to every manager via `is_management()`;
-`audit_row_change` actor always NULL; `payroll-feed-sync` not deployed;
+`audit_row_change` actor always NULL;
 no real-device / real pay-run test yet.
 
 ## Owner has no KPI tab — decision from Yash, 28 Sep 2026
