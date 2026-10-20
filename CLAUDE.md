@@ -905,6 +905,12 @@ moves to `approved` before that comparison passes (Yash verifies the math
 with his own Supabase access); (2) renumber payroll PATCH_89 → 90 in the
 housekeeping commit; (3) payroll PR into the base branch, with the
 58-assertion regression run before merge.
+**Test setup — Yash's answers, 20 Oct 2026:** test month = **September
+2026** (archived sheet-imported runs exist to compare against; app
+attendance for Sept is test-period data, so days-based lines may differ
+for that reason, not the math). **Yash triggers the calls himself** with
+his own login; Claude only prepares the request bodies and the comparison
+query, and never calls `payroll-run` or moves a run past `calculated`.
 
 Still open (PENDING.md): payroll tables open to every manager via `is_management()`;
 `audit_row_change` actor always NULL;
