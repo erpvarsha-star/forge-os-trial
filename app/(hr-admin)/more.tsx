@@ -13,7 +13,7 @@ import { CountPill } from '@/components/CountPill'
 import { useActionCountsStore } from '@/hooks/useAssignedTasks'
 import { TaskMenuRows } from '@/components/TaskMenuRows'
 import { removePushToken } from '@/lib/notifications'
-import { LogOut, Globe, Settings, ChevronRight, AlertCircle, CreditCard, Users, Eye, Clock, CheckSquare, FileText, Table2 } from 'lucide-react-native'
+import { LogOut, Globe, Settings, ChevronRight, AlertCircle, CreditCard, Users, Eye, Clock, CheckSquare, FileText, Table2, IndianRupee, UtensilsCrossed } from 'lucide-react-native'
 import { router } from 'expo-router'
 import { BRAND, INK } from '@/components/theme'
 
@@ -28,6 +28,8 @@ export default function HRAdminMore() {
 
   const links = [
     { key: 'approvals', label: t('common.approvals'), icon: <CheckSquare size={20} color={INK[500]} />, path: '/(hr-admin)/approvals' },
+    { key: 'payroll-run', label: t('payroll.menuLabel'), icon: <IndianRupee size={20} color={INK[500]} />, path: '/(hr-admin)/payroll-run' },
+    { key: 'payroll-feeds', label: t('payroll.feedsMenuLabel'), icon: <UtensilsCrossed size={20} color={INK[500]} />, path: '/(hr-admin)/payroll-feeds' },
     { key: 'missing-data', label: t('hrAdmin.missingData'), icon: <AlertCircle size={20} color={INK[500]} />, path: '/(hr-admin)/missing-data' },
     { key: 'advance-ledger', label: t('hrAdmin.advanceLedger'), icon: <CreditCard size={20} color={INK[500]} />, path: '/(hr-admin)/advance-ledger' },
     { key: 'new-employee-flow', label: t('hrAdmin.newEmployeeFlow'), icon: <Users size={20} color={INK[500]} />, path: '/(hr-admin)/new-employee-flow' },

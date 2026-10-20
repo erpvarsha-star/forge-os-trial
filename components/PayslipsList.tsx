@@ -42,7 +42,7 @@ export function PayslipsList({ routePrefix }: { routePrefix: string }) {
                 <View className="flex-row items-center gap-3 flex-1">
                   {m.issued ? <CheckCircle2 size={20} color="#16A34A" /> : <Clock size={20} color="#9CA3AF" />}
                   <Text className={`text-base flex-1 ${m.issued ? 'text-ink-900' : 'text-ink-400'}`}>
-                    {m.label}
+                    {t(`payroll.months.${Number(m.month)}`)} {m.year}
                   </Text>
                 </View>
                 <View className="flex-row items-center gap-2">

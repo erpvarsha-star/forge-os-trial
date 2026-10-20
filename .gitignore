@@ -35,3 +35,7 @@ yarn-error.*
 
 # Netlify CLI local site-link state (machine-local, not a secret, not shared)
 .netlify/
+
+# Payroll history extracts contain real salary data — never commit
+payroll_history_*.json
+scripts/PATCH_90_history_seed.sql

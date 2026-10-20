@@ -90,7 +90,7 @@ export function PayslipDetail() {
       <Header empCode={employee.emp_code} role={employee.role} />
       <ScrollView className="flex-1 p-4">
         <Text className="text-xl font-bold text-ink-900 mb-4">
-          {record ? t('worker.payslipMonth', { month: record.month }) : t('worker.payslipTitle')}
+          {record ? t('worker.payslipMonth', { month: `${t(`payroll.months.${Number(record.month)}`)} ${record.year}` }) : t('worker.payslipTitle')}
         </Text>
 
         {record ? (
