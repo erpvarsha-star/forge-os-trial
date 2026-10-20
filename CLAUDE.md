@@ -858,6 +858,10 @@ screens each built by a Sonnet agent, reviewed and live-tested by Claude.
 
 ## Payroll module (branch `claude/payroll-lifecycle`) — status 20 Oct 2026
 
+**🔒 Decisions from Yash, 21 Oct 2026 (recorded the moment given):**
+1. **Salary table lockdown — yes, now.** Restrict `employee_salary_structure` SELECT to **owner + hr_admin only**. First verify which screens/code read it (expected: none of the manager-facing ones). If plant head needs anything from it, expose only non-sensitive fields via a narrow view/RPC. Verify afterwards that a manager-role session gets zero rows. Additive patch, recorded. (Status: see below once done.)
+2. **Pune BUNG history: record-only.** Do **NOT** seed payslips for the 5 BUNG employees missing from the DB; their old sheet data stays in the archive for comparison only. Owner decision. Item closed.
+
 **Consultant bank details + PAN loaded by Yash directly in the DB, 21 Oct 2026** (parsed from a PDF with mangled columns; **values deliberately not in this file or any repo file — this repo is public**): `employee_salary_structure` now has bank_name/account_no/ifsc/pan for **CON05, CON09, CON12, CON13, CON16, CON18, CON24**; **CON01, CON20, CON21, CON22, CON23 have none** and stay blank-flagged in the bank file. ⚠ **Verify those 7 account numbers against passbooks before the first real bank upload**, and spot-check 2–3 staff accounts. ⚠ **Exposure found same day:** `employee_salary_structure` SELECT policy is `employee_id = current_employee_id() OR is_management()` — so **every manager/plant_head/hr_admin/owner (including CON12, a consultant with role=manager) can read every employee's bank account, PAN and UAN**. Tightening to owner/hr_admin(/plant_head) is therefore no longer low priority (see PENDING.md); not yet done — needs a check of which screens read this table first.
 
 **✅ 21 Oct 2026 (PR #13, `aa4cb69`; `apk-97` built, published 20 Oct 22:23 UTC): daily consultants + salary-sheet/bank-file download.**
