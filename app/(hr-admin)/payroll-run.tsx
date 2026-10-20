@@ -8,12 +8,17 @@ import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
-import { payrollRun, CalculateResult, RunSummary } from '@/lib/payroll/client'
+import * as FileSystem from 'expo-file-system'
+import * as Sharing from 'expo-sharing'
+import { payrollRun, exportPayRun, PAYROLL_MONTH_LABEL, CalculateResult, RunSummary } from '@/lib/payroll/client'
+import { buildSalarySheetCsv, buildBankFileCsv } from '@/lib/payroll/exportCsv'
 import { istMonthYear } from '@/lib/istDate'
 import { BRAND, STATUS, INK } from '@/components/theme'
-import { ChevronLeft, ChevronRight, CheckCircle2, Circle, AlertTriangle, Play, Send, Stamp, IndianRupee } from 'lucide-react-native'
+import { ChevronLeft, ChevronRight, CheckCircle2, Circle, AlertTriangle, Play, Send, Stamp, IndianRupee, Download } from 'lucide-react-native'
 
 type Run = { id: string; status: string; name: string }
+
+const EXPORTABLE = ['finalized', 'payment_file_generated', 'paid', 'archived']
 
 const FEED_TABLES = [
   { key: 'canteen', table: 'payroll_canteen_entries' },
@@ -85,6 +90,23 @@ export default function PayrollRunScreen() {
     if (confirmMsg) Alert.alert(t('common.confirm'), confirmMsg, [{ text: t('common.cancel') }, { text: t('common.confirm'), onPress: go }])
     else go()
   }
+
+  const exportFile = (kind: 'salary' | 'bank') => act(`export-${kind}`, async () => {
+    if (!run || !EXPORTABLE.includes(run.status)) throw new Error(t('payroll.exportNotReady'))
+    if (!(await Sharing.isAvailableAsync())) throw new Error(t('payroll.exportFailed'))
+    let data
+    try { data = await exportPayRun(run.id) } catch (e: any) {
+      throw new Error(e?.detail?.error?.includes?.('finalized') ? t('payroll.exportNotReady') : t('payroll.exportFailed'))
+    }
+    const label = PAYROLL_MONTH_LABEL(data.month, data.year).replace(' ', '_')
+    let csv: string, missing: string[] = []
+    if (kind === 'salary') csv = buildSalarySheetCsv(data.salaryRows)
+    else { const b = buildBankFileCsv(data.bankRows, data.month, data.year); csv = b.csv; missing = b.missingBank }
+    const uri = `${FileSystem.cacheDirectory}${kind === 'salary' ? 'salary_sheet' : 'bank_file'}_${label}.csv`
+    await FileSystem.writeAsStringAsync(uri, csv, { encoding: FileSystem.EncodingType.UTF8 })
+    if (missing.length) Alert.alert(t('common.warning'), t('payroll.bankMissingWarning', { count: missing.length }))
+    await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: t(kind === 'salary' ? 'payroll.downloadSalarySheet' : 'payroll.downloadBankFile') })
+  })
 
   const totalPending = Object.values(pendingFeeds).reduce((a, b) => a + b, 0)
   const isOct2026 = month === 10 && year === 2026
@@ -181,6 +203,16 @@ export default function PayrollRunScreen() {
                   <Button title="payroll.finalizeRun" variant="primary" size="md" className="mt-1" loading={busy === 'tr'}
                     onPress={() => act('tr', () => payrollRun('transition', { payRunId: run.id, to: 'finalized' }), t('payroll.finalizeConfirm'))} />
                 )}
+              </Card>
+            )}
+
+            {/* Downloads — finished runs only */}
+            {run && EXPORTABLE.includes(run.status) && (
+              <Card className="mb-3">
+                <Button title="payroll.downloadSalarySheet" variant="secondary" size="md" loading={busy === 'export-salary'}
+                  icon={<Download size={16} color={BRAND[600]} />} onPress={() => exportFile('salary')} />
+                <Button title="payroll.downloadBankFile" variant="secondary" size="md" className="mt-2" loading={busy === 'export-bank'}
+                  icon={<Download size={16} color={BRAND[600]} />} onPress={() => exportFile('bank')} />
               </Card>
             )}
 

@@ -949,6 +949,11 @@
     "saveOverride": "Save override",
     "overrideSaved": "Override saved",
     "currentEntries": "Entries this month",
-    "invalidPct": "Enter a valid percentage between 0 and 100"
+    "invalidPct": "Enter a valid percentage between 0 and 100",
+    "downloadSalarySheet": "Download salary sheet",
+    "downloadBankFile": "Download bank file",
+    "exportFailed": "Could not prepare the file. Please try again.",
+    "exportNotReady": "Downloads are available only after the payroll run is finalized.",
+    "bankMissingWarning": "{{count}} employees have missing bank details. They are included with blank bank cells."
   }
 }

@@ -5,6 +5,7 @@
 //   transition { payRunId, to }                -> state-machine move (DB trigger enforces legality)
 //   arrears_sep26_30 { payRunId }              -> one-time 26–30 Sep 2026 bridge line per employee
 //   summary    { payRunId }                    -> totals + held + warnings
+//   export     { payRunId }                    -> salary-sheet + bank-file rows (owner/hr_admin only)
 //
 // House rules: additive only; engine math is frozen (lib/payroll/engine.ts);
 // every action writes audit_log; salary numbers never leave the DB.
@@ -272,6 +273,60 @@ Deno.serve(async (req) => {
         arrearsSep2630: rows.reduce((s: number, r: any) => s + (r.snapshot?.arrears_sep26_30 ?? 0), 0),
         byCategory: byCat,
       });
+    }
+
+    // ---------------------------------------------------------------- export
+    // Owner/hr_admin only (plant_head is allowed 'summary' alone, see gate above).
+    // Bank details are returned to the caller only; never written to audit or logs.
+    if (action === 'export') {
+      const { payRunId } = body;
+      const { data: run } = await supabase
+        .from('pay_runs').select('status, name, pay_periods(month, year, end_date)').eq('id', payRunId).single();
+      if (!run) return json({ error: 'pay run not found' }, 404);
+      if (!['finalized', 'payment_file_generated', 'paid', 'archived'].includes(run.status)) {
+        return json({ error: `export is available only for finalized runs (current: ${run.status})` }, 409);
+      }
+      const month = Number(run.pay_periods.month);
+      const year = Number(run.pay_periods.year);
+      const periodEnd = run.pay_periods.end_date
+        ?? `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`;
+
+      const { data: items, error: iErr } = await supabase
+        .from('pay_run_items').select('employee_id, snapshot, net_pay').eq('pay_run_id', payRunId);
+      if (iErr) return json({ error: iErr.message }, 500);
+      const { data: emps } = await supabase.from('employees').select('id, emp_code, name');
+      const empById = new Map((emps ?? []).map((e: any) => [e.id, e]));
+      const { data: banks } = await supabase
+        .from('employee_salary_structure')
+        .select('employee_id, effective_from, bank_name, account_no, ifsc')
+        .lte('effective_from', periodEnd);
+      const bankByEmp = new Map<string, any>();
+      for (const b of banks ?? []) {
+        const cur = bankByEmp.get(b.employee_id);
+        if (!cur || String(b.effective_from) > String(cur.effective_from)) bankByEmp.set(b.employee_id, b);
+      }
+
+      const salaryRows: any[] = [];
+      const bankRows: any[] = [];
+      for (const it of items ?? []) {
+        const e: any = empById.get(it.employee_id);
+        const snap: any = it.snapshot ?? {};
+        const empCode = e?.emp_code ?? String(it.employee_id);
+        const name = e?.name ?? '';
+        const netPay = Number(it.net_pay ?? snap.netPay ?? 0);
+        salaryRows.push({
+          empCode, name, category: snap.category ?? null, worked: snap.worked ?? null,
+          earnings: snap.earnings ?? {}, deductions: snap.deductions ?? {},
+          totalEarnings: snap.totalEarnings ?? 0, totalDeductions: snap.totalDeductions ?? 0, netPay,
+        });
+        const b = bankByEmp.get(it.employee_id);
+        bankRows.push({
+          empCode, name, netPay,
+          bankName: b?.bank_name ?? null, accountNo: b?.account_no ?? null, ifsc: b?.ifsc ?? null,
+        });
+      }
+      await audit(payRunId, { event: 'export', items: salaryRows.length });
+      return json({ month, year, runName: run.name, salaryRows, bankRows });
     }
 
     return json({ error: `unknown action: ${action}` }, 400);
