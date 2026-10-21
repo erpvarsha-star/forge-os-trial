@@ -177,8 +177,9 @@ begin
     raise exception 'Status % already recorded effective %', p_status, v_eff;
   end if;
 
-  insert into public.employee_status_history (employee_id, status, effective_from, note, recorded_by)
-  values (p_employee_id, p_status, v_eff, p_note, public.current_employee_id());
+  -- clock_timestamp(), not now(): keeps same-day rows ordered even inside one transaction
+  insert into public.employee_status_history (employee_id, status, effective_from, note, recorded_by, created_at)
+  values (p_employee_id, p_status, v_eff, p_note, public.current_employee_id(), clock_timestamp());
 
   if v_eff <= v_today then
     if p_status in ('left','terminated','retired') then
