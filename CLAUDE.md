@@ -877,9 +877,7 @@ screen has "Download salary sheet" / "Download bank file" buttons
 Bank details come from `employee_salary_structure` (`bank_name`, `account_no`,
 `ifsc`; 85 of 108 rows have them — the 12 consultant rows from PATCH_97 do
 not, so consultants appear in the bank file with blank bank cells and the
-screen warns with a count). **The bank file layout is a DEFAULT (emp code,
-name, bank, account, IFSC, net pay, narration) awaiting the format Yash's bank
-requires.** `payroll-run` redeployed **v3** (`verify_jwt` true, deployed source
+screen warns with a count). **Bank file layout (Yash, 21 Oct 2026: "exactly as the old salary calculation sheet"): header EMP_ID, EMPLOYEE_NAME, BANK_NAME, BANK_ACCOUNT, IFSC, NET_PAY, no narration** (the old HR OS sheet has no separate bank-upload layout; these are its own column names). `payroll-run` redeployed **v3** (`verify_jwt` true, deployed source
 byte-identical to the repo, unauthenticated call → 401). Tests: regression
 58/0, feedsync 22/0, export 15/0, tsc 7 (baseline), i18n clean. Not yet
 exercised on a real device or against a real finalized run.
@@ -1307,6 +1305,7 @@ Two separate fixes, both same day:
 | `PATCH_99_salary_table_owner_hr_only_21Oct2026.sql` | `employee_salary_structure` SELECT restricted to owner + hr_admin (was: own row or any manager/plant_head/hr_admin/owner via `is_management()`) — bank account/PAN/UAN/salary no longer readable by managers | ✅ Applied 21 Oct 2026 — verified by role impersonation (manager/plant head/consultant-manager/member 0 rows; HR admin and owner 108) |
 | `PATCH_100_payroll_tables_owner_hr_only_21Oct2026.sql` | `pay_runs`, `pay_run_items` (items_mgmt), `pay_periods`, `audit_log`, `documents`, `payroll_canteen_entries`, `payroll_society_recoveries`, `payroll_adjustments`, `payroll_monthly_rates` restricted to owner + hr_admin; `payroll_efficiency_entries` also keeps plant_head (his input screen); `payroll_records` = own row OR owner/hr_admin. Left alone: `items_self`, `docs_self`, `pt_slabs`, `employee_status_history` | ✅ Applied 21 Oct 2026 (PR #17) — rolled-back role tests: manager/CON12/plant head 0 rows on runs/items/audit, HR/owner 24/652; plant head can still write efficiency, manager cannot. ⚠ `pay_run_items.items_self` returns 0 for everyone (its subquery reads `pay_runs`, hidden from non-owner/HR) — pre-existing, harmless since `my_payslips()` is SECURITY DEFINER |
 | `PATCH_101_items_self_released_helper_21Oct2026.sql` | `pay_run_is_released(uuid)` SECURITY DEFINER boolean helper; `pay_run_items.items_self` now uses it, so employees read their own items from released runs without needing read access to `pay_runs` | ✅ Applied 21 Oct 2026 (PR #18) — member/manager/plant head see only own 6 rows, 0 `pay_runs`; HR/owner 652; anon cannot execute. Unreleased-run case untested (no such run live; status list identical to old policy) |
+| `PATCH_102_salary_table_revoke_grants_21Oct2026.sql` | `employee_salary_structure`: all privileges revoked from `anon`; `authenticated` keeps SELECT only (writes go via service role / SECURITY DEFINER RPCs) | ✅ Applied 21 Oct 2026 (PR #20) — owner/HR 108 rows, manager 0, owner UPDATE → 42501 |
 | `PATCH_95_my_payslips_rpc_20Oct2026.sql` (payroll branch) | `my_payslips()` SECURITY DEFINER — employee's own `pay_run_items` (archived/paid/finalized) with month/year, for the Payslip tab | ✅ Applied 20 Oct 2026 — verified own-rows-only as 2 employees |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
 
