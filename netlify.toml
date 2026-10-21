@@ -23,6 +23,10 @@
   # react-native-screens has a broken postinstall ('bob build && husky install') that
   # always fails outside its own repo. --ignore-scripts skips all postinstall hooks.
   NPM_FLAGS = "--ignore-scripts"
+  # google-services.json is the Firebase client config for the Android app. Its AIza...
+  # api_key is public by design (compiled into every APK), so Netlify's secrets scan
+  # must skip this one path. Scanning stays on for everything else.
+  SECRETS_SCAN_OMIT_PATHS = "google-services.json"
 
 [[headers]]
   for = "/*"
