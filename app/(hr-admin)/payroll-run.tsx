@@ -10,13 +10,13 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import * as FileSystem from 'expo-file-system'
 import * as Sharing from 'expo-sharing'
-import { payrollRun, exportPayRun, PAYROLL_MONTH_LABEL, CalculateResult, RunSummary } from '@/lib/payroll/client'
+import { payrollRun, exportPayRun, createTopupRun, transitionRun, PAYROLL_MONTH_LABEL, VDA_RATE_MISSING_ERROR, CalculateResult, RunSummary, TransitionResult } from '@/lib/payroll/client'
 import { buildSalarySheetCsv, buildBankFileCsv } from '@/lib/payroll/exportCsv'
 import { istMonthYear } from '@/lib/istDate'
 import { BRAND, STATUS, INK } from '@/components/theme'
 import { ChevronLeft, ChevronRight, CheckCircle2, Circle, AlertTriangle, Play, Send, Stamp, IndianRupee, Download } from 'lucide-react-native'
 
-type Run = { id: string; status: string; name: string }
+type Run = { id: string; status: string; name: string; adjustment_of: string | null }
 
 const EXPORTABLE = ['finalized', 'payment_file_generated', 'paid', 'archived']
 
@@ -37,6 +37,11 @@ export default function PayrollRunScreen() {
   const [run, setRun] = useState<Run | null>(null)
   const [pendingFeeds, setPendingFeeds] = useState<Record<string, number>>({})
   const [summary, setSummary] = useState<RunSummary | null>(null)
+  const [parentName, setParentName] = useState<string | null>(null)
+  // Result of the last Calculate / Finalize on this screen (cleared when the run changes)
+  const [calc, setCalc] = useState<{ runId: string; result: CalculateResult } | null>(null)
+  const [vdaMissing, setVdaMissing] = useState<{ hint: string | null } | null>(null)
+  const [recovery, setRecovery] = useState<TransitionResult['advanceRecovery'] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -50,12 +55,16 @@ export default function PayrollRunScreen() {
     let r: Run | null = null
     if (period) {
       const { data: runs } = await supabase
-        .from('pay_runs').select('id, status, name')
+        .from('pay_runs').select('id, status, name, adjustment_of')
         .eq('pay_period_id', period.id).neq('status', 'cancelled')
         .order('created_at', { ascending: false }).limit(1)
       r = runs?.[0] ?? null
     }
     setRun(r)
+    if (r?.adjustment_of) {
+      const { data: parent } = await supabase.from('pay_runs').select('name').eq('id', r.adjustment_of).maybeSingle()
+      setParentName(parent?.name ?? null)
+    } else setParentName(null)
     const counts: Record<string, number> = {}
     for (const f of FEED_TABLES) {
       const { count } = await supabase
@@ -71,6 +80,8 @@ export default function PayrollRunScreen() {
   }, [month, year, payrollMonth])
 
   useEffect(() => { refresh() }, [refresh])
+  // Month change shows a different run — drop the previous run's transient results
+  useEffect(() => { setCalc(null); setVdaMissing(null); setRecovery(null) }, [month, year])
 
   if (!employee) return <LoadingScreen />
 
@@ -153,6 +164,13 @@ export default function PayrollRunScreen() {
                   <Text className="text-xs font-bold uppercase tracking-wider" style={{ color: statusColor }}>
                     {t(`payroll.status.${run.status}`)}
                   </Text>
+                  {run.adjustment_of ? (
+                    <View className="mt-1.5 self-start bg-amber-100 rounded-full px-2.5 py-0.5">
+                      <Text className="text-xs font-bold text-amber-700">
+                        {t('payroll.topupBadge')}{parentName ? ` — ${t('payroll.topupOf', { name: parentName })}` : ''}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               ) : (
                 <Button title="payroll.createRun" variant="primary" size="md" className="mt-1" loading={busy === 'create'}
@@ -163,12 +181,40 @@ export default function PayrollRunScreen() {
                   icon={<Play size={18} color="white" />}
                   onPress={() => act('calc',
                     async () => {
-                      const r = await payrollRun<CalculateResult>('calculate', { payRunId: run.id })
+                      let r: CalculateResult
+                      try {
+                        r = await payrollRun<CalculateResult>('calculate', { payRunId: run.id })
+                      } catch (e: any) {
+                        // 422: monthly VDA rate missing — point HR at the Payroll Rates screen instead of a bare alert
+                        if (String(e?.message ?? '').includes(VDA_RATE_MISSING_ERROR)) {
+                          setVdaMissing({ hint: e?.detail?.hint ?? null })
+                          return
+                        }
+                        throw e
+                      }
+                      setVdaMissing(null)
+                      setCalc({ runId: run.id, result: r })
                       Alert.alert(t('payroll.calculated', { count: r.calculated }),
                         (r.held.length ? t('payroll.heldNote', { count: r.held.length }) + '\n' : '')
                         + (r.warnings.length ? t('payroll.warningsNote', { count: r.warnings.length }) : ''))
                     }, t('payroll.calculateConfirm'))} />
               )}
+              {vdaMissing && (
+                <View className="mt-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                  <View className="flex-row items-center gap-2">
+                    <AlertTriangle size={16} color="#B45309" />
+                    <Text className="text-sm font-bold text-amber-700 flex-1">{t('payroll.vdaMissingTitle')}</Text>
+                  </View>
+                  <Text className="text-xs text-amber-700 mt-1">{vdaMissing.hint ?? t('payroll.vdaMissingBody')}</Text>
+                  <Button title="payroll.openRates" variant="secondary" size="md" className="mt-2"
+                    onPress={() => router.push('/(hr-admin)/payroll-rates' as any)} />
+                </View>
+              )}
+              {run?.adjustment_of && calc?.runId === run.id && calc.result.topup ? (
+                <Text className="text-xs text-ink-600 mt-2 px-1">
+                  {t('payroll.topupResult', { paid: calc.result.calculated, skipped: calc.result.skippedAlreadyPaid ?? 0 })}
+                </Text>
+              ) : null}
             </Card>
 
             {/* Step 3 — arrears (Oct 2026 only) */}
@@ -201,8 +247,34 @@ export default function PayrollRunScreen() {
                 )}
                 {run.status === 'approved' && (
                   <Button title="payroll.finalizeRun" variant="primary" size="md" className="mt-1" loading={busy === 'tr'}
-                    onPress={() => act('tr', () => payrollRun('transition', { payRunId: run.id, to: 'finalized' }), t('payroll.finalizeConfirm'))} />
+                    onPress={() => act('tr', async () => {
+                      const r = await transitionRun(run.id, 'finalized')
+                      if (r?.advanceRecovery) setRecovery(r.advanceRecovery)
+                    }, t('payroll.finalizeConfirm'))} />
                 )}
+              </Card>
+            )}
+
+            {recovery && (
+              <Card className="mb-3">
+                <Text className="text-sm font-semibold text-ink-900">{t('payroll.advanceRecovered', { amount: Math.round(Number(recovery.recovered_total) || 0).toLocaleString('en-IN') })}</Text>
+                {recovery.unmatched?.length ? (
+                  <View className="flex-row items-center gap-2 mt-2">
+                    <AlertTriangle size={14} color="#B45309" />
+                    <Text className="text-xs text-amber-700 flex-1">{t('payroll.advanceUnmatched', { count: recovery.unmatched.length })}</Text>
+                  </View>
+                ) : null}
+              </Card>
+            )}
+
+            {/* Top-up — a second run for employees who were held and have no payslip yet */}
+            {run && !run.adjustment_of && EXPORTABLE.includes(run.status) && (
+              <Card className="mb-3">
+                <Button title="payroll.createTopup" variant="secondary" size="md" loading={busy === 'topup'}
+                  onPress={() => act('topup', async () => {
+                    await createTopupRun(run.id)
+                    Alert.alert(t('common.success'), t('payroll.topupCreated'))
+                  }, t('payroll.createTopupConfirm'))} />
               </Card>
             )}
 
