@@ -1072,7 +1072,7 @@ below. Empty tables and a broken sync look identical from the app.
 
 ## ✅ Completed setup items (Sep 2026)
 
-- [ ] **Netlify deployment — NOT DONE per Yash, 21 Oct 2026 (recorded on his instruction).**
+- [x] **Netlify deployment — COMPLETE per Yash, 21 Oct 2026 (was recorded as not done earlier the same day; he confirmed it is now complete, I did not independently verify the live dashboard).**
       What I verified: the PR #18 deploy preview failed at Netlify's secrets scan
       (public Firebase key in `google-services.json`); PR #19 added
       `SECRETS_SCAN_OMIT_PATHS = "google-services.json"` and Netlify's own rebuild
