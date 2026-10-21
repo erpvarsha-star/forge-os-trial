@@ -1,7 +1,7 @@
 # >>> IN-FLIGHT (21 Oct 2026): payroll gaps build — see CLAUDE.md "IN-FLIGHT BUILD — payroll gaps" <<<
 - [x] Backend (PR #22) and screens (PR #23) MERGED. PATCH_103 applied live.
-- [ ] Deploy `payroll-run` v4 (agent `aabadac75665b3345` launched) — verify version 4, verify_jwt true, source matches repo, contains create_topup.
-- [ ] Verify the new APK release (apk-101+) exists, then install and test: Payroll Rates, Employee Exit, Top-up run, advance recovery on finalize.
+- [x] `payroll-run` v4 DEPLOYED and verified (21 Oct): version 4, verify_jwt true, sha256 matches repo, unauthenticated → 401.
+- [x] `apk-101` published (built from 591a5ac). [ ] Yash installs apk-101 and tests: Payroll Rates, Employee Exit, Top-up run, advance recovery on finalize.
 - [ ] HR enters the October VDA per-day rate before the October run (Calculate refuses without it unless forced).
 
 # Forge OS — Pending Work Tracker
