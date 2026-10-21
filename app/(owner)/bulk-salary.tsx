@@ -57,7 +57,7 @@ export default function BulkSalaryScreen() {
     setIsDownloading(true)
     const { data, error } = await supabase
       .from('employee_salary_structure')
-      .select('*, employee:employees!inner(emp_code, name, department, is_active)')
+      .select(`${ALL_FIELDS.join(', ')}, employee:employees!inner(emp_code, name, department, is_active)`)
       .eq('is_active', true)
       .eq('employee.is_active', true)
 
