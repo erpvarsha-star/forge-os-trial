@@ -79,7 +79,17 @@ export interface PayRunExport {
 
 export async function payrollRun<T = any>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
   const { data, error } = await supabase.functions.invoke('payroll-run', { body: { action, ...payload } })
-  if (error) throw new Error(error.message)
+  if (error) {
+    // supabase-js returns FunctionsHttpError for any non-2xx; the JSON body (e.g. 422 {error, hint}) is on error.context
+    let body: any = null
+    try { body = await (error as any).context?.json?.() } catch { body = null }
+    if (body && typeof body.error === 'string') {
+      const err: any = new Error(body.error)
+      err.detail = body
+      throw err
+    }
+    throw new Error(error.message)
+  }
   if (data?.error) {
     const err: any = new Error(data.error)
     err.detail = data
