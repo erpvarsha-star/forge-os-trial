@@ -1,7 +1,8 @@
-# >>> IN-FLIGHT (21 Oct 2026): payroll gaps build — see CLAUDE.md "IN-FLIGHT BUILD — payroll gaps" for the full state and next steps <<<
-- [ ] Backend branch `claude/payroll-gaps-backend` (PATCH_103 + payroll-run index.ts): agent was still running — check it, verify, merge, then deploy `payroll-run` v4 (verify_jwt true).
-- [ ] Screens branch `claude/payroll-gaps-screens` (commits 62c6d34, 32a6d32, 5d9b34d): built and pushed, NOT merged. Merge after backend; confirm 422 "monthly VDA rate not entered" JSON body shape end to end.
-- [ ] After deploy: HR enters the October VDA per-day rate (Payroll Rates screen) before the October run; test top-up, advance recovery, exit screen on the new APK.
+# >>> IN-FLIGHT (21 Oct 2026): payroll gaps build — see CLAUDE.md "IN-FLIGHT BUILD — payroll gaps" <<<
+- [x] Backend (PR #22) and screens (PR #23) MERGED. PATCH_103 applied live.
+- [ ] Deploy `payroll-run` v4 (agent `aabadac75665b3345` launched) — verify version 4, verify_jwt true, source matches repo, contains create_topup.
+- [ ] Verify the new APK release (apk-101+) exists, then install and test: Payroll Rates, Employee Exit, Top-up run, advance recovery on finalize.
+- [ ] HR enters the October VDA per-day rate before the October run (Calculate refuses without it unless forced).
 
 # Forge OS — Pending Work Tracker
 
