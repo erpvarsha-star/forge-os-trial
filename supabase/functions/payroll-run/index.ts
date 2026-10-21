@@ -2,7 +2,9 @@
 // Actions (POST body.action):
 //   create     { month, year, name? }          -> create draft pay_run (+ pay_period if missing)
 //   calculate  { payRunId, force? }            -> assemble feeds, run engine, write pay_run_items
-//   transition { payRunId, to }                -> state-machine move (DB trigger enforces legality)
+//   transition { payRunId, to }                -> state-machine move (DB trigger enforces legality);
+//                                                 to='finalized' first applies advance recoveries (PATCH_103)
+//   create_topup { parentRunId }               -> supplementary draft run for employees held in a regular run
 //   arrears_sep26_30 { payRunId }              -> one-time 26–30 Sep 2026 bridge line per employee
 //   summary    { payRunId }                    -> totals + held + warnings
 //   export     { payRunId }                    -> salary-sheet + bank-file rows (owner/hr_admin only)
@@ -16,7 +18,7 @@
 // Feed tables (PATCH_91) are keyed by payroll_month TEXT 'YYYY-MM'.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { assemblePayrollInputs } from './lib/feedSync.ts';
-import { calculateOne } from './lib/engine.ts';
+import { calculateOne, DEFAULT_ENGINE_CONFIG } from './lib/engine.ts';
 import { PAY_RUN_TRANSITIONS } from './lib/payRunStateMachine.ts';
 
 const cors = {
@@ -92,6 +94,32 @@ Deno.serve(async (req) => {
       return json({ payRunId: run.id, payPeriodId: period.id, status: 'draft' });
     }
 
+    // ----------------------------------------------------------- create_topup
+    // Supplementary run in the same pay period for employees HELD in a regular run; the
+    // locked parent run is never touched. 'calculate' only pays people with no item yet.
+    if (action === 'create_topup') {
+      const { parentRunId } = body;
+      const { data: parent } = await supabase
+        .from('pay_runs').select('id, name, status, pay_period_id, adjustment_of').eq('id', parentRunId).single();
+      if (!parent) return json({ error: 'parent pay run not found' }, 404);
+      if (parent.adjustment_of) {
+        return json({ error: 'parent must be a regular run (it is itself a top-up/adjustment)' }, 409);
+      }
+      if (!['finalized', 'payment_file_generated', 'paid', 'archived'].includes(parent.status)) {
+        return json({ error: `parent run must be finalized or later (current: ${parent.status})` }, 409);
+      }
+      const { count } = await supabase
+        .from('pay_runs').select('id', { count: 'exact', head: true }).eq('adjustment_of', parent.id);
+      const n = (count ?? 0) + 1;
+      const { data: top, error: tErr } = await supabase
+        .from('pay_runs')
+        .insert({ pay_period_id: parent.pay_period_id, adjustment_of: parent.id, name: `${parent.name} top-up ${n}`, status: 'draft' })
+        .select().single();
+      if (tErr) return json({ error: tErr.message }, 500);
+      await audit(top.id, { event: 'create_topup', parentRunId: parent.id, n });
+      return json({ payRunId: top.id, parentRunId: parent.id, status: 'draft' });
+    }
+
     // ------------------------------------------------------------ transition
     if (action === 'transition') {
       const { payRunId, to } = body;
@@ -101,17 +129,25 @@ Deno.serve(async (req) => {
       if (!legal.includes(to)) {
         return json({ error: `illegal transition ${run.status} -> ${to}`, legalTargets: legal }, 409);
       }
+      // PATCH_103: finalizing draws down advance balances. Idempotent per (run, advance), so a
+      // retry after a failed status update is safe. If it errors the status is left unchanged.
+      let advanceRecovery: unknown = undefined;
+      if (to === 'finalized') {
+        const { data: rec, error: recErr } = await supabase.rpc('apply_advance_recoveries', { p_run_id: payRunId });
+        if (recErr) return json({ error: 'advance recovery failed (status unchanged): ' + recErr.message }, 500);
+        advanceRecovery = rec;
+      }
       const { error } = await supabase.from('pay_runs').update({ status: to }).eq('id', payRunId);
       if (error) return json({ error: error.message }, 500);
-      await audit(payRunId, { event: 'transition', from: run.status, to });
-      return json({ ok: true, from: run.status, to });
+      await audit(payRunId, { event: 'transition', from: run.status, to, ...(advanceRecovery ? { advanceRecovery } : {}) });
+      return json({ ok: true, from: run.status, to, ...(advanceRecovery ? { advanceRecovery } : {}) });
     }
 
     // ------------------------------------------------------------ calculate
     if (action === 'calculate') {
       const { payRunId, force } = body;
       const { data: run } = await supabase
-        .from('pay_runs').select('status, pay_periods(month, year)').eq('id', payRunId).single();
+        .from('pay_runs').select('status, adjustment_of, pay_period_id, pay_periods(month, year)').eq('id', payRunId).single();
       if (!run) return json({ error: 'pay run not found' }, 404);
       if (run.status !== 'draft') {
         return json({ error: `calculate only from draft (current: ${run.status}). For a recalc, cancel and create a fresh run.` }, 409);
@@ -158,6 +194,22 @@ Deno.serve(async (req) => {
         }, 422);
       }
 
+      // ---- monthly VDA per-day rate gate (PATCH_103). Checked before any item is written.
+      const { data: vdaRow } = await supabase
+        .from('payroll_monthly_rates').select('vda_per_day_rate').eq('month', mm).eq('year', year).maybeSingle();
+      const extraWarnings: string[] = [];
+      let cfg = DEFAULT_ENGINE_CONFIG;
+      if (vdaRow && Number(vdaRow.vda_per_day_rate) > 0) {
+        cfg = { ...DEFAULT_ENGINE_CONFIG, workerVdaRatePerDay: Number(vdaRow.vda_per_day_rate) };
+      } else if (!force) {
+        return json({
+          error: 'monthly VDA rate not entered',
+          hint: "HR must enter this month's VDA per-day rate (Payroll Rates screen), or call calculate with force:true to use the default 103",
+        }, 422);
+      } else {
+        extraWarnings.push(`No monthly VDA rate entered for ${payrollMonth}; using default ₹${DEFAULT_ENGINE_CONFIG.workerVdaRatePerDay}/day (forced)`);
+      }
+
       const assembled = assemblePayrollInputs(year, month, {
         employees, salaries, attendance, punches: [], leaves, advances,
         canteen: canteen.filter((c: any) => c.approval_status === 'approved'),
@@ -169,8 +221,31 @@ Deno.serve(async (req) => {
       const idByCode = new Map(employees.map((e: any) => [e.emp_code, e.id]));
       const items: any[] = [];
       const held: any[] = [];
-      for (const input of assembled.inputs) {
-        const result = calculateOne(input);
+
+      // ---- top-up mode: only employees with no item yet in ANY non-cancelled run of this period
+      const topup = !!run.adjustment_of;
+      let skippedAlreadyPaid = 0;
+      let inputs = assembled.inputs;
+      if (topup) {
+        const { data: periodRuns } = await supabase
+          .from('pay_runs').select('id').eq('pay_period_id', run.pay_period_id).neq('status', 'cancelled');
+        const runIds = (periodRuns ?? []).map((r: any) => r.id);
+        const paid = new Set<string>();
+        if (runIds.length) {
+          const { data: paidItems, error: pErr } = await supabase
+            .from('pay_run_items').select('employee_id').in('pay_run_id', runIds);
+          if (pErr) return json({ error: 'could not read existing items: ' + pErr.message }, 500);
+          for (const it of paidItems ?? []) paid.add(it.employee_id);
+        }
+        inputs = assembled.inputs.filter((i: any) => {
+          const already = paid.has(idByCode.get(i.empCode) as string);
+          if (already) skippedAlreadyPaid++;
+          return !already;
+        });
+      }
+
+      for (const input of inputs) {
+        const result = calculateOne(input, cfg);
         if (result.held) { held.push({ empCode: input.empCode, blockers: result.blockers }); continue; }
         items.push({
           pay_run_id: payRunId,
@@ -197,13 +272,20 @@ Deno.serve(async (req) => {
       const { error: tErr } = await supabase.from('pay_runs').update({ status: 'calculated' }).eq('id', payRunId);
       if (tErr) return json({ error: 'status transition failed after items written: ' + tErr.message }, 500);
 
+      const warnings = [...extraWarnings, ...assembled.warnings];
       await audit(payRunId, {
         event: 'calculate', items: items.length, held: held.length,
-        warnings: assembled.warnings.length,
+        warnings: warnings.length, vdaRatePerDay: cfg.workerVdaRatePerDay,
+        ...(topup ? { topup: true, skippedAlreadyPaid } : {}),
       });
       return json({
         ok: true, calculated: items.length, held,
-        warnings: assembled.warnings,
+        warnings,
+        vdaRatePerDay: cfg.workerVdaRatePerDay,
+        ...(topup ? {
+          topup: true, skippedAlreadyPaid,
+          ...(items.length === 0 ? { message: 'Nothing to pay: every eligible employee already has an item in this pay period (or is still held).' } : {}),
+        } : {}),
         blockedEmployees: assembled.blockedEmployees,
         reconciliation: assembled.reconciliation,
       });
@@ -213,8 +295,9 @@ Deno.serve(async (req) => {
     if (action === 'arrears_sep26_30') {
       const { payRunId } = body;
       const { data: run } = await supabase
-        .from('pay_runs').select('status, pay_periods(month, year)').eq('id', payRunId).single();
+        .from('pay_runs').select('status, adjustment_of, pay_periods(month, year)').eq('id', payRunId).single();
       if (!run) return json({ error: 'pay run not found' }, 404);
+      if (run.adjustment_of) return json({ error: 'arrears helper is not available for top-up runs' }, 400);
       if (run.pay_periods.month !== '10' || run.pay_periods.year !== '2026') {
         return json({ error: 'arrears helper is only for October 2026' }, 400);
       }
