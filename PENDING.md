@@ -1,3 +1,8 @@
+# >>> IN-FLIGHT (21 Oct 2026): payroll gaps build — see CLAUDE.md "IN-FLIGHT BUILD — payroll gaps" for the full state and next steps <<<
+- [ ] Backend branch `claude/payroll-gaps-backend` (PATCH_103 + payroll-run index.ts): agent was still running — check it, verify, merge, then deploy `payroll-run` v4 (verify_jwt true).
+- [ ] Screens branch `claude/payroll-gaps-screens` (commits 62c6d34, 32a6d32, 5d9b34d): built and pushed, NOT merged. Merge after backend; confirm 422 "monthly VDA rate not entered" JSON body shape end to end.
+- [ ] After deploy: HR enters the October VDA per-day rate (Payroll Rates screen) before the October run; test top-up, advance recovery, exit screen on the new APK.
+
 # Forge OS — Pending Work Tracker
 
 Living checklist. Updated at the end of every work session, before the final

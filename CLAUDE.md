@@ -856,6 +856,32 @@ screens each built by a Sonnet agent, reviewed and live-tested by Claude.
   on Yash's phone (apk-94), 11 Oct 2026** — keep this patch; if a future
   screen clips again, check it isn't overriding fontFamily first.
 
+## IN-FLIGHT BUILD — payroll gaps (items 1, 2, 6 + top-up run), started 21 Oct 2026 — READ THIS FIRST IF A SESSION RESTARTS
+
+**Decision (Yash, 21 Oct 2026):** "build items 1, 2, 6 and the top-up run" after a gap audit of the old HR OS vs the app. Claude-verified facts behind it:
+- **Item 6 (advance recovery) was a real bug:** `feedSync` deducts `min(monthly_deduction, outstanding_balance)` for approved `advance_requests` every month but nothing ever reduces `outstanding_balance` (7 approved advances, ~₹857,000 outstanding live) → deductions would repeat forever. Fix = recover at finalize, idempotent.
+- **Item 1 (monthly VDA rate):** the NEW `payroll-run` engine ignored `payroll_monthly_rates` (0 rows) and used the fixed default 103; only the old `run-payroll` read it. Fix = HR entry screen + `calculate` reads the month's rate; no rate row → 422 unless `force:true` (then default 103 + warning). **HR must enter the October rate before the October run.**
+- **Item 2 (employee exit):** `employee_status_history` had no writer/UI; exits were plain `is_active=false` (and feedSync skips inactive people with no history row → they get no final-month pay). Fix = `record_employee_status` RPC + screen + daily `apply_due_exits()` cron.
+- **Top-up run:** `pay_runs.adjustment_of` already exists. `create_topup {parentRunId}` makes a new draft run in the same period; its `calculate` only pays employees with NO item in any non-cancelled run of that period (so nobody is paid twice).
+
+**Two Sonnet agents, two branches (disjoint files), NOT yet merged:**
+1. `claude/payroll-gaps-screens` — ✅ DONE and pushed (commits 62c6d34, 32a6d32, 5d9b34d): `lib/payroll/client.ts` wrappers, `payroll-run.tsx` (Top-up badge/button, VDA-missing box, advances-recovered line), new `payroll-rates.tsx` + `employee-exit.tsx`, layout/More wiring, EN+HI i18n. tsc 7 (baseline), i18n clean, payroll tests 58/0, 22/0, 15/0. Not run on a device. **Open concern to verify:** the VDA-missing box detects `e.message` containing "monthly VDA rate not entered" and reads `detail.hint`; `payrollRun` surfaces only `data.error`, so confirm the 422 JSON body shape end to end.
+2. `claude/payroll-gaps-backend` — ⏳ agent `aa22bc9214242ac3f` was STILL RUNNING when this note was written. Brief: `scripts/PATCH_103_payroll_gaps_21Oct2026.sql` (applied live by the agent: `advance_recoveries` table + `apply_advance_recoveries(run)` service-role only; `record_employee_status`; `apply_due_exits` + pg_cron `apply-due-exits` 18:40 UTC; `set_monthly_vda_rate`) and `supabase/functions/payroll-run/index.ts` changes (finalize calls the recovery RPC BEFORE the status update; `create_topup`; top-up filter in `calculate`; VDA gate; arrears helper rejects top-ups). It was told NOT to deploy the edge function.
+
+**Next steps, in order (Claude verifies, agents edit — Sonnet, `model:"sonnet"`):**
+1. Wait for / check the backend agent's report; check `git branch -r` for `claude/payroll-gaps-backend`. If it died, finish from its branch/worktree rather than restarting.
+2. Verify independently: read the PATCH_103 SQL and the index.ts diff; re-run rolled-back live tests (recovery decrements balance once and is idempotent; exit RPC owner-only; VDA RPC owner-only; anon has no execute; `authenticated` has NO execute on `apply_advance_recoveries`/`apply_due_exits`); live counts must be unchanged (24 archived runs, 652 items, advance balances untouched); regression 58/0, feedsync 22/0, export 15/0, tsc 7, i18n clean.
+3. Confirm the 422 body shape matches what the screen expects (`{error:'monthly VDA rate not entered', hint:...}` as JSON); adjust screen or function if not.
+4. Open PRs for both branches into `claude/forge-os-backend-setup-7woj4t`, squash-merge (backend first, then screens). Screens touch `app/`, `lib/`, `i18n/` → triggers an APK build (expect apk-101 or later; verify the RELEASE exists via job steps/`get_release_by_tag`, not just run status).
+5. Deploy `payroll-run` (v4) via the Supabase MCP tool with `verify_jwt: true` (Sonnet agent does the deploy; file set = index.ts + `lib/` vendored files; check the deployed source against the repo afterwards, and diff `origin/claude/forge-os-backend-setup-7woj4t` first — the recurring stray "noop" commits blank this file).
+6. Update this section, the patch table (PATCH_103), the Payroll section and PENDING.md; tell Yash: HR must enter the Oct VDA rate; test the new screens on apk after install; top-up and recovery are untested on a real finalized run.
+
+Other state at the time of writing: all earlier work this session is merged and documented (PATCH_99–102, items_self fix, bank file in old-sheet column names EMP_ID/EMPLOYEE_NAME/BANK_NAME/BANK_ACCOUNT/IFSC/NET_PAY, bulk-salary explicit columns, Netlify omit-path fix, apk-99 published). Still waiting on Yash/HR (unchanged): U6/U7 salary figures (VFL1389/1556/1566/5322/5442, VFL5464), bank details for CON01/20/21/22/23, passbook check of the 7 consultant accounts, PATCH_96 24-vs-23 question, source of the stray "noop" commits, real-phone test of the payroll screens, October month-end run, November late-marking review.
+
+Not being built (Yash did not select them; do not build unasked): readiness-check screen/exceptions table, society carry-forward, payslip email, holiday calendar, corrections log, audit-log viewer, payroll Telegram/push digests. Old HR OS had no PF/ESI/PT filing reports either.
+
+---
+
 ## Payroll module (branch `claude/payroll-lifecycle`) — status 20 Oct 2026
 
 **🔒 Decisions from Yash, 21 Oct 2026 (recorded the moment given):**
