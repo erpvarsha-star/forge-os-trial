@@ -12,7 +12,33 @@ export interface CalculateResult {
   warnings: string[]
   blockedEmployees: { empCode: string; reason: string }[]
   reconciliation: { empCode: string; date: string; adminStatus: string; mismatch: string }[]
+  // Added with top-up runs / monthly VDA rate
+  vdaRatePerDay?: number | null
+  topup?: boolean
+  skippedAlreadyPaid?: number
 }
+
+export interface AdvanceRecovery {
+  recovered_total: number
+  employees: number
+  unmatched: unknown[]
+}
+
+export interface TransitionResult {
+  ok?: boolean
+  status?: string
+  // Only present when transitioning to 'finalized'
+  advanceRecovery?: AdvanceRecovery
+}
+
+export interface TopupResult {
+  payRunId: string
+  parentRunId: string
+  status: string
+}
+
+// The server answers calculate with HTTP 422 + this message when no VDA rate is entered for the month.
+export const VDA_RATE_MISSING_ERROR = 'monthly VDA rate not entered'
 
 export interface RunSummary {
   employees: number
@@ -68,3 +94,8 @@ export const PAYROLL_MONTH_LABEL = (month: number, year: number) => {
 }
 
 export const exportPayRun = (payRunId: string) => payrollRun<PayRunExport>('export', { payRunId })
+
+export const createTopupRun = (parentRunId: string) => payrollRun<TopupResult>('create_topup', { parentRunId })
+
+export const transitionRun = (payRunId: string, to: string) =>
+  payrollRun<TransitionResult>('transition', { payRunId, to })
