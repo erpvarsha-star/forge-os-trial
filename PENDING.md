@@ -1072,6 +1072,17 @@ below. Empty tables and a broken sync look identical from the app.
 
 ## ✅ Completed setup items (Sep 2026)
 
+- [ ] **Netlify deployment — NOT DONE per Yash, 21 Oct 2026 (recorded on his instruction).**
+      What I verified: the PR #18 deploy preview failed at Netlify's secrets scan
+      (public Firebase key in `google-services.json`); PR #19 added
+      `SECRETS_SCAN_OMIT_PATHS = "google-services.json"` and Netlify's own rebuild
+      of the branch (deploy `6ad805ab…`, site `forge-os-review`) reported `ready`
+      with 0 secret matches. I did NOT confirm the live dashboard's content or that
+      `APPS_SCRIPT_URL` produces a working production panel, and Yash says the
+      deployment is not done — so treat it as unfinished. Needs: ask Yash what he
+      sees (which site/URL, what is missing), check the `APPS_SCRIPT_URL` env var
+      on the right Netlify site, and re-check the preview for PR #20 (not yet looked at).
+
 - [x] **Netlify dashboard deploy + production panel — committed 10 Sep 2026.**
       Added `netlify.toml` (static deploy config) and a Production & collections
       card to `dashboard/index.html` that fetches the Apps Script aggregator
