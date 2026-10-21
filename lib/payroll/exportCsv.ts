@@ -1,12 +1,12 @@
 /**
  * Pay-run export builders (pure functions, no I/O).
- * DEFAULT layout — awaiting the bank's required upload format.
+ * Bank file mirrors the old HR OS salary sheet's column names and order
+ * (EMP_ID, EMPLOYEE_NAME, BANK_NAME, BANK_ACCOUNT, IFSC, NET_PAY); no narration.
  * Salary sheet: one row per employee, earnings/deductions columns are the union
  * of keys across all rows. Bank file: net pay per employee with bank details.
  * Tolerant of lean/historical snapshots (missing keys never throw).
  */
 // Self-contained on purpose: no supabase import, so it runs under plain tsx.
-const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 export interface SalaryRow {
   empCode: string
@@ -71,13 +71,13 @@ export function buildSalarySheetCsv(rows: SalaryRow[]): string {
 export function buildBankFileCsv(
   rows: BankRow[], month: number, year: number,
 ): { csv: string; missingBank: string[] } {
-  const narration = `Salary ${MON[month - 1] ?? ''} ${year}`
+  void month; void year // kept for call-site compatibility; the old-sheet layout has no narration
   const list = byCode(rows ?? []).filter((r) => num(r.netPay) > 0)
   const missingBank: string[] = []
-  const out = [line(['Emp Code', 'Name', 'Bank Name', 'Account No', 'IFSC', 'Net Pay', 'Narration'])]
+  const out = [line(['EMP_ID', 'EMPLOYEE_NAME', 'BANK_NAME', 'BANK_ACCOUNT', 'IFSC', 'NET_PAY'])]
   for (const r of list) {
     if (!r.accountNo || !r.ifsc) missingBank.push(r.empCode)
-    out.push(line([r.empCode, r.name, r.bankName ?? '', r.accountNo ?? '', r.ifsc ?? '', money(r.netPay), narration]))
+    out.push(line([r.empCode, r.name, r.bankName ?? '', r.accountNo ?? '', r.ifsc ?? '', money(r.netPay)]))
   }
   return { csv: BOM + out.join('\r\n') + '\r\n', missingBank }
 }
