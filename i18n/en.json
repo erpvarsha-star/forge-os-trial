@@ -632,6 +632,28 @@
       "WO": "Week off"
     }
   },
+  "onboarding": {
+    "title": "Onboarding",
+    "menuLabel": "Onboarding",
+    "subtitle": "Department sign-offs for each new employee",
+    "search": "Search by name or code",
+    "filterAll": "All",
+    "filterInProgress": "In progress",
+    "filterOnboarded": "Onboarded",
+    "progress": "{{done}}/{{total}}",
+    "onboarded": "Onboarded",
+    "noEmployees": "No employees match",
+    "departments": "Department sign-offs",
+    "notes": "Notes (optional)",
+    "saveNote": "Save",
+    "completedBy": "Done by {{who}} on {{when}}",
+    "pending": "Pending",
+    "saveFailed": "Could not save",
+    "loadFailed": "Could not load onboarding data",
+    "open": "Onboarding",
+    "close": "Close",
+    "allDone": "All {{total}} departments signed off"
+  },
   "shiftAllocator": {
     "tab": "Shift Allocation",
     "sub": "Set weekly shifts for your team",

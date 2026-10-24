@@ -632,6 +632,28 @@
       "WO": "साप्ताहिक अवकाश"
     }
   },
+  "onboarding": {
+    "title": "ऑनबोर्डिंग",
+    "menuLabel": "ऑनबोर्डिंग",
+    "subtitle": "हर नए कर्मचारी के लिए विभागवार मंज़ूरी",
+    "search": "नाम या कोड से खोजें",
+    "filterAll": "सभी",
+    "filterInProgress": "प्रक्रिया में",
+    "filterOnboarded": "ऑनबोर्ड हो चुके",
+    "progress": "{{done}}/{{total}}",
+    "onboarded": "ऑनबोर्ड हो गए",
+    "noEmployees": "कोई कर्मचारी नहीं मिला",
+    "departments": "विभागवार मंज़ूरी",
+    "notes": "टिप्पणी (वैकल्पिक)",
+    "saveNote": "सहेजें",
+    "completedBy": "{{who}} द्वारा {{when}} को पूर्ण",
+    "pending": "लंबित",
+    "saveFailed": "सहेज नहीं सके",
+    "loadFailed": "ऑनबोर्डिंग डेटा लोड नहीं हो सका",
+    "open": "ऑनबोर्डिंग",
+    "close": "बंद करें",
+    "allDone": "सभी {{total}} विभागों की मंज़ूरी पूरी"
+  },
   "shiftAllocator": {
     "tab": "शिफ्ट आवंटन",
     "sub": "अपनी टीम के लिए साप्ताहिक शिफ्ट सेट करें",
