@@ -619,7 +619,18 @@
     "resetPinAction": "PIN रीसेट करें",
     "employeeNotFound": "उस कोड के लिए कोई सक्रिय कर्मचारी नहीं मिला",
     "pinResetTitle": "PIN रीसेट हुआ",
-    "pinResetBody": "{{name}} का PIN {{pin}} पर रीसेट कर दिया गया है। उन्हें इसके साथ लॉगिन करने को कहें, उन्हें नया PIN सेट करने के लिए कहा जाएगा।"
+    "pinResetBody": "{{name}} का PIN {{pin}} पर रीसेट कर दिया गया है। उन्हें इसके साथ लॉगिन करने को कहें, उन्हें नया PIN सेट करने के लिए कहा जाएगा।",
+    "puneAttendance": "पुणे उपस्थिति",
+    "puneSaved": "{{count}} कर्मचारी की उपस्थिति सहेजी गई",
+    "puneNoEmployees": "पुणे में कोई सक्रिय कर्मचारी नियुक्त नहीं है।",
+    "puneReminderNote": "यदि दिन की पुणे उपस्थिति दर्ज नहीं हुई है तो शाम 19:00 IST पर रिमाइंडर भेजा जाता है।",
+    "punchedAt": "{{time}} बजे पंच किया",
+    "puneStatus": {
+      "P": "उपस्थित",
+      "L": "देर से",
+      "HL": "आधा दिन",
+      "WO": "साप्ताहिक अवकाश"
+    }
   },
   "shiftAllocator": {
     "tab": "शिफ्ट आवंटन",
@@ -1002,6 +1013,38 @@
     "exitSaved": "स्थिति दर्ज हो गई",
     "exitHistory": "हाल का इतिहास",
     "exitNoHistory": "कोई इतिहास नहीं",
-    "exitInactiveTag": "निष्क्रिय"
+    "exitInactiveTag": "निष्क्रिय",
+    "warnMenuLabel": "पेरोल चेतावनियाँ",
+    "warnTitle": "पेरोल चेतावनियाँ",
+    "warnPendingCount": "{{count}} चेतावनी पर निर्णय बाकी",
+    "warnFilterPending": "लंबित",
+    "warnFilterAll": "सभी",
+    "warnEmpty": "कोई चेतावनी नहीं",
+    "warnWaive": "माफ़ करें",
+    "warnDeduct": "कटौती",
+    "warnDeductInfo": "कटौती केवल आपका निर्णय दर्ज करती है। काटी जाने वाली राशि फिर भी पेरोल इनपुट में समायोजन के रूप में दर्ज करनी होगी।",
+    "warnNeedDecision": "इस रन को समीक्षा में भेजने से पहले {{count}} चेतावनी पर निर्णय ज़रूरी है",
+    "warnOpen": "चेतावनियाँ देखें",
+    "warnType": {
+      "late_excess": "अधिक देरी से आना",
+      "no_punch": "कोई पंच दर्ज नहीं",
+      "punched_absent": "पंच किया पर अनुपस्थित दर्ज",
+      "missing_efficiency": "दक्षता दर्ज नहीं"
+    },
+    "warnDecision": {
+      "pending": "लंबित",
+      "waived": "माफ़",
+      "deduct": "कटौती"
+    },
+    "warnDetail": {
+      "late_days": "देरी के दिन",
+      "lateDays": "देरी के दिन",
+      "count": "संख्या",
+      "dates": "तारीखें",
+      "days": "दिन",
+      "date": "तारीख",
+      "grace": "अनुमत",
+      "category": "श्रेणी"
+    }
   }
 }

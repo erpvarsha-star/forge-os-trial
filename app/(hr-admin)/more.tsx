@@ -13,7 +13,7 @@ import { CountPill } from '@/components/CountPill'
 import { useActionCountsStore } from '@/hooks/useAssignedTasks'
 import { TaskMenuRows } from '@/components/TaskMenuRows'
 import { removePushToken } from '@/lib/notifications'
-import { LogOut, Globe, Settings, ChevronRight, AlertCircle, CreditCard, Users, Eye, Clock, CheckSquare, FileText, Table2, IndianRupee, UtensilsCrossed, Percent, UserMinus } from 'lucide-react-native'
+import { LogOut, Globe, Settings, ChevronRight, AlertCircle, CreditCard, Users, Eye, Clock, CheckSquare, FileText, Table2, IndianRupee, UtensilsCrossed, Percent, UserMinus, AlertTriangle, MapPin } from 'lucide-react-native'
 import { router } from 'expo-router'
 import { BRAND, INK } from '@/components/theme'
 
@@ -32,6 +32,8 @@ export default function HRAdminMore() {
     { key: 'payroll-feeds', label: t('payroll.feedsMenuLabel'), icon: <UtensilsCrossed size={20} color={INK[500]} />, path: '/(hr-admin)/payroll-feeds' },
     { key: 'payroll-rates', label: t('payroll.ratesMenuLabel'), icon: <Percent size={20} color={INK[500]} />, path: '/(hr-admin)/payroll-rates' },
     { key: 'employee-exit', label: t('payroll.exitMenuLabel'), icon: <UserMinus size={20} color={INK[500]} />, path: '/(hr-admin)/employee-exit' },
+    { key: 'payroll-warnings', label: t('payroll.warnMenuLabel'), icon: <AlertTriangle size={20} color={INK[500]} />, path: '/(hr-admin)/payroll-warnings' },
+    { key: 'pune-attendance', label: t('hrAdmin.puneAttendance'), icon: <MapPin size={20} color={INK[500]} />, path: '/(hr-admin)/pune-attendance' },
     { key: 'missing-data', label: t('hrAdmin.missingData'), icon: <AlertCircle size={20} color={INK[500]} />, path: '/(hr-admin)/missing-data' },
     { key: 'advance-ledger', label: t('hrAdmin.advanceLedger'), icon: <CreditCard size={20} color={INK[500]} />, path: '/(hr-admin)/advance-ledger' },
     { key: 'new-employee-flow', label: t('hrAdmin.newEmployeeFlow'), icon: <Users size={20} color={INK[500]} />, path: '/(hr-admin)/new-employee-flow' },

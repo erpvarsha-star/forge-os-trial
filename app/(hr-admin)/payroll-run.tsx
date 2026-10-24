@@ -10,7 +10,7 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import * as FileSystem from 'expo-file-system'
 import * as Sharing from 'expo-sharing'
-import { payrollRun, exportPayRun, createTopupRun, transitionRun, PAYROLL_MONTH_LABEL, VDA_RATE_MISSING_ERROR, CalculateResult, RunSummary, TransitionResult } from '@/lib/payroll/client'
+import { payrollRun, exportPayRun, createTopupRun, transitionRun, PAYROLL_MONTH_LABEL, VDA_RATE_MISSING_ERROR, WARNINGS_PENDING_ERROR, CalculateResult, RunSummary, TransitionResult } from '@/lib/payroll/client'
 import { buildSalarySheetCsv, buildBankFileCsv } from '@/lib/payroll/exportCsv'
 import { istMonthYear } from '@/lib/istDate'
 import { BRAND, STATUS, INK } from '@/components/theme'
@@ -41,6 +41,8 @@ export default function PayrollRunScreen() {
   // Result of the last Calculate / Finalize on this screen (cleared when the run changes)
   const [calc, setCalc] = useState<{ runId: string; result: CalculateResult } | null>(null)
   const [vdaMissing, setVdaMissing] = useState<{ hint: string | null } | null>(null)
+  // Attendance warnings awaiting a decision (set after Calculate, or by a blocked move-to-review)
+  const [warnPending, setWarnPending] = useState<number | null>(null)
   const [recovery, setRecovery] = useState<TransitionResult['advanceRecovery'] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -81,7 +83,7 @@ export default function PayrollRunScreen() {
 
   useEffect(() => { refresh() }, [refresh])
   // Month change shows a different run — drop the previous run's transient results
-  useEffect(() => { setCalc(null); setVdaMissing(null); setRecovery(null) }, [month, year])
+  useEffect(() => { setCalc(null); setVdaMissing(null); setRecovery(null); setWarnPending(null) }, [month, year])
 
   if (!employee) return <LoadingScreen />
 
@@ -194,11 +196,22 @@ export default function PayrollRunScreen() {
                       }
                       setVdaMissing(null)
                       setCalc({ runId: run.id, result: r })
+                      setWarnPending(r.warningsCount ?? 0)
                       Alert.alert(t('payroll.calculated', { count: r.calculated }),
                         (r.held.length ? t('payroll.heldNote', { count: r.held.length }) + '\n' : '')
                         + (r.warnings.length ? t('payroll.warningsNote', { count: r.warnings.length }) : ''))
                     }, t('payroll.calculateConfirm'))} />
               )}
+              {warnPending ? (
+                <View className="mt-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                  <View className="flex-row items-center gap-2">
+                    <AlertTriangle size={16} color="#B45309" />
+                    <Text className="text-sm font-bold text-amber-700 flex-1">{t('payroll.warnNeedDecision', { count: warnPending })}</Text>
+                  </View>
+                  <Button title="payroll.warnOpen" variant="secondary" size="md" className="mt-2"
+                    onPress={() => router.push({ pathname: '/(hr-admin)/payroll-warnings', params: { runId: run!.id } } as any)} />
+                </View>
+              ) : null}
               {vdaMissing && (
                 <View className="mt-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
                   <View className="flex-row items-center gap-2">
@@ -238,7 +251,14 @@ export default function PayrollRunScreen() {
                 {run.status === 'calculated' && (
                   <Button title="payroll.moveToReview" variant="secondary" size="md" className="mt-1" loading={busy === 'tr'}
                     icon={<Send size={16} color={BRAND[600]} />}
-                    onPress={() => act('tr', () => payrollRun('transition', { payRunId: run.id, to: 'in_review' }))} />
+                    onPress={() => act('tr', async () => {
+                      try { await payrollRun('transition', { payRunId: run.id, to: 'in_review' }); setWarnPending(null) }
+                      catch (e: any) {
+                        // 409: undecided attendance warnings — show the count and the decision screen instead of a bare error
+                        if (String(e?.message ?? '') === WARNINGS_PENDING_ERROR) { setWarnPending(Number(e?.detail?.pendingCount) || 1); return }
+                        throw e
+                      }
+                    })} />
                 )}
                 {run.status === 'in_review' && (
                   <Button title="payroll.approveRun" variant="primary" size="md" className="mt-1" loading={busy === 'tr'}
