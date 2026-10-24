@@ -1044,7 +1044,7 @@
     "warnEmpty": "No warnings",
     "warnWaive": "Waive",
     "warnDeduct": "Deduct",
-    "warnDeductInfo": "Deduct only records your decision. Any amount to be deducted must still be entered as an adjustment in Payroll Inputs.",
+    "warnDeductInfo": "Deduct only records your decision. The deduction amount is not applied automatically. Suggested formula: late minutes / 480 x day rate (pending owner confirmation). Enter it as an adjustment in Payroll Feeds.",
     "warnNeedDecision": "{{count}} warning(s) need a decision before this run can move to review",
     "warnOpen": "Review warnings",
     "warnType": {
@@ -1067,6 +1067,30 @@
       "date": "Date",
       "grace": "Allowed",
       "category": "Category"
-    }
+    },
+    "warnAwaitingCount": "{{count}} awaiting AI review",
+    "warnKindOver30": "Over 30 minutes late",
+    "warnKindOverFreeQuota": "Beyond the 3 free late arrivals",
+    "warnNthFree": "Late #{{n}} of the month",
+    "warnLateMinutes": "{{count}} min late",
+    "warnReason": "Reason",
+    "warnNoReason": "No reason given",
+    "warnAiReviewing": "AI review…",
+    "warnAgreed": "Agreed",
+    "warnConcern": "Concern",
+    "warnAwaitingReview": "Awaiting AI review",
+    "warnRetryReview": "Retry review",
+    "warnReviewFailed": "AI review could not be completed. Use Retry review.",
+    "precheckTitle": "Pre-check",
+    "precheckHint": "Find attendance warnings before calculating. Decide each one, and wait for the AI review.",
+    "precheckRun": "Run pre-check",
+    "precheckDone": "{{count}} warning(s) found",
+    "precheckStatus": "Pending decision: {{pending}}. Awaiting AI review: {{unreviewed}}.",
+    "precheckReady": "Ready to calculate",
+    "precheckNotReady": "Not ready to calculate",
+    "notReadyTitle": "Warnings are not ready",
+    "notReadyBody": "{{pending}} warning(s) are pending a decision and {{unreviewed}} are awaiting AI review. Calculate is blocked until both are zero.",
+    "retryReview": "Retry review",
+    "retryReviewDone": "Review requested. Pre-check updated."
   }
 }
