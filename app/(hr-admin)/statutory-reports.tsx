@@ -14,9 +14,9 @@ import { BRAND, STATUS, INK } from '@/components/theme'
 import { ChevronLeft, ChevronRight, Download, AlertTriangle } from 'lucide-react-native'
 import { mergeRows, buildPfEcr, buildEsi, buildPt, buildMlwf, isMlwfMonth, StatRow } from '@/lib/statutory'
 
-// Only fully finalized runs: statutory returns must never be filed on numbers that can still change.
-const REPORTABLE = ['finalized', 'payment_file_generated', 'paid', 'archived']
-const RANK: Record<string, number> = { finalized: 1, payment_file_generated: 2, paid: 3, archived: 4 }
+// Approved or later runs (owner request): approved is the least-final status shown in the run-status chip.
+const REPORTABLE = ['approved', 'finalized', 'payment_file_generated', 'paid', 'archived']
+const RANK: Record<string, number> = { approved: 0, finalized: 1, payment_file_generated: 2, paid: 3, archived: 4 }
 const chunk = <T,>(a: T[], n: number) => Array.from({ length: Math.ceil(a.length / n) }, (_, i) => a.slice(i * n, i * n + n))
 const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`
 const daysIn = (month: number, year: number) => new Date(Date.UTC(year, month, 0)).getUTCDate() // pure calendar arithmetic, not "today"
