@@ -619,7 +619,18 @@
     "resetPinAction": "Reset PIN",
     "employeeNotFound": "No active employee found for that code",
     "pinResetTitle": "PIN Reset",
-    "pinResetBody": "{{name}}'s PIN has been reset to {{pin}}. Tell them to log in with this and they'll be asked to set a new one."
+    "pinResetBody": "{{name}}'s PIN has been reset to {{pin}}. Tell them to log in with this and they'll be asked to set a new one.",
+    "puneAttendance": "Pune Attendance",
+    "puneSaved": "Saved attendance for {{count}} employee(s)",
+    "puneNoEmployees": "No active employees are assigned to Pune.",
+    "puneReminderNote": "A reminder is sent at 19:00 IST if no Pune attendance has been entered for the day.",
+    "punchedAt": "Punched in at {{time}}",
+    "puneStatus": {
+      "P": "Present",
+      "L": "Late",
+      "HL": "Half day",
+      "WO": "Week off"
+    }
   },
   "shiftAllocator": {
     "tab": "Shift Allocation",
