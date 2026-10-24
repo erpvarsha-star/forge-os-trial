@@ -1,7 +1,9 @@
 // Forge OS — Pay run runner (edge function).
 // Actions (POST body.action):
 //   create     { month, year, name? }          -> create draft pay_run (+ pay_period if missing)
-//   calculate  { payRunId, force? }            -> assemble feeds, run engine, write pay_run_items
+//   generate_warnings { runId }                -> pre-check: compute + idempotently sync pay_run_warnings (draft only)
+//   calculate  { payRunId, force? }            -> sync warnings, gate on pay_run_ready_to_calculate (422), then
+//                                                 assemble feeds, run engine, write pay_run_items
 //   transition { payRunId, to }                -> state-machine move (DB trigger enforces legality);
 //                                                 to='finalized' first applies advance recoveries (PATCH_103)
 //   create_topup { parentRunId }               -> supplementary draft run for employees held in a regular run
@@ -20,7 +22,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { assemblePayrollInputs } from './lib/feedSync.ts';
 import { calculateOne, DEFAULT_ENGINE_CONFIG } from './lib/engine.ts';
 import { PAY_RUN_TRANSITIONS } from './lib/payRunStateMachine.ts';
-import { computeRunWarnings, countByType } from './lib/warnings.ts';
+import { computeRunWarnings, countByType, diffWarnings } from './lib/warnings.ts';
 import { notifyPayslipReady } from './lib/appNotify.ts';
 
 const cors = {
@@ -30,6 +32,114 @@ const cors = {
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
+
+// ------------------------------------------------------------------ shared helpers
+const safe = async (q: PromiseLike<any>) => { try { const r = await q; return r.data ?? []; } catch { return []; } };
+
+/** Fetch every feed the engine + warnings need for one pay month (PATCH_91 tables degrade gracefully). */
+async function loadFeeds(supabase: any, year: number, month: number) {
+  const mm = String(month).padStart(2, '0');
+  const payrollMonth = `${year}-${mm}`; // PATCH_91 feed key
+  const periodEnd = `${year}-${mm}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`;
+  const [employees, salaries, attendance, leaves, advances, canteen, society, efficiency, adjustments, statusEvents] =
+    await Promise.all([
+      safe(supabase.from('employees').select('id,emp_code,name,category,work_location,gender,is_active,weekly_off_day,pt_exempt')),
+      safe(supabase.from('employee_salary_structure').select('*')),
+      safe(supabase.from('attendance_records').select('employee_id,date,status,overtime_hours,check_in_time,check_out_time,late_minutes,late_reason')
+        .gte('date', `${year}-${mm}-01`).lte('date', periodEnd)),
+      safe(supabase.from('leave_requests').select('employee_id,type,start_date,end_date,days,status')),
+      safe(supabase.from('advance_requests').select('employee_id,monthly_deduction,outstanding_balance,status')),
+      safe(supabase.from('payroll_canteen_entries').select('employee_id,amount_inr,approval_status')
+        .eq('payroll_month', payrollMonth)),
+      safe(supabase.from('payroll_society_recoveries').select('employee_id,total_recovery_inr,approval_status')
+        .eq('payroll_month', payrollMonth)),
+      safe(supabase.from('payroll_efficiency_entries').select('employee_id,efficiency_pct,approval_status')
+        .eq('payroll_month', payrollMonth)),
+      safe(supabase.from('payroll_adjustments').select('employee_id,adjustment_type,signed_amount_inr,approval_status')
+        .eq('payroll_month', payrollMonth)),
+      safe(supabase.from('employee_status_history').select('employee_id,status,effective_from')),
+    ]);
+  return { mm, payrollMonth, periodEnd, employees, salaries, attendance, leaves, advances, canteen, society,
+    efficiency, adjustments, statusEvents };
+}
+
+type Feeds = Awaited<ReturnType<typeof loadFeeds>>;
+
+/** Assemble engine inputs; for a top-up run keep only employees with no item yet in the period. */
+async function buildRunInputs(supabase: any, run: any, year: number, month: number, f: Feeds) {
+  const assembled = assemblePayrollInputs(year, month, {
+    employees: f.employees, salaries: f.salaries, attendance: f.attendance, punches: [], leaves: f.leaves,
+    advances: f.advances,
+    canteen: f.canteen.filter((c: any) => c.approval_status === 'approved'),
+    society: f.society.filter((c: any) => c.approval_status === 'approved'),
+    efficiency: f.efficiency, adjustments: f.adjustments, statusEvents: f.statusEvents,
+  });
+  const idByCode = new Map(f.employees.map((e: any) => [e.emp_code, e.id]));
+  const topup = !!run.adjustment_of;
+  let skippedAlreadyPaid = 0;
+  let inputs = assembled.inputs;
+  if (topup) {
+    const { data: periodRuns } = await supabase
+      .from('pay_runs').select('id').eq('pay_period_id', run.pay_period_id).neq('status', 'cancelled');
+    const runIds = (periodRuns ?? []).map((r: any) => r.id);
+    const paid = new Set<string>();
+    if (runIds.length) {
+      const { data: paidItems, error: pErr } = await supabase
+        .from('pay_run_items').select('employee_id').in('pay_run_id', runIds);
+      if (pErr) return { error: 'could not read existing items: ' + pErr.message } as const;
+      for (const it of paidItems ?? []) paid.add(it.employee_id);
+    }
+    inputs = assembled.inputs.filter((i: any) => {
+      const already = paid.has(idByCode.get(i.empCode) as string);
+      if (already) skippedAlreadyPaid++;
+      return !already;
+    });
+  }
+  return { assembled, inputs, idByCode, topup, skippedAlreadyPaid } as const;
+}
+
+/**
+ * Idempotent warning sync: insert missing rows, delete only still-pending rows that no longer apply,
+ * never touch waived/deduct rows. Throws on DB error.
+ */
+async function syncRunWarnings(supabase: any, runId: string, f: Feeds, inputs: any[]) {
+  const desired = computeRunWarnings({
+    attendance: f.attendance, employees: f.employees,
+    inputs: inputs.map((i: any) => ({ empCode: i.empCode, category: i.category, efficiencyPct: i.efficiencyPct })),
+  });
+  const { data: existing, error: eErr } = await supabase
+    .from('pay_run_warnings').select('id, employee_code, warning_type, detail, decision').eq('run_id', runId);
+  if (eErr) throw new Error('could not read warnings: ' + eErr.message);
+  const { toInsert, toDeleteIds } = diffWarnings(existing ?? [], desired);
+  if (toDeleteIds.length) {
+    const { error } = await supabase.from('pay_run_warnings').delete().in('id', toDeleteIds).eq('decision', 'pending');
+    if (error) throw new Error('warnings delete failed: ' + error.message);
+  }
+  if (toInsert.length) {
+    const { error } = await supabase.from('pay_run_warnings').insert(
+      toInsert.map((w) => ({ run_id: runId, employee_code: w.employee_code, warning_type: w.warning_type,
+        detail: w.detail, decision: 'pending' })));
+    if (error) throw new Error('warnings insert failed: ' + error.message);
+  }
+  return { inserted: toInsert.length, deleted: toDeleteIds.length };
+}
+
+/** Current state of a run's warnings + the DB-side readiness verdict. */
+async function warningStatus(supabase: any, runId: string) {
+  const { data: rows, error } = await supabase
+    .from('pay_run_warnings').select('warning_type, decision, agent_reviewed_at').eq('run_id', runId);
+  if (error) throw new Error('could not read warnings: ' + error.message);
+  const counts: Record<string, number> = {};
+  let pendingCount = 0, unreviewedCount = 0;
+  for (const r of rows ?? []) {
+    counts[r.warning_type] = (counts[r.warning_type] ?? 0) + 1;
+    if (r.decision === 'pending') pendingCount++;
+    else if (!r.agent_reviewed_at) unreviewedCount++;
+  }
+  const { data: ready, error: rErr } = await supabase.rpc('pay_run_ready_to_calculate', { p_run_id: runId });
+  if (rErr) throw new Error('readiness check failed: ' + rErr.message);
+  return { warningsCount: (rows ?? []).length, counts, pendingCount, unreviewedCount, ready: ready === true };
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -131,15 +241,17 @@ Deno.serve(async (req) => {
       if (!legal.includes(to)) {
         return json({ error: `illegal transition ${run.status} -> ${to}`, legalTargets: legal }, 409);
       }
-      // Warnings gate: every pay_run_warnings row must be waived/deducted before review starts.
+      // Warnings gate #2: every pay_run_warnings row must be waived/deducted before review starts
+      // (gate #1 is in 'calculate' via pay_run_ready_to_calculate, incl. the AI review).
       if (run.status === 'calculated' && to === 'in_review') {
-        const { count: pendingCount, error: wErr } = await supabase
-          .from('pay_run_warnings').select('id', { count: 'exact', head: true })
-          .eq('run_id', payRunId).eq('decision', 'pending');
+        const { data: resolved, error: wErr } = await supabase.rpc('pay_run_warnings_resolved', { p_run_id: payRunId });
         if (wErr) return json({ error: 'could not read warnings: ' + wErr.message }, 500);
-        if ((pendingCount ?? 0) > 0) {
+        if (resolved !== true) {
+          const { count: pendingCount } = await supabase
+            .from('pay_run_warnings').select('id', { count: 'exact', head: true })
+            .eq('run_id', payRunId).eq('decision', 'pending');
           return json({
-            error: 'warnings pending decision', pendingCount,
+            error: 'warnings pending decision', pendingCount: pendingCount ?? 0,
             hint: 'Resolve the warnings (waive or deduct) on the Payroll Warnings screen first',
           }, 409);
         }
@@ -171,6 +283,29 @@ Deno.serve(async (req) => {
       return json({ ok: true, from: run.status, to, ...extra });
     }
 
+    // ------------------------------------------------------ generate_warnings
+    // Pre-check: compute warnings from the same inputs 'calculate' would use and sync the table
+    // idempotently (decisions preserved). Writes no pay_run_items and changes no status.
+    if (action === 'generate_warnings') {
+      const { runId } = body;
+      const { data: run } = await supabase
+        .from('pay_runs').select('status, adjustment_of, pay_period_id, pay_periods(month, year)').eq('id', runId).single();
+      if (!run) return json({ error: 'pay run not found' }, 404);
+      if (run.status !== 'draft') return json({ error: `generate_warnings only from draft (current: ${run.status})` }, 409);
+      const month = Number(run.pay_periods.month), year = Number(run.pay_periods.year);
+      const f = await loadFeeds(supabase, year, month);
+      const built = await buildRunInputs(supabase, run, year, month, f);
+      if ('error' in built) return json({ error: built.error }, 500);
+      const sync = await syncRunWarnings(supabase, runId, f, built.inputs);
+      const st = await warningStatus(supabase, runId);
+      await audit(runId, { event: 'generate_warnings', ...sync, warningsCount: st.warningsCount, pendingCount: st.pendingCount });
+      return json({
+        ok: true, warningsCount: st.warningsCount, counts: st.counts,
+        pendingCount: st.pendingCount, unreviewedCount: st.unreviewedCount, ready: st.ready,
+        inserted: sync.inserted, deleted: sync.deleted,
+      });
+    }
+
     // ------------------------------------------------------------ calculate
     if (action === 'calculate') {
       const { payRunId, force } = body;
@@ -182,30 +317,8 @@ Deno.serve(async (req) => {
       }
       const month = Number(run.pay_periods.month);
       const year = Number(run.pay_periods.year);
-      const mm = String(month).padStart(2, '0');
-      const payrollMonth = `${year}-${mm}`; // PATCH_91 feed key
-      const periodEnd = `${year}-${mm}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`;
-
-      // ---- fetch feeds (PATCH_91 tables degrade gracefully if not yet applied)
-      const safe = async (q: PromiseLike<any>) => { try { const r = await q; return r.data ?? []; } catch { return []; } };
-      const [employees, salaries, attendance, leaves, advances, canteen, society, efficiency, adjustments, statusEvents] =
-        await Promise.all([
-          safe(supabase.from('employees').select('id,emp_code,name,category,work_location,gender,is_active,weekly_off_day,pt_exempt')),
-          safe(supabase.from('employee_salary_structure').select('*')),
-          safe(supabase.from('attendance_records').select('employee_id,date,status,overtime_hours,check_in_time,check_out_time')
-            .gte('date', `${year}-${mm}-01`).lte('date', periodEnd)),
-          safe(supabase.from('leave_requests').select('employee_id,type,start_date,end_date,days,status')),
-          safe(supabase.from('advance_requests').select('employee_id,monthly_deduction,outstanding_balance,status')),
-          safe(supabase.from('payroll_canteen_entries').select('employee_id,amount_inr,approval_status')
-            .eq('payroll_month', payrollMonth)),
-          safe(supabase.from('payroll_society_recoveries').select('employee_id,total_recovery_inr,approval_status')
-            .eq('payroll_month', payrollMonth)),
-          safe(supabase.from('payroll_efficiency_entries').select('employee_id,efficiency_pct,approval_status')
-            .eq('payroll_month', payrollMonth)),
-          safe(supabase.from('payroll_adjustments').select('employee_id,adjustment_type,signed_amount_inr,approval_status')
-            .eq('payroll_month', payrollMonth)),
-          safe(supabase.from('employee_status_history').select('employee_id,status,effective_from')),
-        ]);
+      const f = await loadFeeds(supabase, year, month);
+      const { mm, payrollMonth, employees, canteen, society, efficiency, adjustments } = f;
 
       // ---- feed-readiness gate: pending approvals block calculate unless forced
       const pendingFeeds = {
@@ -238,46 +351,24 @@ Deno.serve(async (req) => {
         extraWarnings.push(`No monthly VDA rate entered for ${payrollMonth}; using default ₹${DEFAULT_ENGINE_CONFIG.workerVdaRatePerDay}/day (forced)`);
       }
 
-      const assembled = assemblePayrollInputs(year, month, {
-        employees, salaries, attendance, punches: [], leaves, advances,
-        canteen: canteen.filter((c: any) => c.approval_status === 'approved'),
-        society: society.filter((c: any) => c.approval_status === 'approved'),
-        efficiency, adjustments, statusEvents,
-      });
+      const built = await buildRunInputs(supabase, run, year, month, f);
+      if ('error' in built) return json({ error: built.error }, 500);
+      const { assembled, inputs, idByCode, topup, skippedAlreadyPaid } = built;
+
+      // ---- warnings gate (before ANY item is written): sync is idempotent and keeps decisions
+      const runWarningsSync = await syncRunWarnings(supabase, payRunId, f, inputs);
+      const wst = await warningStatus(supabase, payRunId);
+      if (!wst.ready) {
+        return json({
+          error: 'warnings not ready', pendingCount: wst.pendingCount, unreviewedCount: wst.unreviewedCount,
+          hint: 'Decide every warning (waive/deduct) and wait for the AI review before calculating',
+        }, 422);
+      }
+      const warningCounts = wst.counts;
 
       // ---- run engine (still in draft — items are only written if the whole batch is sound)
-      const idByCode = new Map(employees.map((e: any) => [e.emp_code, e.id]));
       const items: any[] = [];
       const held: any[] = [];
-
-      // ---- top-up mode: only employees with no item yet in ANY non-cancelled run of this period
-      const topup = !!run.adjustment_of;
-      let skippedAlreadyPaid = 0;
-      let inputs = assembled.inputs;
-      if (topup) {
-        const { data: periodRuns } = await supabase
-          .from('pay_runs').select('id').eq('pay_period_id', run.pay_period_id).neq('status', 'cancelled');
-        const runIds = (periodRuns ?? []).map((r: any) => r.id);
-        const paid = new Set<string>();
-        if (runIds.length) {
-          const { data: paidItems, error: pErr } = await supabase
-            .from('pay_run_items').select('employee_id').in('pay_run_id', runIds);
-          if (pErr) return json({ error: 'could not read existing items: ' + pErr.message }, 500);
-          for (const it of paidItems ?? []) paid.add(it.employee_id);
-        }
-        inputs = assembled.inputs.filter((i: any) => {
-          const already = paid.has(idByCode.get(i.empCode) as string);
-          if (already) skippedAlreadyPaid++;
-          return !already;
-        });
-      }
-
-      // ---- persisted warnings (computed before anything is written)
-      const runWarnings = computeRunWarnings({
-        attendance, employees,
-        inputs: inputs.map((i: any) => ({ empCode: i.empCode, category: i.category, efficiencyPct: i.efficiencyPct })),
-      });
-      const warningCounts = countByType(runWarnings);
 
       for (const input of inputs) {
         const result = calculateOne(input, cfg);
@@ -302,22 +393,6 @@ Deno.serve(async (req) => {
         if (iErr) return json({ error: 'item insert failed (run still draft): ' + iErr.message }, 500);
       }
 
-      // Replace this run's warnings (draft run: none exist normally). On failure undo the items and stay draft.
-      {
-        const { error: dErr } = await supabase.from('pay_run_warnings').delete().eq('run_id', payRunId);
-        let wErr = dErr;
-        if (!wErr && runWarnings.length) {
-          const { error } = await supabase.from('pay_run_warnings').insert(
-            runWarnings.map((w) => ({ run_id: payRunId, employee_code: w.employee_code,
-              warning_type: w.warning_type, detail: w.detail, decision: 'pending' })));
-          wErr = error;
-        }
-        if (wErr) {
-          if (items.length) await supabase.from('pay_run_items').delete().eq('pay_run_id', payRunId);
-          return json({ error: 'warnings insert failed (run still draft, items removed): ' + wErr.message }, 500);
-        }
-      }
-
       // draft -> calculating -> calculated (two legal single steps per PATCH_89 trigger)
       await supabase.from('pay_runs').update({ status: 'calculating' }).eq('id', payRunId);
       const { error: tErr } = await supabase.from('pay_runs').update({ status: 'calculated' }).eq('id', payRunId);
@@ -327,13 +402,13 @@ Deno.serve(async (req) => {
       await audit(payRunId, {
         event: 'calculate', items: items.length, held: held.length,
         warnings: warnings.length, vdaRatePerDay: cfg.workerVdaRatePerDay,
-        warningsCount: runWarnings.length, warningCounts,
+        warningsCount: wst.warningsCount, warningCounts,
         ...(topup ? { topup: true, skippedAlreadyPaid } : {}),
       });
       return json({
         ok: true, calculated: items.length, held,
         warnings,
-        warningsCount: runWarnings.length, warningCounts,
+        warningsCount: wst.warningsCount, warningCounts,
         vdaRatePerDay: cfg.workerVdaRatePerDay,
         ...(topup ? {
           topup: true, skippedAlreadyPaid,
