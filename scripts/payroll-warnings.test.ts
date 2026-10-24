@@ -1,5 +1,5 @@
 /** Run warnings unit test — pure, fabricated rows. Run: npx tsx scripts/payroll-warnings.test.ts */
-import { computeRunWarnings, countByType, type AttendanceRow } from '../supabase/functions/payroll-run/lib/warnings.ts'
+import { computeRunWarnings, countByType, type AttendanceRow } from '../supabase/functions/payroll-run/lib/warnings'
 
 let pass = 0, fail = 0
 const check = (n: string, c: boolean, d = '') => { c ? (pass++, console.log(`  ok  ${n}`)) : (fail++, console.log(`FAIL  ${n} ${d}`)) }

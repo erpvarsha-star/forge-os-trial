@@ -18,6 +18,7 @@ FUNCTIONS=(
   "send-push-notification"
   "plant-head-form-reminder"
   "auto-checkout"
+  "pune-attendance-reminder"
 )
 
 # Deliberately NOT `set -e` around the loop: with it, the first bad function

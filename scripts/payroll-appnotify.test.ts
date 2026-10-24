@@ -1,5 +1,5 @@
 /** payslip_ready pure parts. Run: npx tsx scripts/payroll-appnotify.test.ts */
-import { monthLabelEn, monthLabelHi, buildPayslipRows, chunk, notifyPayslipReady } from '../supabase/functions/payroll-run/lib/appNotify.ts'
+import { monthLabelEn, monthLabelHi, buildPayslipRows, chunk, notifyPayslipReady } from '../supabase/functions/payroll-run/lib/appNotify'
 
 let pass = 0, fail = 0
 const check = (n: string, c: boolean, d = '') => { c ? (pass++, console.log(`  ok  ${n}`)) : (fail++, console.log(`FAIL  ${n} ${d}`)) }
