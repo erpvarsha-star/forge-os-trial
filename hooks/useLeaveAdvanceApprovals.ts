@@ -70,6 +70,10 @@ export function useLeaveAdvanceApprovals() {
     setActingId(id)
     const { error } = await supabase.rpc('review_advance_request', { p_id: id, p_approve: approve, p_note: note || null })
     setActingId(null)
+    // Tell the requester once the decision is final (server decides). Fire and forget — never blocks or fails the approval.
+    if (!error) {
+      try { supabase.functions.invoke('app-notify', { body: { action: 'advance_decision', advanceId: id } }).catch(() => {}) } catch {}
+    }
     if (!error) { await fetchApprovals(); refreshActionCounts() }
     return { error }
   }

@@ -8,6 +8,7 @@ import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { UpdateAppLink } from '@/components/UpdateAppLink'
+import { NotificationsMenuRow } from '@/components/NotificationsMenuRow'
 import { TaskMenuRows } from '@/components/TaskMenuRows'
 import { removePushToken } from '@/lib/notifications'
 import { LogOut, Globe, Briefcase, ChevronRight, FileText, Calendar } from 'lucide-react-native'
@@ -36,6 +37,8 @@ export default function ManagerMore() {
         </Card>
 
         <TaskMenuRows group="manager" canAssign={true} />
+
+        <NotificationsMenuRow group="manager" />
 
         <TouchableOpacity onPress={() => router.push('/(manager)/payslips')} className="mb-2 min-h-touch">
           <Card className="flex-row items-center justify-between">

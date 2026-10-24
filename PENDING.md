@@ -1,3 +1,11 @@
+# >>> IN-FLIGHT (24 Oct 2026): payroll-ops-features PR — see CLAUDE.md "Payroll ops features (24 Oct 2026)" <<<
+- [x] Built + merged on `claude/payroll-ops-features`: cleanup (run-payroll function dir, login-otp.tsx.bak removed), warnings v2 (per-date late rule, pre-check `generate_warnings`, calculate 422 gate, AI review `payroll-warning-review`), notifications (payslip_ready, advance_approved/rejected, bell for ALL 7 roles), Pune attendance + reminder, onboarding checklist, statutory reports. All test suites 0 failed, tsc 7, i18n clean.
+- [ ] After PR merge: DEPLOY via Supabase MCP with verify_jwt TRUE: `payroll-run` (v5), `app-notify`, `payroll-warning-review`. `pune-attendance-reminder` deploys via CI (deploy.sh).
+- [ ] Yash/ops: set edge secret `ANTHROPIC_API_KEY` (AI review returns 502 without it, and calculate stays blocked until every waived/deduct warning is AI-reviewed — so this is REQUIRED before the October run if any warning exists).
+- [ ] Yash decision: apply `scripts/PATCH_104_pune_attendance_reminder_cron_24Oct2026.sql` (19:00 IST Pune reminder cron) — written, NOT applied.
+- [ ] Open: `deduct` decision has no automatic payroll effect (engine frozen); `lateDeductionAmount` = late_minutes/480*dayRate is PENDING OWNER CONFIRMATION and unwired.
+- [ ] Open: `supabase/functions/run-payroll` is still deployed live (source deleted) — delete in Supabase dashboard. Onboarding rows are created by the app (no DB trigger, no employee-create flow exists). Statutory formats (ECR/ESI/PT/MLWF) unverified against EPFO/ESIC validators — CA review before filing. Notification More-badge sums not changed (pill on the More row only). Nothing here run on a real device.
+
 # >>> IN-FLIGHT (21 Oct 2026): payroll gaps build — see CLAUDE.md "IN-FLIGHT BUILD — payroll gaps" <<<
 - [x] Backend (PR #22) and screens (PR #23) MERGED. PATCH_103 applied live.
 - [x] `payroll-run` v4 DEPLOYED and verified (21 Oct): version 4, verify_jwt true, sha256 matches repo, unauthenticated → 401.

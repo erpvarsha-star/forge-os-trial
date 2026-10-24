@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react'
+import { TouchableOpacity } from 'react-native'
+import { router } from 'expo-router'
+import { ensureChecklist } from '@/hooks/useOnboarding'
 import { View, Text, ScrollView } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/hooks/useAuth'
@@ -20,7 +23,11 @@ export default function NewEmployeeFlowScreen() {
     const fetch = async () => {
       if (!employee) return
       const { data } = await supabase.from('employees').select('*').eq('is_active', false).order('created_at', { ascending: false })
-      if (data) setPending(data as Employee[])
+      if (data) {
+        setPending(data as Employee[])
+        // Create the 8 department checklist rows up front (idempotent)
+        Promise.all((data as Employee[]).map(e => ensureChecklist(e.emp_code))).catch(() => {})
+      }
       setIsLoading(false)
     }
     fetch()
@@ -75,6 +82,9 @@ export default function NewEmployeeFlowScreen() {
                   <Clock size={15} color={STATUS.pending.fg} />
                 </View>
               </View>
+              <TouchableOpacity onPress={() => router.push({ pathname: '/(hr-admin)/onboarding', params: { code: emp.emp_code } } as any)} className="mt-3 self-start px-3 py-1.5 rounded-full bg-brand-50">
+                <Text className="text-sm font-semibold text-brand-600">{t('onboarding.open')}</Text>
+              </TouchableOpacity>
             </Card>
           ))
         )}
