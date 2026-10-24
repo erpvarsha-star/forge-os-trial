@@ -45,6 +45,10 @@ export const VDA_RATE_MISSING_ERROR = 'monthly VDA rate not entered'
 // calculated -> in_review answers HTTP 409 with this message (err.detail.pendingCount) while any pay_run_warnings row is undecided.
 export const WARNINGS_PENDING_ERROR = 'warnings pending decision'
 
+// calculate answers HTTP 422 with this message (err.detail.pendingCount / unreviewedCount / hint) until every
+// warning is decided AND the AI review has looked at each waived/deducted one.
+export const WARNINGS_NOT_READY_ERROR = 'warnings not ready'
+
 export type PayRunWarningType = 'late_excess' | 'no_punch' | 'punched_absent' | 'missing_efficiency'
 export type PayRunWarningDecision = 'pending' | 'waived' | 'deduct'
 
@@ -57,6 +61,26 @@ export interface PayRunWarning {
   decision: PayRunWarningDecision
   decided_by: string | null
   decided_at: string | null
+  // AI review (payroll-warning-review) of a waive/deduct decision
+  agent_verdict?: 'agree' | 'concern' | null
+  agent_notes?: string | null
+  agent_reviewed_at?: string | null
+}
+
+export interface GenerateWarningsResult {
+  warningsCount: number
+  counts: Record<string, number>
+  pendingCount: number
+  unreviewedCount: number
+  ready: boolean
+}
+
+export interface WarningReviewResult {
+  ok: boolean
+  verdict?: 'agree' | 'concern'
+  notes?: string
+  notified?: boolean
+  skipped?: boolean
 }
 
 export interface RunSummary {
@@ -128,3 +152,13 @@ export const createTopupRun = (parentRunId: string) => payrollRun<TopupResult>('
 
 export const transitionRun = (payRunId: string, to: string) =>
   payrollRun<TransitionResult>('transition', { payRunId, to })
+
+export const generateWarnings = (runId: string) => payrollRun<GenerateWarningsResult>('generate_warnings', { runId })
+
+/** Ask the AI reviewer to look at a waived/deducted warning. Throws on 409/502 etc; callers refetch either way. */
+export async function reviewWarning(warningId: string): Promise<WarningReviewResult> {
+  const { data, error } = await supabase.functions.invoke('payroll-warning-review', { body: { warningId } })
+  if (error) throw new Error(error.message)
+  if (data?.error) throw new Error(String(data.error))
+  return data as WarningReviewResult
+}
