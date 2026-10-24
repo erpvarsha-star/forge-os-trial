@@ -20,6 +20,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { assemblePayrollInputs } from './lib/feedSync.ts';
 import { calculateOne, DEFAULT_ENGINE_CONFIG } from './lib/engine.ts';
 import { PAY_RUN_TRANSITIONS } from './lib/payRunStateMachine.ts';
+import { computeRunWarnings, countByType } from './lib/warnings.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -128,6 +129,19 @@ Deno.serve(async (req) => {
       const legal = (PAY_RUN_TRANSITIONS as Record<string, string[]>)[run.status] ?? [];
       if (!legal.includes(to)) {
         return json({ error: `illegal transition ${run.status} -> ${to}`, legalTargets: legal }, 409);
+      }
+      // Warnings gate: every pay_run_warnings row must be waived/deducted before review starts.
+      if (run.status === 'calculated' && to === 'in_review') {
+        const { count: pendingCount, error: wErr } = await supabase
+          .from('pay_run_warnings').select('id', { count: 'exact', head: true })
+          .eq('run_id', payRunId).eq('decision', 'pending');
+        if (wErr) return json({ error: 'could not read warnings: ' + wErr.message }, 500);
+        if ((pendingCount ?? 0) > 0) {
+          return json({
+            error: 'warnings pending decision', pendingCount,
+            hint: 'Resolve the warnings (waive or deduct) on the Payroll Warnings screen first',
+          }, 409);
+        }
       }
       // PATCH_103: finalizing draws down advance balances. Idempotent per (run, advance), so a
       // retry after a failed status update is safe. If it errors the status is left unchanged.
@@ -244,6 +258,13 @@ Deno.serve(async (req) => {
         });
       }
 
+      // ---- persisted warnings (computed before anything is written)
+      const runWarnings = computeRunWarnings({
+        attendance, employees,
+        inputs: inputs.map((i: any) => ({ empCode: i.empCode, category: i.category, efficiencyPct: i.efficiencyPct })),
+      });
+      const warningCounts = countByType(runWarnings);
+
       for (const input of inputs) {
         const result = calculateOne(input, cfg);
         if (result.held) { held.push({ empCode: input.empCode, blockers: result.blockers }); continue; }
@@ -267,6 +288,22 @@ Deno.serve(async (req) => {
         if (iErr) return json({ error: 'item insert failed (run still draft): ' + iErr.message }, 500);
       }
 
+      // Replace this run's warnings (draft run: none exist normally). On failure undo the items and stay draft.
+      {
+        const { error: dErr } = await supabase.from('pay_run_warnings').delete().eq('run_id', payRunId);
+        let wErr = dErr;
+        if (!wErr && runWarnings.length) {
+          const { error } = await supabase.from('pay_run_warnings').insert(
+            runWarnings.map((w) => ({ run_id: payRunId, employee_code: w.employee_code,
+              warning_type: w.warning_type, detail: w.detail, decision: 'pending' })));
+          wErr = error;
+        }
+        if (wErr) {
+          if (items.length) await supabase.from('pay_run_items').delete().eq('pay_run_id', payRunId);
+          return json({ error: 'warnings insert failed (run still draft, items removed): ' + wErr.message }, 500);
+        }
+      }
+
       // draft -> calculating -> calculated (two legal single steps per PATCH_89 trigger)
       await supabase.from('pay_runs').update({ status: 'calculating' }).eq('id', payRunId);
       const { error: tErr } = await supabase.from('pay_runs').update({ status: 'calculated' }).eq('id', payRunId);
@@ -276,11 +313,13 @@ Deno.serve(async (req) => {
       await audit(payRunId, {
         event: 'calculate', items: items.length, held: held.length,
         warnings: warnings.length, vdaRatePerDay: cfg.workerVdaRatePerDay,
+        warningsCount: runWarnings.length, warningCounts,
         ...(topup ? { topup: true, skippedAlreadyPaid } : {}),
       });
       return json({
         ok: true, calculated: items.length, held,
         warnings,
+        warningsCount: runWarnings.length, warningCounts,
         vdaRatePerDay: cfg.workerVdaRatePerDay,
         ...(topup ? {
           topup: true, skippedAlreadyPaid,
