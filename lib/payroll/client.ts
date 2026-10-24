@@ -16,6 +16,8 @@ export interface CalculateResult {
   vdaRatePerDay?: number | null
   topup?: boolean
   skippedAlreadyPaid?: number
+  // Attendance warnings persisted in pay_run_warnings (decision 'pending') by calculate
+  warningsCount?: number
 }
 
 export interface AdvanceRecovery {
@@ -39,6 +41,23 @@ export interface TopupResult {
 
 // The server answers calculate with HTTP 422 + this message when no VDA rate is entered for the month.
 export const VDA_RATE_MISSING_ERROR = 'monthly VDA rate not entered'
+
+// calculated -> in_review answers HTTP 409 with this message (err.detail.pendingCount) while any pay_run_warnings row is undecided.
+export const WARNINGS_PENDING_ERROR = 'warnings pending decision'
+
+export type PayRunWarningType = 'late_excess' | 'no_punch' | 'punched_absent' | 'missing_efficiency'
+export type PayRunWarningDecision = 'pending' | 'waived' | 'deduct'
+
+export interface PayRunWarning {
+  id: string
+  run_id: string
+  employee_code: string
+  warning_type: PayRunWarningType
+  detail: Record<string, any> | null
+  decision: PayRunWarningDecision
+  decided_by: string | null
+  decided_at: string | null
+}
 
 export interface RunSummary {
   employees: number

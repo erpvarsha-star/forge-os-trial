@@ -33,6 +33,7 @@ export default function HrAdminLayout() {
         <Tabs.Screen name="payroll-feeds" options={{ href: null }} />
         <Tabs.Screen name="payroll-rates" options={{ href: null }} />
         <Tabs.Screen name="employee-exit" options={{ href: null }} />
+        <Tabs.Screen name="payroll-warnings" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )
