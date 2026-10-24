@@ -1068,5 +1068,33 @@
       "grace": "Allowed",
       "category": "Category"
     }
+  },
+  "statutory": {
+    "title": "Statutory Reports",
+    "noRuns": "No finalized pay runs yet. Reports appear once a run is finalized.",
+    "runStatus": "Run status",
+    "pfTitle": "PF ECR (EPFO)",
+    "esiTitle": "ESI Contribution",
+    "ptTitle": "Professional Tax (PT)",
+    "mlwfTitle": "Labour Welfare Fund (MLWF)",
+    "members": "Members",
+    "epfWages": "EPF wages",
+    "epfEe": "EPF (employee share)",
+    "eps": "EPS contribution",
+    "erDiff": "EPF-EPS difference (employer)",
+    "wages": "Total wages",
+    "ipShare": "Employee contribution (0.75%)",
+    "erShare": "Employer contribution (3.25%)",
+    "ptDeducted": "PT deducted",
+    "ptExpected": "PT expected (slab)",
+    "mlwfTotal": "Total MLWF",
+    "mlwfNotPayable": "MLWF is payable half-yearly, only for June and December. Choose a June or December month to see it.",
+    "missingUan": "{{count}} PF member(s) have no UAN and are left out of the ECR: {{list}}",
+    "missingEsi": "{{count}} ESI member(s) have no ESI number and are left out of the file: {{list}}",
+    "pfMismatch": "{{count}} member(s) where PF deducted differs from 12% of PF wages: {{list}}",
+    "ptMismatch": "{{count}} member(s) where PT deducted differs from the Maharashtra slab: {{list}}",
+    "download": "Download / Share",
+    "shareFailed": "Sharing is not available on this device.",
+    "disclaimer": "Check these file formats on the EPFO and ESIC portals (and with your CA) before filing. Figures come from finalized pay runs; unreviewed mismatches are only flags."
   }
 }
