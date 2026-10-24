@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { return json({ error: 'invalid json' }, 400); }
   const { action } = body ?? {};
 
-  // Caller auth: deployed --no-verify-jwt, so this function must check the JWT itself.
+  // Caller auth: verify_jwt is ON at the gateway; this JWT -> employee -> role check is defence-in-depth.
   const authHeader = req.headers.get('Authorization') ?? '';
   if (!authHeader.startsWith('Bearer ')) return json({ error: 'unauthorized' }, 401);
   const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!,
