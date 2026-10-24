@@ -21,6 +21,7 @@ import { assemblePayrollInputs } from './lib/feedSync.ts';
 import { calculateOne, DEFAULT_ENGINE_CONFIG } from './lib/engine.ts';
 import { PAY_RUN_TRANSITIONS } from './lib/payRunStateMachine.ts';
 import { computeRunWarnings, countByType } from './lib/warnings.ts';
+import { notifyPayslipReady } from './lib/appNotify.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -153,8 +154,21 @@ Deno.serve(async (req) => {
       }
       const { error } = await supabase.from('pay_runs').update({ status: to }).eq('id', payRunId);
       if (error) return json({ error: error.message }, 500);
-      await audit(payRunId, { event: 'transition', from: run.status, to, ...(advanceRecovery ? { advanceRecovery } : {}) });
-      return json({ ok: true, from: run.status, to, ...(advanceRecovery ? { advanceRecovery } : {}) });
+      // Best-effort payslip_ready notifications: never fails or rolls back the finalize.
+      let notified: unknown = undefined;
+      if (to === 'finalized') {
+        try {
+          const { data: pr } = await supabase
+            .from('pay_runs').select('pay_periods(month, year)').eq('id', payRunId).single();
+          notified = pr?.pay_periods
+            ? await notifyPayslipReady(supabase, Deno.env.get('SUPABASE_URL')!, payRunId,
+                Number(pr.pay_periods.month), Number(pr.pay_periods.year))
+            : { inserted: 0, pushed: 0, error: 'pay period not found' };
+        } catch (e) { notified = { inserted: 0, pushed: 0, error: String(e) }; }
+      }
+      const extra = { ...(advanceRecovery ? { advanceRecovery } : {}), ...(notified ? { notified } : {}) };
+      await audit(payRunId, { event: 'transition', from: run.status, to, ...extra });
+      return json({ ok: true, from: run.status, to, ...extra });
     }
 
     // ------------------------------------------------------------ calculate
