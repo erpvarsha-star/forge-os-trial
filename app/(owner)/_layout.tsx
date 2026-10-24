@@ -27,6 +27,7 @@ export default function OwnerLayout() {
         <Tabs.Screen name="payslip" options={{ href: null }} />
         <Tabs.Screen name="my-tasks" options={{ href: null }} />
         <Tabs.Screen name="ontime-race" options={{ href: null }} />
+        <Tabs.Screen name="notifications" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )

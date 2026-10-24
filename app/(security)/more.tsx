@@ -8,6 +8,7 @@ import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { UpdateAppLink } from '@/components/UpdateAppLink'
+import { NotificationsMenuRow } from '@/components/NotificationsMenuRow'
 import { TaskMenuRows } from '@/components/TaskMenuRows'
 import { removePushToken } from '@/lib/notifications'
 import { LogOut, Globe, ShieldCheck, ChevronRight, FileText } from 'lucide-react-native'
@@ -41,6 +42,8 @@ export default function SecurityMore() {
         </Card>
 
         <TaskMenuRows group="security" canAssign={false} />
+
+        <NotificationsMenuRow group="security" />
 
         <TouchableOpacity onPress={() => router.push('/(security)/payslips')} className="mb-2 min-h-touch">
           <Card className="flex-row items-center justify-between">

@@ -11,6 +11,7 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { UpdateAppLink } from '@/components/UpdateAppLink'
 import { CountPill } from '@/components/CountPill'
 import { useActionCountsStore } from '@/hooks/useAssignedTasks'
+import { NotificationsMenuRow } from '@/components/NotificationsMenuRow'
 import { TaskMenuRows } from '@/components/TaskMenuRows'
 import { removePushToken } from '@/lib/notifications'
 import { LogOut, Globe, Settings, ChevronRight, AlertCircle, CreditCard, Users, Eye, Clock, CheckSquare, FileText, Table2, IndianRupee, UtensilsCrossed, Percent, UserMinus, AlertTriangle, MapPin, ClipboardCheck } from 'lucide-react-native'
@@ -59,6 +60,8 @@ export default function HRAdminMore() {
         </Card>
 
         <TaskMenuRows group="hr-admin" canAssign={true} teamTasksIsTab />
+
+        <NotificationsMenuRow group="hr-admin" />
 
         <Text className="text-xs font-semibold uppercase tracking-wider text-ink-400 mb-2">{t('common.quickActions')}</Text>
         {links.map(link => (
