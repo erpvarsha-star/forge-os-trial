@@ -1,7 +1,7 @@
 # >>> IN-FLIGHT (24-25 Oct 2026): payroll-ops-features PR — see CLAUDE.md "Payroll ops features (24 Oct 2026)" <<<
 - [x] Built + merged on `claude/payroll-ops-features`: cleanup (run-payroll function dir, login-otp.tsx.bak removed), warnings v2 (per-date late rule, pre-check `generate_warnings`, calculate 422 gate, AI review `payroll-warning-review`), notifications (payslip_ready, advance_approved/rejected, bell for ALL 7 roles), Pune attendance + reminder, onboarding checklist, statutory reports. All test suites 0 failed, tsc 7, i18n clean.
 - [x] PR #24 merged (cd35be2, 25 Oct). DEPLOYED + verified: `payroll-run` v5, `app-notify` v1, `payroll-warning-review` v1 (all verify_jwt true, files match repo); `pune-attendance-reminder` v1 via CI. `apk-102` published 25 Oct 12:24 UTC (built from cd35be2) — Yash installs.
-- [ ] Yash/ops: set edge secret `ANTHROPIC_API_KEY` (AI review returns 502 without it, and calculate stays blocked until every waived/deduct warning is AI-reviewed — so this is REQUIRED before the October run if any warning exists).
+- [ ] Yash/ops (25 Oct: key was pasted into chat — treat as exposed, revoke it and enter a fresh one ONLY via the Supabase dashboard prompt / Edge Functions → Secrets; the secret tool timed out unanswered): set edge secret `ANTHROPIC_API_KEY` (AI review returns 502 without it, and calculate stays blocked until every waived/deduct warning is AI-reviewed — so this is REQUIRED before the October run if any warning exists).
 - [x] Pune reminder cron applied live 25 Oct as PATCH_107 (job `pune-attendance-reminder`, 13:30 UTC, active, job id 29). Posts to a function that deploys on PR merge.
 - [x] Deduct wired 25 Oct (decide_warning -> approved payroll_adjustments from the 4th >30-min late); recalculation is manual after AI review.
 - [ ] Day rate for the late deduction (decide_warning `dayRateFor`) is derived per category from the engine's per-day basis (staff FIXED_GROSS/workingDays; worker basic+hra+conveyance+washing+education over workingDays + VDA + heat; consultant daily/monthly); no pre-existing day-rate code existed. Owner to sanity-check one real example. Reopen-for-adjustment also deletes the run's pay_run_items (calculate re-inserts).
@@ -11,7 +11,7 @@
 - [x] Backend (PR #22) and screens (PR #23) MERGED. PATCH_103 applied live.
 - [x] `payroll-run` v4 DEPLOYED and verified (21 Oct): version 4, verify_jwt true, sha256 matches repo, unauthenticated → 401.
 - [x] `apk-101` published (built from 591a5ac). [ ] Yash installs apk-101 and tests: Payroll Rates, Employee Exit, Top-up run, advance recovery on finalize.
-- [ ] HR enters the October VDA per-day rate before the October run (Calculate refuses without it unless forced).
+- [x] October VDA per-day rate = 103 (same as September's default), row already in `payroll_monthly_rates` (entered 25 Oct; confirmed live). Owner decision 25 Oct: "October vda same as September".
 
 # Forge OS — Pending Work Tracker
 
