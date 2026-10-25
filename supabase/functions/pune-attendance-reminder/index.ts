@@ -1,5 +1,5 @@
 // pune-attendance-reminder — reminds the Pune admin + HR when no Pune attendance exists for today (IST).
-// verify_jwt false; idempotent per IST day, so safe for anyone to call. Cron: PATCH_104 (19:00 IST).
+// verify_jwt false; idempotent per IST day, so safe for anyone to call. Cron: PATCH_107 (19:00 IST).
 import { handleOptions, jsonResponse } from '../_shared/cors.ts';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
 import { istDateStr } from '../_shared/istDate.ts';
