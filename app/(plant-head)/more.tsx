@@ -9,6 +9,7 @@ import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { UpdateAppLink } from '@/components/UpdateAppLink'
+import { NotificationsMenuRow } from '@/components/NotificationsMenuRow'
 import { TaskMenuRows } from '@/components/TaskMenuRows'
 import { removePushToken } from '@/lib/notifications'
 import { LogOut, Globe, Shield, ChevronRight, Eye, Clock, FileText, Table2, Mail, Gauge } from 'lucide-react-native'
@@ -37,6 +38,8 @@ export default function PlantHeadMore() {
         </Card>
 
         <TaskMenuRows group="plant-head" canAssign={true} teamTasksIsTab />
+
+        <NotificationsMenuRow group="plant-head" />
 
         <TouchableOpacity onPress={() => router.push('/(plant-head)/email')} className="mb-2 min-h-touch">
           <Card className="flex-row items-center justify-between">

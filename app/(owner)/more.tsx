@@ -11,6 +11,7 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { UpdateAppLink } from '@/components/UpdateAppLink'
 import { CountPill } from '@/components/CountPill'
 import { useActionCountsStore } from '@/hooks/useAssignedTasks'
+import { NotificationsMenuRow } from '@/components/NotificationsMenuRow'
 import { TaskMenuRows } from '@/components/TaskMenuRows'
 import { removePushToken } from '@/lib/notifications'
 import { LogOut, Globe, Crown, ChevronRight, Eye, CheckCircle, Clock, FileText, Table2, Gavel, Trophy } from 'lucide-react-native'
@@ -56,6 +57,8 @@ export default function OwnerMore() {
         </TouchableOpacity>
 
         <TaskMenuRows group="owner" canAssign={true} teamTasksIsTab />
+
+        <NotificationsMenuRow group="owner" />
 
         <TouchableOpacity onPress={toggleLanguage} className="mb-2 min-h-touch">
           <Card className="flex-row items-center justify-between">

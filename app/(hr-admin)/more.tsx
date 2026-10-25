@@ -11,9 +11,10 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { UpdateAppLink } from '@/components/UpdateAppLink'
 import { CountPill } from '@/components/CountPill'
 import { useActionCountsStore } from '@/hooks/useAssignedTasks'
+import { NotificationsMenuRow } from '@/components/NotificationsMenuRow'
 import { TaskMenuRows } from '@/components/TaskMenuRows'
 import { removePushToken } from '@/lib/notifications'
-import { LogOut, Globe, Settings, ChevronRight, AlertCircle, CreditCard, Users, Eye, Clock, CheckSquare, FileText, Table2, IndianRupee, UtensilsCrossed, Percent, UserMinus } from 'lucide-react-native'
+import { LogOut, Globe, Settings, ChevronRight, AlertCircle, CreditCard, Users, Eye, Clock, CheckSquare, FileText, Table2, IndianRupee, UtensilsCrossed, Percent, UserMinus, AlertTriangle, MapPin, ClipboardCheck, FileSpreadsheet } from 'lucide-react-native'
 import { router } from 'expo-router'
 import { BRAND, INK } from '@/components/theme'
 
@@ -29,12 +30,16 @@ export default function HRAdminMore() {
   const links = [
     { key: 'approvals', label: t('common.approvals'), icon: <CheckSquare size={20} color={INK[500]} />, path: '/(hr-admin)/approvals' },
     { key: 'payroll-run', label: t('payroll.menuLabel'), icon: <IndianRupee size={20} color={INK[500]} />, path: '/(hr-admin)/payroll-run' },
+    { key: 'statutory-reports', label: t('statutory.title'), icon: <FileSpreadsheet size={20} color={INK[500]} />, path: '/(hr-admin)/statutory-reports' },
     { key: 'payroll-feeds', label: t('payroll.feedsMenuLabel'), icon: <UtensilsCrossed size={20} color={INK[500]} />, path: '/(hr-admin)/payroll-feeds' },
     { key: 'payroll-rates', label: t('payroll.ratesMenuLabel'), icon: <Percent size={20} color={INK[500]} />, path: '/(hr-admin)/payroll-rates' },
     { key: 'employee-exit', label: t('payroll.exitMenuLabel'), icon: <UserMinus size={20} color={INK[500]} />, path: '/(hr-admin)/employee-exit' },
+    { key: 'payroll-warnings', label: t('payroll.warnMenuLabel'), icon: <AlertTriangle size={20} color={INK[500]} />, path: '/(hr-admin)/payroll-warnings' },
+    { key: 'pune-attendance', label: t('hrAdmin.puneAttendance'), icon: <MapPin size={20} color={INK[500]} />, path: '/(hr-admin)/pune-attendance' },
     { key: 'missing-data', label: t('hrAdmin.missingData'), icon: <AlertCircle size={20} color={INK[500]} />, path: '/(hr-admin)/missing-data' },
     { key: 'advance-ledger', label: t('hrAdmin.advanceLedger'), icon: <CreditCard size={20} color={INK[500]} />, path: '/(hr-admin)/advance-ledger' },
     { key: 'new-employee-flow', label: t('hrAdmin.newEmployeeFlow'), icon: <Users size={20} color={INK[500]} />, path: '/(hr-admin)/new-employee-flow' },
+    { key: 'onboarding', label: t('onboarding.menuLabel'), icon: <ClipboardCheck size={20} color={INK[500]} />, path: '/(hr-admin)/onboarding' },
     { key: 'late-review', label: t('reports.lateComersReview'), icon: <Clock size={20} color={INK[500]} />, path: '/(hr-admin)/late-review' },
     { key: 'payslips', label: t('common.payslip'), icon: <FileText size={20} color={INK[500]} />, path: '/(hr-admin)/payslips' },
     { key: 'shift-summary', label: t('shiftCheckinSummary.tab'), icon: <Table2 size={20} color={INK[500]} />, path: '/(hr-admin)/shift-summary' },
@@ -56,6 +61,8 @@ export default function HRAdminMore() {
         </Card>
 
         <TaskMenuRows group="hr-admin" canAssign={true} teamTasksIsTab />
+
+        <NotificationsMenuRow group="hr-admin" />
 
         <Text className="text-xs font-semibold uppercase tracking-wider text-ink-400 mb-2">{t('common.quickActions')}</Text>
         {links.map(link => (

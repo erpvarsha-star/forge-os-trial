@@ -25,6 +25,7 @@ export default function ManagerLayout() {
         <Tabs.Screen name="shifts" options={{ href: null }} />
         <Tabs.Screen name="my-tasks" options={{ href: null }} />
         <Tabs.Screen name="team-tasks" options={{ href: null }} />
+        <Tabs.Screen name="notifications" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )
