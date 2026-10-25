@@ -6,6 +6,9 @@
 //                                                 assemble feeds, run engine, write pay_run_items
 //   transition { payRunId, to }                -> state-machine move (DB trigger enforces legality);
 //                                                 to='finalized' first applies advance recoveries (PATCH_103)
+//   decide_warning { warningId, decision:'waived'|'deduct' } -> record HR's decision on one warning; a 'deduct' on a
+//                                                 late_excess flagged deduct_eligible (4th+ late >30 min) also inserts an
+//                                                 approved payroll_adjustments row and reopens calculated/in_review runs
 //   create_topup { parentRunId }               -> supplementary draft run for employees held in a regular run
 //   arrears_sep26_30 { payRunId }              -> one-time 26–30 Sep 2026 bridge line per employee
 //   summary    { payRunId }                    -> totals + held + warnings
@@ -24,6 +27,9 @@ import { calculateOne, DEFAULT_ENGINE_CONFIG } from './lib/engine.ts';
 import { PAY_RUN_TRANSITIONS } from './lib/payRunStateMachine.ts';
 import { computeRunWarnings, countByType, diffWarnings } from './lib/warnings.ts';
 import { notifyPayslipReady } from './lib/appNotify.ts';
+import {
+  buildAdjustmentRow, dayRateFor, deductionSkippedReason, isDeductEligible, lateDeductionAmount, runAction, sourceReference,
+} from './lib/decideWarning.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -165,7 +171,7 @@ Deno.serve(async (req) => {
   const { data: { user } } = await userClient.auth.getUser();
   if (!user) return json({ error: 'unauthorized' }, 401);
   const { data: caller } = await supabase
-    .from('employees').select('emp_code, role').eq('auth_user_id', user.id).single();
+    .from('employees').select('id, emp_code, role').eq('auth_user_id', user.id).single();
   // owner / hr_admin: every action; plant_head: summary only; everyone else refused.
   const allowed = caller && (caller.role === 'owner' || caller.role === 'hr_admin' ||
     (caller.role === 'plant_head' && action === 'summary'));
@@ -285,6 +291,98 @@ Deno.serve(async (req) => {
       const extra = { ...(advanceRecovery ? { advanceRecovery } : {}), ...(notified ? { notified } : {}) };
       await audit(payRunId, { event: 'transition', from: run.status, to, ...extra });
       return json({ ok: true, from: run.status, to, ...extra });
+    }
+
+    // ------------------------------------------------------- decide_warning
+    // Owner rule B (25 Oct 2026): deduction only from the 4th flagged (>30 min) late of the month.
+    // Order: validate -> (if deducting) compute + insert adjustment -> reopen run -> record decision.
+    // Every step is retry-safe: the adjustment is keyed by source_reference, the decision update is
+    // conditional on 'pending'. Recalculation is NOT done here (calculate needs the AI review first).
+    if (action === 'decide_warning') {
+      const { warningId, decision } = body;
+      if (!warningId || (decision !== 'waived' && decision !== 'deduct')) {
+        return json({ error: "warningId and decision ('waived'|'deduct') required" }, 400);
+      }
+      const { data: w } = await supabase
+        .from('pay_run_warnings').select('id, run_id, employee_code, warning_type, detail, decision').eq('id', warningId).single();
+      if (!w) return json({ error: 'warning not found' }, 404);
+      if (w.decision !== 'pending') return json({ error: `warning already decided (${w.decision})` }, 409);
+      const { data: run } = await supabase
+        .from('pay_runs').select('id, status, adjustment_of, pay_period_id, pay_periods(month, year)').eq('id', w.run_id).single();
+      if (!run) return json({ error: 'pay run not found' }, 404);
+
+      const skippedReason = deductionSkippedReason(w, decision);
+      const wantDeduction = decision === 'deduct' && isDeductEligible(w);
+      let adjustmentInserted = false, adjustmentAmount: number | null = null, reopened = false;
+      let existingNote: string | null = null;
+
+      if (wantDeduction) {
+        const act = runAction(run.status);
+        if (act === 'blocked') {
+          return json({ error: 'run already past review; use a top-up/adjustment', status: run.status }, 409);
+        }
+        if (act === 'busy') return json({ error: 'run is calculating; retry in a moment', status: run.status }, 409);
+
+        const month = Number(run.pay_periods.month), year = Number(run.pay_periods.year);
+        const f = await loadFeeds(supabase, year, month);
+        const built = await buildRunInputs(supabase, run, year, month, f);
+        if ('error' in built) return json({ error: built.error }, 500);
+        const input = built.assembled.inputs.find((i: any) => i.empCode === w.employee_code);
+        const employeeId = built.idByCode.get(w.employee_code) as string | undefined;
+        if (!input || !employeeId) return json({ error: 'employee not part of this month\'s payroll inputs' }, 422);
+        const { data: vdaRow } = await supabase
+          .from('payroll_monthly_rates').select('vda_per_day_rate').eq('month', f.mm).eq('year', year).maybeSingle();
+        const vda = vdaRow && Number(vdaRow.vda_per_day_rate) > 0
+          ? Number(vdaRow.vda_per_day_rate) : DEFAULT_ENGINE_CONFIG.workerVdaRatePerDay;
+        const dayRate = dayRateFor(input, vda);
+        const amount = lateDeductionAmount(Number(w.detail?.late_minutes), dayRate);
+        if (!(dayRate > 0) || !(amount > 0)) {
+          return json({ error: 'cannot compute a day rate / deduction for this employee (no pay basis); decision not recorded' }, 422);
+        }
+
+        const ref = sourceReference(w.id);
+        const { data: dup, error: dErr } = await supabase
+          .from('payroll_adjustments').select('id, signed_amount_inr').eq('source_reference', ref).limit(1);
+        if (dErr) return json({ error: 'could not check existing adjustment: ' + dErr.message }, 500);
+        if (dup && dup.length) {
+          adjustmentAmount = Math.abs(Number(dup[0].signed_amount_inr));
+          existingNote = 'adjustment already exists';
+        } else {
+          const row = buildAdjustmentRow({
+            payrollMonth: f.payrollMonth, employeeId, amount, warningId: w.id,
+            lateMinutes: Number(w.detail.late_minutes), date: String(w.detail.date), nth: Number(w.detail.nth_over_30),
+            actorEmployeeId: caller.id, nowIso: new Date().toISOString(),
+          });
+          const { error: aErr } = await supabase.from('payroll_adjustments').insert(row);
+          if (aErr) return json({ error: 'adjustment insert failed (decision not recorded): ' + aErr.message }, 500);
+          adjustmentInserted = true; adjustmentAmount = amount;
+          await audit(run.id, { event: 'late_deduction_adjustment', warningId: w.id, employeeCode: w.employee_code,
+            amount, dayRate, payrollMonth: f.payrollMonth, nth: w.detail.nth_over_30 });
+        }
+
+        if (act === 'reopen') {
+          const { error: rErr } = await supabase.from('pay_runs').update({ status: 'draft' }).eq('id', run.id).eq('status', run.status);
+          if (rErr) return json({ error: 'could not reopen run (decision not recorded): ' + rErr.message }, 500);
+          // draft items are mutable; calculate re-inserts a fresh set, so clear the stale ones now
+          const { error: delErr } = await supabase.from('pay_run_items').delete().eq('pay_run_id', run.id);
+          if (delErr) return json({ error: 'run reopened but stale items not cleared: ' + delErr.message }, 500);
+          reopened = true;
+          await audit(run.id, { event: 'reopen_for_adjustment', from: run.status, to: 'draft', warningId: w.id });
+        }
+      }
+
+      const { data: upd, error: uErr } = await supabase
+        .from('pay_run_warnings')
+        .update({ decision, decided_by: caller.emp_code, decided_at: new Date().toISOString() })
+        .eq('id', w.id).eq('decision', 'pending').select('id');
+      if (uErr) return json({ error: uErr.message }, 500);
+      if (!upd || !upd.length) return json({ error: 'warning already decided' }, 409);
+      await audit(run.id, { event: 'decide_warning', warningId: w.id, decision, adjustmentInserted, adjustmentAmount, reopened });
+      return json({
+        ok: true, decision, adjustmentInserted, adjustmentAmount,
+        deductionSkippedReason: skippedReason ?? existingNote,
+        reopened, recalcRequired: adjustmentInserted || reopened,
+      });
     }
 
     // ------------------------------------------------------ generate_warnings
