@@ -1,4 +1,4 @@
--- PATCH_104 — daily Pune attendance reminder cron (24 Oct 2026). NOT YET APPLIED.
+-- PATCH_107 — daily Pune attendance reminder cron (renumbered from PATCH_104, 25 Oct 2026). Applied 25 Oct 2026.
 -- Calls the pune-attendance-reminder edge function (verify_jwt false, idempotent per IST day)
 -- at 13:30 UTC = 19:00 IST. No Authorization header and no keys are needed.
 -- Rollback: select cron.unschedule('pune-attendance-reminder');
