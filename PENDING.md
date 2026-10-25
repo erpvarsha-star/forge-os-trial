@@ -3,7 +3,7 @@
 - [ ] After PR merge: DEPLOY via Supabase MCP with verify_jwt TRUE: `payroll-run` (v5), `app-notify`, `payroll-warning-review`. `pune-attendance-reminder` deploys via CI (deploy.sh).
 - [ ] Yash/ops: set edge secret `ANTHROPIC_API_KEY` (AI review returns 502 without it, and calculate stays blocked until every waived/deduct warning is AI-reviewed — so this is REQUIRED before the October run if any warning exists).
 - [ ] Yash decision: apply `scripts/PATCH_104_pune_attendance_reminder_cron_24Oct2026.sql` (19:00 IST Pune reminder cron) — written, NOT applied.
-- [ ] Open: `deduct` decision has no automatic payroll effect (engine frozen); `lateDeductionAmount` = late_minutes/480*dayRate is PENDING OWNER CONFIRMATION and unwired.
+- [x] Deduct wired 25 Oct (decide_warning -> approved payroll_adjustments from the 4th >30-min late); recalculation is manual after AI review.
 - [ ] Open: `supabase/functions/run-payroll` is still deployed live (source deleted) — delete in Supabase dashboard. Onboarding rows are created by the app (no DB trigger, no employee-create flow exists). Statutory formats (ECR/ESI/PT/MLWF) unverified against EPFO/ESIC validators — CA review before filing. Notification More-badge sums not changed (pill on the More row only). Nothing here run on a real device.
 
 # >>> IN-FLIGHT (21 Oct 2026): payroll gaps build — see CLAUDE.md "IN-FLIGHT BUILD — payroll gaps" <<<
