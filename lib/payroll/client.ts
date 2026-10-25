@@ -162,3 +162,17 @@ export async function reviewWarning(warningId: string): Promise<WarningReviewRes
   if (data?.error) throw new Error(String(data.error))
   return data as WarningReviewResult
 }
+
+export interface DecideWarningResult {
+  ok: boolean
+  decision: 'waived' | 'deduct'
+  adjustmentInserted: boolean
+  adjustmentAmount: number | null
+  deductionSkippedReason: string | null
+  reopened: boolean
+  recalcRequired: boolean
+}
+
+/** Record a Waive/Deduct decision. Server applies the deduction rule (from the 4th over-30 late) and stamps decided_by/at. */
+export const decideWarning = (warningId: string, decision: 'waived' | 'deduct') =>
+  payrollRun<DecideWarningResult>('decide_warning', { warningId, decision })

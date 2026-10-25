@@ -8,7 +8,7 @@ import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
-import { PayRunWarning, PayRunWarningDecision, reviewWarning } from '@/lib/payroll/client'
+import { PayRunWarning, PayRunWarningDecision, reviewWarning, decideWarning } from '@/lib/payroll/client'
 import { BRAND, INK } from '@/components/theme'
 import { AlertTriangle, Info } from 'lucide-react-native'
 
@@ -32,6 +32,7 @@ export default function PayrollWarningsScreen() {
   const [isLoading, setIsLoading] = useState(true)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [reviewingIds, setReviewingIds] = useState<string[]>([])
+  const [notice, setNotice] = useState<string | null>(null)
 
   // Runs for the picker, newest first; default to the newest unless a run was passed in
   useEffect(() => {
@@ -78,13 +79,17 @@ export default function PayrollWarningsScreen() {
 
   const decide = async (w: PayRunWarning, decision: 'waived' | 'deduct') => {
     setSavingId(w.id)
-    // decided_at is a real UTC instant for a timestamptz column — correct as a plain ISO string
-    const decided_at = new Date().toISOString()
-    const { error } = await supabase.from('pay_run_warnings')
-      .update({ decision, decided_by: employee.emp_code, decided_at }).eq('id', w.id)
+    let res
+    try { res = await decideWarning(w.id, decision) }
+    catch (e: any) { setSavingId(null); Alert.alert(t('common.error'), e.message); return }
     setSavingId(null)
-    if (error) { Alert.alert(t('common.error'), error.message); return }
-    setWarnings(prev => prev.map(x => x.id === w.id ? { ...x, decision, decided_by: employee.emp_code, decided_at, agent_verdict: null, agent_notes: null, agent_reviewed_at: null } : x))
+    setWarnings(prev => prev.map(x => x.id === w.id ? { ...x, decision, agent_verdict: null, agent_notes: null, agent_reviewed_at: null } : x))
+    if (res.adjustmentInserted) {
+      setNotice(`${t('payroll.warnDeductedMsg', { amount: Math.round(res.adjustmentAmount ?? 0).toLocaleString('en-IN') })}${res.recalcRequired ? `\n${t('payroll.warnRecalcNotice')}` : ''}`)
+    } else if (res.deductionSkippedReason) {
+      const m = /#\s*(\d+)\s*<\s*4/.exec(res.deductionSkippedReason)
+      setNotice(m ? t('payroll.warnSkippedNth', { n: m[1] }) : t('payroll.warnSkippedGeneric'))
+    } else setNotice(res.recalcRequired ? t('payroll.warnRecalcNotice') : null)
     runReview(w.id)
   }
 
@@ -108,14 +113,23 @@ export default function PayrollWarningsScreen() {
 
   const lateBlock = (w: PayRunWarning) => {
     const d = w.detail ?? {}
-    const kind = d.kind === 'over_30' ? t('payroll.warnKindOver30') : t('payroll.warnKindOverFreeQuota')
+    const nth = Number(d.nth_over_30)
+    // Old pending rows (over_free_quota / nth_free_late) have no nth_over_30: show a plain late warning
+    const kind = nth ? t('payroll.warnKindOver30', { n: nth }) : t('payroll.warnKindOver30Plain')
     return (
       <View className="mt-1">
         <Text className="text-xs text-ink-900 font-semibold">
           {d.date ? fmtDate(d.date) : ''} · {t('payroll.warnLateMinutes', { count: d.late_minutes ?? 0 })}
         </Text>
-        <Text className="text-xs text-ink-600">{kind}{d.nth_free_late ? ` (${t('payroll.warnNthFree', { n: d.nth_free_late })})` : ''}</Text>
+        <Text className="text-xs text-ink-600">{kind}</Text>
         <Text className="text-xs text-ink-600">{t('payroll.warnReason')}: {d.late_reason ? String(d.late_reason) : t('payroll.warnNoReason')}</Text>
+        {nth ? (
+          <View className="self-start rounded-full px-2.5 py-0.5 mt-1" style={{ backgroundColor: d.deduct_eligible ? '#FEE2E2' : '#E5E7EB' }}>
+            <Text className="text-xs font-bold" style={{ color: d.deduct_eligible ? '#B91C1C' : '#4B5563' }}>
+              {t(d.deduct_eligible ? 'payroll.warnDeductApplies' : 'payroll.warnRecordOnly')}
+            </Text>
+          </View>
+        ) : null}
       </View>
     )
   }
@@ -198,6 +212,13 @@ export default function PayrollWarningsScreen() {
           <Info size={16} color={INK[500]} />
           <Text className="text-xs text-ink-600 flex-1">{t('payroll.warnDeductInfo')}</Text>
         </View>
+
+        {notice ? (
+          <View className="flex-row items-start gap-2 mb-3 bg-brand-50 border border-brand-200 rounded-xl p-3">
+            <Info size={16} color={BRAND[600]} />
+            <Text className="text-xs text-ink-900 flex-1">{notice}</Text>
+          </View>
+        ) : null}
 
         {isLoading ? <ActivityIndicator color={BRAND[600]} /> : grouped.length === 0 ? (
           <Card className="items-center py-8">
