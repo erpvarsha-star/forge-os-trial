@@ -110,10 +110,14 @@ async function syncRunWarnings(supabase: any, runId: string, f: Feeds, inputs: a
   const { data: existing, error: eErr } = await supabase
     .from('pay_run_warnings').select('id, employee_code, warning_type, detail, decision').eq('run_id', runId);
   if (eErr) throw new Error('could not read warnings: ' + eErr.message);
-  const { toInsert, toDeleteIds } = diffWarnings(existing ?? [], desired);
+  const { toInsert, toDeleteIds, toUpdate } = diffWarnings(existing ?? [], desired);
   if (toDeleteIds.length) {
     const { error } = await supabase.from('pay_run_warnings').delete().in('id', toDeleteIds).eq('decision', 'pending');
     if (error) throw new Error('warnings delete failed: ' + error.message);
+  }
+  for (const u of toUpdate) {
+    const { error } = await supabase.from('pay_run_warnings').update({ detail: u.detail }).eq('id', u.id).eq('decision', 'pending');
+    if (error) throw new Error('warnings update failed: ' + error.message);
   }
   if (toInsert.length) {
     const { error } = await supabase.from('pay_run_warnings').insert(
@@ -121,7 +125,7 @@ async function syncRunWarnings(supabase: any, runId: string, f: Feeds, inputs: a
         detail: w.detail, decision: 'pending' })));
     if (error) throw new Error('warnings insert failed: ' + error.message);
   }
-  return { inserted: toInsert.length, deleted: toDeleteIds.length };
+  return { inserted: toInsert.length, deleted: toDeleteIds.length, updated: toUpdate.length };
 }
 
 /** Current state of a run's warnings + the DB-side readiness verdict. */

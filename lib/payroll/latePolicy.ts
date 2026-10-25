@@ -1,17 +1,13 @@
 // ===========================================================================================
-// PENDING OWNER CONFIRMATION — formula may change; THIS IS THE SINGLE PLACE TO EDIT.
+// Late-arrival deduction — confirmed by owner 25 Oct 2026; wired through payroll-run decide_warning.
 //
-// Proposed late-arrival deduction: pro-rata on an 8-hour (480-minute) working day.
-//   deduction = lateMinutes / 480 * dayRate   (rounded to 2 decimals)
+//   deduction = Math.round(lateMinutes / 480 * dayRate)   (whole rupees; 480 = 8-hour working day)
 //
-// NOT WIRED ANYWHERE. The payroll engine (lib/payroll/engine.ts) is frozen and neither feedSync nor
-// payroll-run call this. A warning decided 'deduct' currently has NO automatic payroll effect: it is
-// only a recorded decision (and subject to the AI review). Wiring this in needs an explicit owner
-// sign-off on the formula and on which pay component supplies `dayRate`.
+// Applies ONLY when the warning is a 'late_excess' with detail.deduct_eligible === true (the 4th or later
+// late of more than 30 minutes in a month) AND HR decides 'deduct'. The payroll-run edge function carries a
+// function-local copy (supabase/functions/payroll-run/lib/decideWarning.ts) — keep both in sync.
 // ===========================================================================================
-const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
-
 export function lateDeductionAmount(lateMinutes: number, dayRate: number): number {
   if (!Number.isFinite(lateMinutes) || !Number.isFinite(dayRate) || lateMinutes <= 0 || dayRate <= 0) return 0;
-  return round2((lateMinutes / 480) * dayRate);
+  return Math.round((lateMinutes / 480) * dayRate);
 }
