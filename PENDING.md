@@ -1,6 +1,6 @@
 # >>> IN-FLIGHT (24-25 Oct 2026): payroll-ops-features PR — see CLAUDE.md "Payroll ops features (24 Oct 2026)" <<<
 - [x] Built + merged on `claude/payroll-ops-features`: cleanup (run-payroll function dir, login-otp.tsx.bak removed), warnings v2 (per-date late rule, pre-check `generate_warnings`, calculate 422 gate, AI review `payroll-warning-review`), notifications (payslip_ready, advance_approved/rejected, bell for ALL 7 roles), Pune attendance + reminder, onboarding checklist, statutory reports. All test suites 0 failed, tsc 7, i18n clean.
-- [ ] After PR merge: DEPLOY via Supabase MCP with verify_jwt TRUE: `payroll-run` (v5), `app-notify`, `payroll-warning-review`. `pune-attendance-reminder` deploys via CI (deploy.sh).
+- [x] PR #24 merged (cd35be2, 25 Oct). DEPLOYED + verified: `payroll-run` v5, `app-notify` v1, `payroll-warning-review` v1 (all verify_jwt true, files match repo); `pune-attendance-reminder` v1 via CI. `apk-102` published 25 Oct 12:24 UTC (built from cd35be2) — Yash installs.
 - [ ] Yash/ops: set edge secret `ANTHROPIC_API_KEY` (AI review returns 502 without it, and calculate stays blocked until every waived/deduct warning is AI-reviewed — so this is REQUIRED before the October run if any warning exists).
 - [x] Pune reminder cron applied live 25 Oct as PATCH_107 (job `pune-attendance-reminder`, 13:30 UTC, active, job id 29). Posts to a function that deploys on PR merge.
 - [x] Deduct wired 25 Oct (decide_warning -> approved payroll_adjustments from the 4th >30-min late); recalculation is manual after AI review.
