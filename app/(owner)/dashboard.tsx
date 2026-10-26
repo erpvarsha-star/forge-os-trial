@@ -26,7 +26,7 @@ export default function OwnerDashboard() {
       if (!employee) return
       const today = istDateStr()
       const { month, year } = istMonthYear()
-      const { data: allEmps } = await supabase.from('employees').select('id').eq('is_active', true)
+      const { data: allEmps } = await supabase.from('employees').select('id').eq('is_active', true).eq('uses_app', true)
       const { data: attendance } = await supabase.from('attendance_records').select('status').in('employee_id', allEmps?.map(e => e.id) || []).eq('date', today)
       const present = attendance?.filter(a => isPresentStatus(a.status)).length || 0
       const total = allEmps?.length || 1

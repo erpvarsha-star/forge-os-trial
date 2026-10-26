@@ -26,7 +26,7 @@ export default function ManagerDashboard() {
   const fetchStats = async () => {
     if (!employee) return
     const today = istDateStr()
-    const { data: deptEmployees } = await supabase.from('employees').select('id').eq('department', employee.department).eq('is_active', true)
+    const { data: deptEmployees } = await supabase.from('employees').select('id').eq('department', employee.department).eq('is_active', true).eq('uses_app', true)
     if (!deptEmployees) { setIsLoading(false); return }
     const ids = deptEmployees.map(e => e.id)
     const { data: attendance } = await supabase.from('attendance_records').select('status').in('employee_id', ids).eq('date', today)

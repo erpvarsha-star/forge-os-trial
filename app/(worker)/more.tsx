@@ -14,7 +14,7 @@ import { TaskMenuRows } from '@/components/TaskMenuRows'
 import { removePushToken } from '@/lib/notifications'
 import { router, useFocusEffect } from 'expo-router'
 import {
-  FileText, User, Bell, Globe, LogOut, ChevronRight, Wallet, QrCode
+  FileText, User, Bell, Globe, LogOut, ChevronRight, Wallet, QrCode, ClipboardList
 } from 'lucide-react-native'
 import { TouchableOpacity } from 'react-native'
 
@@ -40,6 +40,7 @@ export default function WorkerMore() {
     { icon: <Bell size={20} color="#E65C00" />, label: 'common.notifications', count: unreadCount, onPress: () => router.push('/(worker)/notifications') },
     { icon: <Wallet size={20} color="#E65C00" />, label: 'common.advance', onPress: () => router.push('/(worker)/advance') },
     { icon: <QrCode size={20} color="#E65C00" />, label: 'worker.qrCheckIn', onPress: () => router.push('/(worker)/qr') },
+    ...(employee.attendance_clerk_location ? [{ icon: <ClipboardList size={20} color="#E65C00" />, label: 'hrAdmin.puneAttendance', onPress: () => router.push('/(worker)/pune-attendance') }] : []),
     { icon: <Globe size={20} color="#E65C00" />, label: 'common.language', onPress: () => setShowLangModal(true), value: language === 'hi' ? 'हिंदी' : 'English' },
   ]
 

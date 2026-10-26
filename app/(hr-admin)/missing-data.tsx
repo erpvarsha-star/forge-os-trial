@@ -31,7 +31,7 @@ export default function MissingDataScreen() {
     setIsLoading(true)
 
     const [{ data: empData }, { data: devData }] = await Promise.all([
-      supabase.from('employees').select('*').eq('is_active', true),
+      supabase.from('employees').select('*').eq('is_active', true).eq('uses_app', true),
       supabase
         .from('device_registrations')
         .select('*, employee:employees(name, emp_code)')
@@ -87,6 +87,7 @@ export default function MissingDataScreen() {
       .select('id, name, emp_code')
       .ilike('emp_code', code)
       .eq('is_active', true)
+      .eq('uses_app', true)
       .maybeSingle()
 
     if (!match) {

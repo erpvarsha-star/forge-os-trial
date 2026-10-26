@@ -25,7 +25,7 @@ export default function PlantHeadDashboard() {
   const fetchStats = async () => {
     if (!employee) return
     const today = istDateStr()
-    const { data: allEmployees } = await supabase.from('employees').select('id').eq('is_active', true)
+    const { data: allEmployees } = await supabase.from('employees').select('id').eq('is_active', true).eq('uses_app', true)
     if (!allEmployees) { setIsLoading(false); return }
     const ids = allEmployees.map(e => e.id)
     const { data: attendance } = await supabase.from('attendance_records').select('status').in('employee_id', ids).eq('date', today)

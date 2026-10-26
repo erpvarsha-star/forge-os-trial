@@ -47,11 +47,11 @@ export default function HrAdminDashboard() {
       { count: pendingLeaves },
       { count: missingDataCount },
     ] = await Promise.all([
-      supabase.from('employees').select('id', { count: 'exact', head: true }).eq('is_active', true),
+      supabase.from('employees').select('id', { count: 'exact', head: true }).eq('is_active', true).eq('uses_app', true),
       supabase.from('attendance_records').select('id', { count: 'exact', head: true }).eq('date', today).in('status', PRESENT_STATUSES),
       supabase.from('advance_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('leave_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-      supabase.from('employees').select('id', { count: 'exact', head: true }).eq('is_active', true).or('name.is.null,phone.is.null,department.is.null'),
+      supabase.from('employees').select('id', { count: 'exact', head: true }).eq('is_active', true).eq('uses_app', true).or('name.is.null,phone.is.null,department.is.null'),
     ])
 
     setStats({

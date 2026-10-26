@@ -1155,5 +1155,13 @@
     "download": "Download / Share",
     "shareFailed": "Sharing is not available on this device.",
     "disclaimer": "Check these file formats on the EPFO and ESIC portals (and with your CA) before filing. Figures come from finalized pay runs; unreviewed mismatches are only flags."
+  },
+  "puneClerk": {
+    "notClerk": "You are not set up as an attendance clerk.",
+    "notYourLocation": "This employee is not at your location.",
+    "invalidStatus": "Invalid attendance status.",
+    "dateOutOfRange": "Date out of range: only today and the previous 7 days can be edited.",
+    "alreadyPunched": "This employee already punched in; the record cannot be overwritten.",
+    "generic": "Could not save: {{message}}"
   }
 }
