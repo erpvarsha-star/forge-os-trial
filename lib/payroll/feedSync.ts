@@ -77,11 +77,22 @@ export interface AssembleResult {
   blockedEmployees: { empCode: string; reason: string }[];
 }
 
-/** employees.category/work_location → engine PayCategory. */
+/**
+ * employees.emp_code / category → engine PayCategory.
+ * Owner decision 26 Oct 2026: the emp_code identifies which payroll a person is on;
+ * work_location (Pune) does NOT. The two active Pune-location employees carry VFL codes and
+ * are paid from the STAFF workbook (PF/PT/ESI etc.), so Pune location is ignored here.
+ * Order: BUNG prefix -> PUNE_STAFF (Pune home workers); CON prefix -> CONSULTANT;
+ * category worker -> PERMANENT_WORKER; category consultant -> CONSULTANT (consultant w/o CON
+ * prefix); otherwise STAFF. For VFL codes the DB category stays the tiebreaker (a VFL4xxx
+ * person with category staff is paid from the Staff sheet).
+ */
 export function mapCategory(e: EmployeeRow): PayCategory {
+  const code = (e.emp_code ?? '').trim().toUpperCase();
+  if (code.startsWith('BUNG')) return 'PUNE_STAFF';
+  if (code.startsWith('CON')) return 'CONSULTANT';
   if (e.category === 'worker') return 'PERMANENT_WORKER';
   if (e.category === 'consultant') return 'CONSULTANT';
-  if (e.work_location === 'Pune') return 'PUNE_STAFF';
   return 'STAFF';
 }
 
