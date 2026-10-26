@@ -96,6 +96,15 @@ export function mapCategory(e: EmployeeRow): PayCategory {
   return 'STAFF';
 }
 
+/**
+ * Weekly-off weekday (0=Sun..6=Sat). Owner rule 11 Oct 2026: Friday for everyone unless
+ * employees.weekly_off_day is set (explicit value always wins). The Sunday default applies
+ * only to PUNE_STAFF (BUNG codes); work_location is NOT consulted (26 Oct 2026).
+ */
+export function resolveWeeklyOff(e: EmployeeRow, cat: PayCategory): number {
+  return e.weekly_off_day ?? (cat === 'PUNE_STAFF' ? WEEKLY_OFF_WEEKDAY.PUNE : WEEKLY_OFF_WEEKDAY.WALUJ);
+}
+
 function pickSalary(rows: SalaryRow[], employeeId: string, asOf: string): SalaryRow | null {
   const mine = rows
     .filter((r) => r.employee_id === employeeId && r.effective_from <= asOf)
@@ -161,7 +170,7 @@ export function assemblePayrollInputs(year: number, month: number, feeds: FeedBu
 
     // Working days: workers → site weekly-off; staff/consultants → full calendar
     const weeklyOff = cat === 'PERMANENT_WORKER'
-      ? (emp.weekly_off_day ?? (emp.work_location === 'Pune' ? WEEKLY_OFF_WEEKDAY.PUNE : WEEKLY_OFF_WEEKDAY.WALUJ))
+      ? resolveWeeklyOff(emp, cat)
       : null;
     const wd = workingDaysInMonth(year, month, weeklyOff);
 

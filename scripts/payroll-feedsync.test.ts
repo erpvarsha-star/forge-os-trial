@@ -1,5 +1,5 @@
 /** Feed sync unit test — no DB, fabricated rows. Run: npx tsx scripts/payroll-feedsync.test.ts */
-import { assemblePayrollInputs, mapCategory, FeedBundle, SalaryRow } from '../lib/payroll/feedSync';
+import { assemblePayrollInputs, mapCategory, resolveWeeklyOff, FeedBundle, SalaryRow } from '../lib/payroll/feedSync';
 import { calculateOne } from '../lib/payroll/engine';
 
 let pass = 0, fail = 0;
@@ -66,6 +66,7 @@ check('mapCategory: worker/staff/pune/consultant',
   && mapCategory(bundle.employees[2]) === 'PUNE_STAFF'
   && mapCategory({ ...bundle.employees[0], category: 'consultant' }) === 'CONSULTANT');
 
+
 // --- Consultant daily-rate support (PATCH_97) ---
 const emptySal = { basic: null, hra: null, conveyance: null, washing: null, education: null, heat_allow: null, vda: null, production_allow: null, medical: null, professional_development: null, communication: null, uniform: null };
 
@@ -122,6 +123,16 @@ const conBundle: FeedBundle = {
 };
 const cr = assemblePayrollInputs(2026, 10, conBundle);
 const cIn = (code: string) => cr.inputs.find((i) => i.empCode === code)!;
+
+// --- Weekly-off default no longer keyed off work_location ---
+const wk = (code: string, cat: string, loc: string, wo: number | null) => ({ ...mk(code, cat, loc), weekly_off_day: wo });
+const wkOf = (e: ReturnType<typeof wk>) => resolveWeeklyOff(e, mapCategory(e));
+check('weekly-off: STAFF at Pune, null -> Friday', wkOf(wk('VFL5439', 'staff', 'Pune', null)) === 5);
+check('weekly-off: STAFF at Pune, 0 -> Sunday (explicit wins)', wkOf(wk('VFL1567', 'staff', 'Pune', 0)) === 0);
+check('weekly-off: BUNG null -> Sunday', wkOf(wk('BUNG02', 'staff', 'Pune', null)) === 0);
+check('weekly-off: worker at Pune, null -> Friday', wkOf(wk('VFL4010', 'worker', 'Pune', null)) === 5);
+const wb: FeedBundle = { ...bundle, employees: [wk('VFL4010', 'worker', 'Pune', null)], salaries: [], attendance: [], leaves: [], advances: [], canteen: [], society: [], statusEvents: [] };
+check('weekly-off e2e: Pune worker null -> Oct wd 26 (Friday off)', assemblePayrollInputs(2026, 10, wb).inputs[0]?.workingDays === 26);
 
 const c1 = cIn('CON01');
 const c1r = calculateOne(c1);
