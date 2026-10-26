@@ -1,61 +1,115 @@
 /**
  * Forge OS — payslip PDF generator.
  *
- * Produces the same payslip HTML app/(worker)/payslip.tsx previously built
- * inline, now shared here so any screen can generate one. Uses expo-print
- * (HTML -> PDF) so the same template works on Android and iOS without a
- * native PDF library.
+ * Builds the payslip HTML in the layout of the owner's saved Staff / Worker
+ * slip templates (company header, identity block, attendance block, side by
+ * side Earnings | Deductions table, net payable + words, IDs and leave
+ * balances) and prints it with expo-print (HTML -> PDF) so the same template
+ * works on Android and iOS without a native PDF library.
  */
 
 import * as Print from 'expo-print'
-import { APP_CONFIG } from './config'
 import type { Employee, PayrollRecord } from '../types'
+import { buildSlipView, formatInr, type SlipRow } from './payslipLayout'
+
+const COMPANY = 'VARSHA FORGINGS PVT LTD'
+const ADDRESS = 'B7, M.I.D.C AREA, WALUJ, AURANGABAD.'
+
+const esc = (v: unknown) =>
+  String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+function pairedRows(earn: SlipRow[], ded: SlipRow[]): string {
+  const n = Math.max(earn.length, ded.length)
+  let out = ''
+  for (let i = 0; i < n; i++) {
+    const e = earn[i]
+    const d = ded[i]
+    out += `<tr>
+      <td class="l">${e ? esc(e.label.en) : ''}</td>
+      <td class="r">${e?.rate ? esc(e.rate) + ' hrs' : ''}</td>
+      <td class="r">${e ? formatInr(e.amount) : ''}</td>
+      <td class="l">${d ? esc(d.label.en) : ''}</td>
+      <td class="r">${d ? formatInr(d.amount) : ''}</td>
+    </tr>`
+  }
+  return out
+}
 
 /** Builds the payslip HTML for one employee/month's payroll record. */
 export function payslipHtml(employee: Employee, record: PayrollRecord): string {
-  return `
-    <html>
-      <head><style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        .header { text-align: center; border-bottom: 2px solid #E65C00; padding-bottom: 10px; margin-bottom: 20px; }
-        .company { font-size: 20px; font-weight: bold; color: #E65C00; }
-        .details { margin-bottom: 20px; }
-        .row { display: flex; justify-content: space-between; margin: 5px 0; }
-        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f3f4f6; }
-        .net { font-size: 18px; font-weight: bold; color: #E65C00; text-align: right; margin-top: 10px; }
-      </style></head>
-      <body>
-        <div class="header">
-          <div class="company">${APP_CONFIG.companyName}</div>
-          <div>Payslip - ${record.month}/${record.year}</div>
-        </div>
-        <div class="details">
-          <div class="row"><span>Name:</span><span>${employee.name}</span></div>
-          <div class="row"><span>Code:</span><span>${employee.emp_code}</span></div>
-          <div class="row"><span>Department:</span><span>${employee.department}</span></div>
-        </div>
-        <table>
-          <tr><th>Earnings</th><th>Amount (₹)</th></tr>
-          <tr><td>Basic</td><td>${record.basic}</td></tr>
-          <tr><td>HRA</td><td>${record.hra}</td></tr>
-          <tr><td>Conveyance</td><td>${record.conveyance}</td></tr>
-          <tr><td>Special Allowance</td><td>${record.special_allowance}</td></tr>
-          <tr><td>Overtime</td><td>${record.overtime}</td></tr>
-        </table>
-        <table>
-          <tr><th>Deductions</th><th>Amount (₹)</th></tr>
-          <tr><td>PF</td><td>${record.pf}</td></tr>
-          <tr><td>ESIC</td><td>${record.esic}</td></tr>
-          <tr><td>Professional Tax</td><td>${record.pt}</td></tr>
-          <tr><td>Advance Recovery</td><td>${record.advance_recovery}</td></tr>
-          <tr><td>TDS</td><td>${record.tds}</td></tr>
-        </table>
-        <div class="net">Net Pay: ₹${record.net_pay.toFixed(2)}</div>
-      </body>
-    </html>
-  `
+  const v = buildSlipView(record, {
+    name: employee.name,
+    empCode: employee.emp_code,
+    department: employee.department,
+  })
+
+  const attendance = v.attendance.length
+    ? `<table class="grid"><tr>${v.attendance.map((c) => `<th>${esc(c.label.en)}</th>`).join('')}</tr>
+        <tr>${v.attendance.map((c) => `<td class="c${c.strong ? ' b' : ''}">${esc(c.value)}</td>`).join('')}</tr></table>`
+    : ''
+
+  const footCells = (cells: { label: { en: string }; value: string }[]) =>
+    cells.map((c) => `<tr><th class="l">${esc(c.label.en)}</th><td class="l">${esc(c.value)}</td></tr>`).join('')
+  const footer = v.idCells.length || v.leaveCells.length
+    ? `<table class="grid foot"><tr>
+        <td class="half"><table class="inner">${footCells(v.idCells)}</table></td>
+        <td class="half"><table class="inner">${footCells(v.leaveCells)}</table></td>
+      </tr></table>`
+    : ''
+
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @page { size: A4; margin: 12mm; }
+      * { box-sizing: border-box; }
+      body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; margin: 0; }
+      .head { text-align: center; margin-bottom: 8px; }
+      .company { font-size: 18px; font-weight: bold; }
+      .period { font-size: 13px; font-weight: bold; margin-top: 6px; }
+      table { width: 100%; border-collapse: collapse; margin: 6px 0; table-layout: fixed; }
+      th, td { border: 1px solid #999; padding: 4px 6px; word-wrap: break-word; overflow-wrap: anywhere; }
+      th { background: #f3f4f6; }
+      .l { text-align: left; } .r { text-align: right; } .c { text-align: center; } .b { font-weight: bold; }
+      .tot td { font-weight: bold; background: #f3f4f6; }
+      .net td { font-size: 13px; font-weight: bold; }
+      .words { font-style: italic; }
+      .inner { margin: 0; } .inner th, .inner td { border: none; padding: 2px 4px; }
+      .half { width: 50%; vertical-align: top; }
+      .note { font-size: 9px; font-style: italic; margin-top: 8px; color: #444; }
+    </style>
+  </head>
+  <body>
+    <div class="head">
+      <div class="company">${COMPANY}</div>
+      <div>${ADDRESS}</div>
+      <div class="period">Payment Slip For The Month Of ${esc(v.period)}</div>
+    </div>
+    <table class="grid">
+      <tr><th class="l" style="width:18%">Name</th><td class="l" style="width:32%">${esc(v.name)}</td>
+          <th class="l" style="width:18%">Emp ID</th><td class="l" style="width:32%">${esc(v.empCode)}</td></tr>
+      <tr><th class="l">Department</th><td class="l">${esc(v.department)}</td>
+          <th class="l">Designation</th><td class="l">${esc(v.designation)}</td></tr>
+      ${v.doj ? `<tr><th class="l">Date of Joining</th><td class="l">${esc(v.doj)}</td><td></td><td></td></tr>` : ''}
+    </table>
+    ${attendance}
+    <table class="grid">
+      <tr><th style="width:30%">EARNINGS</th><th style="width:12%">Rate (Rs.) / Hrs</th><th style="width:16%">Earned (Rs.)</th>
+          <th style="width:28%">EMPLOYEE CASH DEDUCTIONS</th><th style="width:14%">Amount (Rs.)</th></tr>
+      ${pairedRows(v.earnings, v.deductions)}
+      <tr class="tot"><td class="l">Gross Earnings</td><td></td><td class="r">${formatInr(v.totalEarnings)}</td>
+          <td class="l">Total Deductions</td><td class="r">${formatInr(v.totalDeductions)}</td></tr>
+    </table>
+    <table class="grid net">
+      ${v.adjustment ? `<tr><td class="l" style="font-weight:normal">Adjustment / rounding</td><td class="r" style="font-weight:normal">${formatInr(v.adjustment)}</td></tr>` : ''}
+      <tr><td class="l">NET PAYABLE (Rs.)</td><td class="r">${formatInr(v.netPay)}</td></tr>
+      <tr><td class="l words" colspan="2" style="font-weight:normal">In words: ${esc(v.netInWords)}</td></tr>
+    </table>
+    ${footer}
+    <div class="note">Amounts in Indian Rupees. Shows employee cash earnings and deductions only; employer contributions and provisions are not part of this slip.</div>
+  </body>
+</html>`
 }
 
 /** Renders the payslip PDF on-device and returns its local file URI. */
