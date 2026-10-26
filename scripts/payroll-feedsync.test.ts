@@ -1,5 +1,5 @@
 /** Feed sync unit test — no DB, fabricated rows. Run: npx tsx scripts/payroll-feedsync.test.ts */
-import { assemblePayrollInputs, mapCategory, FeedBundle, SalaryRow } from '../lib/payroll/feedSync';
+import { assemblePayrollInputs, mapCategory, resolveWeeklyOff, FeedBundle, SalaryRow } from '../lib/payroll/feedSync';
 import { calculateOne } from '../lib/payroll/engine';
 
 let pass = 0, fail = 0;
@@ -66,8 +66,41 @@ check('mapCategory: worker/staff/pune/consultant',
   && mapCategory(bundle.employees[2]) === 'PUNE_STAFF'
   && mapCategory({ ...bundle.employees[0], category: 'consultant' }) === 'CONSULTANT');
 
+
 // --- Consultant daily-rate support (PATCH_97) ---
 const emptySal = { basic: null, hra: null, conveyance: null, washing: null, education: null, heat_allow: null, vda: null, production_allow: null, medical: null, professional_development: null, communication: null, uniform: null };
+
+// --- Category routing by emp_code (owner decision 26 Oct 2026; work_location ignored) ---
+const mk = (emp_code: string, category: string, work_location: string) =>
+  ({ id: 'z', emp_code, name: 'Z', category, work_location, gender: 'M', is_active: true, weekly_off_day: null });
+check('route: BUNG code, category staff -> PUNE_STAFF', mapCategory(mk('BUNG05', 'staff', 'Pune')) === 'PUNE_STAFF');
+check('route: BUNG code, Aurangabad location -> PUNE_STAFF', mapCategory(mk('BUNG05', 'staff', 'Aurangabad')) === 'PUNE_STAFF');
+check('route: staff VFL code at Pune -> STAFF', mapCategory(mk('VFL1567', 'staff', 'Pune')) === 'STAFF');
+check('route: VFL5 security staff at Pune -> STAFF', mapCategory(mk('VFL5439', 'staff', 'Pune')) === 'STAFF');
+check('route: staff VFL code Aurangabad -> STAFF', mapCategory(mk('VFL1234', 'staff', 'Aurangabad')) === 'STAFF');
+check('route: worker VFL4 -> PERMANENT_WORKER', mapCategory(mk('VFL4010', 'worker', 'Aurangabad')) === 'PERMANENT_WORKER');
+check('route: worker category at Pune -> PERMANENT_WORKER', mapCategory(mk('VFL4010', 'worker', 'Pune')) === 'PERMANENT_WORKER');
+check('route: CON code -> CONSULTANT', mapCategory(mk('CON05', 'consultant', 'Aurangabad')) === 'CONSULTANT');
+check('route: CON code even if category member -> CONSULTANT', mapCategory(mk('CON12', 'staff', 'Aurangabad')) === 'CONSULTANT');
+check('route: consultant category without CON prefix -> CONSULTANT', mapCategory(mk('VFL7000', 'consultant', 'Aurangabad')) === 'CONSULTANT');
+check('route: lower-case/whitespace codes', mapCategory(mk('  bung07 ', 'staff', 'Pune')) === 'PUNE_STAFF'
+  && mapCategory(mk(' con03', 'worker', 'Aurangabad')) === 'CONSULTANT');
+check('route: VFL4xxx code with category staff -> STAFF', mapCategory(mk('VFL4099', 'staff', 'Aurangabad')) === 'STAFF');
+
+const puneStaffBundle: FeedBundle = {
+  ...bundle,
+  employees: [mk('VFL1567', 'staff', 'Pune')],
+  salaries: [{ employee_id: 'z', effective_from: '2026-01-01', is_active: true, ...emptySal0(), basic: 20000, hra: 8000, conveyance: 1600, education: 1600, ctc_annual: 0 }],
+  attendance: [1,2,3,4,5,6,7,8,9,10].map((d) => ({ employee_id: 'z', date: `2026-10-${String(d).padStart(2, '0')}`, status: 'P', overtime_hours: 0, check_in_time: `2026-10-${String(d).padStart(2, '0')}T04:00:00Z`, check_out_time: null })),
+  punches: [], leaves: [], advances: [], canteen: [], society: [], efficiency: [], statusEvents: [],
+};
+function emptySal0() { return { washing: null, heat_allow: null, vda: null, production_allow: null, medical: null, professional_development: null, communication: null, uniform: null }; }
+const pr = assemblePayrollInputs(2026, 10, puneStaffBundle);
+const pin = pr.inputs.find((i) => i.empCode === 'VFL1567')!;
+check('e2e: Pune-location staff -> STAFF input with masters, no rateProfile', pin?.category === 'STAFF' && !pin.rateProfile && pin.masters?.FIXED_GROSS === 50000, JSON.stringify(pin));
+const pout = calculateOne(pin);
+check('e2e: Pune-location staff gets multi-line earnings (not single GROSS)', !pout.held && pout.earnings.GROSS === undefined && pout.earnings.BASIC !== undefined, JSON.stringify(pout));
+check('e2e: Pune-location staff has PF deducted', (pout.deductions.PF ?? 0) > 0, JSON.stringify(pout.deductions));
 const conSal = (id: string, extra: Partial<SalaryRow>): SalaryRow =>
   ({ employee_id: id, effective_from: '2026-04-01', is_active: true, ...emptySal, ctc_annual: 0, ...extra });
 const conEmp = (id: string, code: string) =>
@@ -90,6 +123,16 @@ const conBundle: FeedBundle = {
 };
 const cr = assemblePayrollInputs(2026, 10, conBundle);
 const cIn = (code: string) => cr.inputs.find((i) => i.empCode === code)!;
+
+// --- Weekly-off default no longer keyed off work_location ---
+const wk = (code: string, cat: string, loc: string, wo: number | null) => ({ ...mk(code, cat, loc), weekly_off_day: wo });
+const wkOf = (e: ReturnType<typeof wk>) => resolveWeeklyOff(e, mapCategory(e));
+check('weekly-off: STAFF at Pune, null -> Friday', wkOf(wk('VFL5439', 'staff', 'Pune', null)) === 5);
+check('weekly-off: STAFF at Pune, 0 -> Sunday (explicit wins)', wkOf(wk('VFL1567', 'staff', 'Pune', 0)) === 0);
+check('weekly-off: BUNG null -> Sunday', wkOf(wk('BUNG02', 'staff', 'Pune', null)) === 0);
+check('weekly-off: worker at Pune, null -> Friday', wkOf(wk('VFL4010', 'worker', 'Pune', null)) === 5);
+const wb: FeedBundle = { ...bundle, employees: [wk('VFL4010', 'worker', 'Pune', null)], salaries: [], attendance: [], leaves: [], advances: [], canteen: [], society: [], statusEvents: [] };
+check('weekly-off e2e: Pune worker null -> Oct wd 26 (Friday off)', assemblePayrollInputs(2026, 10, wb).inputs[0]?.workingDays === 26);
 
 const c1 = cIn('CON01');
 const c1r = calculateOne(c1);

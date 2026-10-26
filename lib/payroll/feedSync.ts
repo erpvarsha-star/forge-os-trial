@@ -77,12 +77,32 @@ export interface AssembleResult {
   blockedEmployees: { empCode: string; reason: string }[];
 }
 
-/** employees.category/work_location → engine PayCategory. */
+/**
+ * employees.emp_code / category → engine PayCategory.
+ * Owner decision 26 Oct 2026: the emp_code identifies which payroll a person is on;
+ * work_location (Pune) does NOT. The two active Pune-location employees carry VFL codes and
+ * are paid from the STAFF workbook (PF/PT/ESI etc.), so Pune location is ignored here.
+ * Order: BUNG prefix -> PUNE_STAFF (Pune home workers); CON prefix -> CONSULTANT;
+ * category worker -> PERMANENT_WORKER; category consultant -> CONSULTANT (consultant w/o CON
+ * prefix); otherwise STAFF. For VFL codes the DB category stays the tiebreaker (a VFL4xxx
+ * person with category staff is paid from the Staff sheet).
+ */
 export function mapCategory(e: EmployeeRow): PayCategory {
+  const code = (e.emp_code ?? '').trim().toUpperCase();
+  if (code.startsWith('BUNG')) return 'PUNE_STAFF';
+  if (code.startsWith('CON')) return 'CONSULTANT';
   if (e.category === 'worker') return 'PERMANENT_WORKER';
   if (e.category === 'consultant') return 'CONSULTANT';
-  if (e.work_location === 'Pune') return 'PUNE_STAFF';
   return 'STAFF';
+}
+
+/**
+ * Weekly-off weekday (0=Sun..6=Sat). Owner rule 11 Oct 2026: Friday for everyone unless
+ * employees.weekly_off_day is set (explicit value always wins). The Sunday default applies
+ * only to PUNE_STAFF (BUNG codes); work_location is NOT consulted (26 Oct 2026).
+ */
+export function resolveWeeklyOff(e: EmployeeRow, cat: PayCategory): number {
+  return e.weekly_off_day ?? (cat === 'PUNE_STAFF' ? WEEKLY_OFF_WEEKDAY.PUNE : WEEKLY_OFF_WEEKDAY.WALUJ);
 }
 
 function pickSalary(rows: SalaryRow[], employeeId: string, asOf: string): SalaryRow | null {
@@ -150,7 +170,7 @@ export function assemblePayrollInputs(year: number, month: number, feeds: FeedBu
 
     // Working days: workers → site weekly-off; staff/consultants → full calendar
     const weeklyOff = cat === 'PERMANENT_WORKER'
-      ? (emp.weekly_off_day ?? (emp.work_location === 'Pune' ? WEEKLY_OFF_WEEKDAY.PUNE : WEEKLY_OFF_WEEKDAY.WALUJ))
+      ? resolveWeeklyOff(emp, cat)
       : null;
     const wd = workingDaysInMonth(year, month, weeklyOff);
 
