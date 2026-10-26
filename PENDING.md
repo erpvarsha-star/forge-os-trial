@@ -1,3 +1,8 @@
+# >>> IN-FLIGHT (26 Oct 2026): payslip format rebuild — see CLAUDE.md 'Payslip format' <<<
+- [ ] PATCH_108 (`my_payslip_extras`) + app payslip tab/PDF to saved Staff/Worker templates (agents running; verify, PR, APK).
+- [ ] DECISION NEEDED (Yash): which employees are PUNE_STAFF payroll vs Waluj staff posted to Pune — current routing mis-calculates Pune-location staff (no PF/PT, OT x1). Hold or fix before October run.
+- [ ] Worker/consultant slips not yet compared (only Staff slips were provided).
+
 # >>> IN-FLIGHT (24-25 Oct 2026): payroll-ops-features PR — see CLAUDE.md "Payroll ops features (24 Oct 2026)" <<<
 - [x] Built + merged on `claude/payroll-ops-features`: cleanup (run-payroll function dir, login-otp.tsx.bak removed), warnings v2 (per-date late rule, pre-check `generate_warnings`, calculate 422 gate, AI review `payroll-warning-review`), notifications (payslip_ready, advance_approved/rejected, bell for ALL 7 roles), Pune attendance + reminder, onboarding checklist, statutory reports. All test suites 0 failed, tsc 7, i18n clean.
 - [x] PR #24 merged (cd35be2, 25 Oct). DEPLOYED + verified: `payroll-run` v5, `app-notify` v1, `payroll-warning-review` v1 (all verify_jwt true, files match repo); `pune-attendance-reminder` v1 via CI. `apk-102` published 25 Oct 12:24 UTC (built from cd35be2) — Yash installs.
