@@ -27,6 +27,8 @@ export interface Employee {
   weekly_off_day?: number | null
   /** False for home workers (BUNG*) who have no login; excluded from app headcount/reminders. */
   uses_app?: boolean
+  /** Set (e.g. 'Pune') for the clerk who enters attendance for that location's home workers. */
+  attendance_clerk_location?: string | null
   created_at: string
   updated_at: string
 }

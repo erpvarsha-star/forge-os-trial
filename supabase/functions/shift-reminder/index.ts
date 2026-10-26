@@ -89,6 +89,7 @@ async function weeklyShiftNotify(db: ReturnType<typeof supabaseAdmin>) {
     .from('employees')
     .select('id')
     .eq('is_active', true)
+    .eq('uses_app', true)
     .neq('role', 'owner');
 
   const missing = (activeEmployees ?? [])
