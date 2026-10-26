@@ -1,5 +1,5 @@
 # >>> IN-FLIGHT (26 Oct 2026): payslip format rebuild — see CLAUDE.md 'Payslip format' <<<
-- [x] PATCH_108 + Staff/Worker payslip tab/PDF merged (PR #25); routing fix merged (PR #26); `payroll-run` v7 deployed; `apk-104` published 26 Oct 13:22 UTC (install this one). [ ] Consultant & Pune layouts (fallbacks live) — answers needed. [ ] designation/DOJ data load. [ ] BUNG reactivation? [ ] check 4 active VFL5xxx staff missing from Sept Staff sheet.
+- [x] PATCH_108 + Staff/Worker payslip tab/PDF merged (PR #25); routing fix merged (PR #26); `payroll-run` v7 deployed; `apk-104` published 26 Oct 13:22 UTC (install this one). [ ] Consultant & Pune layouts (fallbacks live) — answers needed. [ ] designation/DOJ data load. [x] BUNG reactivated 26 Oct (7 people, Sunday off, no login). [ ] LOAD their salary masters (Gross As Per Masters) from the Pune sheet — October run holds them until then. [ ] check 4 active VFL5xxx staff missing from Sept Staff sheet.
 - [x] Pune routing fixed by emp_code (see CLAUDE.md).
 - [ ] Worker/consultant slips not yet compared (only Staff slips were provided).
 
