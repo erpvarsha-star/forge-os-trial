@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { PayrollRecord } from '@/types'
 import type { SlipSnapshot } from '@/lib/payroll/payslipModel'
+import type { PayslipExtras } from '@/types'
+import { monthLabel } from '@/lib/payslipLayout'
 
 export interface PayslipMonth {
   month: string // '04'..'12','01'..'03', zero-padded
@@ -9,11 +11,6 @@ export interface PayslipMonth {
   label: string // 'April 2026'
   issued: boolean
   record: PayrollRecord | null
-}
-
-const MONTH_NAMES: Record<string, string> = {
-  '01': 'January', '02': 'February', '03': 'March', '04': 'April', '05': 'May', '06': 'June',
-  '07': 'July', '08': 'August', '09': 'September', '10': 'October', '11': 'November', '12': 'December',
 }
 
 // FY2026-27: April 2026 through March 2027 — Yash's explicit instruction was
@@ -38,36 +35,29 @@ interface MyPayslipRow {
 const n = (v: unknown) => Number(v ?? 0) || 0
 
 // Adapts a pay_run_items snapshot (via my_payslips RPC, PATCH_95) into the
-// PayrollRecord shape the detail screen and PDF already render. Earnings /
-// deductions keys not mapped to a dedicated column fall into other_allowance /
-// other_deduction so the totals always equal the snapshot totals.
+// PayrollRecord shape. Every snapshot key keeps its own entry in
+// earnings_lines / deduction_lines (nothing is folded together; unknown keys
+// stay visible in the layout), and the totals are the snapshot's own.
 export function snapshotToRecord(employeeId: string, row: MyPayslipRow): PayrollRecord {
   const s = (row.snapshot ?? {}) as Partial<SlipSnapshot>
-  const e = s.earnings ?? {}
-  const d = s.deductions ?? {}
-  const eMapped: Record<string, keyof PayrollRecord> = {
-    BASIC: 'basic', HRA: 'hra', CONVEYANCE: 'conveyance', OT: 'overtime', GROSS: 'basic',
+  const e: Record<string, number> = {}
+  const d: Record<string, number> = {}
+  for (const [k, v] of Object.entries(s.earnings ?? {})) e[k] = n(v)
+  for (const [k, v] of Object.entries(s.deductions ?? {})) d[k] = n(v)
+  const eCols: Record<string, keyof PayrollRecord> = {
+    BASIC: 'basic', HRA: 'hra', CONVEYANCE: 'conveyance', OT: 'overtime',
     EDUCATION: 'education', MEDICAL: 'medical', PRO_DEV: 'professional_development',
     COMMUNICATION: 'communication', UNIFORM: 'uniform', WASHING: 'washing', HEAT: 'heat_allowance',
     VDA: 'vda', PROD_ALLOWANCE: 'production_allowance', ARREARS: 'arrears',
   }
-  const dMapped: Record<string, keyof PayrollRecord> = {
+  const dCols: Record<string, keyof PayrollRecord> = {
     PF: 'pf', ESI: 'esic', PT: 'pt', ADVANCE: 'advance_recovery', TDS: 'tds',
-    CANTEEN: 'canteen', SOCIETY: 'society', MLWF: 'mlwf',
+    CANTEEN: 'canteen', SOCIETY: 'society', MLWF: 'mlwf', OTHER: 'other_deduction',
+    PROD_OFFSET: 'production_allowance_offset',
   }
-  const out: Record<string, number> = {}
-  let otherAllowance = 0
-  for (const [k, v] of Object.entries(e)) {
-    const col = eMapped[k]
-    if (col) out[col] = (out[col] ?? 0) + n(v)
-    else otherAllowance += n(v)
-  }
-  let otherDeduction = 0
-  for (const [k, v] of Object.entries(d)) {
-    const col = dMapped[k]
-    if (col) out[col] = (out[col] ?? 0) + n(v)
-    else otherDeduction += n(v)
-  }
+  const cols: Record<string, number> = {}
+  for (const [k, v] of Object.entries(e)) if (eCols[k]) cols[eCols[k]] = v
+  for (const [k, v] of Object.entries(d)) if (dCols[k]) cols[dCols[k]] = v
   return {
     id: row.pay_run_item_id,
     employee_id: employeeId,
@@ -75,9 +65,12 @@ export function snapshotToRecord(employeeId: string, row: MyPayslipRow): Payroll
     year: Number(row.year),
     basic: 0, hra: 0, conveyance: 0, special_allowance: 0, overtime: 0,
     pf: 0, esic: 0, pt: 0, advance_recovery: 0, tds: 0,
-    ...out,
-    other_allowance: otherAllowance,
-    other_deduction: otherDeduction,
+    ...cols,
+    earnings_lines: e,
+    deduction_lines: d,
+    category: s.category,
+    total_earnings: s.totalEarnings !== undefined ? n(s.totalEarnings) : undefined,
+    total_deductions: s.totalDeductions !== undefined ? n(s.totalDeductions) : undefined,
     net_pay: n(row.net_pay),
     created_at: '',
     status: 'final',
@@ -90,6 +83,16 @@ async function fetchMyPayslips(employeeId: string): Promise<PayrollRecord[]> {
   const { data, error } = await supabase.rpc('my_payslips')
   if (error) return []
   return ((data ?? []) as MyPayslipRow[]).map((r) => snapshotToRecord(employeeId, r))
+}
+
+async function fetchExtras(year: number, month: number): Promise<PayslipExtras | null> {
+  try {
+    const { data, error } = await supabase.rpc('my_payslip_extras', { p_year: year, p_month: month })
+    if (error || !data || typeof data !== 'object') return null
+    return data as PayslipExtras
+  } catch {
+    return null
+  }
 }
 
 export function usePayslips(employeeId: string | undefined) {
@@ -113,7 +116,7 @@ export function usePayslips(employeeId: string | undefined) {
         return {
           month,
           year,
-          label: `${MONTH_NAMES[month]} ${year}`,
+          label: monthLabel(month, year),
           issued: record !== null,
           record,
         }
@@ -137,9 +140,13 @@ export function usePayslip(employeeId: string | undefined, month: string, year: 
     if (!employeeId) return
     let cancelled = false
     setIsLoading(true)
-    fetchMyPayslips(employeeId).then((rows) => {
+    fetchMyPayslips(employeeId).then(async (rows) => {
+      const found = rows.find((r) => r.month === month && r.year === year) ?? null
+      // Extras (identity, attendance, IDs, leave balances) are best-effort:
+      // any failure leaves the snapshot-only payslip intact.
+      const extras = found ? await fetchExtras(year, Number(month)) : null
       if (cancelled) return
-      setRecord(rows.find((r) => r.month === month && r.year === year) ?? null)
+      setRecord(found ? { ...found, extras } : null)
       setIsLoading(false)
     })
     return () => { cancelled = true }
