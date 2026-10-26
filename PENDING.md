@@ -1,6 +1,6 @@
 # >>> IN-FLIGHT (26 Oct 2026): payslip format rebuild — see CLAUDE.md 'Payslip format' <<<
-- [ ] PATCH_108 (`my_payslip_extras`) + app payslip tab/PDF to saved Staff/Worker templates (agents running; verify, PR, APK).
-- [ ] DECISION NEEDED (Yash): which employees are PUNE_STAFF payroll vs Waluj staff posted to Pune — current routing mis-calculates Pune-location staff (no PF/PT, OT x1). Hold or fix before October run.
+- [x] PATCH_108 + Staff/Worker payslip tab/PDF merged (PR #25); routing fix merged (PR #26); `payroll-run` v7 deployed; `apk-104` published 26 Oct 13:22 UTC (install this one). [ ] Consultant & Pune layouts (fallbacks live) — answers needed. [ ] designation/DOJ data load. [ ] BUNG reactivation? [ ] check 4 active VFL5xxx staff missing from Sept Staff sheet.
+- [x] Pune routing fixed by emp_code (see CLAUDE.md).
 - [ ] Worker/consultant slips not yet compared (only Staff slips were provided).
 
 # >>> IN-FLIGHT (24-25 Oct 2026): payroll-ops-features PR — see CLAUDE.md "Payroll ops features (24 Oct 2026)" <<<
