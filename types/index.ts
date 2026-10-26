@@ -25,6 +25,8 @@ export interface Employee {
   /** PATCH_71. 0=Sunday..6=Saturday. Null means the company default,
    *  Friday, for everyone except the few people this has been set for. */
   weekly_off_day?: number | null
+  /** False for home workers (BUNG*) who have no login; excluded from app headcount/reminders. */
+  uses_app?: boolean
   created_at: string
   updated_at: string
 }

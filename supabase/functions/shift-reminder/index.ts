@@ -298,7 +298,8 @@ async function formsDueReminder(db: ReturnType<typeof supabaseAdmin>) {
     .select('id, department')
     .in('department', Array.from(byDepartment.keys()))
     .in('role', ['supervisor', 'manager'])
-    .eq('is_active', true);
+    .eq('is_active', true)
+    .eq('uses_app', true);
 
   // The IST calendar date the deadline falls on. Because this only runs
   // inside the lead window, "now" is already on the deadline's own day even

@@ -24,7 +24,7 @@ export default function SupervisorDashboard() {
   const fetchStats = async () => {
     if (!employee) return
     const today = istDateStr()
-    const { data: team } = await supabase.from('employees').select('id').eq('supervisor_id', employee.id).eq('is_active', true)
+    const { data: team } = await supabase.from('employees').select('id').eq('supervisor_id', employee.id).eq('is_active', true).eq('uses_app', true)
     if (!team) { setIsLoading(false); return }
     const ids = team.map(t => t.id)
     const { data: attendance } = await supabase.from('attendance_records').select('status').in('employee_id', ids).eq('date', today)

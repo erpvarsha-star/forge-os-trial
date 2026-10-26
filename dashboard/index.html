@@ -383,7 +383,7 @@ async function loadAll() {
 
   const [employees, todayAtt, monthAtt, scores, leaves, advances, alerts, tokens, formSubs, production] =
     await Promise.all([
-      safe(select('employees', 'is_active=eq.true&select=id,emp_code,name,department,category,role,phone,supervisor_id,must_change_pin')),
+      safe(select('employees', 'is_active=eq.true&uses_app=eq.true&select=id,emp_code,name,department,category,role,phone,supervisor_id,must_change_pin')),
       safe(select('attendance_records', `date=eq.${today}&select=employee_id,status,late_minutes,check_in_time`)),
       safe(select('attendance_records', `date=gte.${from30}&select=date,status,employee_id,late_minutes`)),
       safe(select('monthly_scores', `year=eq.${year}&month=eq.${month}&select=employee_id,composite_score,attendance_score,on_time_score`)),
