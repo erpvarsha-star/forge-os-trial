@@ -37,7 +37,8 @@ const n = (v: unknown) => Number(v ?? 0) || 0
 // Adapts a pay_run_items snapshot (via my_payslips RPC, PATCH_95) into the
 // PayrollRecord shape. Every snapshot key keeps its own entry in
 // earnings_lines / deduction_lines (nothing is folded together; unknown keys
-// stay visible in the layout), and the totals are the snapshot's own.
+// stay visible in the layout). Net is the snapshot's netPay (authoritative);
+// gross/deductions totals are computed from the printed lines in the layout.
 export function snapshotToRecord(employeeId: string, row: MyPayslipRow): PayrollRecord {
   const s = (row.snapshot ?? {}) as Partial<SlipSnapshot>
   const e: Record<string, number> = {}
@@ -69,9 +70,7 @@ export function snapshotToRecord(employeeId: string, row: MyPayslipRow): Payroll
     earnings_lines: e,
     deduction_lines: d,
     category: s.category,
-    total_earnings: s.totalEarnings !== undefined ? n(s.totalEarnings) : undefined,
-    total_deductions: s.totalDeductions !== undefined ? n(s.totalDeductions) : undefined,
-    net_pay: n(row.net_pay),
+    net_pay: s.netPay !== undefined && s.netPay !== null ? n(s.netPay) : n(row.net_pay),
     created_at: '',
     status: 'final',
     days_payable: s.worked,

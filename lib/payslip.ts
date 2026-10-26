@@ -102,6 +102,7 @@ export function payslipHtml(employee: Employee, record: PayrollRecord): string {
           <td class="l">Total Deductions</td><td class="r">${formatInr(v.totalDeductions)}</td></tr>
     </table>
     <table class="grid net">
+      ${v.adjustment ? `<tr><td class="l" style="font-weight:normal">Adjustment / rounding</td><td class="r" style="font-weight:normal">${formatInr(v.adjustment)}</td></tr>` : ''}
       <tr><td class="l">NET PAYABLE (Rs.)</td><td class="r">${formatInr(v.netPay)}</td></tr>
       <tr><td class="l words" colspan="2" style="font-weight:normal">In words: ${esc(v.netInWords)}</td></tr>
     </table>

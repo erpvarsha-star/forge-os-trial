@@ -414,7 +414,8 @@
     "payslipNetInWords": "In words",
     "payslipRateHrs": "Rate / Hrs",
     "payslipEarned": "Earned",
-    "payslipPdfFailed": "Failed to generate PDF"
+    "payslipPdfFailed": "Failed to generate PDF",
+    "payslipAdjustment": "Adjustment / rounding"
   },
   "supervisor": {
     "teamStatus": "Team Status",

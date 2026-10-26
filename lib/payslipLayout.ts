@@ -57,6 +57,7 @@ export interface SlipView {
   otHours: number
   totalEarnings: number
   totalDeductions: number
+  adjustment: number // net - (gross - deductions); 0 when it balances
   netPay: number
   netInWords: string
   idCells: FooterCell[]
@@ -211,6 +212,7 @@ export function buildSlipView(
   const legacy = legacyLines(record)
   const e = record.earnings_lines ?? legacy.e
   const d = record.deduction_lines ?? legacy.d
+  const sum = (rows: SlipRow[]) => rows.reduce((s, r) => s + r.amount, 0)
   const lay = layoutFor(record.category, e)
   const kind = lay.kind
   const otHours = num(record.ot_hours)
@@ -219,10 +221,14 @@ export function buildSlipView(
   const earnings = buildRows(e, lay.earnings, lay.alwaysEarn, 'OT', otHours, lay.labelOverrides)
   const deductions = buildRows(d, lay.deductions, lay.alwaysDed, undefined, 0, lay.labelOverrides)
 
-  const sum = (rows: SlipRow[]) => rows.reduce((s, r) => s + r.amount, 0)
-  const totalEarnings = record.total_earnings ?? sum(earnings)
-  const totalDeductions = record.total_deductions ?? sum(deductions)
+  // Totals are what is printed, not the snapshot's: snapshot totalEarnings is
+  // inconsistent about OT. Net is the authoritative snapshot netPay, and any
+  // visible gap (>= 0.5 rupee) is shown as one 'Adjustment / rounding' line.
+  const totalEarnings = sum(earnings)
+  const totalDeductions = sum(deductions)
   const netPay = num(record.net_pay)
+  const diff = Math.round((netPay - (totalEarnings - totalDeductions)) * 100) / 100
+  const adjustment = Math.abs(diff) >= 0.5 ? diff : 0
 
   const L = (k: string, en: string): LabelDef => ({ key: W(k), en })
   const a = ex.attendance && ex.attendance.source !== 'none' ? ex.attendance : null
@@ -257,6 +263,7 @@ export function buildSlipView(
     otHours,
     totalEarnings,
     totalDeductions,
+    adjustment,
     netPay,
     netInWords: amountInWords(netPay),
     idCells: [

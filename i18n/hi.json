@@ -414,7 +414,8 @@
     "payslipNetInWords": "शब्दों में",
     "payslipRateHrs": "दर / घंटे",
     "payslipEarned": "अर्जित",
-    "payslipPdfFailed": "PDF बनाने में विफल"
+    "payslipPdfFailed": "PDF बनाने में विफल",
+    "payslipAdjustment": "समायोजन / राउंडिंग"
   },
   "supervisor": {
     "teamStatus": "टीम की स्थिति",

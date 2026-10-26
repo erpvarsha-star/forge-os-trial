@@ -110,6 +110,12 @@ export function PayslipDetail() {
               </View>
             </Card>
 
+            {view.adjustment !== 0 && (
+              <Card className="mb-4">
+                <Row label={t('worker.payslipAdjustment')} value={view.adjustment} />
+              </Card>
+            )}
+
             {(view.idCells.length > 0 || view.leaveCells.length > 0) && (
               <Card className="mb-4">
                 <View className="gap-1">
