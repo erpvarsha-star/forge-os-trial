@@ -47,6 +47,8 @@ to an Agent call with `model: "sonnet"` (Haiku only for trivial file
 reads). Claude itself only plans, briefs, verifies (diff/tsc/live SQL), and
 does git/doc bookkeeping. Never spawn an agent without setting `model`.
 
+**🔒 LOCKED RULE — end every job with a full brief plus open questions. Decision from Yash, 26 Oct 2026** ("ensure everytime you finish i need a entire brief and any questions you have"). Every time a job finishes, the final message must contain: (1) what was asked, (2) every step actually run, in order, incl. agents used, (3) what Claude verified itself vs what an agent claimed, (4) what is live vs merged vs draft vs untested, (5) every open question or decision needed from Yash, numbered. No "done" without it.
+
 **Keep `PENDING.md` current** — it is the shared checklist of what is
 outstanding, blocked, or untested. Update it before the final push of any
 session.
