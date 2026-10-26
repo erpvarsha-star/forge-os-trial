@@ -255,6 +255,39 @@ export interface PayrollRecord {
   employer_esi?: number
   bonus?: number
   gratuity?: number
+  // Payslip format extension (pay_run_items snapshot via my_payslips()).
+  // Raw per-key money lines — the source of truth for the slip layout;
+  // the legacy columns above are kept for payroll_records rows.
+  category?: string
+  earnings_lines?: Record<string, number>
+  deduction_lines?: Record<string, number>
+  total_earnings?: number
+  total_deductions?: number
+  production_allowance_offset?: number
+  extras?: PayslipExtras | null
+}
+
+/** Result of rpc('my_payslip_extras') — identity, attendance, IDs, leave balances. */
+export interface PayslipExtras {
+  designation?: string | null
+  department?: string | null
+  doj?: string | null // YYYY-MM-DD
+  emp_code?: string | null
+  uan?: string | null
+  esi_no?: string | null
+  pan_masked?: string | null
+  attendance?: {
+    working_days?: number | null
+    present?: number | null
+    weekly_off?: number | null
+    el?: number | null
+    cl?: number | null
+    sl?: number | null
+    ph?: number | null
+    days_payable?: number | null
+    source?: 'import' | 'live' | 'none'
+  } | null
+  leave_available?: { el?: number | null; cl?: number | null; sl?: number | null } | null
 }
 
 export interface PlantConfig {
