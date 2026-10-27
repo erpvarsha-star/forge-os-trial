@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator, TextInput, Switch } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/hooks/useAuth'
 import { Header } from '@/components/Header'
@@ -17,7 +17,7 @@ const CODES: Code[] = ['P', 'L', 'HL', 'WO']
 const MAX_DAYS_BACK = 7
 
 type Emp = { id: string; emp_code: string; name: string }
-type Rec = { status: string; check_in_time: string | null }
+type Rec = { status: string; check_in_time: string | null; ot_hours?: number | null; outstation_travel?: boolean | null }
 
 // Calendar-day shift on a YYYY-MM-DD string via UTC arithmetic (timezone-invariant, not a "what day is it" read)
 const shiftDate = (dateStr: string, days: number) => {
@@ -35,7 +35,18 @@ const CLERK_ERRORS: [string, string][] = [
   ['invalid status', 'puneClerk.invalidStatus'],
   ['date out of range', 'puneClerk.dateOutOfRange'],
   ['already has a punch', 'puneClerk.alreadyPunched'],
+  ['invalid OT hours', 'puneClerk.invalidOt'],
 ]
+
+// OT text -> hours. Empty = 0; valid = 0..24 in steps of 0.5; otherwise null (invalid)
+const parseOt = (txt: string): number | null => {
+  const v = txt.trim().replace(',', '.')
+  if (v === '') return 0
+  if (!/^\d+(\.\d+)?$/.test(v)) return null
+  const n = Number(v)
+  if (!Number.isFinite(n) || n < 0 || n > 24 || (n * 2) % 1 !== 0) return null
+  return n
+}
 
 export function PuneAttendance({ clerk }: { clerk?: boolean }) {
   const { t } = useTranslation()
@@ -48,6 +59,10 @@ export function PuneAttendance({ clerk }: { clerk?: boolean }) {
   const [isLoading, setIsLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [notClerk, setNotClerk] = useState(false)
+  const [otEdits, setOtEdits] = useState<Record<string, string>>({})
+  const [travelEdits, setTravelEdits] = useState<Record<string, boolean>>({})
+  // Does the roster RPC return saved OT/travel yet? If not, warn the clerk (tolerant of the DB gap)
+  const [savedShown, setSavedShown] = useState(true)
 
   const clerkMessage = (msg: string) => {
     const hit = CLERK_ERRORS.find(([needle]) => msg.includes(needle))
@@ -56,7 +71,7 @@ export function PuneAttendance({ clerk }: { clerk?: boolean }) {
 
   const load = useCallback(async () => {
     setIsLoading(true)
-    setEdits({})
+    setEdits({}); setOtEdits({}); setTravelEdits({})
     if (clerk) {
       const { data, error } = await supabase.rpc('pune_attendance_roster', { p_date: date })
       if (error) {
@@ -66,10 +81,11 @@ export function PuneAttendance({ clerk }: { clerk?: boolean }) {
         return
       }
       setNotClerk(false)
-      const rows = (data ?? []) as { employee_id: string; emp_code: string; name: string; status: string | null; check_in_time: string | null }[]
+      const rows = (data ?? []) as { employee_id: string; emp_code: string; name: string; status: string | null; check_in_time: string | null; ot_hours?: number | null; outstation_travel?: boolean | null }[]
+      setSavedShown(rows.length > 0 && rows.some(r => 'ot_hours' in r || 'outstation_travel' in r))
       setEmps(rows.map(r => ({ id: r.employee_id, emp_code: r.emp_code, name: r.name })))
       const cmap: Record<string, Rec> = {}
-      for (const r of rows) if (r.status) cmap[r.employee_id] = { status: r.status, check_in_time: r.check_in_time }
+      for (const r of rows) if (r.status) cmap[r.employee_id] = { status: r.status, check_in_time: r.check_in_time, ot_hours: r.ot_hours, outstation_travel: r.outstation_travel }
       setExisting(cmap)
       setIsLoading(false)
       return
@@ -94,7 +110,26 @@ export function PuneAttendance({ clerk }: { clerk?: boolean }) {
 
   const canGoBack = date > shiftDate(today, -MAX_DAYS_BACK)
   const canGoForward = date < today
-  const changedIds = Object.keys(edits).filter(id => edits[id] !== (existing[id]?.status as Code | undefined))
+  const savedOt = (id: string) => Number(existing[id]?.ot_hours ?? 0) || 0
+  const savedTravel = (id: string) => !!existing[id]?.outstation_travel
+  const otText = (id: string) => otEdits[id] ?? (savedOt(id) > 0 ? String(savedOt(id)) : '')
+  const travelOn = (id: string) => travelEdits[id] ?? savedTravel(id)
+  const statusOf = (id: string) => (edits[id] ?? existing[id]?.status) as Code | undefined
+  const otChanged = (id: string) => id in otEdits && parseOt(otEdits[id]) !== savedOt(id)
+  const travelChanged = (id: string) => id in travelEdits && travelEdits[id] !== savedTravel(id)
+  const changedIds = clerk
+    ? emps.map(e => e.id).filter(id =>
+        (id in edits && edits[id] !== existing[id]?.status) || otChanged(id) || travelChanged(id))
+    : Object.keys(edits).filter(id => edits[id] !== (existing[id]?.status as Code | undefined))
+  // Clerk-mode inline validation per row (blocks Save until fixed)
+  const rowError = (id: string): string | null => {
+    if (!clerk) return null
+    if (id in otEdits && parseOt(otEdits[id]) === null) return t('puneClerk.otInvalid')
+    const ot = id in otEdits ? parseOt(otEdits[id]) ?? 0 : savedOt(id)
+    if (!statusOf(id) && (ot > 0 || travelOn(id))) return t('puneClerk.statusFirst')
+    return null
+  }
+  const hasErrors = clerk && changedIds.some(id => rowError(id))
 
   const save = async () => {
     if (!changedIds.length) return
@@ -103,7 +138,11 @@ export function PuneAttendance({ clerk }: { clerk?: boolean }) {
       // One RPC per changed row, sequentially; stop at the first error
       let done = 0
       for (const id of changedIds) {
-        const { error } = await supabase.rpc('pune_set_attendance', { p_employee_id: id, p_date: date, p_status: edits[id] })
+        // Always send all five named args (a 3-arg overload also exists)
+        const { error } = await supabase.rpc('pune_set_attendance', {
+          p_employee_id: id, p_date: date, p_status: statusOf(id),
+          p_ot_hours: parseOt(otText(id)) ?? 0, p_outstation_travel: travelOn(id),
+        })
         if (error) {
           setSaving(false)
           Alert.alert(t('common.error'), clerkMessage(error.message))
@@ -147,6 +186,13 @@ export function PuneAttendance({ clerk }: { clerk?: boolean }) {
           <Text className="text-xs text-ink-600 flex-1">{t('hrAdmin.puneReminderNote')}</Text>
         </View>
 
+        {clerk && !isLoading && !notClerk && emps.length > 0 && !savedShown && (
+          <View className="flex-row items-start gap-2 mb-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
+            <Info size={16} color="#B45309" />
+            <Text className="text-xs text-amber-800 flex-1">{t('puneClerk.savedNotShown')}</Text>
+          </View>
+        )}
+
         {isLoading ? <ActivityIndicator color={BRAND[600]} /> : notClerk ? (
           <Text className="text-sm text-ink-500 px-1">{t('puneClerk.notClerk')}</Text>
         ) : emps.length === 0 ? (
@@ -176,11 +222,31 @@ export function PuneAttendance({ clerk }: { clerk?: boolean }) {
                       ))}
                     </View>
                   )}
+                  {clerk && !punched && (
+                    <View className="mt-3">
+                      <View className="flex-row items-center gap-3">
+                        <View className="flex-1">
+                          <Text className="text-xs text-ink-600 mb-1">{t('puneClerk.otHours')}</Text>
+                          <TextInput
+                            value={otText(e.id)}
+                            onChangeText={v => setOtEdits(prev => ({ ...prev, [e.id]: v }))}
+                            keyboardType="decimal-pad" placeholder="0"
+                            className="border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-900 bg-white" />
+                        </View>
+                        <View className="flex-1 items-start">
+                          <Text className="text-xs text-ink-600 mb-1">{t('puneClerk.outstation')}</Text>
+                          <Switch value={travelOn(e.id)} trackColor={{ true: BRAND[600] }}
+                            onValueChange={v => setTravelEdits(prev => ({ ...prev, [e.id]: v }))} />
+                        </View>
+                      </View>
+                      {rowError(e.id) && <Text className="text-xs text-red-600 mt-1">{rowError(e.id)}</Text>}
+                    </View>
+                  )}
                 </Card>
               )
             })}
             <Button title="common.save" variant="primary" size="lg" className="mt-2" loading={saving}
-              disabled={!changedIds.length} onPress={save} />
+              disabled={!changedIds.length || hasErrors} onPress={save} />
           </>
         )}
       </ScrollView>
