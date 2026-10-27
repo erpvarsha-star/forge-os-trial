@@ -20,10 +20,15 @@ export interface StatRow {
   earnings?: Record<string, number> | null
   deductions?: Record<string, number> | null
   totalEarnings?: number | null
+  /** After-engine extras (recurring allowance, BUNG OT, outstation travel). Included in totalEarnings but NOT statutory wages. */
+  extraEarningsTotal?: number | null
 }
 
 export const num = (v: unknown): number => {
   const n = Number(v)
   return Number.isFinite(n) ? n : 0
 }
+/** Wages for statutory reports: totalEarnings minus after-engine extras (owner decision 27 Oct 2026). */
+export const statutoryWages = (r: { totalEarnings?: unknown; extraEarningsTotal?: unknown }): number =>
+  Math.max(0, num(r.totalEarnings) - num(r.extraEarningsTotal))
 export const money = (v: unknown): string => num(v).toFixed(2)

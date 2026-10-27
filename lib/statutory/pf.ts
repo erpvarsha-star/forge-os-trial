@@ -1,4 +1,4 @@
-import { StatRow, num } from './types'
+import { StatRow, num, statutoryWages } from './types'
 
 /** EPFO constants. */
 export const PF_WAGE_CEILING = 15000
@@ -77,7 +77,7 @@ export function ecrRowFor(r: StatRow, daysInMonth: number): EcrRow {
     empCode: r.empCode,
     uan: String(r.uan ?? ''),
     name: r.name,
-    grossWages: rnd(num(r.totalEarnings)),
+    grossWages: rnd(statutoryWages(r)),
     epfWages,
     epsWages,
     edliWages: epsWages,

@@ -1,4 +1,4 @@
-import { StatRow, num } from './types'
+import { StatRow, num, statutoryWages } from './types'
 import { csvCell } from '../payroll/exportCsv'
 
 const BOM = '﻿'
@@ -38,7 +38,7 @@ export function buildPt(rows: StatRow[], month: number): PtResult {
   const out: PtRow[] = []
   for (const r of rows ?? []) {
     const pt = num(r.deductions?.PT)
-    const gross = num(r.totalEarnings)
+    const gross = statutoryWages(r)
     const female = String(r.gender ?? '').toLowerCase().startsWith('f')
     // Consultants carry no statutory deductions; skip anyone with no PT and no expected PT.
     const expected = String(r.category ?? '') === 'CONSULTANT' ? 0 : expectedPt(gross, month, female, !!r.ptExempt)

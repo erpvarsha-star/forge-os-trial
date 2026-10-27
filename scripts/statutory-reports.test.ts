@@ -4,7 +4,7 @@ import {
   buildEsi, esiContribution, isEsiEligible,
   expectedPt, buildPt,
   buildMlwf, isMlwfMonth, mlwfHalfYearMonths,
-  StatRow,
+  StatRow, statutoryWages,
 } from '../lib/statutory'
 
 let pass = 0, fail = 0
@@ -147,6 +147,24 @@ check('MLWF non-payable month -> no months', mlwfHalfYearMonths(7).length === 0)
   check('merge: one row per employee, sorted', m.length === 2 && m[0].empCode === 'V1')
   check('merge: amounts summed', m[0].worked === 26 && m[0].totalEarnings === 250.5 && m[0].earnings!.BASIC === 130.1 && m[0].earnings!.MEDICAL === 5 && m[0].deductions!.PF === 15.6 && m[0].deductions!.PT === 200, JSON.stringify(m[0]))
   check('merge tolerates lean rows', mergeRows([{ empCode: 'X', name: 'x' }, undefined as any]).length === 1)
+}
+
+// ---- extras excluded from statutory wages (owner decision 27 Oct 2026) ----
+{
+  check('statutoryWages subtracts extras', statutoryWages({ totalEarnings: 25000, extraEarningsTotal: 4000 }) === 21000)
+  check('statutoryWages no extras unchanged', statutoryWages({ totalEarnings: 25000 }) === 25000 && statutoryWages({ totalEarnings: 25000, extraEarningsTotal: null }) === 25000)
+  check('statutoryWages never negative', statutoryWages({ totalEarnings: 100, extraEarningsTotal: 500 }) === 0)
+  const mkE = (extra?: number): StatRow => ({ empCode: 'X1', name: 'x', worked: 26, totalEarnings: 25000, extraEarningsTotal: extra, esiNo: '1', deductions: { ESI: 100 } })
+  const withX = buildEsi([mkE(4000)]), noX = buildEsi([mkE(undefined)])
+  check('ESI wages exclude extras', withX.csv.includes('21000') && !withX.csv.includes('25000'), withX.csv)
+  check('ESI wages unchanged without extras', noX.csv.includes('25000'), noX.csv)
+  const ptRows = [{ empCode: 'P9', name: 'p', category: 'STAFF', gender: 'male', totalEarnings: 12000, extraEarningsTotal: 4000, deductions: { PT: 200 } }]
+  const ptR = buildPt(ptRows as StatRow[], 9)
+  check('PT gross excludes extras (8000 -> expected 175, deducted 200 flagged)', JSON.stringify(ptR).includes('8000') || JSON.stringify(ptR).includes('175'), JSON.stringify(ptR).slice(0, 300))
+  const pfR = buildPfEcr([{ empCode: 'F9', name: 'f', uan: '100000000001', worked: 26, totalEarnings: 30000, extraEarningsTotal: 5000, earnings: { BASIC: 12000 }, deductions: { PF: 1440 } }], 30)
+  check('PF gross wages exclude extras', pfR.text.includes('25000') && !pfR.text.includes('30000'), pfR.text)
+  const mg = mergeRows([{ empCode: 'M', name: 'm', totalEarnings: 100, extraEarningsTotal: 10 }, { empCode: 'M', name: 'm', totalEarnings: 50, extraEarningsTotal: 5 }])
+  check('merge sums extraEarningsTotal', mg[0].extraEarningsTotal === 15 && mg[0].totalEarnings === 150)
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
