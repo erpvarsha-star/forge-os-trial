@@ -1,11 +1,21 @@
-# >>> IN-FLIGHT (27 Oct 2026): October readiness build - PR #30 (payroll core) + PR #31 (clerk OT/travel screen), both DRAFT, NOT merged, payroll-run NOT deployed <<<
-- [x] PR #29 (Sept gate re-run) squash-merged cd3ab2a. Verdict: NOT YET PASSED (1 open: VFL1567's allowance - now covered by `recurring_adjustments`, to be re-verified in the October run).
-- [x] Built + gate-checked by Claude (58/51/42/15/35/26/58/12, tsc 7, i18n clean): pickSalary window, worker OT flat-VDA basis (master read from workers' structure.vda), post-engine extras (recurring allowance, BUNG OT = ot_hours x ot_rate, outstation travel 250/day), payslip lines.
-- [ ] Owner: approve + merge #30 and #31; then Claude deploys `payroll-run` (new version, verify_jwt true) and an APK builds (merge of #31 triggers it).
-- [ ] Owner DB items (Claude cannot/should not apply): (a) `pune_attendance_roster` must also return `ot_hours` and `outstation_travel`; (b) drop the old 3-arg `pune_set_attendance(uuid,date,text)` overload (ambiguity risk for the apk-105 screen).
-- [ ] Decision: extras sit inside `totalEarnings`, so statutory reports (ESI wages, expected PT) include them. Kajal's gross is near the ESI 21,000 ceiling - CA/owner to confirm whether the allowance is ESI/PT-able (sheet practice kept it outside gross).
-- [ ] October run (NOT started): needs owner/HR login + decisions, and the month is not over. Runbook: feeds -> warnings pre-check -> HR decisions -> AI review -> calculate -> arrears_sep26_30 -> approve -> finalize -> exports + notifications. BUNG02/BUNG06 deductions entered by HR as approved negative adjustments; BUNG OT/travel entered by Kajal the next day.
-- [ ] Kajal: install the new APK, test OT/travel entry on a real phone (never tested on a device).
+# >>> IN-FLIGHT (27 Oct 2026, later): PR #30 + #31 MERGED, payroll-run v8 LIVE, APK build HELD, October pre-run checklist below <<<
+- [x] PR #30 (d72671f) + PR #31 (4719f7a) squash-merged on owner approval. Statutory reports (ESI wages, PT gross, PF gross) now exclude after-engine extras (`extraEarningsTotal`) - owner decision 27 Oct: the recurring allowance raises net pay but stays outside ESI/PT wages, matching the sheet. Kajal's ESI status unchanged; revisit only if the CA says otherwise.
+- [x] `payroll-run` DEPLOYED v8 (verify_jwt true, 27 Oct). Roster/overload verified live by Claude: `pune_attendance_roster` returns ot_hours + outstation_travel; only the 5-arg `pune_set_attendance` exists. Screen workaround note removed.
+- [!] **APK HELD (owner, 27 Oct): the `Build Android APK` workflow (id 330767502) is DISABLED.** No build contains the OT/travel screen or the new payslip lines yet; latest published is apk-105. To release: re-enable the workflow (Actions -> Build Android APK -> Enable, or `PUT /repos/erpvarsha-star/forge-os-trial/actions/workflows/330767502/enable`) then push/dispatch a build. Do NOT forget this - app-code pushes to the base branch will not build until re-enabled.
+- [ ] Kajal device test of OT/travel entry: postponed until an APK is released.
+- [ ] BUNG02/BUNG06 deductions: HR enters as approved negative adjustments before the run, only in months they apply (not recurring).
+
+## October pre-run checklist (prepared 27 Oct; run starts once the month closes; Claude prepares, owner/HR trigger)
+Checked live 27 Oct: Oct VDA rate row exists (103/day); no October pay period/run yet; 7 BUNG active with salary structures; BUNG30/33 have ot_rate; 1 active recurring_adjustment (VFL1567 allowance, from 1 Oct); every other active employee has a structure; BUNG09 advance approved, outstanding 6,000.
+Before the month closes:
+1. Re-enable APK workflow and ship a build only when owner says; Kajal then enters BUNG OT hours/outstation travel the next day for every working day.
+2. Attendance complete for all four populations through 31 Oct (Pune via Kajal's clerk screen; Aurangabad via app).
+3. Feeds entered: canteen, society, efficiency (plant head), advances, any one-off adjustments. HR enters BUNG02/06 deductions as approved negative adjustments (only if applicable this month).
+4. Confirm inactive stay inactive: CON16, CON18, CON21, CON22, CON23. Confirm VFL1520 remains on_leave (no exit processing).
+5. Spot-check data gaps still open: bank details CON01/20/21/22/23; 4 active VFL5xxx staff missing from the Sept Staff sheet; VFL5464 master (held if missing); designation/DOJ blank on slips.
+Run (owner/HR session): create October pay run -> feeds -> `generate_warnings` pre-check -> HR decisions on warnings -> AI review (needs ANTHROPIC_API_KEY, set) -> calculate (check response: extras {employees,totalInr}, held list, VDA-missing 422 must NOT appear) -> `attach_arrears_sep26_30` -> approve -> finalize (advance recovery runs: BUNG09 outstanding 6,000 -> 4,000) -> exports (salary sheet, bank file, statutory reports) -> payslip_ready notifications.
+After calculate, verify before approving: VFL1567 allowance present in her slip and absent from ESI/PT wages; workers' OT uses flat-VDA-master basis; BUNG30/33 OT = ot_hours x ot_rate; outstation travel = 250/day; 31-day staff gross gap vs sheet should vanish for a 31-day month (U2 unverified - check a few staff).
+
 
 # >>> IN-FLIGHT (26 Oct 2026, evening): September gate FAILED; Pune attendance for Kajal shipped — see CLAUDE.md "September gate" <<<
 - [x] PR #27 merged (39161d1): `uses_app` filters (headcount/never-signed-in/reminders; payroll deliberately unfiltered) + member-reachable Pune attendance (More -> Pune Attendance, only where `attendance_clerk_location` is set). `apk-105` published 26 Oct 15:34 UTC. [ ] Kajal installs apk-105 and saves one BUNG day on a real phone (never tested on a device).
