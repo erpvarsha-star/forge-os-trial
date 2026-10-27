@@ -88,7 +88,7 @@ for (const p of P){
   row.deltaA = r2(a.res.netPay-expected); row.deltaB=r2(b.res.netPay-expected); row.deltaC=r2(c.res.netPay-expected);
   let cls:string, note:string;
   if (Math.abs(row.deltaA)<=TOL) { cls='PASS_EXACT'; note='engine as-is within Rs50 of owner-rule expected'+(adv.some((x:any)=>x.employee_id===p.code)?' (advance recovery from live advance_requests)':''); }
-  else if (Math.abs(row.deltaB)<=TOL && !p.ownerFlatOT) { cls='PASS_EXCEPTION'; note='needs the deduction entered as an approved negative payroll_adjustment (HR); Kajal clerk screen cannot enter money'; }
+  else if (Math.abs(row.deltaB)<=TOL && !p.ownerFlatOT) { cls='PASS_EXCEPTION'; note='needs the deduction entered as an approved negative payroll_adjustment (HR); clerk screen cannot enter money'; }
   else if (p.ownerFlatOT && Math.abs(row.deltaC)<=TOL) { cls='PASS_EXCEPTION'; note='engine OT = gross/30/8 x hours (x1); sheet flat Rs/hr; within Rs50 ONLY if OT hours are entered in attendance_records.overtime_hours, which no app screen does for BUNG'; }
   else if (p.ownerFlatOT) { cls='PASS_EXCEPTION'; note='flat-rate OT (sheet) vs engine gross/30/8 x hours: exceeds Rs50 even with OT hours entered; documented sheet deviation'; }
   else { cls='FAIL'; note='unexplained'; }
