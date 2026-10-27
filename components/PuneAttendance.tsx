@@ -17,6 +17,7 @@ const CODES: Code[] = ['P', 'L', 'HL', 'WO']
 const MAX_DAYS_BACK = 7
 
 type Emp = { id: string; emp_code: string; name: string }
+type RosterRow = { employee_id: string; emp_code: string; name: string; status: string | null; check_in_time: string | null; ot_hours: number | null; outstation_travel: boolean | null }
 type Rec = { status: string; check_in_time: string | null; ot_hours?: number | null; outstation_travel?: boolean | null }
 
 // Calendar-day shift on a YYYY-MM-DD string via UTC arithmetic (timezone-invariant, not a "what day is it" read)
@@ -61,8 +62,6 @@ export function PuneAttendance({ clerk }: { clerk?: boolean }) {
   const [notClerk, setNotClerk] = useState(false)
   const [otEdits, setOtEdits] = useState<Record<string, string>>({})
   const [travelEdits, setTravelEdits] = useState<Record<string, boolean>>({})
-  // Does the roster RPC return saved OT/travel yet? If not, warn the clerk (tolerant of the DB gap)
-  const [savedShown, setSavedShown] = useState(true)
 
   const clerkMessage = (msg: string) => {
     const hit = CLERK_ERRORS.find(([needle]) => msg.includes(needle))
@@ -81,11 +80,10 @@ export function PuneAttendance({ clerk }: { clerk?: boolean }) {
         return
       }
       setNotClerk(false)
-      const rows = (data ?? []) as { employee_id: string; emp_code: string; name: string; status: string | null; check_in_time: string | null; ot_hours?: number | null; outstation_travel?: boolean | null }[]
-      setSavedShown(rows.length > 0 && rows.some(r => 'ot_hours' in r || 'outstation_travel' in r))
+      const rows = (data ?? []) as RosterRow[]
       setEmps(rows.map(r => ({ id: r.employee_id, emp_code: r.emp_code, name: r.name })))
       const cmap: Record<string, Rec> = {}
-      for (const r of rows) if (r.status) cmap[r.employee_id] = { status: r.status, check_in_time: r.check_in_time, ot_hours: r.ot_hours, outstation_travel: r.outstation_travel }
+      for (const r of rows) if (r.status) cmap[r.employee_id] = { status: r.status, check_in_time: r.check_in_time, ot_hours: Number(r.ot_hours ?? 0) || 0, outstation_travel: !!r.outstation_travel }
       setExisting(cmap)
       setIsLoading(false)
       return
@@ -185,13 +183,6 @@ export function PuneAttendance({ clerk }: { clerk?: boolean }) {
           <Info size={16} color={INK[500]} />
           <Text className="text-xs text-ink-600 flex-1">{t('hrAdmin.puneReminderNote')}</Text>
         </View>
-
-        {clerk && !isLoading && !notClerk && emps.length > 0 && !savedShown && (
-          <View className="flex-row items-start gap-2 mb-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
-            <Info size={16} color="#B45309" />
-            <Text className="text-xs text-amber-800 flex-1">{t('puneClerk.savedNotShown')}</Text>
-          </View>
-        )}
 
         {isLoading ? <ActivityIndicator color={BRAND[600]} /> : notClerk ? (
           <Text className="text-sm text-ink-500 px-1">{t('puneClerk.notClerk')}</Text>

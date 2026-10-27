@@ -1167,7 +1167,6 @@
     "otHours": "OT hours",
     "outstation": "Outstation travel",
     "otInvalid": "Enter 0 to 24 hours, in steps of 0.5.",
-    "statusFirst": "Choose a status first.",
-    "savedNotShown": "Saved OT/travel are not shown yet - re-enter them if you change this day's status"
+    "statusFirst": "Choose a status first."
   }
 }
