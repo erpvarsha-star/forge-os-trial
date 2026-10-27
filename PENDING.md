@@ -1,3 +1,12 @@
+# >>> IN-FLIGHT (27 Oct 2026): October readiness build - PR #30 (payroll core) + PR #31 (clerk OT/travel screen), both DRAFT, NOT merged, payroll-run NOT deployed <<<
+- [x] PR #29 (Sept gate re-run) squash-merged cd3ab2a. Verdict: NOT YET PASSED (1 open: VFL1567's allowance - now covered by `recurring_adjustments`, to be re-verified in the October run).
+- [x] Built + gate-checked by Claude (58/51/42/15/35/26/58/12, tsc 7, i18n clean): pickSalary window, worker OT flat-VDA basis (master read from workers' structure.vda), post-engine extras (recurring allowance, BUNG OT = ot_hours x ot_rate, outstation travel 250/day), payslip lines.
+- [ ] Owner: approve + merge #30 and #31; then Claude deploys `payroll-run` (new version, verify_jwt true) and an APK builds (merge of #31 triggers it).
+- [ ] Owner DB items (Claude cannot/should not apply): (a) `pune_attendance_roster` must also return `ot_hours` and `outstation_travel`; (b) drop the old 3-arg `pune_set_attendance(uuid,date,text)` overload (ambiguity risk for the apk-105 screen).
+- [ ] Decision: extras sit inside `totalEarnings`, so statutory reports (ESI wages, expected PT) include them. Kajal's gross is near the ESI 21,000 ceiling - CA/owner to confirm whether the allowance is ESI/PT-able (sheet practice kept it outside gross).
+- [ ] October run (NOT started): needs owner/HR login + decisions, and the month is not over. Runbook: feeds -> warnings pre-check -> HR decisions -> AI review -> calculate -> arrears_sep26_30 -> approve -> finalize -> exports + notifications. BUNG02/BUNG06 deductions entered by HR as approved negative adjustments; BUNG OT/travel entered by Kajal the next day.
+- [ ] Kajal: install the new APK, test OT/travel entry on a real phone (never tested on a device).
+
 # >>> IN-FLIGHT (26 Oct 2026, evening): September gate FAILED; Pune attendance for Kajal shipped — see CLAUDE.md "September gate" <<<
 - [x] PR #27 merged (39161d1): `uses_app` filters (headcount/never-signed-in/reminders; payroll deliberately unfiltered) + member-reachable Pune attendance (More -> Pune Attendance, only where `attendance_clerk_location` is set). `apk-105` published 26 Oct 15:34 UTC. [ ] Kajal installs apk-105 and saves one BUNG day on a real phone (never tested on a device).
 - [x] PATCH_109 / 109b applied live by owner (clerk flag, `uses_app`, `pune_set_attendance`, `pune_attendance_roster`); audit-log bug (`action='upsert'` rejected by check constraint) found by Claude's rolled-back test and fixed by owner; re-tested.
