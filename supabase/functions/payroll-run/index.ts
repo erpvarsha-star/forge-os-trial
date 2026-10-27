@@ -23,7 +23,9 @@
 // Feed tables (PATCH_91) are keyed by payroll_month TEXT 'YYYY-MM'.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { assemblePayrollInputs } from './lib/feedSync.ts';
-import { calculateOne, DEFAULT_ENGINE_CONFIG } from './lib/engine.ts';
+import { DEFAULT_ENGINE_CONFIG } from './lib/engine.ts';
+import { buildEngineConfig } from './lib/engineConfig.ts';
+import { calculateWithExtras } from './lib/extraEarnings.ts';
 import { PAY_RUN_TRANSITIONS } from './lib/payRunStateMachine.ts';
 import { computeRunWarnings, countByType, diffWarnings } from './lib/warnings.ts';
 import { notifyPayslipReady } from './lib/appNotify.ts';
@@ -47,11 +49,11 @@ async function loadFeeds(supabase: any, year: number, month: number) {
   const mm = String(month).padStart(2, '0');
   const payrollMonth = `${year}-${mm}`; // PATCH_91 feed key
   const periodEnd = `${year}-${mm}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`;
-  const [employees, salaries, attendance, leaves, advances, canteen, society, efficiency, adjustments, statusEvents] =
+  const [employees, salaries, attendance, leaves, advances, canteen, society, efficiency, adjustments, statusEvents, recurring] =
     await Promise.all([
       safe(supabase.from('employees').select('id,emp_code,name,category,work_location,gender,is_active,weekly_off_day,pt_exempt')),
       safe(supabase.from('employee_salary_structure').select('*')),
-      safe(supabase.from('attendance_records').select('employee_id,date,status,overtime_hours,check_in_time,check_out_time,late_minutes,late_reason')
+      safe(supabase.from('attendance_records').select('employee_id,date,status,overtime_hours,ot_hours,outstation_travel,check_in_time,check_out_time,late_minutes,late_reason')
         .gte('date', `${year}-${mm}-01`).lte('date', periodEnd)),
       safe(supabase.from('leave_requests').select('employee_id,type,start_date,end_date,days,status')),
       safe(supabase.from('advance_requests').select('employee_id,monthly_deduction,outstanding_balance,status')),
@@ -64,9 +66,10 @@ async function loadFeeds(supabase: any, year: number, month: number) {
       safe(supabase.from('payroll_adjustments').select('employee_id,adjustment_type,signed_amount_inr,approval_status')
         .eq('payroll_month', payrollMonth)),
       safe(supabase.from('employee_status_history').select('employee_id,status,effective_from')),
+      safe(supabase.from('recurring_adjustments').select('employee_id,kind,label,amount,active_from,active_to,is_active')),
     ]);
   return { mm, payrollMonth, periodEnd, employees, salaries, attendance, leaves, advances, canteen, society,
-    efficiency, adjustments, statusEvents };
+    efficiency, adjustments, statusEvents, recurring };
 }
 
 type Feeds = Awaited<ReturnType<typeof loadFeeds>>;
@@ -441,9 +444,9 @@ Deno.serve(async (req) => {
       const { data: vdaRow } = await supabase
         .from('payroll_monthly_rates').select('vda_per_day_rate').eq('month', mm).eq('year', year).maybeSingle();
       const extraWarnings: string[] = [];
-      let cfg = DEFAULT_ENGINE_CONFIG;
+      let vdaPerDay: number | null = null;
       if (vdaRow && Number(vdaRow.vda_per_day_rate) > 0) {
-        cfg = { ...DEFAULT_ENGINE_CONFIG, workerVdaRatePerDay: Number(vdaRow.vda_per_day_rate) };
+        vdaPerDay = Number(vdaRow.vda_per_day_rate);
       } else if (!force) {
         return json({
           error: 'monthly VDA rate not entered',
@@ -456,6 +459,20 @@ Deno.serve(async (req) => {
       const built = await buildRunInputs(supabase, run, year, month, f);
       if ('error' in built) return json({ error: built.error }, 500);
       const { assembled, inputs, idByCode, topup, skippedAlreadyPaid } = built;
+
+      // ---- engine config: monthly VDA rate + worker OT basis (flat VDA master, owner decision 27 Oct 2026)
+      const builtCfg = buildEngineConfig({
+        vdaPerDay,
+        workerEmployeeIds: inputs.filter((i: any) => i.category === 'PERMANENT_WORKER').map((i: any) => idByCode.get(i.empCode) as string),
+        salaries: f.salaries,
+        asOf: f.periodEnd,
+      });
+      const cfg = builtCfg.cfg;
+      extraWarnings.push(...builtCfg.warnings);
+      const extrasCtx = {
+        periodStart: `${year}-${mm}-01`, periodEnd: f.periodEnd,
+        feeds: { recurring: f.recurring, attendance: f.attendance, salaries: f.salaries },
+      };
 
       // ---- warnings gate (before ANY item is written): sync is idempotent and keeps decisions
       const runWarningsSync = await syncRunWarnings(supabase, payRunId, f, inputs);
@@ -471,9 +488,13 @@ Deno.serve(async (req) => {
       // ---- run engine (still in draft — items are only written if the whole batch is sound)
       const items: any[] = [];
       const held: any[] = [];
+      const extraWarningsList: string[] = [];
+      let extrasEmployees = 0, extrasTotalInr = 0;
 
       for (const input of inputs) {
-        const result = calculateOne(input, cfg);
+        const calc = calculateWithExtras(input, idByCode.get(input.empCode) as string, extrasCtx, cfg);
+        const result = calc.result;
+        extraWarningsList.push(...calc.warnings);
         if (result.held) { held.push({ empCode: input.empCode, blockers: result.blockers }); continue; }
         items.push({
           pay_run_id: payRunId,
@@ -485,10 +506,12 @@ Deno.serve(async (req) => {
             totalEarnings: result.totalEarnings, totalDeductions: result.totalDeductions,
             netPay: result.netPay, otPay: result.otPay,
             employer: result.employer, warnings: result.warnings,
+            ...(calc.items.length ? { extraEarnings: calc.items, extraEarningsTotal: calc.extraTotal } : {}),
             historical: false,
           },
           net_pay: result.netPay,
         });
+        if (calc.items.length) { extrasEmployees++; extrasTotalInr = Math.round((extrasTotalInr + calc.extraTotal) * 100) / 100; }
       }
       if (items.length) {
         const { error: iErr } = await supabase.from('pay_run_items').insert(items);
@@ -500,10 +523,11 @@ Deno.serve(async (req) => {
       const { error: tErr } = await supabase.from('pay_runs').update({ status: 'calculated' }).eq('id', payRunId);
       if (tErr) return json({ error: 'status transition failed after items written: ' + tErr.message }, 500);
 
-      const warnings = [...extraWarnings, ...assembled.warnings];
+      const warnings = [...extraWarnings, ...extraWarningsList, ...assembled.warnings];
       await audit(payRunId, {
         event: 'calculate', items: items.length, held: held.length,
         warnings: warnings.length, vdaRatePerDay: cfg.workerVdaRatePerDay,
+        extrasEmployees, extrasTotalInr, workerOtVdaBasis: cfg.workerOtVdaBasis,
         warningsCount: wst.warningsCount, warningCounts,
         ...(topup ? { topup: true, skippedAlreadyPaid } : {}),
       });
@@ -512,6 +536,7 @@ Deno.serve(async (req) => {
         warnings,
         warningsCount: wst.warningsCount, warningCounts,
         vdaRatePerDay: cfg.workerVdaRatePerDay,
+        extras: { employees: extrasEmployees, totalInr: extrasTotalInr },
         ...(topup ? {
           topup: true, skippedAlreadyPaid,
           ...(items.length === 0 ? { message: 'Nothing to pay: every eligible employee already has an item in this pay period (or is still held).' } : {}),

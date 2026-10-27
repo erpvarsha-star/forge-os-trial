@@ -80,7 +80,7 @@ export default function StatutoryReportsScreen() {
         ;(grouped[runPeriod.get(it.pay_run_id)!] ??= []).push({
           empCode: e.emp_code, name: e.name, gender: e.gender, ptExempt: !!e.pt_exempt,
           uan: s?.uan ?? null, esiNo: s?.esi_no ?? null, category: snap.category ?? null,
-          worked: snap.worked ?? 0, earnings: snap.earnings ?? {}, deductions: snap.deductions ?? {}, totalEarnings: snap.totalEarnings ?? 0,
+          worked: snap.worked ?? 0, earnings: snap.earnings ?? {}, deductions: snap.deductions ?? {}, totalEarnings: snap.totalEarnings ?? 0, extraEarningsTotal: snap.extraEarningsTotal ?? 0,
         })
       }
       const byPeriod: Record<string, StatRow[]> = {}

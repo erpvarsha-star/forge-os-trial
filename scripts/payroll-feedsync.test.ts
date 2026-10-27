@@ -1,5 +1,5 @@
 /** Feed sync unit test — no DB, fabricated rows. Run: npx tsx scripts/payroll-feedsync.test.ts */
-import { assemblePayrollInputs, mapCategory, resolveWeeklyOff, FeedBundle, SalaryRow } from '../lib/payroll/feedSync';
+import { assemblePayrollInputs, mapCategory, resolveWeeklyOff, pickSalary, FeedBundle, SalaryRow } from '../lib/payroll/feedSync';
 import { calculateOne } from '../lib/payroll/engine';
 
 let pass = 0, fail = 0;
@@ -150,6 +150,28 @@ const c4 = cIn('CON18');
 const c4r = calculateOne(c4);
 check('daily with null daily_rate -> held MISSING_RATE', c4r.held && c4r.blockers.includes('MISSING_RATE'), JSON.stringify(c4r));
 check('daily with null daily_rate -> warning', cr.warnings.includes('CON18: daily rate missing'));
+
+// ---- pickSalary validity window (27 Oct 2026): old rows serve past months, new rows from their start
+{
+  const row = (o: Partial<SalaryRow>): SalaryRow => ({ employee_id: 'e', effective_from: '2026-04-01', is_active: true, effective_to: null,
+    basic: 1, hra: null, conveyance: null, washing: null, education: null, heat_allow: null, vda: null, production_allow: null,
+    medical: null, professional_development: null, communication: null, uniform: null, ctc_annual: null, ...o });
+  const rows = [
+    row({ basic: 100, effective_from: '2026-04-01', effective_to: '2026-08-31', is_active: false }),
+    row({ basic: 200, effective_from: '2026-09-01', effective_to: null, is_active: true }),
+  ];
+  check('pickSalary: Aug asOf picks old (inactive but window covers)', pickSalary(rows, 'e', '2026-08-31')?.basic === 100);
+  check('pickSalary: Sep asOf picks new', pickSalary(rows, 'e', '2026-09-30')?.basic === 200);
+  check('pickSalary: Oct asOf picks new', pickSalary(rows, 'e', '2026-10-31')?.basic === 200);
+  check('pickSalary: old row with later (buggy) start no longer shadows new',
+    pickSalary([row({ basic: 100, effective_from: '2026-09-24', effective_to: '2026-08-31', is_active: false }), rows[1]], 'e', '2026-09-30')?.basic === 200);
+  check('pickSalary: retired (inactive, no end) excluded',
+    pickSalary([row({ basic: 300, is_active: false, effective_to: null })], 'e', '2026-10-31') === null);
+  check('pickSalary: not-yet-started excluded', pickSalary([row({ basic: 400, effective_from: '2026-11-01' })], 'e', '2026-10-31') === null);
+  check('pickSalary: ended before asOf excluded', pickSalary([row({ basic: 500, effective_to: '2026-09-30' })], 'e', '2026-10-31') === null);
+  check('pickSalary: effective_to inclusive on asOf', pickSalary([row({ basic: 600, effective_to: '2026-10-31' })], 'e', '2026-10-31')?.basic === 600);
+  check('pickSalary: other employee ignored', pickSalary(rows, 'zzz', '2026-10-31') === null);
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

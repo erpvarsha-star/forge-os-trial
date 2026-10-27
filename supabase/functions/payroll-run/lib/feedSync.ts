@@ -30,6 +30,8 @@ export interface EmployeeRow {
 }
 export interface SalaryRow {
   employee_id: string; effective_from: string; is_active: boolean;
+  effective_to?: string | null;   // validity window end (inclusive); null = open-ended
+  ot_rate?: number | null;        // flat OT rate (BUNG / Pune home workers)
   basic: number | null; hra: number | null; conveyance: number | null; washing: number | null;
   education: number | null; heat_allow: number | null; vda: number | null; production_allow: number | null;
   medical: number | null; professional_development: number | null; communication: number | null;
@@ -106,9 +108,19 @@ export function resolveWeeklyOff(e: EmployeeRow, cat: PayCategory): number {
   return e.weekly_off_day ?? (cat === 'PUNE_STAFF' ? WEEKLY_OFF_WEEKDAY.PUNE : WEEKLY_OFF_WEEKDAY.WALUJ);
 }
 
-function pickSalary(rows: SalaryRow[], employeeId: string, asOf: string): SalaryRow | null {
+/**
+ * Salary master in force on `asOf` (YYYY-MM-DD). A candidate must have started
+ * (effective_from <= asOf) and not yet ended (effective_to null or >= asOf). A row
+ * flagged is_active=false with NO end date is retired and never used; an inactive row
+ * WITH an end date still serves the months its window covers (old rows legitimately
+ * serve past months after an increment). Latest effective_from wins.
+ */
+export function pickSalary(rows: SalaryRow[], employeeId: string, asOf: string): SalaryRow | null {
   const mine = rows
-    .filter((r) => r.employee_id === employeeId && r.effective_from <= asOf)
+    .filter((r) => r.employee_id === employeeId
+      && r.effective_from <= asOf
+      && (r.effective_to == null || r.effective_to >= asOf)
+      && !(r.is_active === false && r.effective_to == null))
     .sort((a, b) => b.effective_from.localeCompare(a.effective_from));
   return mine[0] ?? null;
 }

@@ -21,12 +21,14 @@ export function mergeRows(rows: StatRow[]): StatRow[] {
         ...r,
         worked: num(r.worked),
         totalEarnings: num(r.totalEarnings),
+        extraEarningsTotal: num(r.extraEarningsTotal),
         earnings: addMaps(null, r.earnings),
         deductions: addMaps(null, r.deductions),
       })
     } else {
       cur.worked = num(cur.worked) + num(r.worked)
       cur.totalEarnings = Math.round((num(cur.totalEarnings) + num(r.totalEarnings)) * 100) / 100
+      cur.extraEarningsTotal = Math.round((num(cur.extraEarningsTotal) + num(r.extraEarningsTotal)) * 100) / 100
       cur.earnings = addMaps(cur.earnings, r.earnings)
       cur.deductions = addMaps(cur.deductions, r.deductions)
       cur.uan = cur.uan || r.uan

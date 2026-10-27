@@ -1,4 +1,4 @@
-import { StatRow, num } from './types'
+import { StatRow, num, statutoryWages } from './types'
 import { csvCell } from '../payroll/exportCsv'
 
 export const ESI_WAGE_CEILING = 21000
@@ -42,7 +42,7 @@ export function buildEsi(rows: StatRow[]): EsiResult {
   for (const r of rows ?? []) {
     if (num(r.deductions?.ESI) <= 0) continue
     if (!String(r.esiNo ?? '').trim()) { missingEsiNo.push(r.empCode); continue }
-    const wages = Math.round(num(r.totalEarnings))
+    const wages = Math.round(statutoryWages(r))
     out.push({
       empCode: r.empCode,
       ipNumber: String(r.esiNo),

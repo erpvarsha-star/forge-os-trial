@@ -84,6 +84,8 @@ const LABELS: Record<string, LabelDef> = {
   OT: { key: W('payslipOvertime'), en: 'Overtime' },
   DISPATCH: { key: W('payslipDispatchIncentive'), en: 'Dispatch Incentive' },
   OTHER_ALLOWANCE: { key: W('payslipOtherAllowance'), en: 'Other Allowance' },
+  BUNG_OT: { key: W('payslipOvertime'), en: 'Overtime' },
+  OUTSTATION_TRAVEL: { key: W('payslipOutstationTravel'), en: 'Outstation travel' },
   LEAVE_ENCASHMENT: { key: W('payslipLeaveEncashment'), en: 'Leave Encashment' },
   SPECIAL: { key: W('special'), en: 'Special Allowance' },
   PF: { key: W('pf'), en: 'Provident Fund (employee)' },
@@ -139,7 +141,7 @@ export const LAYOUTS: Record<SlipCategory, CategoryLayout> = {
   // TODO: awaiting owner template (Pune staff). Simple fallback: GROSS + OT.
   PUNE_STAFF: {
     kind: 'flat',
-    earnings: ['GROSS', 'ARREARS', 'ARREARS_SEP26_30', 'OT'],
+    earnings: ['GROSS', 'ARREARS', 'ARREARS_SEP26_30', 'OT', 'BUNG_OT', 'OUTSTATION_TRAVEL', 'OTHER_ALLOWANCE'],
     alwaysEarn: [],
     deductions: ['PF', 'ESI', 'PT', 'MLWF', 'ADVANCE', 'SOCIETY', 'TDS', 'CANTEEN', 'OTHER'],
     alwaysDed: [],
@@ -148,7 +150,7 @@ export const LAYOUTS: Record<SlipCategory, CategoryLayout> = {
   // TODO: awaiting owner template (Consultant). Simple fallback: GROSS + OT.
   CONSULTANT: {
     kind: 'flat',
-    earnings: ['GROSS', 'ARREARS', 'ARREARS_SEP26_30', 'OT'],
+    earnings: ['GROSS', 'ARREARS', 'ARREARS_SEP26_30', 'OT', 'OTHER_ALLOWANCE'],
     alwaysEarn: [],
     deductions: ['PF', 'ESI', 'PT', 'MLWF', 'ADVANCE', 'SOCIETY', 'TDS', 'CANTEEN', 'OTHER'],
     alwaysDed: [],
