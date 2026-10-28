@@ -23,6 +23,9 @@
 
 -- ============================================================================
 -- STEP 0 — PRE-FLIGHT: confirm comp_off_balance's actual columns.
+-- VERIFIED LIVE 28 Oct: comp_off_balance is a per-earning ledger with columns
+-- id, employee_id, earned_date, expiry_date, reason, is_used,
+-- used_in_leave_request_id, created_at (no balance column).
 -- The consume RPC in STEP 4 makes a DOCUMENTED COLUMN ASSUMPTION for the
 -- comp-off debit (see there). Run this first and confirm the balance column
 -- name matches before running the rest of the file.
@@ -85,6 +88,12 @@ create policy leave_consumption_select on leave_consumption
 -- final-stage value is what consume_leave_for_request() draws down.
 -- (review_advance_request has no day-count concept and is intentionally unchanged.)
 -- ============================================================================
+
+-- The live DB has the 3-arg review_leave_request(uuid, boolean, text); a plain
+-- create-or-replace with a 4th arg would add a SECOND overload and PostgREST
+-- could not resolve 3-named-arg calls (PGRST203). Drop the old one first; old
+-- 3-arg callers (apk-106 and older) still resolve to the 4-arg version via the default.
+drop function if exists review_leave_request(uuid, boolean, text);
 
 create or replace function review_leave_request(
   p_id uuid,
@@ -243,6 +252,7 @@ begin
       update leave_balances set sick_leave = sick_leave - v_days
         where employee_id = v_req.employee_id and year = v_year;
     end if;
+  -- KNOWN GAP (28 Oct, verified live): comp_off_balance is a ledger, not a balance column; this branch will raise until redesigned (owner decision pending).
   elsif v_req.type = 'COFF' then
     -- Resolve the comp-off balance column defensively (see header note).
     select string_agg(column_name, ', ' order by ordinal_position) into v_coff_cols
