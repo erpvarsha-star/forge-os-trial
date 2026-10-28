@@ -63,3 +63,23 @@ Every row above answered; gaps imported via additive `scripts/PATCH_*.sql` files
 imports that already landed); audit table shows zero confirmed sheet-only gaps for Apr 2026 → audit date.
 
 *Sheet-side + app-side audit COMPLETE 28 Oct 2026. Awaiting: human review/run of PATCH_111; owner decisions (OD/C-off paid treatment, bank-details maintenance path, export layout, shift-time conflict); October run by owner/HR after 31 Oct with stage verification via OCT2026_RUN_VERIFICATION.sql.*
+
+
+## Full-schema inventory (28 Oct, read-only) — 78 tables enumerated
+
+**Salary-front state, live-verified:**
+| Area | Tables | State |
+|---|---|---|
+| People + masters | employees (154), employee_salary_structure (121), salary_change_requests (3 pending) | ✅ in line (PATCH_111 bank fix pending human run) |
+| Pay runs | pay_periods (6 = Apr–Sep), pay_runs (24 archived), pay_run_items (652), pay_run_warnings (0 — no Oct run yet) | ✅ in line |
+| Payroll history | payroll_records (536 = Apr–Aug import), payroll_monthly_rates (1 = Oct 103) | ✅ in line |
+| Extras / recurring | recurring_adjustments (1 = Kajal, active) | ✅ in line |
+| Advances | advance_requests (10), advance_recoveries (0 — fires at finalize) | ✅ in line |
+| Attendance | attendance_records (2,526, current to today), employee_shifts (7,750), shifts (9) | ✅ in line |
+| Statutory config | efficiency_incentive_slabs (5), pt_slabs (5) | ✅ seeded |
+| **Feeds for October run** | payroll_canteen_entries / payroll_society_recoveries / payroll_efficiency_entries / payroll_adjustments — **ALL 0 ROWS** | 🟠 empty by design (HR/plant-head must enter Oct feeds before calculate; worker production allowance = 0 + missing_efficiency warnings until the efficiency % is entered) |
+| **Leave** | leave_requests (5 vs 659 in sheet), leave_balances (129 = seed), **comp_off_balance (table EXISTS, 0 rows)** | 🔴 import pending; comp-off already has a landing table |
+| **Schema gaps** | designation / date_of_joining ABSENT; public_holidays (table EXISTS, 0 rows) | 🔴 import needs ADD COLUMN; holidays need entry if used |
+| Legacy / parked | salary_advances (0, orphan — documented), worker_efficiency_actuals (0, superseded), attendance_regularisation / attendance_warnings / role_kpis / role_kras (0, future scaffolding) | ⚪ no action |
+
+**Verdict: the salary front is in line for the October run** — engine, lifecycle, masters, advances, statutory config, archived history all verified. Remaining before/around the run: (1) PATCH_111 human-run; (2) HR enters October feeds (efficiency % is the critical one); (3) leave import build (on owner word); (4) DOJ/designation + UAN/PAN import files; (5) owner decisions (OD/C-off → lands in existing comp_off_balance; bank path; export layout; shift conflict).
