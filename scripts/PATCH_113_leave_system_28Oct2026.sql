@@ -114,9 +114,12 @@ declare
   v_authorized boolean := false;
   v_manager_id uuid;
   v_my_role text;
+  v_type text;
+  v_grant numeric;
+  v_unused integer;
 begin
-  select approval_chain, current_stage, employee_id, days
-    into v_chain, v_stage, v_employee_id, v_days
+  select approval_chain, current_stage, employee_id, days, type
+    into v_chain, v_stage, v_employee_id, v_days, v_type
     from leave_requests
     where id = p_id and status = 'pending'
     for update;
@@ -163,6 +166,19 @@ begin
           rejection_reason = p_note, granted_days = 0
       where id = p_id;
   elsif v_stage + 1 >= array_length(v_chain, 1) then
+    -- Owner decision: whole-day COFF beyond the unused, unexpired ledger is
+    -- BLOCKED at final approval. Half-day COFF is not blocked here (it is
+    -- recorded as half_day_pending_decision by consume_leave_for_request).
+    v_grant := coalesce(p_granted_days, v_days);
+    if v_type = 'COFF' and v_grant = floor(v_grant) then
+      select count(*) into v_unused from comp_off_balance
+       where employee_id = v_employee_id
+         and is_used = false
+         and (expiry_date is null or expiry_date >= (now() at time zone 'Asia/Kolkata')::date);
+      if v_unused < v_grant::int then
+        raise exception 'Comp-off balance insufficient: employee has % unused day(s), % requested', v_unused, v_grant::int;
+      end if;
+    end if;
     update leave_requests
       set status = 'approved', current_stage = v_stage + 1, approved_by = current_employee_id(),
           approved_at = now(), granted_days = coalesce(p_granted_days, v_days)
@@ -195,9 +211,10 @@ $$;
 --   * COFF consumes the comp_off_balance LEDGER (one row per comp-off earned):
 --       - whole days: the oldest unexpired unused rows (earned_date asc) are
 --         marked is_used = true / used_in_leave_request_id = request, one row
---         per day. If fewer rows exist than days, it never raises or blocks:
---         it consumes what exists, records source 'approval_shortfall_<N>' on
---         the leave_consumption row and notifies every active owner.
+--         per day. If fewer rows exist than days it RAISES 'Comp-off balance
+--         insufficient' (owner decision: blocked, not warned); the transaction
+--         rolls back so nothing is consumed. review_leave_request also blocks
+--         the final approval up front for the same case.
 --       - half-day (fractional days): the ledger is NOT touched; source
 --         'half_day_pending_decision' is recorded and every active owner is
 --         notified (HR + Plant Head decide the treatment, no auto-deduction).
@@ -284,14 +301,9 @@ begin
        where id = any(v_ids);
       get diagnostics v_marked = row_count;
       if v_marked < v_days::int then
-        -- Never block: consume what exists and record the shortfall.
-        v_source := 'approval_shortfall_' || (v_days::int - v_marked)::text;
-        insert into notifications (user_id, title, body, type, related_entity_type, related_entity_id)
-        select e.id, 'Comp-off shortfall',
-               'Comp-off short by ' || (v_days::int - v_marked)::text || ' day(s) for an approved request',
-               'leave', 'leave_request', p_request_id::text
-          from employees e
-         where e.role = 'owner' and e.is_active = true;
+        -- Owner decision: a whole-day comp-off beyond the ledger is BLOCKED.
+        -- Raising rolls back the ledger update above (single transaction).
+        raise exception 'Comp-off balance insufficient: % day(s) short', (v_days::int - v_marked);
       end if;
     end if;
   elsif v_req.type in ('LWP', 'OD') then
