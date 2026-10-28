@@ -1,7 +1,8 @@
 -- PATCH_113 — In-app leave system: granted-days override, request detail (OD/C-off),
 -- balance consumption ledger (28 Oct 2026, prepared by Kimi Code)
 --
--- STATUS: PREPARED, NOT APPLIED. For a human to review and run manually.
+-- STATUS: APPLIED 29 Oct 2026 (superseded in part by PATCH_117: atomic consumption, validation,
+-- search_path; this file is kept in sync with the live definitions as of PATCH_117).
 -- ADDITIVE ONLY: no DROP, no DELETE, no rewrites of existing columns.
 --
 -- Reproduces the owner's leave sheet behavior in-app:
@@ -91,9 +92,11 @@ create policy leave_consumption_select on leave_consumption
 
 -- The live DB has the 3-arg review_leave_request(uuid, boolean, text); a plain
 -- create-or-replace with a 4th arg would add a SECOND overload and PostgREST
--- could not resolve 3-named-arg calls (PGRST203). Drop the old one first; old
--- 3-arg callers (apk-106 and older) still resolve to the 4-arg version via the default.
-drop function if exists review_leave_request(uuid, boolean, text);
+-- could not resolve 3-named-arg calls (PGRST203). LIVE: the old 3-arg function was RENAMED
+-- (alter function review_leave_request(uuid, boolean, text) rename to review_leave_request_v53_old;
+-- execute revoked) and later dropped by the owner from the SQL Editor (the MCP tool cannot DROP).
+-- Old 3-arg callers (apk-106 and older) still resolve to the 4-arg version via the default.
+-- On a fresh DB that still has the 3-arg version, rename/drop it before running this step.
 
 create or replace function review_leave_request(
   p_id uuid,
@@ -104,6 +107,7 @@ create or replace function review_leave_request(
 returns void
 language plpgsql
 security definer
+set search_path = public
 as $$
 declare
   v_chain text[];
@@ -226,6 +230,7 @@ create or replace function consume_leave_for_request(p_request_id uuid)
 returns void
 language plpgsql
 security definer
+set search_path = public
 as $$
 declare
   v_role text;
@@ -319,6 +324,10 @@ begin
 end;
 $$;
 
+revoke execute on function review_leave_request(uuid, boolean, text, numeric) from public, anon;
+revoke execute on function consume_leave_for_request(uuid) from public, anon;
+-- NOTE: PATCH_117 (run after this file) replaces both functions with the final live definitions.
+
 -- ============================================================================
 -- STEP 5 — VERIFICATION (read-only; safe to re-run)
 -- ============================================================================
@@ -345,7 +354,7 @@ limit 20;
 -- allowed — the sheet warns but never blocks).
 select e.emp_code, lb.year, lb.earned_leave, lb.casual_leave, lb.sick_leave
 from leave_balances lb join employees e on e.id = lb.employee_id
-where lb.year = extract(year from current_date)::int
+where lb.year = extract(year from (now() at time zone 'Asia/Kolkata')::date)::int
 order by e.emp_code
 limit 20;
 
