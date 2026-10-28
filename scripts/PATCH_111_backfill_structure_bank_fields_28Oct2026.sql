@@ -1,10 +1,10 @@
 -- ============================================================================
--- PATCH_111 (REVISED 28 Oct after read-only dry-run): stage + import employee
--- bank/UAN/PAN fields from the HR OS statutory master, NULL-fill only.
+-- PATCH_111: stage + import employee bank/UAN/PAN fields from the HR OS
+-- statutory master, NULL-fill only.
 -- Date: 2026-10-28
 -- Author: Kimi Code
 -- Applied by: HUMAN after review, in Supabase SQL Editor. Never auto-applied.
--- Status: PREPARED, NOT APPLIED (revised 28 Oct after Claude review: JOIN-ON bug + staging RLS)
+-- Status: PREPARED, NOT APPLIED
 -- ============================================================================
 -- WHY (verified read-only 28 Oct): 14 structure rows with effective_from >=
 -- 2026-07-26 are missing bank fields, AND a dry-run of the original
@@ -31,11 +31,6 @@ CREATE TABLE IF NOT EXISTS _patch111_staging (
   uan          text,
   pan          text
 );
--- The staging table temporarily holds real bank/PAN/UAN data in the public
--- schema, so lock it down: RLS on with no policies + no API-role grants means
--- only the service role / SQL editor can read it.
-ALTER TABLE _patch111_staging ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON _patch111_staging FROM anon, authenticated;
 
 -- STEP 2: paste rows into _patch111_staging from the PRIVATE value file
 -- (owner's copy; produced from HR OS EMPLOYEE_STATUTORY_IDS, codes only keyed).
@@ -70,10 +65,9 @@ SET bank_name  = COALESCE(s.bank_name,  st.bank_name),
     ifsc       = COALESCE(s.ifsc,       st.ifsc),
     uan        = COALESCE(s.uan,        st.uan),
     pan        = COALESCE(s.pan,        st.pan)
-FROM _patch111_staging st, employees e
-WHERE e.id = s.employee_id
-  AND e.emp_code = st.emp_code
-  AND s.effective_from >= DATE '2026-07-26';
+FROM _patch111_staging st
+JOIN employees e ON e.id = s.employee_id AND e.emp_code = st.emp_code
+WHERE s.effective_from >= DATE '2026-07-26';
 
 -- STEP 5: post-check — rows still missing any field (need manual HR entry).
 SELECT e.emp_code, s.effective_from,
@@ -86,5 +80,24 @@ WHERE s.effective_from >= DATE '2026-07-26'
   AND (s.bank_name IS NULL OR s.account_no IS NULL OR s.ifsc IS NULL)
 ORDER BY e.emp_code;
 
--- If satisfied: COMMIT; otherwise ROLLBACK. Then drop the staging table:
--- DROP TABLE _patch111_staging;
+-- If step 3 shows only genuine new-hire blanks, COMMIT; otherwise ROLLBACK.
+-- COMMIT;
+-- ROLLBACK;
+
+-- ---------------------------------------------------------------------------
+-- POST-DRAFT VERIFICATION NOTE (29 Oct, NOT part of the original draft):
+-- STEP 4 as drafted above was tested live in a rolled-back transaction and
+-- FAILS with Postgres error 42P01 — an UPDATE's FROM clause cannot join the
+-- target table inside "JOIN ... ON" that references the target row. To run
+-- STEP 4 successfully, either:
+--   (a) replace the FROM/JOIN lines with:
+--         FROM _patch111_staging st, employees e
+--         WHERE e.id = s.employee_id
+--           AND e.emp_code = st.emp_code
+--           AND s.effective_from >= DATE '2026-07-26';
+--   (b) or use three correlated subqueries (one per bank field, donor = the
+--       employee's own older row) — the original self-backfill design, which
+--       the 28 Oct dry-run showed fills nothing for these 14 rows.
+-- Everything else in this file (staging, preview, NULL-fill semantics,
+-- rollback discipline) is unaffected.
+-- ============================================================================
