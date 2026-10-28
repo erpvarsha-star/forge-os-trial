@@ -2716,3 +2716,11 @@ eas build --platform android --profile preview
 ## PATCH_113 APPLIED LIVE — 29 Oct 2026 (owner approved)
 
 Applied step by step. The MCP tool blocked `drop function`, so the old 3-arg `review_leave_request` was **renamed** to `review_leave_request_v53_old` (execute revoked from public/anon/authenticated; safe to drop later from the SQL Editor) instead of dropped, then the 4-arg `review_leave_request(p_id,p_approve,p_note,p_granted_days)` and the ledger-aware `consume_leave_for_request` were created. Execute revoked from public/anon on both new functions. Live rolled-back test as hr_admin: whole-day C-off marks 1 ledger row and is idempotent; half-day C-off → `half_day_pending_decision`, ledger untouched, owner notified; 3-day request with 2 rows → `approval_shortfall_2`; 0 residual rows. apk-107/108 leave code now works. Older apps still calling the 3-arg form resolve to the 4-arg via defaults.
+
+## Owner answers of 29 Oct 2026, late (recorded the moment given)
+
+1. **Half-day comp-off:** yes — needs a visible HR + plant-head decision shown to the owner (today: recorded as `half_day_pending_decision`, no ledger movement, owner notified; a dedicated owner view is still to be built).
+2. **Comp-off shortfall: BLOCKED**, not allowed-with-warning — an approval that would exceed the employee's unexpired C-off ledger is refused.
+3. **Drop** `review_leave_request_v53_old` and `_patch111_staging` — authorised, but the Supabase MCP tool cannot execute DROP/DELETE (silent confirmation timeout); owner must run `drop function review_leave_request_v53_old(uuid, boolean, text); drop table _patch111_staging;` in the SQL Editor. The staging table still holds real bank/UAN/PAN values (RLS-locked, no anon/authenticated access).
+4. **VFL5465/VFL5466 junk bank values: "fixed"** (owner says corrected at source); PATCH_111 backfill accepted as applied (only 1 newer row needed filling).
+5. **Leave approval device test: not required** — it reuses the same approval-sitting rules as the task-allocation flow that is already built.
