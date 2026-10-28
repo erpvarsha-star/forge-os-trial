@@ -1234,5 +1234,16 @@
     "confirm": "Confirm",
     "decided": "Decision recorded.",
     "empty": "No half-day comp-offs awaiting decision"
+  },
+  "halfDayReview": {
+    "title": "Half-day Comp-off Review",
+    "menuLabel": "Half-day Comp-off Review",
+    "halfDay": "uses 0.5 day",
+    "decision": "HR decision",
+    "note": "HR note",
+    "decidedBy": "Decided by {{name}} on {{when}} IST",
+    "markReviewed": "Mark reviewed",
+    "reviewed": "Reviewed",
+    "empty": "No decided half-day comp-offs yet"
   }
 }
