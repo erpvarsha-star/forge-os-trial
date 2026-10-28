@@ -117,9 +117,10 @@ declare
   v_type text;
   v_grant numeric;
   v_unused integer;
+  v_prev_grant numeric;
 begin
-  select approval_chain, current_stage, employee_id, days, type
-    into v_chain, v_stage, v_employee_id, v_days, v_type
+  select approval_chain, current_stage, employee_id, days, type, granted_days
+    into v_chain, v_stage, v_employee_id, v_days, v_type, v_prev_grant
     from leave_requests
     where id = p_id and status = 'pending'
     for update;
@@ -169,7 +170,7 @@ begin
     -- Owner decision: whole-day COFF beyond the unused, unexpired ledger is
     -- BLOCKED at final approval. Half-day COFF is not blocked here (it is
     -- recorded as half_day_pending_decision by consume_leave_for_request).
-    v_grant := coalesce(p_granted_days, v_days);
+    v_grant := coalesce(p_granted_days, v_prev_grant, v_days);
     if v_type = 'COFF' and v_grant = floor(v_grant) then
       select count(*) into v_unused from comp_off_balance
        where employee_id = v_employee_id
@@ -181,7 +182,7 @@ begin
     end if;
     update leave_requests
       set status = 'approved', current_stage = v_stage + 1, approved_by = current_employee_id(),
-          approved_at = now(), granted_days = coalesce(p_granted_days, v_days)
+          approved_at = now(), granted_days = coalesce(p_granted_days, v_prev_grant, v_days)
       where id = p_id;
   else
     -- Mid-chain: advance the stage; keep the latest non-null granted-days
