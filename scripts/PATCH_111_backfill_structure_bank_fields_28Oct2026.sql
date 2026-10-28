@@ -4,7 +4,7 @@
 -- Date: 2026-10-28
 -- Author: Kimi Code
 -- Applied by: HUMAN after review, in Supabase SQL Editor. Never auto-applied.
--- Status: PREPARED, NOT APPLIED
+-- Status: PREPARED, NOT APPLIED (revised 28 Oct after Claude review: JOIN-ON bug + staging RLS)
 -- ============================================================================
 -- WHY (verified read-only 28 Oct): 14 structure rows with effective_from >=
 -- 2026-07-26 are missing bank fields, AND a dry-run of the original
@@ -31,6 +31,11 @@ CREATE TABLE IF NOT EXISTS _patch111_staging (
   uan          text,
   pan          text
 );
+-- The staging table temporarily holds real bank/PAN/UAN data in the public
+-- schema, so lock it down: RLS on with no policies + no API-role grants means
+-- only the service role / SQL editor can read it.
+ALTER TABLE _patch111_staging ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON _patch111_staging FROM anon, authenticated;
 
 -- STEP 2: paste rows into _patch111_staging from the PRIVATE value file
 -- (owner's copy; produced from HR OS EMPLOYEE_STATUTORY_IDS, codes only keyed).
@@ -65,9 +70,10 @@ SET bank_name  = COALESCE(s.bank_name,  st.bank_name),
     ifsc       = COALESCE(s.ifsc,       st.ifsc),
     uan        = COALESCE(s.uan,        st.uan),
     pan        = COALESCE(s.pan,        st.pan)
-FROM _patch111_staging st
-JOIN employees e ON e.id = s.employee_id AND e.emp_code = st.emp_code
-WHERE s.effective_from >= DATE '2026-07-26';
+FROM _patch111_staging st, employees e
+WHERE e.id = s.employee_id
+  AND e.emp_code = st.emp_code
+  AND s.effective_from >= DATE '2026-07-26';
 
 -- STEP 5: post-check — rows still missing any field (need manual HR entry).
 SELECT e.emp_code, s.effective_from,
