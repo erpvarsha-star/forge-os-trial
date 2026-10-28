@@ -2770,3 +2770,8 @@ Every Claude step ends with the locked brief + numbered questions, a commit/push
 ## Owner approval of 29 Oct 2026 (night) — corrections to the other assistant's files
 
 Owner: **"approved but need claude opus to confirm also."** The proposed corrections (verification SQL for per-population runs; retirement checklist + gap audit stale PATCH_111/113/BUNG-release statements; handoff stale sections + removal of the partial token prefix; AGENTS.md base branch + worker-OT basis; HANDOFF_SUMMARY.md marked superseded) are approved, **conditional on an independent Opus review confirming them**. This is an explicit owner instruction for one Opus agent; it overrides the Sonnet-only rule for this review only (all editing still goes through Sonnet agents).
+
+
+## Owner instruction of 29 Oct 2026 (night) — restart rule + progress recording
+
+"If for any reason your ongoing work is stopped start at 7 am again IST. Note that what has been done needs to be recorded at every stage — when an agent wakes up it is not wondering where it stopped or what it needs to do." => (1) A wake-up is scheduled for 07:00 IST (send_later); after any interruption work restarts then. (2) **At the end of every stage Claude updates the 'RESUME STATE' block at the very top of PENDING.md** (last-updated time, branch, done, in-flight with exact check commands, next steps in order, open owner decisions) and commits+pushes it, so any restarted/woken agent knows exactly where to continue. Every briefed agent's prompt must also say to read that block first.
