@@ -80,5 +80,7 @@ Status legend: ✅ in-app replacement live · 🟡 partial / in-flight · ⬜ no
 - **Departed employees: do not dig into them** — audit and imports skip left/inactive people.
 - **BUNG active count = 7 (owner 28 Oct)**: rule = "paid in Aug + Sep = active". Verified: no Aug-2026 tab exists in the Pune salary workbook; the SEPT tab pays exactly the 7 the app holds. The Pune Home Master's 19 "Active" flags are stale — the other 12 are not imported and not investigated.
 - **Supabase access mode (owner 28 Oct): read-only.** SELECT probes only; every change ships as an additive `scripts/PATCH_*.sql` for a human to review and run manually.
+- **Leave import spec (owner 28 Oct):** reconcile **payroll Apr→date against the leave sheet per emp ID**, then push per employee: **leave balance + utilization + applications**. Scope = **staff + workers only — consultants and BUNG (Pune) have no leave** and are excluded. **No payment transactions** enter the app for this. Sources: Leave Databases Staff/PW (allocation + monthly availed) reconciled against the payroll actually paid, plus FY27 application rows.
+- **Payslip delivery process (owner 28 Oct):** payslips are **printed, stamped, and shared with the bank for deposit into each account** — payment transactions are NOT entered into the app (yet). The app's role = generate the payslip PDF/sheet for that workflow; the stamp-and-bank step stays physical.
 
 *Last updated: 28 Oct 2026 — scope bands per owner direction; sheet audit + app-side verification complete; not yet owner-reviewed.*

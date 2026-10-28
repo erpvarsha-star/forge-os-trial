@@ -56,7 +56,7 @@ re-verified. App side: read-only Supabase probes 28 Oct (SELECT only, per owner 
 | 16 | Master Leave Computation 2024 | duplicate of Leave_Applications feed | n/a | archive-only, no unique FY27 data |
 | 17 | Medicine Issue form (3 rows, dormant since 2024-02) / Contractual Operators (377 rows, 2025-01→2026-09) | medical / contract labour | n/a | parked (medical = future scope; contract labour ≠ employee payroll) |
 
-**Net import list for Goal 1 (payroll+leave):** DOJ+designation (HR OS EMPLOYEE_MASTER, cross-check Waluj Staff), missing UAN/PAN, FY27 leave history incl. OD/C-off, leave allocation/availed by month, + PATCH_111 bank-field backfill (already prepared). All imports skip inactive people. Payroll amounts Apr–Sep: already imported — do not re-import.
+**Net import list for Goal 1 (payroll+leave):** DOJ+designation (HR OS EMPLOYEE_MASTER, cross-check Waluj Staff), missing UAN/PAN, FY27 leave history + leave allocation/availed by month — **leave scope = staff + workers only (consultants/BUNG excluded per owner 28 Oct), reconciled against payroll Apr→date per emp ID, balance + utilization + applications only, NO payment transactions** — + PATCH_111 bank-field backfill (already prepared). All imports skip inactive people. Payroll amounts Apr–Sep: already imported — do not re-import.
 
 ## Exit condition
 Every row above answered; gaps imported via additive `scripts/PATCH_*.sql` files (never re-run
