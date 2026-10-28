@@ -944,6 +944,14 @@
     "stepRun": "Step 2: Create and calculate the run",
     "noRun": "No payroll run for this month yet",
     "createRun": "Create payroll run",
+    "population": {
+      "label": "Category",
+      "all": "All",
+      "staff": "Staff",
+      "workers": "Workers",
+      "consultants": "Consultants",
+      "pune": "Pune"
+    },
     "calculate": "Calculate payroll",
     "calculated": "Payroll calculated for {{count}} employees",
     "heldNote": "{{count}} employees are on hold.",

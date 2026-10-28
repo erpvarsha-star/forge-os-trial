@@ -10,7 +10,7 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import * as FileSystem from 'expo-file-system'
 import * as Sharing from 'expo-sharing'
-import { payrollRun, exportPayRun, createTopupRun, transitionRun, generateWarnings, reviewWarning, PAYROLL_MONTH_LABEL, VDA_RATE_MISSING_ERROR, WARNINGS_PENDING_ERROR, WARNINGS_NOT_READY_ERROR, CalculateResult, RunSummary, TransitionResult } from '@/lib/payroll/client'
+import { payrollRun, exportPayRun, createPayRun, createTopupRun, transitionRun, generateWarnings, reviewWarning, PAYROLL_MONTH_LABEL, VDA_RATE_MISSING_ERROR, WARNINGS_PENDING_ERROR, WARNINGS_NOT_READY_ERROR, CalculateResult, PayRunPopulation, RunSummary, TransitionResult } from '@/lib/payroll/client'
 import { buildSalarySheetCsv, buildBankFileCsv } from '@/lib/payroll/exportCsv'
 import { istMonthYear } from '@/lib/istDate'
 import { BRAND, STATUS, INK } from '@/components/theme'
@@ -26,6 +26,15 @@ const FEED_TABLES = [
   { key: 'efficiency', table: 'payroll_efficiency_entries' },
   { key: 'adjustments', table: 'payroll_adjustments' },
 ] as const
+
+// PATCH_112: per-category (population) pay runs; '' = whole population
+const POPULATION_OPTIONS: { value: '' | PayRunPopulation; labelKey: string }[] = [
+  { value: '', labelKey: 'payroll.population.all' },
+  { value: 'STAFF', labelKey: 'payroll.population.staff' },
+  { value: 'PERMANENT_WORKER', labelKey: 'payroll.population.workers' },
+  { value: 'CONSULTANT', labelKey: 'payroll.population.consultants' },
+  { value: 'PUNE_STAFF', labelKey: 'payroll.population.pune' },
+]
 
 export default function PayrollRunScreen() {
   const { t } = useTranslation()
@@ -47,6 +56,7 @@ export default function PayrollRunScreen() {
   const [precheck, setPrecheck] = useState<{ runId: string; count: number; pending: number; unreviewed: number; ready: boolean } | null>(null)
   const [notReady, setNotReady] = useState<{ pending: number; unreviewed: number; hint: string | null } | null>(null)
   const [recovery, setRecovery] = useState<TransitionResult['advanceRecovery'] | null>(null)
+  const [population, setPopulation] = useState<'' | PayRunPopulation>('')
   const [busy, setBusy] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -198,8 +208,29 @@ export default function PayrollRunScreen() {
                   ) : null}
                 </View>
               ) : (
-                <Button title="payroll.createRun" variant="primary" size="md" className="mt-1" loading={busy === 'create'}
-                  onPress={() => act('create', () => payrollRun('create', { month, year }))} />
+                <View className="mt-1">
+                  <Text className="text-xs text-ink-500 mb-1.5">{t('payroll.population.label')}</Text>
+                  <View className="flex-row flex-wrap gap-1.5 mb-2">
+                    {POPULATION_OPTIONS.map((opt) => {
+                      const active = population === opt.value
+                      return (
+                        <TouchableOpacity key={opt.value || 'all'}
+                          onPress={() => setPopulation(opt.value)}
+                          className="rounded-full px-3 py-1.5 border"
+                          style={{
+                            backgroundColor: active ? BRAND[600] : 'transparent',
+                            borderColor: active ? BRAND[600] : INK[200],
+                          }}>
+                          <Text className="text-xs font-semibold" style={{ color: active ? '#fff' : INK[700] }}>
+                            {t(opt.labelKey)}
+                          </Text>
+                        </TouchableOpacity>
+                      )
+                    })}
+                  </View>
+                  <Button title="payroll.createRun" variant="primary" size="md" loading={busy === 'create'}
+                    onPress={() => act('create', () => createPayRun(month, year, population || undefined))} />
+                </View>
               )}
               {run?.status === 'draft' && (
                 <View className="mt-2 border border-ink-100 rounded-xl p-3">
