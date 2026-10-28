@@ -150,6 +150,18 @@ export const exportPayRun = (payRunId: string) => payrollRun<PayRunExport>('expo
 
 export const createTopupRun = (parentRunId: string) => payrollRun<TopupResult>('create_topup', { parentRunId })
 
+export type PayRunPopulation = 'STAFF' | 'PERMANENT_WORKER' | 'CONSULTANT' | 'PUNE_STAFF'
+
+export interface CreateRunResult {
+  payRunId: string
+  payPeriodId: string
+  status: string
+}
+
+/** Create a draft pay run; population omitted/undefined = whole-population run (PATCH_112). */
+export const createPayRun = (month: number, year: number, population?: PayRunPopulation) =>
+  payrollRun<CreateRunResult>('create', { month, year, ...(population ? { population } : {}) })
+
 export const transitionRun = (payRunId: string, to: string) =>
   payrollRun<TransitionResult>('transition', { payRunId, to })
 

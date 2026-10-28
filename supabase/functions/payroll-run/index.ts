@@ -23,6 +23,7 @@
 // Feed tables (PATCH_91) are keyed by payroll_month TEXT 'YYYY-MM'.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { assemblePayrollInputs } from './lib/feedSync.ts';
+import { filterByPopulation, isPayPopulation } from './lib/populationFilter.ts';
 import { DEFAULT_ENGINE_CONFIG } from './lib/engine.ts';
 import { buildEngineConfig } from './lib/engineConfig.ts';
 import { calculateWithExtras } from './lib/extraEarnings.ts';
@@ -192,6 +193,11 @@ Deno.serve(async (req) => {
     if (action === 'create') {
       const month = Number(body.month), year = Number(body.year);
       if (!month || !year) return json({ error: 'month and year required' }, 400);
+      // PATCH_112: optional population (per-category run). NULL/absent = whole population.
+      const population = body.population ?? null;
+      if (population !== null && !isPayPopulation(population)) {
+        return json({ error: `invalid population: ${population} (expected one of STAFF|PERMANENT_WORKER|CONSULTANT|PUNE_STAFF)` }, 400);
+      }
       const mm = String(month).padStart(2, '0');
       const lastDay = new Date(year, month, 0).getDate();
 
@@ -211,11 +217,12 @@ Deno.serve(async (req) => {
           pay_period_id: period.id,
           name: body.name ?? `${year}-${mm} regular`,
           status: 'draft',
+          population,
         })
         .select().single();
       if (rErr) return json({ error: rErr.message }, 500);
 
-      await audit(run.id, { event: 'create', month, year });
+      await audit(run.id, { event: 'create', month, year, population });
       return json({ payRunId: run.id, payPeriodId: period.id, status: 'draft' });
     }
 
@@ -225,7 +232,7 @@ Deno.serve(async (req) => {
     if (action === 'create_topup') {
       const { parentRunId } = body;
       const { data: parent } = await supabase
-        .from('pay_runs').select('id, name, status, pay_period_id, adjustment_of').eq('id', parentRunId).single();
+        .from('pay_runs').select('id, name, status, pay_period_id, adjustment_of, population').eq('id', parentRunId).single();
       if (!parent) return json({ error: 'parent pay run not found' }, 404);
       if (parent.adjustment_of) {
         return json({ error: 'parent must be a regular run (it is itself a top-up/adjustment)' }, 409);
@@ -238,10 +245,10 @@ Deno.serve(async (req) => {
       const n = (count ?? 0) + 1;
       const { data: top, error: tErr } = await supabase
         .from('pay_runs')
-        .insert({ pay_period_id: parent.pay_period_id, adjustment_of: parent.id, name: `${parent.name} top-up ${n}`, status: 'draft' })
+        .insert({ pay_period_id: parent.pay_period_id, adjustment_of: parent.id, name: `${parent.name} top-up ${n}`, status: 'draft', population: parent.population })
         .select().single();
       if (tErr) return json({ error: tErr.message }, 500);
-      await audit(top.id, { event: 'create_topup', parentRunId: parent.id, n });
+      await audit(top.id, { event: 'create_topup', parentRunId: parent.id, n, population: parent.population });
       return json({ payRunId: top.id, parentRunId: parent.id, status: 'draft' });
     }
 
@@ -394,16 +401,18 @@ Deno.serve(async (req) => {
     if (action === 'generate_warnings') {
       const { runId } = body;
       const { data: run } = await supabase
-        .from('pay_runs').select('status, adjustment_of, pay_period_id, pay_periods(month, year)').eq('id', runId).single();
+        .from('pay_runs').select('status, adjustment_of, pay_period_id, population, pay_periods(month, year)').eq('id', runId).single();
       if (!run) return json({ error: 'pay run not found' }, 404);
       if (run.status !== 'draft') return json({ error: `generate_warnings only from draft (current: ${run.status})` }, 409);
       const month = Number(run.pay_periods.month), year = Number(run.pay_periods.year);
       const f = await loadFeeds(supabase, year, month);
       const built = await buildRunInputs(supabase, run, year, month, f);
       if ('error' in built) return json({ error: built.error }, 500);
-      const sync = await syncRunWarnings(supabase, runId, f, built.inputs);
+      // PATCH_112: a population run warns only about its own category
+      const inputs = filterByPopulation(built.inputs, run.population);
+      const sync = await syncRunWarnings(supabase, runId, f, inputs);
       const st = await warningStatus(supabase, runId);
-      await audit(runId, { event: 'generate_warnings', ...sync, warningsCount: st.warningsCount, pendingCount: st.pendingCount });
+      await audit(runId, { event: 'generate_warnings', ...sync, warningsCount: st.warningsCount, pendingCount: st.pendingCount, population: run.population });
       return json({
         ok: true, warningsCount: st.warningsCount, counts: st.counts,
         pendingCount: st.pendingCount, unreviewedCount: st.unreviewedCount, ready: st.ready,
@@ -415,7 +424,7 @@ Deno.serve(async (req) => {
     if (action === 'calculate') {
       const { payRunId, force } = body;
       const { data: run } = await supabase
-        .from('pay_runs').select('status, adjustment_of, pay_period_id, pay_periods(month, year)').eq('id', payRunId).single();
+        .from('pay_runs').select('status, adjustment_of, pay_period_id, population, pay_periods(month, year)').eq('id', payRunId).single();
       if (!run) return json({ error: 'pay run not found' }, 404);
       if (run.status !== 'draft') {
         return json({ error: `calculate only from draft (current: ${run.status}). For a recalc, cancel and create a fresh run.` }, 409);
@@ -458,7 +467,9 @@ Deno.serve(async (req) => {
 
       const built = await buildRunInputs(supabase, run, year, month, f);
       if ('error' in built) return json({ error: built.error }, 500);
-      const { assembled, inputs, idByCode, topup, skippedAlreadyPaid } = built;
+      const { assembled, idByCode, topup, skippedAlreadyPaid } = built;
+      // PATCH_112: population run calculates only its own category (after feed assembly, before the engine)
+      const inputs = filterByPopulation(built.inputs, run.population);
 
       // ---- engine config: monthly VDA rate + worker OT basis (flat VDA master, owner decision 27 Oct 2026)
       const builtCfg = buildEngineConfig({
@@ -528,7 +539,7 @@ Deno.serve(async (req) => {
         event: 'calculate', items: items.length, held: held.length,
         warnings: warnings.length, vdaRatePerDay: cfg.workerVdaRatePerDay,
         extrasEmployees, extrasTotalInr, workerOtVdaBasis: cfg.workerOtVdaBasis,
-        warningsCount: wst.warningsCount, warningCounts,
+        warningsCount: wst.warningsCount, warningCounts, population: run.population,
         ...(topup ? { topup: true, skippedAlreadyPaid } : {}),
       });
       return json({
