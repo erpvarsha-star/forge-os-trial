@@ -2766,3 +2766,7 @@ Every Claude step ends with the locked brief + numbered questions, a commit/push
 2. **Audit-log masking: not necessary, but do it if Claude thinks it right** — Claude does think it right: bank/PAN/UAN are masked going forward in the `employee_salary_structure` audit trigger (PATCH_116). Existing audit rows are NOT rewritten without owner approval.
 3. **Corrections to the other assistant's files: owner asked Claude to list exactly what it wants to fix; edits wait for his approval** (list given in chat 29 Oct; nothing edited).
 4. **Owner screen for half-day C-offs: show ONLY the ones HR has already decided, for the owner's review** (not the undecided ones). Built as More → Half-day Comp-off Review for the owner with a red count of unreviewed decisions (PATCH_116).
+
+## Owner approval of 29 Oct 2026 (night) — corrections to the other assistant's files
+
+Owner: **"approved but need claude opus to confirm also."** The proposed corrections (verification SQL for per-population runs; retirement checklist + gap audit stale PATCH_111/113/BUNG-release statements; handoff stale sections + removal of the partial token prefix; AGENTS.md base branch + worker-OT basis; HANDOFF_SUMMARY.md marked superseded) are approved, **conditional on an independent Opus review confirming them**. This is an explicit owner instruction for one Opus agent; it overrides the Sonnet-only rule for this review only (all editing still goes through Sonnet agents).
