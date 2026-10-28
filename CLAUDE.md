@@ -2724,3 +2724,11 @@ Applied step by step. The MCP tool blocked `drop function`, so the old 3-arg `re
 3. **Drop** `review_leave_request_v53_old` and `_patch111_staging` — authorised, but the Supabase MCP tool cannot execute DROP/DELETE (silent confirmation timeout); owner must run `drop function review_leave_request_v53_old(uuid, boolean, text); drop table _patch111_staging;` in the SQL Editor. The staging table still holds real bank/UAN/PAN values (RLS-locked, no anon/authenticated access).
 4. **VFL5465/VFL5466 junk bank values: "fixed"** (owner says corrected at source); PATCH_111 backfill accepted as applied (only 1 newer row needed filling).
 5. **Leave approval device test: not required** — it reuses the same approval-sitting rules as the task-allocation flow that is already built.
+
+## PATCH_114 — half-day C-off decisions + bank-details completion + auth_role fix (29 Oct 2026, applied live)
+
+Owner: "build for hr and then a notification for me to review"; "fix it" (auth_role); "add a task for HR ... clear table where it is filled and submitted."
+- `auth_role()` now casts `role::role_enum` (it errored for any RLS policy using it, e.g. `comp_off_balance`; employees can read their own C-off ledger again).
+- `list_pending_halfday_coff()` / `decide_halfday_coff(request, 'deduct_full_day'|'no_deduction', note)` (HR; owner notified "please review"); `leave_consumption` gained `decided_by/decided_at/decision_note`. HR screen: More → Half-day Comp-off.
+- `list_missing_bank_details()` / `hr_set_bank_details(...)` (hr_admin/owner; format-validated; values never echoed or put in the HR-edit audit row). HR screen: More → Bank Details (27 employees listed on 29 Oct incl. 7 BUNG, 7 CON). Task `0e9f6482-2f20-4d2c-a4a3-0ff7cf4bb590` assigned to VFL5440, due 3 Nov.
+- ⚠ Existing row-level audit trigger on `employee_salary_structure` writes full old/new rows (bank/PAN/UAN) into `audit_log` (owner/hr_admin read only). Open decision: mask those columns.
