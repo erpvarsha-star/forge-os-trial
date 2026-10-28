@@ -71,8 +71,10 @@ export interface ActionCounts {
   approvals: number
   needs_your_call: number
   fraud_alerts: number
+  /** hr_admin only (pending half-day comp-off decisions). */
+  halfday_coff: number
 }
-const ZERO_COUNTS: ActionCounts = { tasks_todo: 0, tasks_to_confirm: 0, approvals: 0, needs_your_call: 0, fraud_alerts: 0 }
+const ZERO_COUNTS: ActionCounts = { tasks_todo: 0, tasks_to_confirm: 0, approvals: 0, needs_your_call: 0, fraud_alerts: 0, halfday_coff: 0 }
 
 interface ActionCountsState {
   counts: ActionCounts
@@ -101,6 +103,7 @@ export async function refreshActionCounts(): Promise<void> {
       approvals: toN(d.approvals),
       needs_your_call: toN(d.needs_your_call),
       fraud_alerts: toN(d.fraud_alerts),
+      halfday_coff: toN(d.halfday_coff),
     })
   } catch {
     // ignore — badge is a convenience, never blocks a screen
@@ -124,7 +127,7 @@ export function computeBadges(group: BadgeGroup, c: ActionCounts) {
     case 'plant-head':
       return { more: n0(c.tasks_todo), approvals: n0(c.approvals), tasks: n0(tasksTab), alerts: undefined }
     case 'hr-admin':
-      return { more: n0(c.approvals + c.tasks_todo), approvals: undefined, tasks: n0(tasksTab), alerts: undefined }
+      return { more: n0(c.approvals + c.tasks_todo + c.halfday_coff), approvals: undefined, tasks: n0(tasksTab), alerts: undefined }
     case 'manager':
       return { more: n0(c.tasks_todo + c.tasks_to_confirm), approvals: n0(c.approvals), tasks: undefined, alerts: undefined }
     case 'supervisor':

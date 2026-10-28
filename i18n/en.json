@@ -1201,6 +1201,7 @@
     "insufficientBalanceMsg": "You requested {{requested}} day(s) of {{type}} but only {{remaining}} remain. Submit anyway?",
     "proceedAnyway": "Submit anyway",
     "grantedDays": "Approved days",
+    "earlierProposed": "Earlier approver proposed {{days}} day(s)",
     "grantedDaysHint": "Requested: {{requested}} day(s). Change only if approving fewer days.",
     "approvalRemarks": "Remarks",
     "remarksHint": "Remarks are mandatory when rejecting or changing the day count.",

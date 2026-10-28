@@ -24,6 +24,7 @@ export default function HRAdminMore() {
   const { employee, logout } = useAuth()
   const { language, toggleLanguage } = useLanguage(employee)
   const approvalsCount = useActionCountsStore(s => s.counts.approvals)
+  const halfdayCoffCount = useActionCountsStore(s => s.counts.halfday_coff)
   if (!employee) return <LoadingScreen />
   const handleLogout = async () => { if (employee) await removePushToken(employee.id); await logout() }
 
@@ -73,6 +74,7 @@ export default function HRAdminMore() {
               <View className="flex-row items-center gap-3">{link.icon}<Text className="text-base text-ink-900">{link.label}</Text></View>
               <View className="flex-row items-center gap-2">
                 {link.key === 'approvals' ? <CountPill count={approvalsCount} /> : null}
+                {link.key === 'halfday-coff' ? <CountPill count={halfdayCoffCount} /> : null}
                 <ChevronRight size={16} color="#B9C0CC" />
               </View>
             </Card>

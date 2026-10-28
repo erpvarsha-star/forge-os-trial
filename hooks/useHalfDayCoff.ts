@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { refreshActionCounts } from '@/hooks/useAssignedTasks'
 
 export interface HalfDayCoffRow {
   request_id: string
@@ -47,6 +48,7 @@ export function useHalfDayCoff() {
     })
     if (error) return error.message
     await load(true)
+    refreshActionCounts()
     return null
   }, [load])
 

@@ -70,10 +70,18 @@ export function LeaveAdvanceApprovalCards({
   const isFinalStage = (req: MyTurnLeaveRequest) =>
     req.current_stage + 1 >= (req.approval_chain?.length || 0)
 
+  // Days an earlier approver already proposed (only when it differs from the request).
+  const proposedDays = (req: MyTurnLeaveRequest): number | null =>
+    req.granted_days != null && req.granted_days !== req.days ? req.granted_days : null
+
   const approveLeave = async (req: MyTurnLeaveRequest) => {
     const note = noteById[req.id]?.trim() || undefined
     const grantedRaw = grantedById[req.id]
-    const granted = grantedRaw !== undefined && grantedRaw !== '' ? parseFloat(grantedRaw) : null
+    let granted = grantedRaw !== undefined && grantedRaw !== '' ? parseFloat(grantedRaw) : null
+    // Box left at the earlier approver's proposal: send null (server keeps it)
+    // so the "remark mandatory on day-count change" rule is not forced.
+    const prior = proposedDays(req)
+    if (granted !== null && prior !== null && granted === prior) granted = null
     if (granted !== null && granted !== req.days && !note) {
       // The RPC also enforces this; catching it client-side gives a bilingual message.
       Alert.alert(t('common.error'), t('leave.remarkRequiredForDayChange'))
@@ -188,11 +196,14 @@ export function LeaveAdvanceApprovalCards({
                 <View className="mb-3">
                   <Input
                     label={t('leave.grantedDays')}
-                    value={grantedById[req.id] ?? String(req.granted_days ?? req.days)}
+                    value={grantedById[req.id] ?? String(proposedDays(req) ?? req.days)}
                     onChangeText={v => setGrantedById(prev => ({ ...prev, [req.id]: v }))}
                     keyboardType="numeric"
                   />
                   <Text className="text-xs text-ink-400 mb-2">{t('leave.grantedDaysHint', { requested: req.days })}</Text>
+                  {proposedDays(req) !== null && (
+                    <Text className="text-xs text-status-pending mb-2">{t('leave.earlierProposed', { days: proposedDays(req) })}</Text>
+                  )}
                   <Input
                     label={t('leave.approvalRemarks')}
                     value={noteById[req.id] ?? ''}

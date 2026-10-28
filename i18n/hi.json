@@ -1201,6 +1201,7 @@
     "insufficientBalanceMsg": "आपने {{type}} के {{requested}} दिन मांगे हैं, लेकिन केवल {{remaining}} दिन शेष हैं। फिर भी भेजें?",
     "proceedAnyway": "फिर भी भेजें",
     "grantedDays": "स्वीकृत दिन",
+    "earlierProposed": "पिछले अनुमोदक ने {{days}} दिन प्रस्तावित किए",
     "grantedDaysHint": "मांगे गए: {{requested}} दिन। कम दिन स्वीकृत करने पर ही बदलें।",
     "approvalRemarks": "टिप्पणी",
     "remarksHint": "अस्वीकार करने या दिन बदलने पर टिप्पणी अनिवार्य है।",
