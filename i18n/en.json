@@ -1207,5 +1207,31 @@
     "remarkRequiredForDayChange": "Please add a remark when changing the approved day count.",
     "consumeFailedTitle": "Balance not updated",
     "consumeFailedMsg": "The approval was recorded, but the leave balance could not be drawn down. Please ask HR/Owner to run it manually."
+  },
+  "bankDetails": {
+    "title": "Bank Details",
+    "menuLabel": "Bank Details",
+    "needDetails": "{{count}} employees need details",
+    "allComplete": "All bank details are complete",
+    "save": "Save",
+    "saved": "Bank details saved.",
+    "bankName": "Bank name",
+    "accountNo": "Account number",
+    "ifsc": "IFSC",
+    "uan": "UAN",
+    "pan": "PAN"
+  },
+  "halfDayCoff": {
+    "title": "Half-day Comp-off",
+    "menuLabel": "Half-day Comp-off",
+    "usesHalfDay": "uses 0.5 day",
+    "unusedDays": "Unused comp-off days: {{count}}",
+    "deductFull": "Deduct 1 full comp-off day",
+    "noDeduction": "Approve without deduction",
+    "note": "Note (required)",
+    "notePlaceholder": "Reason for this decision",
+    "confirm": "Confirm",
+    "decided": "Decision recorded.",
+    "empty": "No half-day comp-offs awaiting decision"
   }
 }

@@ -14,7 +14,7 @@ import { useActionCountsStore } from '@/hooks/useAssignedTasks'
 import { NotificationsMenuRow } from '@/components/NotificationsMenuRow'
 import { TaskMenuRows } from '@/components/TaskMenuRows'
 import { removePushToken } from '@/lib/notifications'
-import { LogOut, Globe, Settings, ChevronRight, AlertCircle, CreditCard, Users, Eye, Clock, CheckSquare, FileText, Table2, IndianRupee, UtensilsCrossed, Percent, UserMinus, AlertTriangle, MapPin, ClipboardCheck, FileSpreadsheet } from 'lucide-react-native'
+import { LogOut, Globe, Settings, ChevronRight, AlertCircle, CreditCard, Users, Eye, Clock, CheckSquare, FileText, Table2, IndianRupee, UtensilsCrossed, Percent, UserMinus, AlertTriangle, MapPin, ClipboardCheck, FileSpreadsheet, Landmark, CalendarClock } from 'lucide-react-native'
 import { router } from 'expo-router'
 import { BRAND, INK } from '@/components/theme'
 
@@ -40,6 +40,8 @@ export default function HRAdminMore() {
     { key: 'advance-ledger', label: t('hrAdmin.advanceLedger'), icon: <CreditCard size={20} color={INK[500]} />, path: '/(hr-admin)/advance-ledger' },
     { key: 'new-employee-flow', label: t('hrAdmin.newEmployeeFlow'), icon: <Users size={20} color={INK[500]} />, path: '/(hr-admin)/new-employee-flow' },
     { key: 'onboarding', label: t('onboarding.menuLabel'), icon: <ClipboardCheck size={20} color={INK[500]} />, path: '/(hr-admin)/onboarding' },
+    { key: 'bank-details', label: t('bankDetails.menuLabel'), icon: <Landmark size={20} color={INK[500]} />, path: '/(hr-admin)/bank-details' },
+    { key: 'halfday-coff', label: t('halfDayCoff.menuLabel'), icon: <CalendarClock size={20} color={INK[500]} />, path: '/(hr-admin)/halfday-coff' },
     { key: 'late-review', label: t('reports.lateComersReview'), icon: <Clock size={20} color={INK[500]} />, path: '/(hr-admin)/late-review' },
     { key: 'payslips', label: t('common.payslip'), icon: <FileText size={20} color={INK[500]} />, path: '/(hr-admin)/payslips' },
     { key: 'shift-summary', label: t('shiftCheckinSummary.tab'), icon: <Table2 size={20} color={INK[500]} />, path: '/(hr-admin)/shift-summary' },

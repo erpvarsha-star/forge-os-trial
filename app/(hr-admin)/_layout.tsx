@@ -38,6 +38,8 @@ export default function HrAdminLayout() {
         <Tabs.Screen name="pune-attendance" options={{ href: null }} />
         <Tabs.Screen name="onboarding" options={{ href: null }} />
         <Tabs.Screen name="notifications" options={{ href: null }} />
+        <Tabs.Screen name="bank-details" options={{ href: null }} />
+        <Tabs.Screen name="halfday-coff" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )
