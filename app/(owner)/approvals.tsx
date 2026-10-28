@@ -30,7 +30,7 @@ interface SalaryChangeRequest {
 export default function OwnerApprovals() {
   const { t } = useTranslation()
   const { employee } = useAuth()
-  const { leaves, advances, isLoading: leaveAdvanceLoading, actingId, reviewLeave, reviewAdvance } = useLeaveAdvanceApprovals()
+  const { leaves, advances, isLoading: leaveAdvanceLoading, actingId, reviewLeave, reviewAdvance, consumeLeave, stageActions } = useLeaveAdvanceApprovals()
   const [salaryItems, setSalaryItems] = useState<SalaryChangeRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [salaryActingId, setSalaryActingId] = useState<string | null>(null)
@@ -176,6 +176,8 @@ export default function OwnerApprovals() {
             actingId={actingId}
             onReviewLeave={reviewLeave}
             onReviewAdvance={reviewAdvance}
+            onConsumeLeave={consumeLeave}
+            stageActions={stageActions}
             leaveSectionLabel={t('owner.finalEscalation')}
             advanceSectionLabel={t('owner.finalEscalation')}
           />
