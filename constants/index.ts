@@ -30,6 +30,8 @@ export const LEAVE_TYPES = [
   { value: 'CL', label: 'Casual Leave (CL)', labelHi: 'आकस्मिक छुट्टी (CL)' },
   { value: 'SL', label: 'Sick Leave (SL)', labelHi: 'बीमारी छुट्टी (SL)' },
   { value: 'LWP', label: 'Leave Without Pay', labelHi: 'बिना वेतन की छुट्टी' },
+  { value: 'OD', label: 'Outdoor Duty (OD)', labelHi: 'बाहरी ड्यूटी (OD)' },
+  { value: 'COFF', label: 'Comp-Off (C-off)', labelHi: 'कंप-ऑफ (सी-ऑफ)' },
 ]
 
 export const ATTENDANCE_STATUS_COLORS: Record<string, string> = {

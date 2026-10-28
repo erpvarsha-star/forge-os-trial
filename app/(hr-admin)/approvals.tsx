@@ -16,7 +16,7 @@ import { INK } from '@/components/theme'
 export default function HRAdminApprovals() {
   const { t } = useTranslation()
   const { employee } = useAuth()
-  const { leaves, advances, isLoading, actingId, reviewLeave, reviewAdvance } = useLeaveAdvanceApprovals()
+  const { leaves, advances, isLoading, actingId, reviewLeave, reviewAdvance, consumeLeave, stageActions } = useLeaveAdvanceApprovals()
 
   if (!employee) return <LoadingScreen />
   if (isLoading) return <LoadingScreen />
@@ -48,6 +48,8 @@ export default function HRAdminApprovals() {
             actingId={actingId}
             onReviewLeave={reviewLeave}
             onReviewAdvance={reviewAdvance}
+            onConsumeLeave={consumeLeave}
+            stageActions={stageActions}
           />
         )}
       </ScrollView>

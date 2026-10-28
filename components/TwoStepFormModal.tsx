@@ -7,7 +7,10 @@ import { useAdvance } from '@/hooks/useAdvance'
 import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { LEAVE_TYPES } from '@/constants'
+import { computeDays, hoursBetween, EXTRA_WORK_MAX, ExtraWorkBlock, HalfDay } from '@/lib/leaveForm'
 import { CheckCircle2, X } from 'lucide-react-native'
+
+const emptyExtraWork = (): ExtraWorkBlock => ({ date: '', time_from: '', time_to: '', hours: 0, details: '' })
 
 interface Props {
   visible: boolean
@@ -37,6 +40,15 @@ export function TwoStepFormModal({ visible, kind, formUrl, onClose }: Props) {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [leaveReason, setLeaveReason] = useState('')
+  const [startHalf, setStartHalf] = useState<HalfDay>(null)
+  const [endHalf, setEndHalf] = useState<HalfDay>(null)
+  const [daysOverride, setDaysOverride] = useState('')
+  const [daysTouched, setDaysTouched] = useState(false)
+  const [odPlace, setOdPlace] = useState('')
+  const [odPurpose, setOdPurpose] = useState('')
+  const [odTimeFrom, setOdTimeFrom] = useState('')
+  const [odTimeTo, setOdTimeTo] = useState('')
+  const [extraWork, setExtraWork] = useState<ExtraWorkBlock[]>([emptyExtraWork()])
 
   const [amount, setAmount] = useState('')
   const [repaymentMonths, setRepaymentMonths] = useState('')
@@ -45,6 +57,9 @@ export function TwoStepFormModal({ visible, kind, formUrl, onClose }: Props) {
   const reset = () => {
     setStep('form')
     setLeaveType('EL'); setStartDate(''); setEndDate(''); setLeaveReason('')
+    setStartHalf(null); setEndHalf(null); setDaysOverride(''); setDaysTouched(false)
+    setOdPlace(''); setOdPurpose(''); setOdTimeFrom(''); setOdTimeTo('')
+    setExtraWork([emptyExtraWork()])
     setAmount(''); setRepaymentMonths(''); setAdvanceReason('')
   }
 
@@ -56,11 +71,31 @@ export function TwoStepFormModal({ visible, kind, formUrl, onClose }: Props) {
         Alert.alert(t('common.error'), t('common.required'))
         return
       }
+      if (leaveType === 'OD' && (!odPlace || !odPurpose || !odTimeFrom || !odTimeTo)) {
+        Alert.alert(t('common.error'), t('leave.odFieldsRequired'))
+        return
+      }
+      if (leaveType === 'COFF' && extraWork.every(b => !b.date)) {
+        Alert.alert(t('common.error'), t('leave.extraWorkRequired'))
+        return
+      }
       setIsSubmitting(true)
-      const start = new Date(startDate)
-      const end = new Date(endDate)
-      const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
-      const { error } = await applyLeave({ type: leaveType as any, start_date: startDate, end_date: endDate, days, reason: leaveReason })
+      const computed = computeDays(startDate, endDate, startHalf, endHalf)
+      const days = (daysTouched && daysOverride !== '') ? parseFloat(daysOverride) : (computed || 0.5)
+      const detail: Record<string, unknown> = {}
+      if (startHalf) detail.start_half = startHalf
+      if (endHalf) detail.end_half = endHalf
+      if (leaveType === 'OD') {
+        detail.place = odPlace; detail.purpose = odPurpose
+        detail.time_from = odTimeFrom; detail.time_to = odTimeTo
+      }
+      if (leaveType === 'COFF') {
+        detail.extra_work = extraWork.filter(b => !!b.date)
+      }
+      const { error } = await applyLeave({
+        type: leaveType as any, start_date: startDate, end_date: endDate, days, reason: leaveReason,
+        detail: Object.keys(detail).length ? detail as any : null,
+      })
       setIsSubmitting(false)
       if (error) { Alert.alert(t('common.error'), t('common.somethingWentWrong')); return }
       setStep('confirm')
@@ -121,7 +156,60 @@ export function TwoStepFormModal({ visible, kind, formUrl, onClose }: Props) {
                     ))}
                   </View>
                   <Input label={t('worker.startDate')} value={startDate} onChangeText={setStartDate} placeholder="YYYY-MM-DD" />
+                  <View className="flex-row gap-2 mb-3 -mt-1">
+                    {(['first', 'second'] as const).map(h => (
+                      <TouchableOpacity key={h} onPress={() => setStartHalf(startHalf === h ? null : h)}
+                        className={`px-3 py-1.5 rounded-lg border ${startHalf === h ? 'bg-brand-600 border-brand-600' : 'border-ink-300'}`}>
+                        <Text className={`text-xs ${startHalf === h ? 'text-white' : 'text-ink-700'}`}>{t(`leave.half_${h}`)}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                   <Input label={t('worker.endDate')} value={endDate} onChangeText={setEndDate} placeholder="YYYY-MM-DD" />
+                  <View className="flex-row gap-2 mb-3 -mt-1">
+                    {(['first', 'second'] as const).map(h => (
+                      <TouchableOpacity key={h} onPress={() => setEndHalf(endHalf === h ? null : h)}
+                        className={`px-3 py-1.5 rounded-lg border ${endHalf === h ? 'bg-brand-600 border-brand-600' : 'border-ink-300'}`}>
+                        <Text className={`text-xs ${endHalf === h ? 'text-white' : 'text-ink-700'}`}>{t(`leave.half_${h}`)}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <Input
+                    label={t('leave.days') + (daysTouched ? ` (${t('leave.daysOverridden')})` : '')}
+                    value={daysOverride}
+                    onChangeText={v => { setDaysOverride(v); setDaysTouched(true) }}
+                    placeholder={String(computeDays(startDate, endDate, startHalf, endHalf) || '0.5')}
+                    keyboardType="numeric"
+                  />
+                  {leaveType === 'OD' && (
+                    <View className="mt-2">
+                      <Input label={t('leave.odPlace')} value={odPlace} onChangeText={setOdPlace} />
+                      <Input label={t('leave.odPurpose')} value={odPurpose} onChangeText={setOdPurpose} multiline numberOfLines={2} />
+                      <View className="flex-row gap-2">
+                        <View className="flex-1"><Input label={t('leave.odTimeFrom')} value={odTimeFrom} onChangeText={setOdTimeFrom} placeholder="09:00" /></View>
+                        <View className="flex-1"><Input label={t('leave.odTimeTo')} value={odTimeTo} onChangeText={setOdTimeTo} placeholder="17:00" /></View>
+                      </View>
+                    </View>
+                  )}
+                  {leaveType === 'COFF' && (
+                    <View className="mt-2">
+                      <Text className="text-sm font-medium text-ink-700 mb-2">{t('leave.extraWork')}</Text>
+                      {extraWork.map((block, i) => (
+                        <View key={i} className="border border-ink-200 rounded-lg p-3 mb-2">
+                          <Text className="text-xs font-semibold text-ink-500 mb-1">{t('leave.extraWorkBlock', { index: i + 1 })}</Text>
+                          <Input label={t('leave.extraWorkDate')} value={block.date} onChangeText={v => setExtraWork(prev => prev.map((b, idx) => idx === i ? { ...b, date: v } : b))} placeholder="YYYY-MM-DD" />
+                          <View className="flex-row gap-2">
+                            <View className="flex-1"><Input label={t('leave.odTimeFrom')} value={block.time_from} onChangeText={v => setExtraWork(prev => prev.map((b, idx) => idx === i ? { ...b, time_from: v, hours: hoursBetween(v, b.time_to) } : b))} placeholder="09:00" /></View>
+                            <View className="flex-1"><Input label={t('leave.odTimeTo')} value={block.time_to} onChangeText={v => setExtraWork(prev => prev.map((b, idx) => idx === i ? { ...b, time_to: v, hours: hoursBetween(b.time_from, v) } : b))} placeholder="17:00" /></View>
+                          </View>
+                          {block.hours > 0 && <Text className="text-xs text-ink-500 mb-2">{t('leave.extraWorkHours', { hours: block.hours })}</Text>}
+                          <Input label={t('leave.extraWorkDetails')} value={block.details} onChangeText={v => setExtraWork(prev => prev.map((b, idx) => idx === i ? { ...b, details: v } : b))} multiline numberOfLines={2} />
+                        </View>
+                      ))}
+                      {extraWork.length < EXTRA_WORK_MAX && (
+                        <Button title="leave.addExtraWork" onPress={() => setExtraWork(prev => [...prev, emptyExtraWork()])} variant="outline" size="sm" className="mb-3" />
+                      )}
+                    </View>
+                  )}
                   <Input label={t('worker.leaveReason')} value={leaveReason} onChangeText={setLeaveReason} multiline numberOfLines={3} className="mb-4" />
                 </>
               ) : (

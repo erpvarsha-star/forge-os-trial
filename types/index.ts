@@ -122,7 +122,7 @@ export interface LeaveBalance {
 export interface LeaveRequest {
   id: string
   employee_id: string
-  type: 'EL' | 'CL' | 'SL' | 'LWP'
+  type: 'EL' | 'CL' | 'SL' | 'LWP' | 'OD' | 'COFF'
   start_date: string
   end_date: string
   days: number
@@ -136,6 +136,10 @@ export interface LeaveRequest {
   /** Added by PATCH_53 (staged approval chains). Null on rows inserted before it. */
   approval_chain?: string[]
   current_stage?: number
+  /** Added by PATCH_113: APPROVED-DAYS override; null = as requested (days). */
+  granted_days?: number | null
+  /** Added by PATCH_113: half-day flags + OD fields + COFF extra-work blocks. */
+  detail?: import('@/lib/leaveForm').LeaveDetail | null
 }
 
 export interface AdvanceRequest {

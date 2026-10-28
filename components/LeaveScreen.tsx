@@ -10,7 +10,10 @@ import { Input } from '@/components/Input'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { LEAVE_TYPES } from '@/constants'
 import { stageProgressLabel } from '@/lib/approvalStages'
+import { computeDays, hoursBetween, EXTRA_WORK_MAX, ExtraWorkBlock, HalfDay } from '@/lib/leaveForm'
 import { Plus, FileText } from 'lucide-react-native'
+
+const emptyExtraWork = (): ExtraWorkBlock => ({ date: '', time_from: '', time_to: '', hours: 0, details: '' })
 
 export function LeaveScreen() {
   const { t, i18n } = useTranslation()
@@ -22,14 +25,47 @@ export function LeaveScreen() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [reason, setReason] = useState('')
+  const [startHalf, setStartHalf] = useState<HalfDay>(null)
+  const [endHalf, setEndHalf] = useState<HalfDay>(null)
+  const [daysOverride, setDaysOverride] = useState('')
+  const [daysTouched, setDaysTouched] = useState(false)
+  const [odPlace, setOdPlace] = useState('')
+  const [odPurpose, setOdPurpose] = useState('')
+  const [odTimeFrom, setOdTimeFrom] = useState('')
+  const [odTimeTo, setOdTimeTo] = useState('')
+  const [extraWork, setExtraWork] = useState<ExtraWorkBlock[]>([emptyExtraWork()])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   if (!employee || isLoading) return <LoadingScreen />
 
-  const leaveTypeLabel = (value: string) => {
-    const match = LEAVE_TYPES.find(lt => lt.value === value)
-    if (!match) return value
-    return isHindi ? match.labelHi : match.label
+  const computedDays = computeDays(startDate, endDate, startHalf, endHalf)
+  const days = daysTouched && daysOverride !== '' ? parseFloat(daysOverride) : computedDays
+
+  // Sheet rule: warn but NEVER block when the request exceeds the remaining balance.
+  const balanceForType = (type: string): number | null => {
+    if (!balance) return null
+    if (type === 'EL') return balance.earned_leave
+    if (type === 'CL') return balance.casual_leave
+    if (type === 'SL') return balance.sick_leave
+    return null // LWP/OD/COFF have no EL/CL/SL balance to check
+  }
+
+  const updateExtraWork = (i: number, patch: Partial<ExtraWorkBlock>) => {
+    setExtraWork(prev => prev.map((b, idx) => {
+      if (idx !== i) return b
+      const next = { ...b, ...patch }
+      if (patch.time_from !== undefined || patch.time_to !== undefined) {
+        next.hours = hoursBetween(next.time_from, next.time_to)
+      }
+      return next
+    }))
+  }
+
+  const resetForm = () => {
+    setLeaveType('EL'); setStartDate(''); setEndDate(''); setReason('')
+    setStartHalf(null); setEndHalf(null); setDaysOverride(''); setDaysTouched(false)
+    setOdPlace(''); setOdPurpose(''); setOdTimeFrom(''); setOdTimeTo('')
+    setExtraWork([emptyExtraWork()])
   }
 
   const handleApply = async () => {
@@ -37,17 +73,69 @@ export function LeaveScreen() {
       Alert.alert(t('common.error'), t('common.required'))
       return
     }
+    if (leaveType === 'OD' && (!odPlace || !odPurpose || !odTimeFrom || !odTimeTo)) {
+      Alert.alert(t('common.error'), t('leave.odFieldsRequired'))
+      return
+    }
+    if (leaveType === 'COFF' && extraWork.every(b => !b.date)) {
+      Alert.alert(t('common.error'), t('leave.extraWorkRequired'))
+      return
+    }
+    const finalDays = days || computedDays
+    const remaining = balanceForType(leaveType)
+    if (remaining !== null && finalDays > remaining) {
+      Alert.alert(
+        t('leave.insufficientBalanceTitle'),
+        t('leave.insufficientBalanceMsg', { requested: finalDays, remaining, type: leaveType }),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('leave.proceedAnyway'), onPress: () => submitLeave(finalDays) },
+        ]
+      )
+      return
+    }
+    await submitLeave(finalDays)
+  }
+
+  const submitLeave = async (finalDays: number) => {
     setIsSubmitting(true)
-    const start = new Date(startDate)
-    const end = new Date(endDate)
-    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
-    await applyLeave({ type: leaveType as any, start_date: startDate, end_date: endDate, days, reason })
+    const detail: Record<string, unknown> = {}
+    if (startHalf) detail.start_half = startHalf
+    if (endHalf) detail.end_half = endHalf
+    if (leaveType === 'OD') {
+      detail.place = odPlace; detail.purpose = odPurpose
+      detail.time_from = odTimeFrom; detail.time_to = odTimeTo
+    }
+    if (leaveType === 'COFF') {
+      detail.extra_work = extraWork.filter(b => !!b.date)
+    }
+    await applyLeave({
+      type: leaveType as any,
+      start_date: startDate,
+      end_date: endDate,
+      days: finalDays,
+      reason,
+      detail: Object.keys(detail).length ? detail as any : null,
+    })
     setIsSubmitting(false)
     setShowModal(false)
-    setStartDate('')
-    setEndDate('')
-    setReason('')
+    resetForm()
   }
+
+  const leaveTypeLabel = (value: string) => {
+    const match = LEAVE_TYPES.find(lt => lt.value === value)
+    if (!match) return value
+    return isHindi ? match.labelHi : match.label
+  }
+
+  const halfChip = (value: 'first' | 'second', current: HalfDay, onSelect: (h: HalfDay) => void) => (
+    <TouchableOpacity
+      onPress={() => onSelect(current === value ? null : value)}
+      className={`px-3 py-1.5 rounded-lg border ${current === value ? 'bg-brand-600 border-brand-600' : 'border-ink-300'}`}
+    >
+      <Text className={`text-xs ${current === value ? 'text-white' : 'text-ink-700'}`}>{t(`leave.half_${value}`)}</Text>
+    </TouchableOpacity>
+  )
 
   const statusColor = (status: string) => {
     switch (status) {
@@ -137,7 +225,59 @@ export function LeaveScreen() {
                 ))}
               </View>
               <Input label={t('worker.startDate')} value={startDate} onChangeText={setStartDate} placeholder="YYYY-MM-DD" />
+              <View className="flex-row gap-2 mb-3 -mt-1">
+                {halfChip('first', startHalf, setStartHalf)}
+                {halfChip('second', startHalf, setStartHalf)}
+              </View>
               <Input label={t('worker.endDate')} value={endDate} onChangeText={setEndDate} placeholder="YYYY-MM-DD" />
+              <View className="flex-row gap-2 mb-3 -mt-1">
+                {halfChip('first', endHalf, setEndHalf)}
+                {halfChip('second', endHalf, setEndHalf)}
+              </View>
+              <Input
+                label={t('leave.days') + (daysTouched ? ` (${t('leave.daysOverridden')})` : '')}
+                value={daysOverride}
+                onChangeText={v => { setDaysOverride(v); setDaysTouched(true) }}
+                placeholder={String(computedDays || '0.5')}
+                keyboardType="numeric"
+              />
+              {leaveType === 'OD' && (
+                <View className="mt-2">
+                  <Input label={t('leave.odPlace')} value={odPlace} onChangeText={setOdPlace} />
+                  <Input label={t('leave.odPurpose')} value={odPurpose} onChangeText={setOdPurpose} multiline numberOfLines={2} />
+                  <View className="flex-row gap-2">
+                    <View className="flex-1"><Input label={t('leave.odTimeFrom')} value={odTimeFrom} onChangeText={setOdTimeFrom} placeholder="09:00" /></View>
+                    <View className="flex-1"><Input label={t('leave.odTimeTo')} value={odTimeTo} onChangeText={setOdTimeTo} placeholder="17:00" /></View>
+                  </View>
+                </View>
+              )}
+              {leaveType === 'COFF' && (
+                <View className="mt-2">
+                  <Text className="text-sm font-medium text-ink-700 mb-2">{t('leave.extraWork')}</Text>
+                  {extraWork.map((block, i) => (
+                    <View key={i} className="border border-ink-200 rounded-lg p-3 mb-2">
+                      <View className="flex-row justify-between items-center mb-1">
+                        <Text className="text-xs font-semibold text-ink-500">{t('leave.extraWorkBlock', { index: i + 1 })}</Text>
+                        {extraWork.length > 1 && (
+                          <TouchableOpacity onPress={() => setExtraWork(prev => prev.filter((_, idx) => idx !== i))}>
+                            <Text className="text-xs text-red-500">{t('leave.removeBlock')}</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      <Input label={t('leave.extraWorkDate')} value={block.date} onChangeText={v => updateExtraWork(i, { date: v })} placeholder="YYYY-MM-DD" />
+                      <View className="flex-row gap-2">
+                        <View className="flex-1"><Input label={t('leave.odTimeFrom')} value={block.time_from} onChangeText={v => updateExtraWork(i, { time_from: v })} placeholder="09:00" /></View>
+                        <View className="flex-1"><Input label={t('leave.odTimeTo')} value={block.time_to} onChangeText={v => updateExtraWork(i, { time_to: v })} placeholder="17:00" /></View>
+                      </View>
+                      {block.hours > 0 && <Text className="text-xs text-ink-500 mb-2">{t('leave.extraWorkHours', { hours: block.hours })}</Text>}
+                      <Input label={t('leave.extraWorkDetails')} value={block.details} onChangeText={v => updateExtraWork(i, { details: v })} multiline numberOfLines={2} />
+                    </View>
+                  ))}
+                  {extraWork.length < EXTRA_WORK_MAX && (
+                    <Button title="leave.addExtraWork" onPress={() => setExtraWork(prev => [...prev, emptyExtraWork()])} variant="outline" size="sm" className="mb-3" />
+                  )}
+                </View>
+              )}
               <Input label={t('worker.leaveReason')} value={reason} onChangeText={setReason} multiline numberOfLines={3} className="mb-4" />
               <Button title="common.submit" onPress={handleApply} loading={isSubmitting} />
               <Button title="common.cancel" onPress={() => setShowModal(false)} variant="ghost" />
