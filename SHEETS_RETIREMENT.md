@@ -108,3 +108,11 @@ Extracted from the sheet by delegated read (28 Oct), key facts independently che
 3. **Approval checklist per sheet:** keep the PATCH_53 staged chain (richer than the sheet — owner's own earlier decision) but add the sheet's capabilities at every stage: **granted-days override** (default = requested), approver identity (auto), decision, **mandatory remarks on reject** and on any day-count change, stage-by-stage checklist UI on the approval cards. Sheet's single-admin shortcut = the chain collapsing when the requester is senior (already the frozen design).
 4. **Payroll link:** approved OD/C-off counting as paid days still rides on the open OD/C-off decision; C-off consumed from comp_off_balance must NOT also debit EL/CL/SL.
 5. **Migration linkage:** approvals matched to requests by (emp code + start date), normalized; unmatched rows -> the gaps report (never guessed).
+
+## Standing build rules (owner 28 Oct, before the 10 PM window)
+1. **Ready to deploy** — every PR ships complete (migrations + code + tests + i18n), deployable as-is after review; no half-built screens or TODO-stubs.
+2. **Nothing breaks, no bugs** — full safety protocol per build: read-only dry-runs, subagent builds with my independent verification (re-run gate, re-read diffs), quality gate green before any PR is declared ready.
+3. **Language covered** — every UI string EN+HI; `check-i18n.mjs` clean is part of the gate.
+4. **Tab placement** — new screens follow the locked navigation pattern: More-menu row (or existing-tab integration), explicit `href: null` entry in the role's `_layout.tsx` Tabs list so nothing leaks into the bottom bar, badge/count on the More row where decisions pend; bilingual labels.
+5. **Report with doubts** — when a patch/build is ready, the final message states any doubts about what was built and any failure risks, numbered (alongside what was asked / steps / verified-vs-claimed / live-vs-draft).
+6. **Build once** — one canonical implementation per feature; no duplicate or parallel versions (no owner-specific fork later generalized); shared components over per-role copies where the codebase already uses that pattern.
