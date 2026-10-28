@@ -2706,3 +2706,9 @@ Verification beyond "the Gradle command exited 0": `npx expo export --platform w
 eas build --platform android --profile preview
 # or: expo.dev → erp.varsha → forge-os → Builds → New Build
 ```
+
+## Owner decisions of 29 Oct 2026, evening (recorded the moment given)
+
+1. **PATCH_113 approved to apply** ("you and kimi have reviewed it so i am good to go"). Applied only after the COMP-OFF branch was redesigned for the live `comp_off_balance` ledger: a whole-day C-off marks the oldest unexpired unused ledger rows `is_used=true` / `used_in_leave_request_id` (1 row = 1 day); a **half-day C-off is never auto-consumed** — owner: "if it is to be comped off it needs a decision by hr, plant head and shown to me" — it is recorded as `source='half_day_pending_decision'` with no ledger movement and the owner is notified. `consume_leave_for_request` also lets the final approver (plant_head) trigger it; it stays idempotent and only acts on fully approved requests.
+2. **PATCH_111**: owner supplied the template file only (no values — it holds no personal data). It still needs the private values file (STEP 2) to run; use the corrected repo copy, never the attached older draft.
+3. **"Fix the new apk to build without failing"**: runs #107/#108 built green; the real risk is apk-108 shipping leave code that calls RPCs (`p_granted_days`, `consume_leave_for_request`) that only exist once PATCH_113 is live. Apply 113 first, then verify, then (if needed) rebuild.
