@@ -2759,3 +2759,10 @@ Owner: "build for hr and then a notification for me to review"; "fix it" (auth_r
 Every Claude step ends with the locked brief + numbered questions, a commit/push and a PENDING.md update.
 
 **Risks flagged by Claude from the handoff (owner to weigh):** the committed handoff contains a partial Supabase token prefix (public repo) — remove it going forward; the shift-time conflict (sheet S1 08:30/60-min vs app 07:00/15-min); EMI-style loans unclear; `public_holidays` is empty; statutory formats unvalidated; BUNG release on Sunday 1-2 Nov is tight.
+
+## Owner answers of 29 Oct 2026 (night) — recorded the moment given
+
+1. **OD / C-off pay (answer: "if you don't get them from HR salaries remain pending")** — interpreted by Claude as: OD / C-off days count as paid ONLY when HR/approvers have actually approved them; anything HR has not provided/approved stays unpaid (pending) in the run. feedSync already only reads `approved` leave, so the open question is only the mapping of an approved OD / C-off into paid-day buckets (not yet changed; owner to confirm the mapping before payroll code is touched).
+2. **Audit-log masking: not necessary, but do it if Claude thinks it right** — Claude does think it right: bank/PAN/UAN are masked going forward in the `employee_salary_structure` audit trigger (PATCH_116). Existing audit rows are NOT rewritten without owner approval.
+3. **Corrections to the other assistant's files: owner asked Claude to list exactly what it wants to fix; edits wait for his approval** (list given in chat 29 Oct; nothing edited).
+4. **Owner screen for half-day C-offs: show ONLY the ones HR has already decided, for the owner's review** (not the undecided ones). Built as More → Half-day Comp-off Review for the owner with a red count of unreviewed decisions (PATCH_116).
