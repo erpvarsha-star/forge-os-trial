@@ -39,23 +39,25 @@ Status legend: ✅ in-app replacement live · 🟡 partial / in-flight · ⬜ no
 - [ ] **`scripts/MigrateToSupabase.gs` must stay UNINSTALLED** — it pushes the Employee Master Sheet into `employees`; installing it would make the sheet a second write path again. App is the only write path going forward.
 - [ ] **Placeholder Google Form URLs** (PATCH_41/42) need real links from Yash before the Forms tab can stand alone.
 
-## Sheet file IDs / links (collect — needed to run the audit and confirm retirement)
-| Sheet / file | ID / link | Status |
-|---|---|---|
-| Form registry ("which forms exist" sheet) | `1M2E83q64BXzfGwZsNQ_9u2jdfzwJPrJlD8WKRKgG554` | known (from PENDING.md) |
-| "VFPL Operations Dashboard 2026-27" | `1GHdhrRtOhQFshsAOCK4n3GiJp-6a03k8bn0V_M04wSY` | known (parked, Goal 2) |
-| Master "VFL Employee Salary Sheet 2026 Onwards" | — | **needed** |
-| Consultant / Worker / Staff workbooks | — | **needed** (3+ files) |
-| Attendance sheet | — | **needed** |
-| "VFPL Pune Home Workers Salary Sheet v1" | — | **needed** |
-| "VFL HR OS 2026 27" (if distinct from ops dashboard) | — | **needed** |
-| Shift_Planning_1.csv | — | **needed** |
-| Bank-upload / disbursement sheet | — | **needed** |
-| Advance balance sheet | — | **needed** |
+## Sheet file IDs / links (owner-provided index 28 Oct + Drive scan)
+**Confirmed: "VFL HR OS 2026 27" and "VFPL Operations Dashboard 2026-27" are TWO DIFFERENT workbooks.** The HR OS 2026 27 workbook is the attendance/payroll-feed hub — daily + monthly attendance forms (VFL and Pune), OT, canteen and efficiency all land as RAW tabs inside it via Google Forms. Local `.xlsx` exports of all files are in `D:/kimi/sheets-audit/` (outside the repo, never committed).
 
-Per sheet, one line on who writes in it today and how often is enough — most of the "what happens" is already captured in CLAUDE.md/PENDING.md; the links are for verification and the final "writes stopped" check.
+| Sheet / process | ID / link | Notes |
+|---|---|---|
+| Master "VFL Employee Salary Sheet 2026 Onwards" | `1Cct6oXSGiXJHhgKSb5W3UGVsjXGHE7Q_zo952KjUwA8` | staff masters + monthly tabs to Sep 2026 |
+| VFPL Worker Salary Sheet v1 | `1xNjusx4-r2fZ3XliCUll-HvBl6Qk-vey8soNdEAsxn4` | worker workbook |
+| VFPL Consultant Salary Sheet v1 | — (not yet collected) | consultant workbook |
+| VFPL Pune Home Workers Salary Sheet v1 | — (not yet collected) | Pune BUNG masters |
+| VFL Leave Application 2026 | — | live leave-submission form + leave databases |
+| VFL Advance/Loan Form Responses | — | live advance-submission form |
+| VFL HR OS 2026 27 (started Sep 2026) | — | **owner's consolidation + agreed fallback** — form-fed RAW tabs (attendance VFL/Pune daily+monthly, OT 26.8k rows, canteen, efficiency) + full parallel payroll schema (EMPLOYEE_MASTER 387, SALARY_STRUCTURE, STATUTORY_IDS 329, INPUT_OT 3.7k, ATTENDANCE_DAILY 3.7k); retires LAST |
+| Form registry | `1M2E83q64BXzfGwZsNQ_9u2jdfzwJPrJlD8WKRKgG554` | known |
+| "VFPL Operations Dashboard 2026-27" | `1GHdhrRtOhQFshsAOCK4n3GiJp-6a03k8bn0V_M04wSY` | parked, Goal 2 |
+| Shift_Planning_1.csv / bank-upload / advance-ledger sheets | — | **needed if they exist** |
 
 ## P0 code findings from leave-closure audit (28 Oct 2026)
+- ✅ **App-side verification executed 28 Oct (read-only, Supabase):** FY27 leave rows in app = **5 only** (3 EL / 1 CL / 1 SL) vs 659 in the sheet — "leaves not pushed yet" confirmed live. `leave_balances` 2026 = 129 rows (PATCH_24 seed). `designation` / `date_of_joining` columns confirmed ABSENT. UAN-or-PAN present on 106 of 116 active structure rows. All 99 active non-BUNG employees have a valid structure on 2026-10-31. BUNG09 advance = 6,000 approved. CON16/18/21/22/23 inactive; VFL1520 active + `on_leave` from 2026-09-01, no exit row. Oct VDA 103 entered; no October run/period exists yet; BUNG30/33 ot_rates = 100/70; Kajal's recurring allowance active.
+- 🔴 **Confirmed 28 Oct (live): 14 structure rows (effective_from ≥ 2026-07-26) missing bank fields** — would blank the October bank-file export. Fix prepared as `scripts/PATCH_111_backfill_structure_bank_fields_28Oct2026.sql` (preview + rollback-safe, human-applied). Genuine new-hire blanks remain for HR entry (bank-details maintenance path decision still open).
 - 🔴 **OD / COFF are paid-day holes in the payroll feed.** DB allows leave types EL/CL/SL/LWP/COFF/OD (PATCH_28), but the app leave form offers only EL/CL/SL/LWP (`constants/index.ts` LEAVE_TYPES), and `feedSync` counts only EL/CL/SL from approved leave. An approved **OD** (outdoor duty — by definition no plant check-in, so no attendance row) or **COFF** (compensatory off) silently counts as an unpaid day in the October run. Needs: (1) owner decision — are OD/COFF paid? (2) if yes, a `feedSync` mapping (source-of-truth file, not frozen — legal to change) + re-vendor + regression/test update; the engine's unused `plo` bucket may fit OD.
 - 🟡 **Leave form parity**: COFF/OD not selectable in-app, so if they're real categories HR must enter them via SQL today — check live `leave_requests` for existing COFF/OD rows once Supabase access lands.
 - ✅ Confirmed sound: EL/CL/SL add-days-without-attendance-rows logic, LWP correctly unpaid, staged chains (PATCH_53) frozen and code-verified earlier, `leave_balances` seeded (PATCH_24).
@@ -71,4 +73,12 @@ Per sheet, one line on who writes in it today and how often is enough — most o
 - 🟡 **Statutory formats unverified against official validators** — PF ECR (`#~#`), ESI CSV, PT CSV, MLWF were built to spec but never run through EPFO/ESIC validation; CA review needed before any real filing (known since 25 Oct, reaffirmed here because row 12's closure includes statutory exports).
 - ✅ Confirmed sound: bank file mirrors the old sheet's exact columns (EMP_ID/EMPLOYEE_NAME/BANK_NAME/BANK_ACCOUNT/IFSC/NET_PAY, owner decision 21 Oct); CSV is formula-injection-safe; held/zero-net employees are excluded from the bank file; salary-window `pickSalary` + increment-date fix verified earlier; payslip extras and recurring-adjustment paths code-verified.
 
-*Last updated: 28 Oct 2026 — scope bands per owner direction; P0 leave, advance/bank and export audits complete; not yet owner-reviewed.*
+## Owner clarifications (28 Oct 2026)
+- **HR OS 2026 27 is the owner's consolidation sheet and the agreed fallback** — built to bring the other sheets together. It retires LAST, only after the app proves a full cycle; until then it is the parallel record, not a legacy artifact. It holds a complete parallel payroll schema (see link table).
+- **Canteen, efficiency, loan deduction were manual entries in HR OS via forms** — survey: canteen ✅ (HR feeds tab), efficiency ✅ (plant-head screen), loan deduction 🟡 (one-time advances covered; EMI-style loans unclear — owner to confirm). No builds started.
+- **Gate pass**: currently a Google Form; in-app version with gate IN/OUT monitoring comes later, together with medical and other forms — process flow to be explained first. Parked, do not build.
+- **Departed employees: do not dig into them** — audit and imports skip left/inactive people.
+- **BUNG active count = 7 (owner 28 Oct)**: rule = "paid in Aug + Sep = active". Verified: no Aug-2026 tab exists in the Pune salary workbook; the SEPT tab pays exactly the 7 the app holds. The Pune Home Master's 19 "Active" flags are stale — the other 12 are not imported and not investigated.
+- **Supabase access mode (owner 28 Oct): read-only.** SELECT probes only; every change ships as an additive `scripts/PATCH_*.sql` for a human to review and run manually.
+
+*Last updated: 28 Oct 2026 — scope bands per owner direction; sheet audit + app-side verification complete; not yet owner-reviewed.*
