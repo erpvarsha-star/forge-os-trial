@@ -83,3 +83,10 @@ imports that already landed); audit table shows zero confirmed sheet-only gaps f
 | Legacy / parked | salary_advances (0, orphan — documented), worker_efficiency_actuals (0, superseded), attendance_regularisation / attendance_warnings / role_kpis / role_kras (0, future scaffolding) | ⚪ no action |
 
 **Verdict: the salary front is in line for the October run** — engine, lifecycle, masters, advances, statutory config, archived history all verified. Remaining before/around the run: (1) PATCH_111 human-run; (2) HR enters October feeds (efficiency % is the critical one); (3) leave import build (on owner word); (4) DOJ/designation + UAN/PAN import files; (5) owner decisions (OD/C-off → lands in existing comp_off_balance; bank path; export layout; shift conflict).
+
+## October runbook + owner process decisions (28-29 Oct)
+- **Payslips Apr–Sep: ALREADY LIVE in-app** (verified 28 Oct: all 24 runs archived incl. 4 September population runs; `my_payslips()` serves them). No push needed for visibility; retroactive payslip_ready bell rows = optional one-off patch, owner decision.
+- **Canteen/society/efficiency for October: enter IN APP** (recommended, awaiting owner confirm) — HR Payroll Feeds + plant-head Efficiency; data arrives by 5 Nov. HR OS = read-only fallback record. BUNG02/06 deductions also via app adjustments.
+- **BUNG early release 2 Nov: lifecycle constraint flagged** — finalize locks the whole October run permanently, so finalizing on 2 Nov would freeze staff/worker items without feeds. Options: (a) verified preview figures on 2 Nov, bank release with everyone ≥5 Nov (recommended); (b) manual BUNG payment as documented exception, reconciled against the formal run. Owner to pick.
+- **No unexplained gaps in salary sheets** beyond the resolved Pune-Aug absence. Known gap list unchanged (leave import, OD/C-off, DOJ/designation, bank fields, UAN/PAN).
+- **Per-person leave balance table = the leave-import build** (spec locked); not yet generated.
