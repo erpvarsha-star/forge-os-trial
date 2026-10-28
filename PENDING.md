@@ -7,6 +7,8 @@
 
 - [x] **apk-106 PUBLISHED 28 Oct 15:15 UTC** (run #106, commit 411ca28, 88.4 MB, latest release). Contains clerk OT/travel screen + new payslip lines. [ ] Install on phones; Kajal tests OT/travel entry on a real device. Workflow is ENABLED again.
 
+- [x] 28 Oct: PATCH_112 applied live + `payroll-run` v9 deployed (population runs). [ ] PATCH_113 ON HOLD (owner: comp-off pending, no leave data reviewed; see CLAUDE.md). [ ] PATCH_111 not applied (needs owner's private values file; repo copy fixed on `claude/patch-111-113-fixes`). [!] The merged app leave code calls RPCs from 113 - do not ship it in an APK until 113 is decided.
+
 ## October pre-run checklist (prepared 27 Oct; run starts once the month closes; Claude prepares, owner/HR trigger)
 Checked live 27 Oct: Oct VDA rate row exists (103/day); no October pay period/run yet; 7 BUNG active with salary structures; BUNG30/33 have ot_rate; 1 active recurring_adjustment (VFL1567 allowance, from 1 Oct); every other active employee has a structure; BUNG09 advance approved, outstanding 6,000.
 Before the month closes:
