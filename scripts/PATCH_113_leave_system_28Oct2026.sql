@@ -23,12 +23,12 @@
 
 -- ============================================================================
 -- STEP 0 — PRE-FLIGHT: confirm comp_off_balance's actual columns.
--- VERIFIED LIVE 28 Oct: comp_off_balance is a per-earning ledger with columns
+-- VERIFIED LIVE 28 Oct: comp_off_balance is a per-earning LEDGER with columns
 -- id, employee_id, earned_date, expiry_date, reason, is_used,
--- used_in_leave_request_id, created_at (no balance column).
--- The consume RPC in STEP 4 makes a DOCUMENTED COLUMN ASSUMPTION for the
--- comp-off debit (see there). Run this first and confirm the balance column
--- name matches before running the rest of the file.
+-- used_in_leave_request_id, created_at (no numeric balance column).
+-- The consume RPC in STEP 4 is written against exactly this ledger shape
+-- (marks the oldest unexpired unused rows as used). Run this first and
+-- confirm the columns still match before running the rest of the file.
 -- ============================================================================
 
 select ordinal_position, column_name, data_type
@@ -180,7 +180,9 @@ $$;
 
 -- ============================================================================
 -- STEP 4 — consume_leave_for_request(p_request_id uuid): draw the approved
--- leave down from balances. SECURITY DEFINER, owner/hr_admin only.
+-- leave down from balances. SECURITY DEFINER, owner/hr_admin/plant_head only
+-- (plant head is usually the FINAL approver and the app calls this right
+-- after final approval).
 --   * IDEMPOTENT: no-op when a leave_consumption row already exists.
 --   * Proceeds only when status = 'approved' AND the chain is fully walked
 --     (current_stage >= array_length(approval_chain,1)) — same finality
@@ -190,13 +192,15 @@ $$;
 --   * EL/CL/SL decrement leave_balances for the year of start_date; a missing
 --     balance row is created at 0 first, then decremented (sheet behavior:
 --     negative balances are ALLOWED, never raised).
---   * COFF debits comp_off_balance.
---     DOCUMENTED COLUMN ASSUMPTION: one balance row per employee with a
---     numeric column named 'balance' (fallbacks: 'days', 'available_days',
---     'hours', 'comp_off_days'). comp_off_balance's live columns were NOT
---     verified at authoring time — STEP 0 prints them; if none of the
---     candidate names matches, this RPC raises a clear error listing the
---     actual columns and the human adjusts this function before re-running.
+--   * COFF consumes the comp_off_balance LEDGER (one row per comp-off earned):
+--       - whole days: the oldest unexpired unused rows (earned_date asc) are
+--         marked is_used = true / used_in_leave_request_id = request, one row
+--         per day. If fewer rows exist than days, it never raises or blocks:
+--         it consumes what exists, records source 'approval_shortfall_<N>' on
+--         the leave_consumption row and notifies every active owner.
+--       - half-day (fractional days): the ledger is NOT touched; source
+--         'half_day_pending_decision' is recorded and every active owner is
+--         notified (HR + Plant Head decide the treatment, no auto-deduction).
 --   * OD consumes nothing.
 -- ============================================================================
 
@@ -210,12 +214,13 @@ declare
   v_req leave_requests%rowtype;
   v_days numeric;
   v_year integer;
-  v_coff_col text;
-  v_coff_cols text;
+  v_source text := 'approval';
+  v_ids uuid[];
+  v_marked integer := 0;
 begin
   select get_current_employee_role() into v_role;
-  if v_role not in ('owner', 'hr_admin') then
-    raise exception 'Only owner or hr_admin can consume leave balances';
+  if v_role not in ('owner', 'hr_admin', 'plant_head') then
+    raise exception 'Only owner, hr_admin or plant_head can consume leave balances';
   end if;
 
   -- Idempotency: unique(request_id) means a second call is a no-op.
@@ -252,34 +257,43 @@ begin
       update leave_balances set sick_leave = sick_leave - v_days
         where employee_id = v_req.employee_id and year = v_year;
     end if;
-  -- KNOWN GAP (28 Oct, verified live): comp_off_balance is a ledger, not a balance column; this branch will raise until redesigned (owner decision pending).
   elsif v_req.type = 'COFF' then
-    -- Resolve the comp-off balance column defensively (see header note).
-    select string_agg(column_name, ', ' order by ordinal_position) into v_coff_cols
-      from information_schema.columns
-     where table_schema = 'public' and table_name = 'comp_off_balance';
-    select column_name into v_coff_col
-      from information_schema.columns
-     where table_schema = 'public' and table_name = 'comp_off_balance'
-       and data_type in ('numeric', 'integer', 'double precision', 'real', 'bigint')
-       and column_name in ('balance', 'days', 'available_days', 'hours', 'comp_off_days')
-     order by array_position(array['balance', 'days', 'available_days', 'hours', 'comp_off_days'], column_name)
-     limit 1;
-    if v_coff_col is null then
-      raise exception 'comp_off_balance: none of the assumed balance columns (balance, days, available_days, hours, comp_off_days) exists. Actual columns: %. Adjust consume_leave_for_request before retrying.', v_coff_cols;
+    -- comp_off_balance is a per-earning ledger (verified live 28 Oct).
+    if v_days <> floor(v_days) then
+      -- Half-day comp-off: do NOT touch the ledger; owner decides.
+      v_source := 'half_day_pending_decision';
+      insert into notifications (user_id, title, body, type, related_entity_type, related_entity_id)
+      select e.id, 'Comp-off decision needed',
+             'Half-day comp-off approved — needs HR + Plant Head decision, not auto-deducted',
+             'leave', 'leave_request', p_request_id::text
+        from employees e
+       where e.role = 'owner' and e.is_active = true;
+    else
+      -- Whole days: lock and take the oldest unexpired unused ledger rows.
+      select coalesce(array_agg(id), '{}') into v_ids from (
+        select id from comp_off_balance
+         where employee_id = v_req.employee_id
+           and is_used = false
+           and (expiry_date is null or expiry_date >= (now() at time zone 'Asia/Kolkata')::date)
+         order by earned_date asc, created_at asc
+         limit v_days::int
+           for update
+      ) q;
+      update comp_off_balance
+         set is_used = true, used_in_leave_request_id = p_request_id
+       where id = any(v_ids);
+      get diagnostics v_marked = row_count;
+      if v_marked < v_days::int then
+        -- Never block: consume what exists and record the shortfall.
+        v_source := 'approval_shortfall_' || (v_days::int - v_marked)::text;
+        insert into notifications (user_id, title, body, type, related_entity_type, related_entity_id)
+        select e.id, 'Comp-off shortfall',
+               'Comp-off short by ' || (v_days::int - v_marked)::text || ' day(s) for an approved request',
+               'leave', 'leave_request', p_request_id::text
+          from employees e
+         where e.role = 'owner' and e.is_active = true;
+      end if;
     end if;
-    if not exists (select 1 from information_schema.columns
-                    where table_schema = 'public' and table_name = 'comp_off_balance'
-                      and column_name = 'employee_id') then
-      raise exception 'comp_off_balance has no employee_id column. Actual columns: %. Adjust consume_leave_for_request before retrying.', v_coff_cols;
-    end if;
-    execute format(
-      'update comp_off_balance set %I = %I - $1 where employee_id = $2',
-      v_coff_col, v_coff_col)
-    using v_days, v_req.employee_id;
-    -- NOTE: if comp_off_balance turns out to be a per-earning ledger (one row
-    -- per comp-off earned, e.g. is_used flags) instead of one balance row per
-    -- employee, this debit needs to mark individual rows used — see STEP 0 output.
   elsif v_req.type in ('LWP', 'OD') then
     -- LWP is unpaid (no balance), OD is on duty (no balance): consume nothing.
     null;
@@ -288,7 +302,7 @@ begin
   end if;
 
   insert into leave_consumption (request_id, employee_id, leave_type, days, source)
-  values (p_request_id, v_req.employee_id, v_req.type, v_days, 'approval');
+  values (p_request_id, v_req.employee_id, v_req.type, v_days, v_source);
 end;
 $$;
 
