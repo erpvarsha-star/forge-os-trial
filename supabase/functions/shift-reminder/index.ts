@@ -70,12 +70,42 @@ async function weeklyShiftNotify(db: ReturnType<typeof supabaseAdmin>) {
 
   const employeesWithShift = new Set<string>((assignments ?? []).map((s: { employee_id: string }) => s.employee_id));
 
+  // The cron runs hourly and Thursday maps to this mode all day, so without a
+  // per-week key every run re-sent "Your shift plan is ready" (~20x/day).
+  // Dedupe on related_entity_id = `week:${start}`; the owner has no real shift
+  // (HR bulk-allocates rows to him anyway), so he is never notified.
+  const weekKey = `week:${start}`;
+  const gapKey = `gap:${start}`;
+
+  let toNotify: string[] = [];
   if (employeesWithShift.size > 0) {
+    const { data: eligible } = await db
+      .from('employees')
+      .select('id')
+      .in('id', Array.from(employeesWithShift))
+      .eq('is_active', true)
+      .eq('uses_app', true)
+      .neq('role', 'owner');
+
+    const { data: already } = await db
+      .from('notifications')
+      .select('user_id')
+      .eq('type', 'weekly_shift_assigned')
+      .eq('related_entity_id', weekKey)
+      .limit(10000);
+    const alreadySet = new Set<string>((already ?? []).map((n: { user_id: string }) => n.user_id));
+
+    toNotify = (eligible ?? []).map((e: { id: string }) => e.id).filter((id: string) => !alreadySet.has(id));
+  }
+
+  if (toNotify.length > 0) {
     await notifyEmployees(db, {
-      employeeIds: Array.from(employeesWithShift),
+      employeeIds: toNotify,
       type: 'weekly_shift_assigned',
       title: 'Your shift plan is ready',
       body: `Your shifts for ${start} to ${end} have been assigned. Check the Shifts tab.`,
+      relatedEntityType: 'shift_week',
+      relatedEntityId: weekKey,
     });
   }
 
@@ -103,15 +133,29 @@ async function weeklyShiftNotify(db: ReturnType<typeof supabaseAdmin>) {
       .in('role', ['hr_admin', 'plant_head'])
       .eq('is_active', true);
 
+    // Once per week is enough for the gap alert too.
+    const { data: gapSent } = await db
+      .from('notifications')
+      .select('user_id')
+      .eq('type', 'shift_gap_alert')
+      .eq('related_entity_id', gapKey)
+      .limit(10000);
+    const gapSet = new Set<string>((gapSent ?? []).map((n: { user_id: string }) => n.user_id));
+    const gapRecipients = (hrAndPlantHead ?? [])
+      .map((e: { id: string }) => e.id)
+      .filter((id: string) => !gapSet.has(id));
+
     await notifyEmployees(db, {
-      employeeIds: (hrAndPlantHead ?? []).map((e: { id: string }) => e.id),
+      employeeIds: gapRecipients,
       type: 'shift_gap_alert',
       title: 'Shift plan incomplete',
       body: `${missing.length} active employee(s) have no shift assigned for ${start} to ${end}.`,
+      relatedEntityType: 'shift_week',
+      relatedEntityId: gapKey,
     });
   }
 
-  return { weekStart: start, weekEnd: end, notified: employeesWithShift.size, missing: missing.length };
+  return { weekStart: start, weekEnd: end, notified: toNotify.length, missing: missing.length };
 }
 
 interface ShiftWindow {
