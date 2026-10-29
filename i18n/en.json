@@ -1233,7 +1233,10 @@
     "notePlaceholder": "Reason for this decision",
     "confirm": "Confirm",
     "decided": "Decision recorded.",
-    "empty": "No half-day comp-offs awaiting decision"
+    "empty": "No half-day comp-offs awaiting decision",
+    "conflict": "HR chose: {{hr}}. Kajal chose: {{kajal}}. Please settle.",
+    "hrDone": "HR has decided. Waiting for Kajal.",
+    "kajalDone": "Kajal has decided. Waiting for HR."
   },
   "halfDayReview": {
     "title": "Half-day Comp-off Review",

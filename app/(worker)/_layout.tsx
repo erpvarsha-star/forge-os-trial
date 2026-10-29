@@ -66,6 +66,7 @@ export default function WorkerLayout() {
         <Tabs.Screen name="profile" options={{ href: null }} />
         <Tabs.Screen name="my-tasks" options={{ href: null }} />
         <Tabs.Screen name="pune-attendance" options={{ href: null }} />
+        <Tabs.Screen name="halfday-coff" options={{ href: null }} />
       </Tabs>
     </RoleGate>
   )

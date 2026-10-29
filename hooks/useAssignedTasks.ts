@@ -71,7 +71,7 @@ export interface ActionCounts {
   approvals: number
   needs_your_call: number
   fraud_alerts: number
-  /** hr_admin only (pending half-day comp-off decisions). */
+  /** hr_admin and Kajal (rows awaiting MY decision) (pending half-day comp-off decisions). */
   halfday_coff: number
   /** owner only (decided half-day comp-offs awaiting owner review). */
   halfday_review: number
@@ -135,6 +135,9 @@ export function computeBadges(group: BadgeGroup, c: ActionCounts) {
       return { more: n0(c.tasks_todo + c.tasks_to_confirm), approvals: n0(c.approvals), tasks: undefined, alerts: undefined }
     case 'supervisor':
       return { more: n0(c.tasks_todo + c.tasks_to_confirm), approvals: undefined, tasks: undefined, alerts: undefined }
+    case 'worker':
+      // Kajal (VFL1567) decides half-day comp-offs; the key is 0 for other members.
+      return { more: n0(c.tasks_todo + c.halfday_coff), approvals: undefined, tasks: undefined, alerts: undefined }
     default:
       return { more: n0(c.tasks_todo), approvals: undefined, tasks: undefined, alerts: undefined }
   }

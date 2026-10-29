@@ -14,9 +14,11 @@ import { TaskMenuRows } from '@/components/TaskMenuRows'
 import { removePushToken } from '@/lib/notifications'
 import { router, useFocusEffect } from 'expo-router'
 import {
-  FileText, User, Bell, Globe, LogOut, ChevronRight, Wallet, QrCode, ClipboardList
+  FileText, User, Bell, Globe, LogOut, ChevronRight, Wallet, QrCode, ClipboardList, CalendarClock
 } from 'lucide-react-native'
 import { TouchableOpacity } from 'react-native'
+import { useActionCountsStore } from '@/hooks/useAssignedTasks'
+import { useIsHalfDayCoffDecider } from '@/hooks/useHalfDayCoff'
 
 export default function WorkerMore() {
   const { t } = useTranslation()
@@ -26,6 +28,8 @@ export default function WorkerMore() {
   // Unread across old + new bell stores; re-fetched whenever this tab regains focus
   const { unreadCount, refresh: refreshBell } = useUnifiedNotifications()
   useFocusEffect(useCallback(() => { refreshBell() }, [refreshBell]))
+  const isCoffDecider = useIsHalfDayCoffDecider()
+  const halfdayCoffCount = useActionCountsStore(s => s.counts.halfday_coff)
 
   if (!employee) return <LoadingScreen />
 
@@ -41,6 +45,7 @@ export default function WorkerMore() {
     { icon: <Wallet size={20} color="#E65C00" />, label: 'common.advance', onPress: () => router.push('/(worker)/advance') },
     { icon: <QrCode size={20} color="#E65C00" />, label: 'worker.qrCheckIn', onPress: () => router.push('/(worker)/qr') },
     ...(employee.attendance_clerk_location ? [{ icon: <ClipboardList size={20} color="#E65C00" />, label: 'hrAdmin.puneAttendance', onPress: () => router.push('/(worker)/pune-attendance') }] : []),
+    ...(isCoffDecider ? [{ icon: <CalendarClock size={20} color="#E65C00" />, label: 'halfDayCoff.menuLabel', count: halfdayCoffCount, onPress: () => router.push('/(worker)/halfday-coff') }] : []),
     { icon: <Globe size={20} color="#E65C00" />, label: 'common.language', onPress: () => setShowLangModal(true), value: language === 'hi' ? 'हिंदी' : 'English' },
   ]
 

@@ -12,11 +12,16 @@ export interface HalfDayCoffRow {
   reason: string | null
   approved_at: string
   unused_ledger_days: number
+  hr_decided?: boolean
+  kajal_decided?: boolean
+  is_conflict?: boolean
+  hr_outcome?: HalfDayDecision | null
+  kajal_outcome?: HalfDayDecision | null
 }
 
 export type HalfDayDecision = 'deduct_full_day' | 'no_deduction'
 
-/** Pending half-day comp-off requests awaiting an HR / plant head decision. */
+/** Half-day comp-off requests awaiting MY decision (HR or Kajal); owner sees HR/Kajal conflicts. */
 export function useHalfDayCoff() {
   const [rows, setRows] = useState<HalfDayCoffRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -53,4 +58,17 @@ export function useHalfDayCoff() {
   }, [load])
 
   return { rows, isLoading, isRefreshing, loadError, refresh: () => load(true), decide }
+}
+
+/** True when the signed-in person is allowed to decide half-day comp-offs (HR or Kajal). */
+export function useIsHalfDayCoffDecider(): boolean {
+  const [ok, setOk] = useState(false)
+  useEffect(() => {
+    let alive = true
+    supabase.rpc('my_halfday_coff_decider').then(({ data, error }) => {
+      if (alive && !error) setOk(data === true)
+    })
+    return () => { alive = false }
+  }, [])
+  return ok
 }

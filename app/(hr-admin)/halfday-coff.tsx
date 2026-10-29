@@ -39,6 +39,15 @@ function CoffCard({
       <Text className="text-xs text-ink-500">{row.department ?? '—'}</Text>
       <Text className="text-sm text-ink-700 mt-2">{row.leave_date} · {t('halfDayCoff.usesHalfDay')}</Text>
       {row.reason ? <Text className="text-sm text-ink-600 mt-1">{row.reason}</Text> : null}
+      {row.is_conflict ? (
+        <Text className="text-sm font-semibold text-status-rejected mt-2">
+          {t('halfDayCoff.conflict', { hr: row.hr_outcome === 'deduct_full_day' ? t('halfDayCoff.deductFull') : t('halfDayCoff.noDeduction'), kajal: row.kajal_outcome === 'deduct_full_day' ? t('halfDayCoff.deductFull') : t('halfDayCoff.noDeduction') })}
+        </Text>
+      ) : row.hr_decided || row.kajal_decided ? (
+        <Text className="text-xs text-ink-500 mt-2">
+          {row.hr_decided ? t('halfDayCoff.hrDone') : t('halfDayCoff.kajalDone')}
+        </Text>
+      ) : null}
       <Text className="text-sm font-semibold text-brand-600 mt-2">
         {t('halfDayCoff.unusedDays', { count: row.unused_ledger_days })}
       </Text>
