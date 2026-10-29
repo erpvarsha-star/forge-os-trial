@@ -14,7 +14,7 @@ import { useActionCountsStore } from '@/hooks/useAssignedTasks'
 import { NotificationsMenuRow } from '@/components/NotificationsMenuRow'
 import { TaskMenuRows } from '@/components/TaskMenuRows'
 import { removePushToken } from '@/lib/notifications'
-import { LogOut, Globe, Crown, ChevronRight, Eye, CheckCircle, Clock, FileText, Table2, Gavel, Trophy, CalendarCheck } from 'lucide-react-native'
+import { LogOut, Globe, Crown, ChevronRight, Eye, CheckCircle, Clock, FileText, Table2, Gavel, Trophy, CalendarCheck, Scale } from 'lucide-react-native'
 import { BRAND } from '@/components/theme'
 
 export default function OwnerMore() {
@@ -25,6 +25,7 @@ export default function OwnerMore() {
   const approvalsCount = useActionCountsStore(s => s.counts.approvals)
   const nycCount = useActionCountsStore(s => s.counts.needs_your_call)
   const halfDayReviewCount = useActionCountsStore(s => s.counts.halfday_review)
+  const halfDayConflictCount = useActionCountsStore(s => s.counts.halfday_conflicts)
   if (!employee) return <LoadingScreen />
   const handleLogout = async () => { if (employee) await removePushToken(employee.id); await logout() }
   return (
@@ -61,6 +62,13 @@ export default function OwnerMore() {
           <Card className="flex-row items-center justify-between">
             <View className="flex-row items-center gap-3"><CalendarCheck size={20} color={BRAND[600]} /><Text className="text-base text-ink-900">{t('halfDayReview.menuLabel')}</Text></View>
             <View className="flex-row items-center gap-2"><CountPill count={halfDayReviewCount} /><ChevronRight size={18} color="#9CA3AF" /></View>
+          </Card>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => router.push('/(owner)/halfday-conflicts')} className="mb-2 min-h-touch">
+          <Card className="flex-row items-center justify-between">
+            <View className="flex-row items-center gap-3"><Scale size={20} color={BRAND[600]} /><Text className="text-base text-ink-900">{t('halfDayConflicts.menuLabel')}</Text></View>
+            <View className="flex-row items-center gap-2"><CountPill count={halfDayConflictCount} /><ChevronRight size={18} color="#9CA3AF" /></View>
           </Card>
         </TouchableOpacity>
 

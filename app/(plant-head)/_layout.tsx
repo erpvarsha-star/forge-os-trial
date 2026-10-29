@@ -26,6 +26,7 @@ export default function PlantHeadLayout() {
         <Tabs.Screen name="payslip" options={{ href: null }} />
         <Tabs.Screen name="my-tasks" options={{ href: null }} />
         <Tabs.Screen name="efficiency" options={{ href: null }} />
+        <Tabs.Screen name="halfday-conflicts" options={{ href: null }} />
         <Tabs.Screen name="notifications" options={{ href: null }} />
       </Tabs>
     </RoleGate>

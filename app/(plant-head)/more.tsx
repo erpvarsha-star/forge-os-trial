@@ -11,14 +11,17 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { UpdateAppLink } from '@/components/UpdateAppLink'
 import { NotificationsMenuRow } from '@/components/NotificationsMenuRow'
 import { TaskMenuRows } from '@/components/TaskMenuRows'
+import { CountPill } from '@/components/CountPill'
+import { useActionCountsStore } from '@/hooks/useAssignedTasks'
 import { removePushToken } from '@/lib/notifications'
-import { LogOut, Globe, Shield, ChevronRight, Eye, Clock, FileText, Table2, Mail, Gauge } from 'lucide-react-native'
+import { LogOut, Globe, Shield, ChevronRight, Eye, Clock, FileText, Table2, Mail, Gauge, Scale } from 'lucide-react-native'
 import { BRAND } from '@/components/theme'
 
 export default function PlantHeadMore() {
   const { t } = useTranslation()
   const router = useRouter()
   const { employee, logout } = useAuth()
+  const halfDayConflictCount = useActionCountsStore(s => s.counts.halfday_conflicts)
   const { language, toggleLanguage } = useLanguage(employee)
   if (!employee) return <LoadingScreen />
   const handleLogout = async () => { if (employee) await removePushToken(employee.id); await logout() }
@@ -38,6 +41,13 @@ export default function PlantHeadMore() {
         </Card>
 
         <TaskMenuRows group="plant-head" canAssign={true} teamTasksIsTab />
+
+        <TouchableOpacity onPress={() => router.push('/(plant-head)/halfday-conflicts')} className="mb-2 min-h-touch">
+          <Card className="flex-row items-center justify-between">
+            <View className="flex-row items-center gap-3"><Scale size={20} color={BRAND[600]} /><Text className="text-base text-ink-900">{t('halfDayConflicts.menuLabel')}</Text></View>
+            <View className="flex-row items-center gap-2"><CountPill count={halfDayConflictCount} /><ChevronRight size={18} color="#9CA3AF" /></View>
+          </Card>
+        </TouchableOpacity>
 
         <NotificationsMenuRow group="plant-head" />
 

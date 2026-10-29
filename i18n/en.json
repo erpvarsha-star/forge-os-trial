@@ -1248,5 +1248,16 @@
     "markReviewed": "Mark reviewed",
     "reviewed": "Reviewed",
     "empty": "No decided half-day comp-offs yet"
+  },
+  "halfDayConflicts": {
+    "title": "Half-day Comp-off Conflicts",
+    "menuLabel": "Half-day Comp-off Conflicts",
+    "hr": "HR",
+    "kajal": "Kajal",
+    "escalate": "Escalate to owner",
+    "escalateNote": "Note for the owner (optional)",
+    "escalated": "Escalated by the plant head",
+    "escalatedDone": "Escalated to the owner.",
+    "empty": "No HR/Kajal disagreements to settle"
   }
 }
