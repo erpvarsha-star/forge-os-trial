@@ -33,6 +33,11 @@ import { supabaseAdmin, getPlantConfig } from '../_shared/supabaseAdmin.ts';
 import { notifyEmployees } from '../_shared/push.ts';
 import { istNow } from '../_shared/istDate.ts';
 
+// Extra recipients (by emp_code) of the weekly 'Shift plan incomplete' alert,
+// in addition to every active hr_admin / plant_head. Owner decision 29 Oct 2026:
+// Kajal (VFL1567) must receive it too. Extend this list to add more people.
+const SHIFT_GAP_EXTRA_RECIPIENT_CODES = ['VFL1567'];
+
 /**
  * The upcoming Saturday-through-Thursday work week.
  *
@@ -130,7 +135,7 @@ async function weeklyShiftNotify(db: ReturnType<typeof supabaseAdmin>) {
     const { data: hrAndPlantHead } = await db
       .from('employees')
       .select('id')
-      .in('role', ['hr_admin', 'plant_head'])
+      .or(`role.in.(hr_admin,plant_head),emp_code.in.(${SHIFT_GAP_EXTRA_RECIPIENT_CODES.join(',')})`)
       .eq('is_active', true);
 
     // Once per week is enough for the gap alert too.
