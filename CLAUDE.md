@@ -2796,3 +2796,10 @@ Reply was "hr and kajal / yes / ok", confirmed by Yash as answers to Q1/Q2/Q3 in
 ## Owner decision of 29 Oct 2026 — October pay period (recorded the moment given)
 
 **"Salary will be calculated 1st October to 31st October."** The October 2026 pay period is the full calendar month, `start_date` 2026-10-01 to `end_date` 2026-10-31 (31 days), the same calendar-month convention as the existing periods (Apr–Sep rows are 1st..last day of the month). Attendance, OT, leave, feeds and the per-population runs all use that window; the 26–30 Sep arrears are a separate one-off attach (see arrears decision). No `pay_periods` row for October exists yet (latest is Sep, locked); it is created with the October run by HR/owner.
+
+## Owner answers of 29 Oct 2026 (afternoon, to the shift-notification follow-up) — recorded the moment given
+
+Reply "1 ok / 2 hr and kajal with notification if any shift entries not found", clarified by Yash via AskUserQuestion:
+1. **Half-day comp-off: BOTH must sign off — HR and Kajal (VFL1567).** The deduction/no-deduction outcome is applied only after both have decided; the owner still reviews decided ones. **Claude's design call (not Yash's words, change if wrong):** if HR and Kajal choose different outcomes, nothing is applied and the owner is notified to settle it. Supersedes the "single HR decision" built in PATCH_114.
+2. **Shift-gap alert recipients: HR, Kajal and the plant head** — the weekly "Shift plan incomplete" notification (employees with no shift entries for the coming Sat–Thu week) goes to hr_admin + plant_head + Kajal (VFL1567). Previously HR + plant head only.
+3. The 6 HR-bulk-allocated `employee_shifts` rows under the owner's name (31 Oct–5 Nov): Yash did not say to remove them; left untouched.
