@@ -2783,3 +2783,10 @@ Owner: **"approved but need claude opus to confirm also."** The proposed correct
 3. **Existing audit_log rows are NOT to be masked** (no rewrite of history). Forward masking (PATCH_116) stays.
 4. **Hindi hint wording approved** ("पिछले अनुमोदक ने N दिन प्रस्तावित किए").
 5. **Restart at 7 am IST confirmed** (wake-up already scheduled, trigger trig_01F2HA33Z7PqgU8ajhJVKSE8, 01:30 UTC 29 Oct).
+
+## Owner answers of 29 Oct 2026 (morning, to the three open questions) — recorded the moment given
+
+Reply was "hr and kajal / yes / ok", confirmed by Yash as answers to Q1/Q2/Q3 in order:
+1. **Half-day comp-off decision (Q1): "hr and kajal"** — the decision is made by HR **and Kajal (VFL1567)**, not a single HR actor; the owner still reviews decided ones. NOT yet built: today only HR decides (`decide_halfday_coff`). Open: how Kajal's part works (second sign-off vs either may decide) — asked in the next brief; do not change the RPC until answered.
+2. **Audit actor (Q2): yes** — audit rows must record the real acting person (use `current_employee_id()`), not NULL. To be built by a Sonnet agent, additive, rolled-back tests.
+3. **OD/COFF bucket (Q3): ok** — the Opus mapping is accepted: approved OD and COFF -> engine `plo`, `coalesce(granted_days, days)`, clipped to the pay period. TIMING unchanged from the earlier decision ("freeze when we see October salary calculation in November"): no feedSync change before the October calculate is reviewed, unless Yash says to do it earlier.
