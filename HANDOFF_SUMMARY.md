@@ -1,3 +1,5 @@
+> **SUPERSEDED (29 Oct 2026).** This 31 Aug 2026 summary is stale. Current state: `HANDOFF_KIMI_29Oct2026.md` and `CLAUDE.md` (authoritative). Do not act on anything below.
+
 # Forge OS Build 22-23 — Handoff Summary
 
 **Status:** All code complete. Ready for deployment. Waiting on your actions.

@@ -1,6 +1,8 @@
 # Forge OS — Kimi Code Handoff
 **Date:** 29 October 2026 · **Author:** Kimi Code (code-side assistant, session of 27–29 Oct)
 **Audience:** owner (Yash), the DB-side assistant ("Kimi"), Claude sessions, any future agent
+> **STATE NOTE (updated 29 Oct 2026 by Claude, owner-approved, Opus-reviewed):** sections 5, 6, 8, 9, 10 and 11 below were corrected for facts that changed after this handoff was written: PATCH_111 and PATCH_113 are APPLIED, comp-off is decided, the APK workflow is enabled, and key rotation is deferred by the owner. `CLAUDE.md` is authoritative where anything here conflicts.
+
 **Redaction:** codes and structure only; no names, no pay figures ≥ ₹1,000 (public repo rule).
 
 ---
@@ -68,24 +70,21 @@ All work is on branch `claude/forge-os-backend-setup-7woj4t` (merged via squash 
 
 ---
 
-## 5. Live vs prepared (deployment state, 29 Oct)
+## 5. Live vs prepared (deployment state, updated 29 Oct)
 
-**LIVE (verified):** PATCH_112 (`pay_runs.population`, 24 historical runs NULL) · `payroll-run` v9, `verify_jwt` true (per-category filter active; population runs create-able) · payslips Apr–Sep visible to all employees.
+**LIVE (verified):** PATCH_112 (`pay_runs.population`, 24 historical runs NULL) · `payroll-run` v9, `verify_jwt` true · payslips Apr-Sep visible to all employees · **PATCH_111 APPLIED 29 Oct** (bank/UAN/PAN backfill; 1 newer row filled; staging table dropped) · **PATCH_113 APPLIED 29 Oct** (leave system, ledger-aware comp-off) · PATCH_114/115/116 (HR Bank Details + Half-day Comp-off screens, HR red count, owner review of HR-decided half-day C-offs, forward audit masking of bank/PAN/UAN) · APK workflow re-enabled; apk-111 and apk-112 published.
 
-**PREPARED, NOT APPLIED (human steps, order matters):**
-1. `PATCH_111` (corrected) — needs the private values file at `D:\kimi\sheets-audit\_patch111_values.sql` (on the owner's machine only, never in git); owner pastes STEP 2.
-2. `PATCH_113` (corrected) — **blocked on one owner decision: the comp-off ledger draw rule** (§8). Recommendation: oldest-unexpired-unused rows first, 1 row = 1 whole day; half-day C-off blocked in v1 (ledger has no quantity column); shortfall allowed with warning, paid per grant.
-3. **Keep the Build Android APK workflow DISABLED until PATCH_113 is applied** — the merged leave UI calls the new RPC, so the next APK would break leave approvals. apk-106 (published) predates the leave code and is fine.
+**Comp-off rule (owner, 29 Oct):** a whole-day C-off draws the oldest unexpired unused ledger rows (1 row = 1 day); a whole-day shortfall is BLOCKED; a half-day C-off is never auto-consumed, it is recorded as pending, HR decides, and the owner reviews the decided ones.
 
----
+**Remaining human steps:** owner runs `drop function review_leave_request_v53_old(uuid, boolean, text);` in the SQL Editor (the MCP tool cannot execute DROP); HR fills the Bank Details task (due 3 Nov; blank bank cells never hold an employee out of payroll); install the latest APK.
 
 ## 6. Known gaps / findings not yet closed
 
 - **Leave data not in app** (5 rows vs 659) → the leave-import build (queued; spec locked in §4 items 3–4; produces the per-person balance table + gaps report + review-only SQL).
 - **DOJ/designation columns absent** → additive import from HR OS employee master (unblocks payslip headers).
-- **UAN/PAN partial** (10 active rows) → folded into PATCH_111.
-- **OD/C-off paid treatment** — the payroll feed doesn't count them as paid days; real rows exist (14/9). Decision rides with the comp-off ruling.
-- **Bank-details maintenance path** — no in-app screen; owner decision: small owner/hr_admin screen vs dashboard edits.
+- **UAN/PAN partial** (10 active rows) → folded into PATCH_111 (applied 29 Oct).
+- **OD/C-off paid treatment** — the payroll feed doesn't count them as paid days; real rows exist (14/9). **DEFERRED by the owner (29 Oct) to the November review of the October calculation**; no feedSync change before then.
+- **Bank-details maintenance path** — CLOSED 29 Oct: HR More -> Bank Details screen built (PATCH_114); task assigned to HR, due 3 Nov.
 - **Shift-time conflict** — sheet shift master (08:30/60-min grace) vs app shifts (07:00/15-min, PATCH_38); owner must confirm app times before the sheet freezes.
 - **Salary-sheet CSV layout** — generic union-of-keys, not a workbook mirror; owner acceptance pending.
 - **Statutory formats** unvalidated against EPFO/ESIC — CA review before filing.
@@ -107,7 +106,7 @@ All work is on branch `claude/forge-os-backend-setup-7woj4t` (merged via squash 
 
 ## 8. Development design (how further work is built)
 
-- **Boundaries (frozen):** engine math untouchable (adjustments via feeds); additive-only DB; redacted repo; APK builds owner-gated; nothing to main; Supabase writes only by humans.
+- **Boundaries (frozen):** engine math untouchable (adjustments via feeds); additive-only DB; redacted repo; APK builds owner-gated; nothing to main; Supabase writes only by humans, or by Claude with the owner's explicit approval in chat (PATCH_111-116 were applied that way); DROP only with recorded owner approval.
 - **Safety protocol (owner-mandated):** verify from ≥2 sources → read-only dry-run (PATCH_111's dry-run caught a wrong approach before it shipped) → review-only PR → transaction + preview + rollback in SQL → nothing auto-applied → full gate on every branch.
 - **Delegation pattern (owner instruction):** briefed subagents do reads/builds, report back; **I independently verify** (diffs, live probes, re-run gates) before reporting — this caught the two-assistant worktree collision and the patch defects this cycle.
 - **Testing:** the gate suites (engine 58, feedsync 51, warnings, decide-warning, statutory, payslip, amount-in-words, category 13, leave-form 21) are the arbiter; new logic ships with new tests.
@@ -116,27 +115,28 @@ All work is on branch `claude/forge-os-backend-setup-7woj4t` (merged via squash 
 
 ---
 
-## 9. Open decisions for the owner (numbered)
+## 9. Open decisions for the owner (numbered; status 29 Oct)
 
-1. **Comp-off ledger draw rule** (blocks PATCH_113) — recommendation in §5.2.
-2. **OD/C-off paid treatment in the payroll feed** (with #1).
+1. ~~Comp-off ledger draw rule~~ DECIDED 29 Oct (see section 5).
+2. **OD/C-off paid treatment in the payroll feed** - DEFERRED to the November review of the October calculation.
 3. **Leave-data review:** say "pull the leave review pack" for the read-only per-person comparison before balance treatment is finalized.
-4. **Bank-details maintenance path** — in-app screen vs dashboard edits.
-5. **Shift-time conflict** — confirm app shift times (07:00/15-min grace) are the real ones.
-6. **Salary-sheet CSV layout** — accept generic layout or request per-category mirrors.
-7. **Half-day C-off** allowed or whole-days-only in v1.
-8. Housekeeping: apk-106 install status · HR advances approval · revoke the Anthropic key pasted in the other chat (re-enter via dashboard only).
+4. ~~Bank-details maintenance path~~ DONE 29 Oct (HR Bank Details screen).
+5. **Shift-time conflict** - confirm app shift times (07:00/15-min grace) are the real ones.
+6. **Salary-sheet CSV layout** - accept generic layout or request per-category mirrors.
+7. ~~Half-day C-off~~ DECIDED 29 Oct (HR decides, owner reviews decided ones; never auto-consumed).
+8. Housekeeping: install the latest APK; HR advances approval (VFL5324, VFL1556 + "10000 months" typo); owner runs the DROP of `review_leave_request_v53_old` in the SQL Editor.
 
 ## 10. Access & hygiene
 
-- **GitHub:** fine-grained PAT `kimi-code-forgeos` (repo `forge-os-trial` only; contents+PR), stored in this machine's git origin; expires per its 90-day setting. **Rotate the Supabase PAT** (`sbp_fcc9…`) and the GitHub PAT after the October run — both have appeared in chat. The service-role key derived during verification lived only in this machine's temp dir; revoke concern is low but rotation of the above two is due.
+- **GitHub:** fine-grained PAT `kimi-code-forgeos` (repo `forge-os-trial` only; contents+PR), stored in this machine's git origin; expires per its 90-day setting. **Key rotation (Supabase PAT, GitHub PAT, Anthropic key):** the owner deferred rotation until everything is built and working (29 Oct) and does not want a new key issued to Claude in the meantime. Do not push it before then. The service-role key derived during verification lived only in this machine's temp dir.
 - **Supabase:** project `odfwtdpvpfzdrznvurru` (Free tier, owner decision to stay).
 - **Local artifacts:** `D:\kimi\sheets-audit\` (xlsx exports, audit JSONs, `_patch111_values.sql` — back this up; it is the only copy of the bank import values).
 
-## 11. Queued work (after the October run)
+## 11. Queued work (after the October run; updated 29 Oct)
 
-1. Leave data import (reconciliation + gaps report + review-only SQL) — on owner's word.
+1. Leave data import (reconciliation + gaps report + review-only SQL) - on owner's word.
 2. DOJ/designation + remaining UAN/PAN import files.
-3. PATCH_113 apply (after decision #1) → then re-enable APK workflow + build → Kajal device test → leave flow end-to-end on device.
-4. Sheet-retirement confirmations per checklist row (owner/HR sign-offs) → HR OS retires **last**.
-5. **Goal 2 (KPI/performance monitor):** role-differentiated KPIs fed by in-app daily production-report entry, weekly reports, monthly reconciliation — parked scope incl. ops dashboard, energy/consumables, gate pass + medical (process flow to be explained by owner before building).
+3. ~~PATCH_113 apply / re-enable APK workflow~~ DONE 29 Oct (apk-111/112 published). Remaining: Kajal device test (optional) and leave flow on a device (owner: not required).
+4. Sheet-retirement confirmations per checklist row (owner/HR sign-offs) -> HR OS retires **last**.
+5. November review of the October calculation: settle OD/C-off paid mapping (deferred), late-marking review, closed data-gap items.
+6. **Goal 2 (KPI/performance monitor):** role-differentiated KPIs fed by in-app daily production-report entry, weekly reports, monthly reconciliation - parked scope incl. ops dashboard, energy/consumables, gate pass + medical (process flow to be explained by owner before building).

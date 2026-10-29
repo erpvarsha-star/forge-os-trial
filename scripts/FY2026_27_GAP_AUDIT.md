@@ -62,7 +62,7 @@ re-verified. App side: read-only Supabase probes 28 Oct (SELECT only, per owner 
 Every row above answered; gaps imported via additive `scripts/PATCH_*.sql` files (never re-run
 imports that already landed); audit table shows zero confirmed sheet-only gaps for Apr 2026 → audit date.
 
-*Sheet-side + app-side audit COMPLETE 28 Oct 2026. Awaiting: human review/run of PATCH_111; owner decisions (OD/C-off paid treatment, bank-details maintenance path, export layout, shift-time conflict); October run by owner/HR after 31 Oct with stage verification via OCT2026_RUN_VERIFICATION.sql.*
+*Sheet-side + app-side audit COMPLETE 28 Oct 2026 (statuses refreshed 29 Oct: PATCH_111 and PATCH_113 applied, bank-details path built, OD/C-off paid mapping deferred to the November review). Awaiting: owner decisions (export layout, shift-time conflict); October run by owner/HR after 31 Oct with stage verification via OCT2026_RUN_VERIFICATION.sql.*
 
 
 ## Full-schema inventory (28 Oct, read-only) — 78 tables enumerated
@@ -70,7 +70,7 @@ imports that already landed); audit table shows zero confirmed sheet-only gaps f
 **Salary-front state, live-verified:**
 | Area | Tables | State |
 |---|---|---|
-| People + masters | employees (154), employee_salary_structure (121), salary_change_requests (3 pending) | ✅ in line (PATCH_111 bank fix pending human run) |
+| People + masters | employees (154), employee_salary_structure (121), salary_change_requests (3 pending) | ✅ in line (PATCH_111 bank fix APPLIED 29 Oct) |
 | Pay runs | pay_periods (6 = Apr–Sep), pay_runs (24 archived), pay_run_items (652), pay_run_warnings (0 — no Oct run yet) | ✅ in line |
 | Payroll history | payroll_records (536 = Apr–Aug import), payroll_monthly_rates (1 = Oct 103) | ✅ in line |
 | Extras / recurring | recurring_adjustments (1 = Kajal, active) | ✅ in line |
@@ -82,18 +82,18 @@ imports that already landed); audit table shows zero confirmed sheet-only gaps f
 | **Schema gaps** | designation / date_of_joining ABSENT; public_holidays (table EXISTS, 0 rows) | 🔴 import needs ADD COLUMN; holidays need entry if used |
 | Legacy / parked | salary_advances (0, orphan — documented), worker_efficiency_actuals (0, superseded), attendance_regularisation / attendance_warnings / role_kpis / role_kras (0, future scaffolding) | ⚪ no action |
 
-**Verdict: the salary front is in line for the October run** — engine, lifecycle, masters, advances, statutory config, archived history all verified. Remaining before/around the run: (1) PATCH_111 human-run; (2) HR enters October feeds (efficiency % is the critical one); (3) leave import build (on owner word); (4) DOJ/designation + UAN/PAN import files; (5) owner decisions (OD/C-off → lands in existing comp_off_balance; bank path; export layout; shift conflict).
+**Verdict: the salary front is in line for the October run** — engine, lifecycle, masters, advances, statutory config, archived history all verified. Remaining before/around the run: (1) ~~PATCH_111 human-run~~ done 29 Oct; (2) HR enters October feeds (efficiency % is the critical one); (3) leave import build (on owner word); (4) DOJ/designation + UAN/PAN import files; (5) owner decisions (OD/C-off paid mapping DEFERRED to the November review of the October calculation; bank path settled 29 Oct; export layout; shift conflict).
 
 ## October runbook + owner process decisions (28-29 Oct)
 - **Payslips Apr–Sep: ALREADY LIVE in-app** (verified 28 Oct: all 24 runs archived incl. 4 September population runs; `my_payslips()` serves them). No push needed for visibility; retroactive payslip_ready bell rows = optional one-off patch, owner decision.
 - **Canteen/society/efficiency for October: enter IN APP** (recommended, awaiting owner confirm) — HR Payroll Feeds + plant-head Efficiency; data arrives by 5 Nov. HR OS = read-only fallback record. BUNG02/06 deductions also via app adjustments.
-- **BUNG early release 2 Nov: lifecycle constraint flagged** — finalize locks the whole October run permanently, so finalizing on 2 Nov would freeze staff/worker items without feeds. Options: (a) verified preview figures on 2 Nov, bank release with everyone ≥5 Nov (recommended); (b) manual BUNG payment as documented exception, reconciled against the formal run. Owner to pick.
+- **SETTLED 29 Oct: BUNG release is via the per-category PUNE_STAFF run (PATCH_112/payroll-run v9), verified Kajal → HR → accounts, ~2 Nov; the options below are historical.** BUNG early release 2 Nov: lifecycle constraint flagged — finalize locks the whole October run permanently, so finalizing on 2 Nov would freeze staff/worker items without feeds. Options: (a) verified preview figures on 2 Nov, bank release with everyone ≥5 Nov (recommended); (b) manual BUNG payment as documented exception, reconciled against the formal run. Owner to pick.
 - **No unexplained gaps in salary sheets** beyond the resolved Pune-Aug absence. Known gap list unchanged (leave import, OD/C-off, DOJ/designation, bank fields, UAN/PAN).
 - **Per-person leave balance table = the leave-import build** (spec locked); not yet generated.
 
 ## Cross-assistant coordination state (29 Oct)
 - **LIVE (verified by Kimi Code read-only 29 Oct):** PATCH_112 applied (`pay_runs.population` present, 24 historical runs NULL) · payroll-run v9 deployed (unauth call → 401; hash match verified by Claude) · `comp_off_balance` confirmed a per-earning LEDGER (employee_id, earned_date, expiry_date, is_used, used_in_leave_request_id — no quantity column, so 1 row = 1 day).
 - **REPO BASE now carries the corrected patch copies** (PR #37 merged 29 Oct): PATCH_111 staging table gets RLS + API-grant revoke + comma-FROM UPDATE fix (the JOIN-on-target form errors 42P01); PATCH_113 drops the 3-arg review_leave_request before the 4-arg create (prevents PGRST203 ambiguity for apk-106 callers) + COFF branch documented as KNOWN GAP.
-- **STILL NOT APPLIED (human):** PATCH_111 (needs the private values file at D:/kimi/sheets-audit/_patch111_values.sql — owner pastes STEP 2) · PATCH_113 (owner decision pending on the comp-off ledger draw rule).
-- **Comp-off draw rule recommendation (awaiting owner):** consume oldest-unexpired-unused rows first, 1 row = 1 whole day; half-day C-off: v1 block (request whole days) or consume 1 row and record 0.5 in leave_consumption — owner picks; shortfall (granted > unused rows): allow with warning, paid per grant (sheet-consistent), HR trues the ledger later.
-- **APK risk:** the merged leave UI calls p_granted_days / consume_leave_for_request which exist only after PATCH_113 — the Build Android APK workflow should stay DISABLED until 113 is applied (next APK would break leave approvals). apk-106 predates the leave code and is unaffected.
+- **UPDATED 29 Oct: both are now APPLIED** (PATCH_111 29 Oct, 1 newer row filled, staging dropped; PATCH_113 29 Oct with a ledger-aware comp-off branch; PATCH_114/115/116 built: HR Bank Details + Half-day Comp-off screens, owner review screen, audit masking). Historical text follows. PATCH_111 (needs the private values file at D:/kimi/sheets-audit/_patch111_values.sql — owner pastes STEP 2) · PATCH_113 (owner decision pending on the comp-off ledger draw rule).
+- **DECIDED 29 Oct (owner): whole-day C-off draws oldest-unexpired-unused ledger rows; whole-day shortfall is BLOCKED (not allowed-with-warning); half-day C-off is never auto-consumed, HR decides and the owner reviews decided ones. OD/C-off paid-day mapping in the payroll feed is DEFERRED to the November review.** Original recommendation:  consume oldest-unexpired-unused rows first, 1 row = 1 whole day; half-day C-off: v1 block (request whole days) or consume 1 row and record 0.5 in leave_consumption — owner picks; shortfall (granted > unused rows): allow with warning, paid per grant (sheet-consistent), HR trues the ledger later.
+- **RESOLVED 29 Oct: PATCH_113 is live and the APK workflow is re-enabled (apk-111/112 published).** Historical risk note: the merged leave UI calls p_granted_days / consume_leave_for_request which exist only after PATCH_113 — the Build Android APK workflow should stay DISABLED until 113 is applied (next APK would break leave approvals). apk-106 predates the leave code and is unaffected.

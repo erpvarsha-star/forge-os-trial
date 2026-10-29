@@ -5,7 +5,7 @@ Forge OS is a LIVE plant app (React Native/Expo, bilingual EN/HI, 7 roles, PIN a
 People on the shop floor use it daily. Breaking it is not acceptable.
 
 ## Absolute rules
-1. **Never touch live Supabase.** No migrations are applied by agents. SQL changes go in
+1. **Never touch live Supabase.** No migrations are applied by agents, with one narrow exception: Claude may apply a patch live only with the owner's explicit approval in chat. DROP statements are run only with recorded owner approval. SQL changes go in
    `scripts/PATCH_XX_<name>_<date>.sql` as ADDITIVE-ONLY patches (no DROP, no DELETE of
    existing tables/columns, no rewrites). A human runs them manually after review.
 2. **Never commit secrets.** No `.env`, no service-role keys, no tokens. Blanked
@@ -15,17 +15,18 @@ People on the shop floor use it daily. Breaking it is not acceptable.
    Do not change calculation logic. If you think it's wrong, open an issue instead.
 4. **Run the regression suite before every PR:**
    `npx tsx scripts/payroll-engine.sept2026.test.ts` — must print `0 failed`.
-5. **One task = one branch = one PR** into `claude/payroll-lifecycle`. Never push to
-   `main` or `claude/forge-os-backend-setup-7woj4t` directly.
+5. **One task = one branch = one PR** into `claude/forge-os-backend-setup-7woj4t` (the base branch; `claude/payroll-lifecycle` is
+   merged and dead). Never push to `main` directly.
 6. **No new dependencies** without stating why in the PR description.
 7. UI text must be bilingual (EN/HI) following existing screens' pattern.
 
 ## Decided business rules (do not relitigate)
 - Payroll cycle: full calendar month. October 2026 = 1–31 Oct; 26–30 Sep 2026 paid as
   a one-time arrears adjustment line in the October run.
-- Worker OT rate VDA basis: CURRENT rate (103 x working days). MASTER_SNAPSHOT mode
-  exists only to reproduce legacy sheets in tests.
-- Weekly off: Waluj plant = Friday; Pune office = Sunday. A worked weekly-off day is
+- Worker OT rate (owner, 27 Oct 2026): OT hourly = 2 x (basic + flat VDA master) / working
+  days / 8. VDA *earnings* stay 103/day x present days (the flat master is not put in the
+  earning line).
+- Weekly off: Friday off for everyone, except Kajal (VFL1567) whose weekly off is Sunday. A worked weekly-off day is
   entered as PRESENT, with extra hours via OT.
 - Working days are COMPUTED (`workingDaysInMonth`), never hand-entered.
 - Pay run lifecycle is DB-enforced; finalized runs are immutable — corrections via
