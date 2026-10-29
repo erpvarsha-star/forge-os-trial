@@ -1,9 +1,9 @@
 -- PATCH_117 - leave: atomic consumption at final approval, approved-days validation,
 -- search_path hardening (29 Oct 2026). Record file (no personal data).
---   STATUS: sections 1-4 APPLIED live 29 Oct 2026 (helper was applied earlier; wrapper + review_leave_request + revokes later the same day).
---   Section 5 (owner auto-approved insert trigger) was SENT but its confirmation timed out (the MCP tool treats DROP TRIGGER as destructive):
---   NOT CONFIRMED APPLIED - verify with: select tgname from pg_trigger where tgname='trg_leave_requests_autoconsume';
---   Rolled-back functional tests were NOT run (tool blocked after the timeout) - see PENDING.md.
+--   STATUS: ALL sections 1-5 APPLIED live 29 Oct 2026 and TESTED (rolled back, zero residue) by Claude.
+--   Tests passed: 2-day EL manager>HR 1.5>plant head => granted 1.5, balance -1.5, 1 consumption row, no explicit consume; granted 0/-1/2.3/over-request rejected; whole-day COFF marks 1 ledger row; over-ledger COFF blocked; half-day COFF => half_day_pending_decision, ledger untouched; 2nd consume idempotent; owner auto-approved request consumes at insert (trigger), pending request does not.
+--
+--
 --   A2: review_leave_request now consumes the balance in the SAME transaction as the final
 --       approval (via private _consume_leave); consume_leave_for_request stays as a
 --       role-checked, idempotent wrapper (the existing app call becomes a no-op).
