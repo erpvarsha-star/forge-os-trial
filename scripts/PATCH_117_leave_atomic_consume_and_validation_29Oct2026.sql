@@ -1,5 +1,9 @@
 -- PATCH_117 - leave: atomic consumption at final approval, approved-days validation,
--- search_path hardening (29 Oct 2026). APPLIED LIVE 29 Oct 2026. Record file (no personal data).
+-- search_path hardening (29 Oct 2026). Record file (no personal data).
+--   STATUS: sections 1-4 APPLIED live 29 Oct 2026 (helper was applied earlier; wrapper + review_leave_request + revokes later the same day).
+--   Section 5 (owner auto-approved insert trigger) was SENT but its confirmation timed out (the MCP tool treats DROP TRIGGER as destructive):
+--   NOT CONFIRMED APPLIED - verify with: select tgname from pg_trigger where tgname='trg_leave_requests_autoconsume';
+--   Rolled-back functional tests were NOT run (tool blocked after the timeout) - see PENDING.md.
 --   A2: review_leave_request now consumes the balance in the SAME transaction as the final
 --       approval (via private _consume_leave); consume_leave_for_request stays as a
 --       role-checked, idempotent wrapper (the existing app call becomes a no-op).
@@ -203,7 +207,7 @@ begin
     end if;
     update leave_requests
       set status = 'approved', current_stage = v_stage + 1, approved_by = current_employee_id(),
-          approved_at = now(), granted_days = coalesce(p_granted_days, v_prev_grant, v_days)
+          approved_at = now(), granted_days = v_grant
       where id = p_id;
     -- atomic balance consumption (idempotent via leave_consumption unique(request_id))
     perform public._consume_leave(p_id);
@@ -220,3 +224,21 @@ $$;
 revoke execute on function public._consume_leave(uuid) from public, anon, authenticated;
 revoke execute on function public.consume_leave_for_request(uuid) from public, anon;
 revoke execute on function public.review_leave_request(uuid, boolean, text, numeric) from public, anon;
+
+
+-- 5) owner / no-chain requests are inserted already 'approved' (leave_requests_set_chain) and never pass
+--    through review_leave_request, so consume at insert time. NOT CONFIRMED APPLIED (see header).
+create or replace function public.leave_requests_autoconsume()
+returns trigger language plpgsql security definer set search_path = public
+as $$
+begin
+  if new.status = 'approved' and coalesce(array_length(new.approval_chain, 1), 0) = 0 then
+    perform public._consume_leave(new.id);
+  end if;
+  return null;
+end;
+$$;
+revoke execute on function public.leave_requests_autoconsume() from public, anon, authenticated;
+-- (run once; if the trigger already exists, skip) :
+create trigger trg_leave_requests_autoconsume after insert on public.leave_requests
+  for each row execute function public.leave_requests_autoconsume();

@@ -3,6 +3,11 @@
 --
 -- STATUS: APPLIED 29 Oct 2026 (superseded in part by PATCH_117: atomic consumption, validation,
 -- search_path; this file is kept in sync with the live definitions as of PATCH_117).
+-- LIVE NOTES: the old 3-arg review_leave_request was renamed to review_leave_request_v53_old (execute revoked) because the
+-- MCP tool cannot DROP; the owner then dropped it in the SQL Editor. Execute is revoked from public/anon on the new
+-- review_leave_request(uuid,boolean,text,numeric) and consume_leave_for_request. Comp-off: whole days draw the oldest
+-- unexpired ledger rows (shortfall BLOCKED); half-day COFF -> source 'half_day_pending_decision', no ledger movement.
+-- Date logic uses IST ((now() at time zone 'Asia/Kolkata')::date), never bare current_date.
 -- ADDITIVE ONLY: no DROP, no DELETE, no rewrites of existing columns.
 --
 -- Reproduces the owner's leave sheet behavior in-app:
