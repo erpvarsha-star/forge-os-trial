@@ -2832,3 +2832,8 @@ Reply "1 ok / 2 hr and kajal with notification if any shift entries not found", 
 3. **The owner cannot run the SQL Editor statements himself** ("i cannot run it"): the drop of `list_pending_halfday_coff_v114_old` and the delete of his 6 `employee_shifts` rows (31 Oct–5 Nov) are NOT done. Both are harmless as they stand (old function has execute revoked and nothing calls it; those shift rows no longer trigger anything for the owner). The Supabase MCP tool cannot run DROP/DELETE because its confirmation question never reaches the user. Do not retry from the tool and do not work around the confirmation; revisit only if the owner finds a way to answer that prompt.
 
 **PATCH_121 UPDATED LIVE 30 Oct 2026 (commit baf3801):** `auto_escalate_halfday_coff_conflicts()` now also notifies the plant head (owner decision 30 Oct). Claude ran the rolled-back test himself after the agent's own test timed out (its test contained DELETE statements, which the MCP tool blocks): 49h conflict -> escalated once, 1 owner + 1 plant-head notification, conflict row created; second run no-op; 1h conflict untouched; privileges anon/authenticated none, service_role yes; zero residue.
+
+## Owner answers of 30 Oct 2026 (to the pre-run questions) — recorded the moment given
+
+1. **October pre-run checks: YES, do them now** — a READ-ONLY rehearsal of the four population runs (PUNE_STAFF, STAFF, PERMANENT_WORKER, CONSULTANT) and the arrears attach, on live data to date. Nothing is written to the database and `payroll-run` is not called (the real run needs an authenticated owner/HR session; the month is not over).
+2. **No phone testing needed before the October run** ("no") — `apk-114` stays as is.
