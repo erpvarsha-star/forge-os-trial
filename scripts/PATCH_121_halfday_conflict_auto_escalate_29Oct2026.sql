@@ -1,4 +1,6 @@
 -- PATCH_121 (29 Oct 2026) - APPLIED live 29 Oct 2026 via the Supabase tool.
+-- UPDATED 30 Oct 2026: also notifies the plant head (owner decision 30 Oct). Applied live 30 Oct; the
+-- rolled-back test for the plant-head notification has NOT been run yet (see end of file).
 -- Owner decision: a half-day comp-off conflict (HR vs Kajal) the plant head has not resolved within
 -- 2 days (48 hours; Claude's default - owner gave no number) auto-escalates to the owner.
 -- The delay lives in ONE place: v_escalate_after inside the function. Additive; no DROP/DELETE.
@@ -9,7 +11,7 @@ create or replace function public.auto_escalate_halfday_coff_conflicts()
 returns integer language plpgsql security definer set search_path = public as $$
 declare
   v_escalate_after interval := interval '48 hours';  -- the ONE place the auto-escalation delay lives
-  r record; o record; v_n int := 0;
+  r record; o record; ph record; v_n int := 0;
 begin
   for r in
     select lc.request_id, lc.employee_id, e.name
@@ -33,6 +35,12 @@ begin
           'HR and Kajal disagree on ' || coalesce(r.name,'employee') || ' and the plant head did not decide within 48 hours - please settle.',
           'halfday_coff_conflict', 'leave_request', r.request_id::text);
       end loop;
+      for ph in select id from employees where role = 'plant_head' and is_active loop
+        insert into notifications(user_id, title, body, type, related_entity_type, related_entity_id)
+        values (ph.id, 'Half-day comp-off conflict auto-escalated to the owner',
+          'HR and Kajal disagree on ' || coalesce(r.name,'employee') || ' and nobody decided within 48 hours, so it went to the owner.',
+          'halfday_coff_conflict', 'leave_request', r.request_id::text);
+      end loop;
       v_n := v_n + 1;
     end if;
   end loop;
@@ -49,3 +57,7 @@ select cron.schedule('halfday-coff-auto-escalate','7 * * * *','select public.aut
 -- E_agree_row=false; run2_returned=0; notifs_new_run1=1; notifs_new_run2=0; A_rows=1
 -- Residue after rollback: leave_requests 5, leave_consumption 0, comp_off_balance 0, notifications 14042,
 -- audit_log 139, half_day_coff_decisions 0, half_day_coff_conflicts 0 (identical to before).
+
+-- 30 Oct 2026: plant-head change applied; privileges re-asserted (anon=false, authenticated=false, service_role=true).
+-- Rolled-back test for the plant-head notification: NOT RUN (the test DO block contained cleanup DELETEs, which the tool's
+-- confirmation blocked and timed out; to be re-written without DELETE, relying on the final raise exception to roll back).
