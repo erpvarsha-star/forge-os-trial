@@ -2824,3 +2824,9 @@ Reply "1 ok / 2 hr and kajal with notification if any shift entries not found", 
 3. **Delete the 6 HR-bulk-allocated `employee_shifts` rows under the owner's name (31 Oct–5 Nov): "yes delete".**
 
 **PATCH_121 APPLIED LIVE 29 Oct 2026 (auto-escalation, commit 7e267f0).** `auto_escalate_halfday_coff_conflicts()` (service_role only; 48 h constant `v_escalate_after`; 48 h is Claude's default, owner gave no number) escalates unresolved plant-head-stage half-day comp-off conflicts to the owner (note 'Auto-escalated after 48h without a plant head decision', owner notified once, idempotent). pg_cron job `halfday-coff-auto-escalate`, `7 * * * *`, active. Claude verified live: privileges (anon/authenticated none, service_role yes), job row, zero residue; agent's rolled-back test passed (49h escalated; 1h, already-escalated, settled, agreed untouched; rerun no-op). Plant head is NOT told of the auto-escalation (owner-only, as built).
+
+## Owner answers of 30 Oct 2026 (to the PATCH_121 questions) — recorded the moment given
+
+1. **48 hours before a half-day comp-off conflict auto-escalates to the owner: confirmed ("yes").**
+2. **Fazal (plant head) IS also told when a conflict is auto-escalated** ("yes"). Change to `auto_escalate_halfday_coff_conflicts()` queued (plant head gets a notification in addition to the owner).
+3. **The owner cannot run the SQL Editor statements himself** ("i cannot run it"): the drop of `list_pending_halfday_coff_v114_old` and the delete of his 6 `employee_shifts` rows (31 Oct–5 Nov) are NOT done. Both are harmless as they stand (old function has execute revoked and nothing calls it; those shift rows no longer trigger anything for the owner). The Supabase MCP tool cannot run DROP/DELETE because its confirmation question never reaches the user. Do not retry from the tool and do not work around the confirmation; revisit only if the owner finds a way to answer that prompt.
