@@ -2841,3 +2841,10 @@ Reply "1 ok / 2 hr and kajal with notification if any shift entries not found", 
 ## Owner decision of 31 Oct 2026 — monthly consultants ARE paid overtime (recorded the moment given)
 
 Supersedes the 27 Oct "monthly consultants: no OT" answer. Owner: consultants' formula must accommodate extra hours, using the basis in the old Consultant sheet. Sheet evidence (VFPL Consultant Salary Sheet v1): OT = master gross / days in month / 8 x OT hours, 1x (daily-rate consultants: daily rate / 8 x hours, unchanged). The `CONSULTANT_OT` hold in `calcSimple` (engine.ts) is removed (commit 38ca865; engine regression 61/0, feedsync 51/0); monthly CON05/09/12/13 now use the same formula as PUNE_STAFF. **`payroll-run` must be redeployed (verify_jwt true) before the October run, otherwise the live v9 still holds them.** Also noted: the sandbox was reset on 31 Oct (empty checkout) — re-fetch the branch if `ls` shows no files; tsc in a fresh sandbox shows 2 env errors (missing expo base config), not the 7 baseline.
+
+## Owner answers of 31 Oct 2026 (to the pre-run rehearsal questions) — recorded the moment given
+
+1. **Redeploy `payroll-run` with the monthly-consultant OT change: YES** (Sonnet deploy agent launched; verify_jwt true; Claude diffs the deployed source afterwards).
+2. **Kajal enters the October BUNG attendance once she has seen the screen** (apk-115 has the OT/travel clerk screen) — owner will have her start after she sees it.
+3. **Holiday (20 Oct), VFL1520, staff OT and zero-attendance people: "refer to the past months and build your formulas accordingly"** — the rules must be derived from how the Apr–Sep (and festival-month 2025) sheets treated each case, not invented. Research + rules recorded in the report that follows.
+4. **Process: Claude first hands HR the ENTIRE attendance + salary-calculation sheet (all populations); HR then decides pay / not pay per person.** The review workbook contains names and pay figures, so it is delivered to the owner directly and is never committed to this public repo.
