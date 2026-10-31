@@ -2837,3 +2837,7 @@ Reply "1 ok / 2 hr and kajal with notification if any shift entries not found", 
 
 1. **October pre-run checks: YES, do them now** — a READ-ONLY rehearsal of the four population runs (PUNE_STAFF, STAFF, PERMANENT_WORKER, CONSULTANT) and the arrears attach, on live data to date. Nothing is written to the database and `payroll-run` is not called (the real run needs an authenticated owner/HR session; the month is not over).
 2. **No phone testing needed before the October run** ("no") — `apk-114` stays as is.
+
+## Owner decision of 31 Oct 2026 — monthly consultants ARE paid overtime (recorded the moment given)
+
+Supersedes the 27 Oct "monthly consultants: no OT" answer. Owner: consultants' formula must accommodate extra hours, using the basis in the old Consultant sheet. Sheet evidence (VFPL Consultant Salary Sheet v1): OT = master gross / days in month / 8 x OT hours, 1x (daily-rate consultants: daily rate / 8 x hours, unchanged). The `CONSULTANT_OT` hold in `calcSimple` (engine.ts) is removed (commit 38ca865; engine regression 61/0, feedsync 51/0); monthly CON05/09/12/13 now use the same formula as PUNE_STAFF. **`payroll-run` must be redeployed (verify_jwt true) before the October run, otherwise the live v9 still holds them.** Also noted: the sandbox was reset on 31 Oct (empty checkout) — re-fetch the branch if `ls` shows no files; tsc in a fresh sandbox shows 2 env errors (missing expo base config), not the 7 baseline.
