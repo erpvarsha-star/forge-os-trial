@@ -5,6 +5,8 @@
  *   calcStaff (gs ~6100), calcWorker (~6178), calc_simple_ (~6282),
  *   calc_pf_ (~6087), calc_mlwf_ (~6091), ptAmount (~5819), efficiencySlab (~5841).
  *
+ * Monthly CONSULTANT OT is PAID (owner decision 31 Oct 2026): gross / days / 8 x hours, x1.
+ *
  * Verified against actual September 2026 payouts:
  *   19 PERMANENT_WORKER + 7 CONSULTANT rows reproduce paid nets exactly
  *   (see scripts/payroll-engine.sept2026.test.ts).
@@ -132,13 +134,10 @@ function calcSimple(input: PayrollInput, cfg: EngineConfig): PayrollResult {
   } else {
     if (rp.monthlyGross == null) { res.blockers.push('MISSING_RATE'); return finish(res); }
     gross = r2(rp.monthlyGross * w / wd);
+    // OWNER DECISION 31 Oct 2026: monthly consultants ARE paid OT, same formula as
+    // PUNE_STAFF and the old Consultant sheet: master gross / days in month / 8 x hours, x1.
     if (input.otHours > 0) {
-      if (input.category === 'CONSULTANT') {
-        res.blockers.push('CONSULTANT_OT'); // consultants cannot be paid OT
-        otPay = 0;
-      } else {
-        otPay = r2((rp.monthlyGross / wd / 8) * input.otHours); // PUNE_STAFF x1
-      }
+      otPay = r2((rp.monthlyGross / wd / 8) * input.otHours); // PUNE_STAFF + monthly CONSULTANT x1
     }
   }
   // No PF / ESI / PT / MLWF for consultant categories.

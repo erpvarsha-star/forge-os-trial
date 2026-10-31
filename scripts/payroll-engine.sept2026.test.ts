@@ -52,12 +52,28 @@ for (const f of CONSULTANTS) {
   };
   const r = calculateOne(input, SNAPSHOT);
   if (f.emp === 'CON24') {
-    // Open conflict: legacy paid him daily-rate, rate profile says MONTHLY + OT -> engine must HOLD.
-    check('CON24 held (CONSULTANT_OT blocker)', r.held && r.blockers.includes('CONSULTANT_OT'), JSON.stringify(r.blockers));
+    // Owner decision 31 Oct 2026: monthly consultants are paid OT = gross/days/8 x hours (legacy paid 187.5 daily-rate style).
+    const wantOt = Math.round((15000 / 31 / 8) * 3 * 100) / 100;
+    check('CON24 paid OT (not held)', !r.held && r.blockers.length === 0 && close(r.otPay, wantOt, 0.005), `got ${r.otPay} want ${wantOt} ${JSON.stringify(r.blockers)}`);
     continue;
   }
   check(`${f.emp} gross`, close(r.earnings.GROSS ?? 0, f.paidGross, 0.02), `got ${r.earnings.GROSS} want ${f.paidGross}`);
   check(`${f.emp} ot`, close(r.otPay, f.paidOT, 0.02), `got ${r.otPay} want ${f.paidOT}`);
+}
+
+console.log('== Monthly consultant OT (owner decision 31 Oct 2026) ==');
+{
+  const mk = (ot: number): PayrollInput => ({
+    empCode: 'CONTEST', category: 'CONSULTANT', month: 10, year: 2026, workingDays: 31,
+    rateProfile: { basis: 'MONTHLY_GROSS_PRORATED', monthlyGross: 20000 },
+    days: { present: 31, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: ot, deductions: { canteen: 0, society: 0, advance: 0 },
+  });
+  const wantOt = Math.round((20000 / 31 / 8) * 10 * 100) / 100;
+  const r0 = calculateOne(mk(0)), r10 = calculateOne(mk(10));
+  check('monthly consultant 10h OT: no blocker, not held', !r10.held && r10.blockers.length === 0, JSON.stringify(r10.blockers));
+  check(`monthly consultant 10h OT = ${wantOt}`, r10.otPay === wantOt && r10.earnings.OT === wantOt, `got ${r10.otPay}`);
+  check('monthly consultant OT added to net', close((r10.netPay ?? 0) - (r0.netPay ?? 0), wantOt, 0.005), `net ${r10.netPay} vs ${r0.netPay}`);
 }
 
 console.log('== State machine sanity ==');
