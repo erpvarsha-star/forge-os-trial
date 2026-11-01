@@ -2848,3 +2848,13 @@ Supersedes the 27 Oct "monthly consultants: no OT" answer. Owner: consultants' f
 2. **Kajal enters the October BUNG attendance once she has seen the screen** (apk-115 has the OT/travel clerk screen) — owner will have her start after she sees it.
 3. **Holiday (20 Oct), VFL1520, staff OT and zero-attendance people: "refer to the past months and build your formulas accordingly"** — the rules must be derived from how the Apr–Sep (and festival-month 2025) sheets treated each case, not invented. Research + rules recorded in the report that follows.
 4. **Process: Claude first hands HR the ENTIRE attendance + salary-calculation sheet (all populations); HR then decides pay / not pay per person.** The review workbook contains names and pay figures, so it is delivered to the owner directly and is never committed to this public repo.
+
+## Owner answers of 1 Nov 2026 (to the six review-sheet questions; recorded the moment given)
+
+(Replies came as six short lines, mapped in order by Claude — re-ask if a mapping is wrong.)
+1. **Overtime-hours source:** owner asked "which separate one?" — i.e. which report the sheet takes OT hours from. Not yet decided; explained in chat (the Overtime form's "Monthwise OT Report" that the sheet's OT tab imports). **Still open: pay on report hours or on app punch hours.**
+2. **20 Oct 2026 WAS a paid holiday** ("yes it was paid holiday"). Rule from past months: +1 paid day for staff, workers and Pune with at least one present day; consultants excluded (their sheet has no holiday column). Applied as 'H' attendance rows (engine maps H to PH) — not yet written to the DB.
+3. **VFL1520:** reply was just "need" — unclear, asked again. Until answered: no change for him (stays held NET_NEGATIVE).
+4. **The five weekly-off-only people (VFL1557, VFL5439, VFL5457, VFL4072, CON24): "do nothing"** — no attendance is invented for them; they stay as computed (zero) in the HR review sheet and HR decides.
+5. **Weekly-off days count as paid only for people who actually worked ("yes applies to people who work"):** a WO day with no present day in the period is NOT paid, and a person with zero earned days gets no advance instalment deducted that month (matches the Sep 2026 sheet). Needs a small feedSync change (queued).
+6. **Monthly consultants (CON05/09/12/13) ARE paid overtime ("yes they should be paid")** — confirms the 31 Oct decision.
