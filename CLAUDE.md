@@ -2879,3 +2879,12 @@ Supersedes the 27 Oct "monthly consultants: no OT" answer. Owner: consultants' f
 1. **YES — move overtime and the 20 Oct holiday OUT of the payroll core into the extras report.** Payroll then pays only days worked + salary (plus the existing after-engine items the owner already defined: recurring allowance, BUNG OT/travel, advances, deductions). Overtime, holiday pay, worked Fridays and any other special case are proposed in the separate Extras report; HR approves each line; approved lines flow into pay as approved positive adjustments.
 2. **A completed 12-hour shift = 4 hours of overtime** (12 minus 8). General overtime = hours above 8 in a day.
 3. **The 590 check-outs with no overtime value: calculate their overtime from the stored check-in/check-out times (hours above 8) and put it in the Extras report** — no database write; the app's `overtime_hours` column is not backfilled.
+
+## Owner answers of 1 Nov 2026 (evening, to the October sheet-vs-app comparison; recorded the moment given)
+
+(Answers came as four short lines to the first four worker-side questions; mapped by Claude in order — re-ask if a mapping is wrong.)
+1. **Diwali 15,000 in the sheets' "Diwali Advance" slot is an ADVANCE that gets RECOVERED, not a payment/earning** (17 workers + 4 staff: VFL1453, VFL5237, VFL5465, VFL5466 on the staff side). It must be entered/recovered as an advance, never as an approved positive extra. **The 21,000 "Other Allowance" on VFL4063 is NOT confirmed — the owner will check it himself.** Open: how the Diwali advance is recovered (instalments / which months) was not given.
+2. **Pay-days basis (app punches vs HR sheet days): NOT answered** — owner needs names with emp_codes per person before deciding; a named table was produced 1 Nov.
+3. **Worker production allowance stays on PRESENT days / 26 (frozen U5 rule); the sheet's /25 with HR day credit is not followed.**
+4. **Yes — overtime, 20 Oct holiday and other special items are entered by HR as approved extras (Extras report route); Diwali items are advances, not extras** (see 1).
+5. The nine staff-side gaps were put forward 1 Nov; owner asked for names WITH codes in every list from now on (chat only; names still never go in the public repo).
