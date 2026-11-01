@@ -2873,3 +2873,9 @@ Supersedes the 27 Oct "monthly consultants: no OT" answer. Owner: consultants' f
 4. **BUNG had NO holiday on 20 Oct — they all worked.** Kajal enters them as present; no 'H' rows for BUNG (this answers the open BUNG-20-Oct question).
 5. **757 h of overtime dated 26-30 Sep = 5 days** (201 form entries) — owner's question; those days belong to September, not to the 1-31 Oct pay period.
 6. **590 check-outs without overtime data (owner asked what it means):** the overtime value was never computed for them (see chat explanation); to be calculated from stored check-in/out times under the owner's >8 h rule once he confirms.
+
+## Owner answers of 1 Nov 2026, fourth batch (recorded the moment given)
+
+1. **YES — move overtime and the 20 Oct holiday OUT of the payroll core into the extras report.** Payroll then pays only days worked + salary (plus the existing after-engine items the owner already defined: recurring allowance, BUNG OT/travel, advances, deductions). Overtime, holiday pay, worked Fridays and any other special case are proposed in the separate Extras report; HR approves each line; approved lines flow into pay as approved positive adjustments.
+2. **A completed 12-hour shift = 4 hours of overtime** (12 minus 8). General overtime = hours above 8 in a day.
+3. **The 590 check-outs with no overtime value: calculate their overtime from the stored check-in/check-out times (hours above 8) and put it in the Extras report** — no database write; the app's `overtime_hours` column is not backfilled.
