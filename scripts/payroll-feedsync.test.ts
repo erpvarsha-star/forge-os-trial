@@ -173,5 +173,38 @@ check('daily with null daily_rate -> warning', cr.warnings.includes('CON18: dail
   check('pickSalary: other employee ignored', pickSalary(rows, 'zzz', '2026-10-31') === null);
 }
 
+// ---- Weekly-off paid only if worked (owner decision 1 Nov 2026) ----
+{
+  const att = (id: string, d: number, status: string) => ({ employee_id: id, date: `2026-10-${String(d).padStart(2, '0')}`, status, overtime_hours: 0, check_in_time: null, check_out_time: null });
+  const emp = (id: string, code: string, cat: string) => ({ id, emp_code: code, name: code, category: cat, work_location: 'Aurangabad', gender: 'M', is_active: true, weekly_off_day: null });
+  const adv = (id: string) => ({ employee_id: id, monthly_deduction: 1000, outstanding_balance: 5000, status: 'approved' });
+  const wob: FeedBundle = {
+    ...bundle,
+    employees: [emp('a', 'VFL1101', 'staff'), emp('b', 'VFL1102', 'staff'), emp('c', 'VFL1103', 'staff'), emp('d', 'VFL1104', 'staff'), emp('e', 'VFL4101', 'worker')],
+    salaries: [], punches: [], canteen: [], society: [], efficiency: [], statusEvents: [],
+    attendance: [
+      att('a', 2, 'WO'), att('a', 9, 'WO'),
+      att('b', 1, 'P'), att('b', 2, 'P'), att('b', 9, 'WO'),
+      att('c', 2, 'WO'), att('c', 9, 'WO'),
+      att('d', 2, 'WO'), att('d', 9, 'WO'),
+      att('e', 1, 'P'), att('e', 9, 'WO'),
+    ],
+    leaves: [{ employee_id: 'd', type: 'EL', start_date: '2026-10-12', end_date: '2026-10-14', days: 3, status: 'approved' }],
+    advances: [adv('a'), adv('c'), adv('d')],
+  };
+  const wr = assemblePayrollInputs(2026, 10, wob);
+  const g = (c: string) => wr.inputs.find((i) => i.empCode === c)!;
+  check('WO only (no present) -> weekOff 0', g('VFL1101').days.weekOff === 0 && g('VFL1101').days.present === 0);
+  check('WO only + advance -> advance 0 + warning', g('VFL1101').deductions.advance === 0
+    && wr.warnings.includes('VFL1101: no paid days - advance instalment skipped'));
+  check('P days + WO -> WO counted', g('VFL1102').days.weekOff === 1 && g('VFL1102').days.present === 2);
+  check('zero-paid employee with advance (c) -> advance 0', g('VFL1103').deductions.advance === 0
+    && wr.warnings.includes('VFL1103: no paid days - advance instalment skipped'));
+  check('only approved EL + WO -> EL paid, WO ignored', g('VFL1104').days.el === 3 && g('VFL1104').days.weekOff === 0);
+  check('EL-only employee still has advance deducted, no warning', g('VFL1104').deductions.advance === 1000
+    && !wr.warnings.some((w) => w.startsWith('VFL1104') && w.includes('advance')));
+  check('worker unchanged (present + WO input kept, wd 26)', g('VFL4101').days.present === 1 && g('VFL4101').workingDays === 26);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

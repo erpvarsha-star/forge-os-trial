@@ -213,6 +213,10 @@ export function assemblePayrollInputs(year: number, month: number, feeds: FeedBu
       else if (t.includes('casual') || t === 'cl') day.cl += d;
       else if (t.includes('sick') || t === 'sl') day.sl += d;
     }
+    // Owner decision 1 Nov 2026: weekly-off days are paid only for people who actually worked
+    // (P/L/HL) in the period. No present day -> WO ignored (leave and PH untouched).
+    if (day.present === 0) day.weekOff = 0;
+    const paidDays = day.present + day.ph + day.el + day.cl + day.sl + day.plo + day.weekOff;
 
     // Reconciliation: admin entry vs punches
     for (const a of att) {
@@ -235,6 +239,9 @@ export function assemblePayrollInputs(year: number, month: number, feeds: FeedBu
     const advance = feeds.advances
       .filter((a) => a.employee_id === emp.id && a.status === 'approved')
       .reduce((s, a) => s + Math.min(num(a.monthly_deduction), num(a.outstanding_balance)), 0);
+    // Zero paid days (no present day, no approved leave, no PH): no pay, so no advance instalment.
+    const advanceFinal = paidDays === 0 && advance > 0 ? 0 : advance;
+    if (paidDays === 0 && advance > 0) warnings.push(`${emp.emp_code}: no paid days - advance instalment skipped`);
     // Adjustments (PATCH_91): approved negative amounts -> deductions.other.
     // Positive amounts (ARREARS / DISPATCH_INCENTIVE / OTHER_ALLOWANCE / ENCASHMENT)
     // have no engine input yet — warn loudly instead of silently dropping them.
@@ -276,7 +283,7 @@ export function assemblePayrollInputs(year: number, month: number, feeds: FeedBu
       masters: cat === 'STAFF' || cat === 'PERMANENT_WORKER' ? (sal ? mastersFrom(sal, cat) : undefined) : undefined,
       rateProfile,
       days: day, otHours, efficiencyPct,
-      deductions: { canteen, society, advance, other: otherDeduction || undefined },
+      deductions: { canteen, society, advance: advanceFinal, other: otherDeduction || undefined },
       ptExempt: emp.pt_exempt === true,
       gender: (() => { const g = (emp.gender ?? '').trim().toLowerCase(); return g === 'female' || g === 'f' ? 'F' : 'M'; })(),
     });
