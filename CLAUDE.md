@@ -2858,3 +2858,9 @@ Supersedes the 27 Oct "monthly consultants: no OT" answer. Owner: consultants' f
 4. **The five weekly-off-only people (VFL1557, VFL5439, VFL5457, VFL4072, CON24): "do nothing"** — no attendance is invented for them; they stay as computed (zero) in the HR review sheet and HR decides.
 5. **Weekly-off days count as paid only for people who actually worked ("yes applies to people who work"):** a WO day with no present day in the period is NOT paid, and a person with zero earned days gets no advance instalment deducted that month (matches the Sep 2026 sheet). Needs a small feedSync change (queued).
 6. **Monthly consultants (CON05/09/12/13) ARE paid overtime ("yes they should be paid")** — confirms the 31 Oct decision.
+
+## Owner answers of 1 Nov 2026, second batch (recorded the moment given)
+
+1. **Overtime hours: "we need to compare and see which one is right and why there is such a difference"** — no choice yet between the Overtime report's hours (5,116.5 h) and the app's punch-derived hours (820 h); a read-only comparison + root cause is being produced first. Payroll keeps using app hours until the owner decides.
+2. **VFL1520: "leave 1520 without doing anything"** — no special handling, no exit processing, no data change for him. (Side effect of the general 1 Nov rule, not special-casing: with zero paid days he computes to 0 and no advance instalment, instead of being held negative.) The 126 report overtime hours against his leave status stays a flag for HR.
+3. **20 Oct 2026: owner authorised Claude to enter it as a paid holiday** ("you can enter it as paid holiday"): 'H' attendance rows for active staff, workers and Pune staff who have at least one present day in October and no row on 20 Oct; consultants excluded; never overwrite an existing row. BUNG have no attendance yet, so their H rows wait until Kajal has entered October.
