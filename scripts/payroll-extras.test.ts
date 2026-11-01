@@ -142,5 +142,34 @@ const ctx = (feeds: ExtrasFeeds) => ({ periodStart: PS, periodEnd: PE, feeds });
   }
 }
 
+// ---- 1 Nov 2026: APPROVED_EXTRAS (HR-approved positive payroll_adjustments, paid after the engine) ----
+{
+  const adj = (o: Record<string, unknown> = {}) => ({ employee_id: 'e1', adjustment_type: 'OTHER_ALLOWANCE', signed_amount_inr: 1200, approval_status: 'approved', reason: 'Worked Friday', ...o });
+  const base = calculateOne(staffIn());
+  const f = (a: ReturnType<typeof adj>[]): ExtrasFeeds => ({ recurring: [], attendance: [], salaries: [], adjustments: a as any });
+  const one = calculateWithExtras(staffIn(), 'e1', ctx(f([adj()])), DEFAULT_ENGINE_CONFIG);
+  check('APPROVED_EXTRAS: earnings line after engine', one.result.earnings.APPROVED_EXTRAS === 1200);
+  check('APPROVED_EXTRAS: label from reason', one.items[0]?.key === 'APPROVED_EXTRAS' && one.items[0].label === 'Worked Friday');
+  check('APPROVED_EXTRAS: raises totalEarnings and net', near(one.result.totalEarnings, base.totalEarnings + 1200) && near(one.result.netPay!, base.netPay! + 1200));
+  check('APPROVED_EXTRAS: extraTotal = 1200 (statutory exclusion basis)', one.extraTotal === 1200);
+  const again = calculateWithExtras(staffIn(), 'e1', ctx(f([adj()])), DEFAULT_ENGINE_CONFIG);
+  check('APPROVED_EXTRAS: once only on recalculation', JSON.stringify(again.result) === JSON.stringify(one.result));
+  const multi = calculateWithExtras(staffIn(), 'e1', ctx(f([adj(), adj({ signed_amount_inr: 300, reason: 'OT' })])), DEFAULT_ENGINE_CONFIG);
+  check('APPROVED_EXTRAS: several rows summed into one line, generic label', multi.result.earnings.APPROVED_EXTRAS === 1500 && multi.items.length === 1 && multi.items[0].label === 'Approved extras');
+  const ign = calculateWithExtras(staffIn(), 'e1', ctx(f([adj({ approval_status: 'pending' }), adj({ approval_status: 'rejected' }), adj({ employee_id: 'other' })])), DEFAULT_ENGINE_CONFIG);
+  check('pending / rejected / other-employee adjustments ignored', ign.result.earnings.APPROVED_EXTRAS === undefined && ign.extraTotal === 0 && JSON.stringify(ign.result) === JSON.stringify(base));
+  const neg = calculateWithExtras(staffIn(), 'e1', ctx(f([adj({ signed_amount_inr: -500 })])), DEFAULT_ENGINE_CONFIG);
+  check('negative adjustment: not an extra (handled via deductions.other in feedSync)', neg.result.earnings.APPROVED_EXTRAS === undefined && neg.extraTotal === 0);
+  const held = calculateWithExtras(staffIn({ masters: undefined }), 'e1', ctx(f([adj()])), DEFAULT_ENGINE_CONFIG);
+  check('held employee gets no APPROVED_EXTRAS', held.result.held === true && held.items.length === 0 && held.result.earnings.APPROVED_EXTRAS === undefined);
+  const sv = buildSlipView({ id: 'x', employee_id: 'e1', month: '10', year: 2026, net_pay: one.result.netPay, earnings_lines: one.result.earnings, deduction_lines: one.result.deductions, category: 'STAFF' } as any, { name: 'T', empCode: 'X' });
+  check('payslip STAFF: Approved Extras printed, balanced', sv.earnings.some((x) => x.key === 'APPROVED_EXTRAS') && sv.adjustment === 0 && near(sv.totalEarnings, one.result.totalEarnings));
+  // PUNE BUNG OT/travel unchanged alongside
+  const pn = { ...staffIn(), category: 'PUNE_STAFF' as const, empCode: 'BUNG01', masters: undefined, rateProfile: { basis: 'MONTHLY_GROSS_PRORATED' as const, monthlyGross: 20000 } };
+  const pf: ExtrasFeeds = { recurring: [], attendance: [{ employee_id: 'e1', date: '2026-10-03', ot_hours: 2, outstation_travel: true }], salaries: [sal('e1', { ot_rate: 100 })], adjustments: [adj() as any] };
+  const pr = calculateWithExtras(pn, 'e1', ctx(pf), DEFAULT_ENGINE_CONFIG);
+  check('PUNE: BUNG_OT 200 + travel 250 unchanged, plus APPROVED_EXTRAS 1200', pr.result.earnings.BUNG_OT === 200 && pr.result.earnings.OUTSTATION_TRAVEL === 250 && pr.result.earnings.APPROVED_EXTRAS === 1200 && pr.extraTotal === 1650, JSON.stringify(pr.result.earnings));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

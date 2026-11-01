@@ -84,6 +84,7 @@ const LABELS: Record<string, LabelDef> = {
   OT: { key: W('payslipOvertime'), en: 'Overtime' },
   DISPATCH: { key: W('payslipDispatchIncentive'), en: 'Dispatch Incentive' },
   OTHER_ALLOWANCE: { key: W('payslipOtherAllowance'), en: 'Other Allowance' },
+  APPROVED_EXTRAS: { key: W('payslipApprovedExtras'), en: 'Approved Extras' },
   BUNG_OT: { key: W('payslipOvertime'), en: 'Overtime' },
   OUTSTATION_TRAVEL: { key: W('payslipOutstationTravel'), en: 'Outstation travel' },
   LEAVE_ENCASHMENT: { key: W('payslipLeaveEncashment'), en: 'Leave Encashment' },
@@ -120,7 +121,7 @@ export const LAYOUTS: Record<SlipCategory, CategoryLayout> = {
   // Staff template (doc 1T7kwVNm...): Present, Weekly Off, EL, CL, SL, PH, Days Payable.
   STAFF: {
     kind: 'staff',
-    earnings: ['BASIC', 'HRA', 'CONVEYANCE', 'EDUCATION', 'MEDICAL', 'PRO_DEV', 'COMMUNICATION', 'UNIFORM', 'WASHING', 'ARREARS', 'ARREARS_SEP26_30', 'OT', 'DISPATCH', 'OTHER_ALLOWANCE'],
+    earnings: ['BASIC', 'HRA', 'CONVEYANCE', 'EDUCATION', 'MEDICAL', 'PRO_DEV', 'COMMUNICATION', 'UNIFORM', 'WASHING', 'ARREARS', 'ARREARS_SEP26_30', 'OT', 'DISPATCH', 'OTHER_ALLOWANCE', 'APPROVED_EXTRAS'],
     alwaysEarn: ['BASIC'],
     deductions: ['PF', 'ESI', 'PT', 'MLWF', 'ADVANCE', 'SOCIETY', 'TDS', 'CANTEEN', 'OTHER'],
     alwaysDed: ['PF'],
@@ -132,7 +133,7 @@ export const LAYOUTS: Record<SlipCategory, CategoryLayout> = {
   // deductions add Production Allowance Offset, no TDS.
   PERMANENT_WORKER: {
     kind: 'worker',
-    earnings: ['BASIC', 'HRA', 'CONVEYANCE', 'WASHING', 'EDUCATION', 'HEAT', 'VDA', 'PROD_ALLOWANCE', 'ARREARS', 'ARREARS_SEP26_30', 'OT', 'DISPATCH', 'OTHER_ALLOWANCE', 'LEAVE_ENCASHMENT'],
+    earnings: ['BASIC', 'HRA', 'CONVEYANCE', 'WASHING', 'EDUCATION', 'HEAT', 'VDA', 'PROD_ALLOWANCE', 'ARREARS', 'ARREARS_SEP26_30', 'OT', 'DISPATCH', 'OTHER_ALLOWANCE', 'APPROVED_EXTRAS', 'LEAVE_ENCASHMENT'],
     alwaysEarn: ['BASIC'],
     deductions: ['PF', 'ESI', 'PT', 'MLWF', 'ADVANCE', 'SOCIETY', 'PROD_OFFSET', 'CANTEEN', 'OTHER'],
     alwaysDed: ['PF'],
@@ -141,7 +142,7 @@ export const LAYOUTS: Record<SlipCategory, CategoryLayout> = {
   // TODO: awaiting owner template (Pune staff). Simple fallback: GROSS + OT.
   PUNE_STAFF: {
     kind: 'flat',
-    earnings: ['GROSS', 'ARREARS', 'ARREARS_SEP26_30', 'OT', 'BUNG_OT', 'OUTSTATION_TRAVEL', 'OTHER_ALLOWANCE'],
+    earnings: ['GROSS', 'ARREARS', 'ARREARS_SEP26_30', 'OT', 'BUNG_OT', 'OUTSTATION_TRAVEL', 'OTHER_ALLOWANCE', 'APPROVED_EXTRAS'],
     alwaysEarn: [],
     deductions: ['PF', 'ESI', 'PT', 'MLWF', 'ADVANCE', 'SOCIETY', 'TDS', 'CANTEEN', 'OTHER'],
     alwaysDed: [],
@@ -150,7 +151,7 @@ export const LAYOUTS: Record<SlipCategory, CategoryLayout> = {
   // TODO: awaiting owner template (Consultant). Simple fallback: GROSS + OT.
   CONSULTANT: {
     kind: 'flat',
-    earnings: ['GROSS', 'ARREARS', 'ARREARS_SEP26_30', 'OT', 'OTHER_ALLOWANCE'],
+    earnings: ['GROSS', 'ARREARS', 'ARREARS_SEP26_30', 'OT', 'OTHER_ALLOWANCE', 'APPROVED_EXTRAS'],
     alwaysEarn: [],
     deductions: ['PF', 'ESI', 'PT', 'MLWF', 'ADVANCE', 'SOCIETY', 'TDS', 'CANTEEN', 'OTHER'],
     alwaysDed: [],

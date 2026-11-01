@@ -149,7 +149,9 @@ function statusEffect(st: string): { present?: number; weekOff?: number; ph?: nu
     case 'l': case 'late': return { present: 1, late: true };
     case 'hl': case 'half_day': return { present: 0.5 };
     case 'wo': case 'week_off': case 'weekly_off': return { weekOff: 1 };
-    case 'h': case 'ph': case 'holiday': return { ph: 1 };
+    // Owner decision 1 Nov 2026: holiday pay is an HR-approved extra, not a payroll-core rule.
+    // 'H' / 'PH' / 'holiday' rows are neutral here (no paid-day effect).
+    case 'h': case 'ph': case 'holiday': return {};
     case 'el': return { el: 1 };
     case 'cl': return { cl: 1 };
     case 'sl': return { sl: 1 };
@@ -189,7 +191,7 @@ export function assemblePayrollInputs(year: number, month: number, feeds: FeedBu
     // Attendance aggregation (admin-entered statuses; live codes P/L/HL/WO)
     const att = feeds.attendance.filter((a) => a.employee_id === emp.id && a.date >= periodStart && a.date <= periodEnd);
     const day = { present: 0, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 };
-    let otHours = 0;
+    const otHours = 0; // always 0: OT lives in the Extras report, not the core (1 Nov 2026)
     let lateDays = 0;
     for (const a of att) {
       const eff = statusEffect((a.status || '').toLowerCase());
@@ -198,7 +200,8 @@ export function assemblePayrollInputs(year: number, month: number, feeds: FeedBu
       day.ph += eff.ph ?? 0;
       day.el += eff.el ?? 0; day.cl += eff.cl ?? 0; day.sl += eff.sl ?? 0; day.plo += eff.plo ?? 0;
       if (eff.late) lateDays++;
-      otHours += num(a.overtime_hours);
+      // Owner decision 1 Nov 2026: overtime is NOT computed by the payroll core; it arrives as
+      // HR-approved positive adjustments (APPROVED_EXTRAS). attendance overtime_hours is ignored here.
     }
     if (lateDays > 0) {
       warnings.push(`${emp.emp_code}: ${lateDays} late day(s) counted as present — apply late-deduction policy separately`);
@@ -241,19 +244,12 @@ export function assemblePayrollInputs(year: number, month: number, feeds: FeedBu
     // Zero paid days (no present day, no approved leave, no PH): no pay, so no advance instalment.
     const advanceFinal = paidDays === 0 && advance > 0 ? 0 : advance;
     if (paidDays === 0 && advance > 0) warnings.push(`${emp.emp_code}: no paid days - advance instalment skipped`);
-    // Adjustments (PATCH_91): approved negative amounts -> deductions.other.
-    // Positive amounts (ARREARS / DISPATCH_INCENTIVE / OTHER_ALLOWANCE / ENCASHMENT)
-    // have no engine input yet — warn loudly instead of silently dropping them.
+    // Adjustments (PATCH_91): approved negative amounts -> deductions.other. Approved POSITIVE
+    // amounts are paid after the engine as the APPROVED_EXTRAS earning (lib/payroll/extraEarnings.ts).
     const adj = (feeds.adjustments ?? []).filter((a) => a.employee_id === emp.id && a.approval_status === 'approved');
     const otherDeduction = adj
       .filter((a) => num(a.signed_amount_inr) < 0)
       .reduce((s, a) => s + Math.abs(num(a.signed_amount_inr)), 0);
-    const unappliedPositive = adj.filter((a) => num(a.signed_amount_inr) > 0);
-    if (unappliedPositive.length) {
-      warnings.push(`${emp.emp_code}: ${unappliedPositive.length} approved positive adjustment(s) (₹${
-        unappliedPositive.reduce((s, a) => s + num(a.signed_amount_inr), 0)
-      }) not applied — engine has no earnings-adjustment input yet`);
-    }
     // Efficiency: per-employee override, else plant-wide, else undefined (engine warns)
     const effRows = feeds.efficiency.filter((e) => e.approval_status === 'approved');
     const effMine = effRows.find((e) => e.employee_id === emp.id) ?? effRows.find((e) => e.employee_id === null);

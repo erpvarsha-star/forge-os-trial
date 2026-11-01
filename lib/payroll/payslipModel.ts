@@ -42,6 +42,7 @@ export const L: Record<string, BiLabel> = {
   ARREARS: { en: 'Arrears', hi: 'बकाया राशि' },
   ARREARS_SEP26_30: { en: 'Arrears (26–30 Sep bridge)', hi: 'बकाया (26–30 सितंबर)' },
   OTHER_ALLOWANCE: { en: 'Other Allowance', hi: 'अन्य भत्ता' },
+  APPROVED_EXTRAS: { en: 'Approved Extras', hi: 'मंजूर अतिरिक्त राशि' },
   BUNG_OT: { en: 'Overtime', hi: 'अतिकालिक काम' },
   OUTSTATION_TRAVEL: { en: 'Outstation travel', hi: 'बाहरगाव प्रवास भत्ता' },
   PF: { en: 'Employee PF', hi: 'भविष्य निधि (PF)' },
@@ -66,10 +67,10 @@ export const L: Record<string, BiLabel> = {
 };
 
 const EARNING_ORDER: Record<string, string[]> = {
-  STAFF: ['BASIC', 'HRA', 'CONVEYANCE', 'MEDICAL', 'EDUCATION', 'PRO_DEV', 'COMMUNICATION', 'UNIFORM', 'WASHING', 'ARREARS_SEP26_30', 'ARREARS', 'OT', 'OTHER_ALLOWANCE'],
-  PERMANENT_WORKER: ['BASIC', 'HRA', 'CONVEYANCE', 'WASHING', 'EDUCATION', 'HEAT', 'VDA', 'PROD_ALLOWANCE', 'ARREARS_SEP26_30', 'ARREARS', 'OT', 'OTHER_ALLOWANCE'],
-  CONSULTANT: ['GROSS', 'ARREARS_SEP26_30', 'ARREARS', 'OT', 'OTHER_ALLOWANCE'],
-  PUNE_STAFF: ['GROSS', 'ARREARS_SEP26_30', 'ARREARS', 'OT', 'BUNG_OT', 'OUTSTATION_TRAVEL', 'OTHER_ALLOWANCE'],
+  STAFF: ['BASIC', 'HRA', 'CONVEYANCE', 'MEDICAL', 'EDUCATION', 'PRO_DEV', 'COMMUNICATION', 'UNIFORM', 'WASHING', 'ARREARS_SEP26_30', 'ARREARS', 'OT', 'OTHER_ALLOWANCE', 'APPROVED_EXTRAS'],
+  PERMANENT_WORKER: ['BASIC', 'HRA', 'CONVEYANCE', 'WASHING', 'EDUCATION', 'HEAT', 'VDA', 'PROD_ALLOWANCE', 'ARREARS_SEP26_30', 'ARREARS', 'OT', 'OTHER_ALLOWANCE', 'APPROVED_EXTRAS'],
+  CONSULTANT: ['GROSS', 'ARREARS_SEP26_30', 'ARREARS', 'OT', 'OTHER_ALLOWANCE', 'APPROVED_EXTRAS'],
+  PUNE_STAFF: ['GROSS', 'ARREARS_SEP26_30', 'ARREARS', 'OT', 'BUNG_OT', 'OUTSTATION_TRAVEL', 'OTHER_ALLOWANCE', 'APPROVED_EXTRAS'],
 };
 const DEDUCTION_ORDER = ['PF', 'ESI', 'PT', 'MLWF', 'TDS', 'CANTEEN', 'SOCIETY', 'ADVANCE', 'OTHER'];
 

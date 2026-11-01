@@ -10,7 +10,8 @@
  *    employee_salary_structure.ot_rate (NOT the engine formula; the engine gets otHours=0), and
  *    outstation travel = 250 x count of attendance rows with outstation_travel=true.
  * After-engine amounts increase netPay and totalEarnings and appear as separate earnings keys
- * (OTHER_ALLOWANCE, BUNG_OT, OUTSTATION_TRAVEL) so a printed payslip's gross = sum of printed lines.
+ * (OTHER_ALLOWANCE, BUNG_OT, OUTSTATION_TRAVEL, APPROVED_EXTRAS) so a printed payslip's gross = sum of printed lines.
+ *  - APPROVED_EXTRAS (owner decision 1 Nov 2026): approved positive payroll_adjustments for the pay month.
  * Held employees get no extras. Everything is derived from this calculation's own engine result, so
  * calculating twice never double-adds.
  */
@@ -28,12 +29,18 @@ export interface RecurringAdjustmentRow {
 export interface ExtraAttendanceRow {
   employee_id: string; date: string; ot_hours?: number | string | null; outstation_travel?: boolean | null;
 }
+export interface ApprovedAdjustmentRow {
+  employee_id: string; adjustment_type?: string | null; signed_amount_inr: number | string | null;
+  approval_status: string; reason?: string | null;
+}
 export interface ExtrasFeeds {
   recurring: RecurringAdjustmentRow[];
+  /** payroll_adjustments rows already filtered to the pay month; only approved positive ones are paid. */
+  adjustments?: ApprovedAdjustmentRow[];
   attendance: ExtraAttendanceRow[];
   salaries: SalaryRow[];
 }
-export interface ExtraItem { key: 'OTHER_ALLOWANCE' | 'BUNG_OT' | 'OUTSTATION_TRAVEL'; label: string; amount: number }
+export interface ExtraItem { key: 'OTHER_ALLOWANCE' | 'BUNG_OT' | 'OUTSTATION_TRAVEL' | 'APPROVED_EXTRAS'; label: string; amount: number }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
@@ -67,6 +74,17 @@ export function computeExtras(args: {
     items.push({ key: 'OTHER_ALLOWANCE', label: (r.label ?? '').trim() || 'Other allowance', amount: r2(num(r.amount)) });
   }
 
+  // Owner decision 1 Nov 2026: HR-approved positive adjustments (overtime, holiday pay, worked-Friday
+  // pay, any special case from the Extras report) are paid here, after the engine, as ONE line.
+  // Pending / rejected rows are ignored; negative rows are handled by feedSync (deductions.other).
+  const approvedPos = (feeds.adjustments ?? []).filter((a) =>
+    a.employee_id === employeeId && a.approval_status === 'approved' && num(a.signed_amount_inr) > 0);
+  if (approvedPos.length) {
+    const amt = r2(approvedPos.reduce((s, a) => s + num(a.signed_amount_inr), 0));
+    const single = approvedPos.length === 1 ? ((approvedPos[0].reason ?? '').trim() || (approvedPos[0].adjustment_type ?? '').trim()) : '';
+    items.push({ key: 'APPROVED_EXTRAS', label: single || 'Approved extras', amount: amt });
+  }
+
   if (category === 'PUNE_STAFF') {
     const att = (feeds.attendance ?? []).filter((a) => a.employee_id === employeeId && a.date >= periodStart && a.date <= periodEnd);
     const otHours = r2(att.reduce((s, a) => s + num(a.ot_hours), 0));
@@ -91,7 +109,7 @@ export interface CalcWithExtras {
 
 /**
  * calculateOne wrapped with the extras. The input is copied, never mutated. Held results are returned
- * untouched (no extras). Earnings keys OTHER_ALLOWANCE / BUNG_OT / OUTSTATION_TRAVEL are summed per key.
+ * untouched (no extras). Earnings keys OTHER_ALLOWANCE / BUNG_OT / OUTSTATION_TRAVEL / APPROVED_EXTRAS are summed per key.
  */
 export function calculateWithExtras(
   input: PayrollInput, employeeId: string, ctx: { periodStart: string; periodEnd: string; feeds: ExtrasFeeds },

@@ -64,7 +64,7 @@ async function loadFeeds(supabase: any, year: number, month: number) {
         .eq('payroll_month', payrollMonth)),
       safe(supabase.from('payroll_efficiency_entries').select('employee_id,efficiency_pct,approval_status')
         .eq('payroll_month', payrollMonth)),
-      safe(supabase.from('payroll_adjustments').select('employee_id,adjustment_type,signed_amount_inr,approval_status')
+      safe(supabase.from('payroll_adjustments').select('employee_id,adjustment_type,signed_amount_inr,approval_status,reason')
         .eq('payroll_month', payrollMonth)),
       safe(supabase.from('employee_status_history').select('employee_id,status,effective_from')),
       safe(supabase.from('recurring_adjustments').select('employee_id,kind,label,amount,active_from,active_to,is_active')),
@@ -482,7 +482,7 @@ Deno.serve(async (req) => {
       extraWarnings.push(...builtCfg.warnings);
       const extrasCtx = {
         periodStart: `${year}-${mm}-01`, periodEnd: f.periodEnd,
-        feeds: { recurring: f.recurring, attendance: f.attendance, salaries: f.salaries },
+        feeds: { recurring: f.recurring, attendance: f.attendance, salaries: f.salaries, adjustments: f.adjustments },
       };
 
       // ---- warnings gate (before ANY item is written): sync is idempotent and keeps decisions

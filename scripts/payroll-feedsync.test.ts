@@ -38,7 +38,7 @@ const w1 = r.inputs.find((i) => i.empCode === 'VFL4008')!;
 check('worker present', !!w1);
 check('worker category', w1.category === 'PERMANENT_WORKER');
 check('Waluj Oct wd = 26 (Friday off)', w1.workingDays === 26, `got ${w1.workingDays}`);
-check('OT summed', w1.otHours === 2);
+check('OT not computed by core: otHours 0 even with attendance overtime_hours (1 Nov 2026)', w1.otHours === 0);
 check('approved EL added', w1.days.el === 2);
 check('advance capped at outstanding', w1.deductions.advance === 300, `got ${w1.deductions.advance}`);
 check('canteen+society read', w1.deductions.canteen === 120 && w1.deductions.society === 450);
@@ -140,7 +140,7 @@ check('daily consultant: DAILY_RATE 700', c1.rateProfile?.basis === 'DAILY_RATE'
 check('daily consultant: 20 days -> GROSS 14000, not held', c1r.earnings.GROSS === 14000 && !c1r.held, JSON.stringify(c1r));
 
 const c2r = calculateOne(cIn('CON16'));
-check('daily consultant + 2 OT hrs: not held, otPay 175', !c2r.held && c2r.otPay === 175, JSON.stringify(c2r));
+check('daily consultant + 2 attendance OT hrs: otHours 0, not held, otPay 0 (OT now an approved extra)', !c2r.held && cIn('CON16').otHours === 0 && c2r.otPay === 0, JSON.stringify(c2r));
 
 const c3 = cIn('CON05');
 check('monthly consultant unchanged: MONTHLY_GROSS_PRORATED 20000',
@@ -204,6 +204,33 @@ check('daily with null daily_rate -> warning', cr.warnings.includes('CON18: dail
   check('EL-only employee still has advance deducted, no warning', g('VFL1104').deductions.advance === 1000
     && !wr.warnings.some((w) => w.startsWith('VFL1104') && w.includes('advance')));
   check('worker unchanged (present + WO input kept, wd 26)', g('VFL4101').days.present === 1 && g('VFL4101').workingDays === 26);
+}
+
+// ---- 1 Nov 2026: OT and holiday out of the core ----
+{
+  const mkA = (id: string, d: number, status: string, ot = 0) => ({ employee_id: id, date: `2026-10-${String(d).padStart(2, '0')}`, status, overtime_hours: ot, check_in_time: null, check_out_time: null });
+  const emp = (id: string, code: string, cat: string) => ({ id, emp_code: code, name: code, category: cat, work_location: 'Aurangabad', gender: 'M', is_active: true, weekly_off_day: null });
+  const b: FeedBundle = {
+    ...bundle,
+    employees: [emp('s', 'VFL1201', 'staff'), emp('w', 'VFL4201', 'worker'), emp('c', 'CON05', 'consultant'), emp('h', 'VFL1202', 'staff')],
+    salaries: [], punches: [], canteen: [], society: [], efficiency: [], statusEvents: [], leaves: [],
+    advances: [{ employee_id: 'h', monthly_deduction: 1000, outstanding_balance: 5000, status: 'approved' }],
+    attendance: [mkA('s', 1, 'P', 3), mkA('s', 2, 'P', 2), mkA('w', 1, 'P', 4), mkA('c', 1, 'P', 5),
+      mkA('s', 20, 'H'), mkA('h', 20, 'H')],
+  };
+  const rr = assemblePayrollInputs(2026, 10, b);
+  const g = (c: string) => rr.inputs.find((i) => i.empCode === c)!;
+  check('staff otHours 0 despite overtime_hours', g('VFL1201').otHours === 0);
+  check('worker otHours 0 despite overtime_hours', g('VFL4201').otHours === 0);
+  check('consultant otHours 0 despite overtime_hours', g('CON05').otHours === 0);
+  check("'H' row adds no paid day", g('VFL1201').days.ph === 0 && g('VFL1201').days.present === 2);
+  check("'H'-only employee: zero paid days, advance skipped + warning", g('VFL1202').days.ph === 0 && g('VFL1202').deductions.advance === 0 && rr.warnings.includes('VFL1202: no paid days - advance instalment skipped'));
+  const adjB: FeedBundle = { ...b, adjustments: [
+    { employee_id: 's', adjustment_type: 'OTHER_ALLOWANCE', signed_amount_inr: 900, approval_status: 'approved' },
+    { employee_id: 's', adjustment_type: 'OTHER_DEDUCTION', signed_amount_inr: -150, approval_status: 'approved' }] };
+  const ar = assemblePayrollInputs(2026, 10, adjB);
+  const sIn = ar.inputs.find((i) => i.empCode === 'VFL1201')!;
+  check('negative adjustment still -> deductions.other; positive not warned as unapplied', sIn.deductions.other === 150 && !ar.warnings.some((w) => w.includes('not applied')));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
