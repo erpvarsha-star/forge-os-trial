@@ -2888,3 +2888,10 @@ Supersedes the 27 Oct "monthly consultants: no OT" answer. Owner: consultants' f
 3. **Worker production allowance stays on PRESENT days / 26 (frozen U5 rule); the sheet's /25 with HR day credit is not followed.**
 4. **Yes — overtime, 20 Oct holiday and other special items are entered by HR as approved extras (Extras report route); Diwali items are advances, not extras** (see 1).
 5. The nine staff-side gaps were put forward 1 Nov; owner asked for names WITH codes in every list from now on (chat only; names still never go in the public repo).
+
+## Owner statements of 2 Nov 2026 (recorded the moment given)
+
+1. **Where HR's sheet days are FEWER than the app's, the owner expects the LESS days to be paid** ("I hope the less days"). Round 1 is being rebuilt on the lesser of app days and sheet days (stated as an expectation; confirm when the rebuilt list is sent).
+2. **HR's October staff/worker sheets cover 26 Sep to 25 Oct** (HR cycle), while the app run is 1-31 Oct (owner decision 29 Oct). Owner: "if yes it's fine but we need to pay for the balance days of October also." Claude's 2 Nov check: the app run is 1-31 Oct, NOT HR's window; comparing HR's present days to app punches shows neither window fits clearly (34 of 90 people within 1 day on both), so HR's days look manually credited. **OPEN RISK: if HR's October sheet already includes 26-30 Sep, the one-off 26-30 Sep arrears attach would double-pay those days — must be settled with HR before the arrears step.**
+3. **Owner mentions advances "deducted at 10%" in HR's staff and worker sheets.** Claude found: staff sheet has fixed advance deductions for 5 people (VFL1482 3,000, VFL1520 4,000, VFL1528 5,000, VFL1567 8,000, VFL5079 5,000 — equal to the app's approved monthly_deduction, not 10%); worker sheet advance column is empty. Where the 10% applies is not yet identified.
+4. **Owner asked for the READY staff and worker lists in the same format as HR's October sheets** — being built (scratchpad workbook, not in the repo).
