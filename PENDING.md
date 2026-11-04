@@ -1,5 +1,32 @@
-# >>> RESUME STATE 4 Nov 2026, late night (round 5) — SESSION ENDED (LATEST — supersedes every block below where they conflict) <<<
-**Restart rule:** if work stops for any reason, read this block first. Branch `claude/forge-os-backend-setup-7woj4t`, HEAD = `330ab80` (PRs #39-#44 all squash-merged), local checkout `ccr-8cdbca68-137bnz` merged up to match and pushed. `git status` clean on both.
+# >>> RESUME STATE 4-5 Nov 2026, late night (round 6) — real work starts 05:30 IST, READ THIS FIRST <<<
+**Restart rule:** if work stops for any reason, read this block first. Branch `claude/forge-os-backend-setup-7woj4t`, HEAD = `506c768` (PRs #39-#45 all squash-merged), local checkout `ccr-8cdbca68-137bnz` merged up to match and pushed. `git status` clean on both. A wake-up is scheduled for **05:30 IST, 5 Nov 2026** — that is when the two builds below actually start; this block exists so a restarted/woken session picks up exactly here.
+
+## Owner's status questions, answered 4-5 Nov night — checked live, not from memory
+
+**Q1: Is the leave system fully built — screens pushed, everyone can see their balance, approval chain + monitoring table in place?**
+- **Screens: YES**, `leave.tsx` exists and is pushed for all 7 role groups (`app/(worker|supervisor|manager|hr-admin|plant-head|owner|security)/leave.tsx`).
+- **Balances visible: YES for the employees who should have one.** Live check: 99 active app-using employees; 11 have no `leave_balances` row. Of those 11, **7 are consultants** (CON01/05/09/12/13/20/24) — correctly blank, consultants have no leave entitlement by design (already documented). The remaining **4 are the already-flagged real data gap** (VFL5463/5464/5465/5466) — owner said 4 Nov "will confirm when I get them, leave this in pending," so this is a known, accepted gap, not new.
+- **Approval chain: YES, and only genuinely reliable as of TONIGHT.** PATCH_126 (this session) fixed a live bug where any employee with no `manager_id` (61 of them) got stuck on an unreachable approval stage forever, invisible to any approver. Before that fix, the chain existed in code but silently failed for the majority of the workforce. Now fixed and verified.
+- **Monitoring table: NO — this does not exist.** Checked directly: there is no leave equivalent of `advance-ledger.tsx` (which lists every advance with status + outstanding balance for HR/owner to browse). HR's dashboard shows only a pending-count tile (`leave_requests` where `status='pending'`), not a browsable table of every leave request and what stage it's at. **This is a real, confirmed gap** — not part of tonight's plan below unless the owner asks for it next.
+
+**Q2: Has the loan/advance application been built — tab, screen, approval sequence in place?**
+- **Screens: YES**, `advance.tsx` pushed for all 7 roles (apply), plus `advance-ledger.tsx` for HR — a real monitoring table (every advance, status badge, outstanding balance total) that leave does NOT have (see above).
+- **Approval chain: YES**, same PATCH_53/126 staged chain (Manager → HR → Accounts → Plant Head → Owner for rank-and-file), same PATCH_126 null-manager_id fix applies here too (advance requests had the identical bug).
+- **Live data gap confirmed**, exactly matching what the "reminder to Accounts" below targets: **2 pending advances have `monthly_deduction=0`** — VFL1556 (₹50,000, "Child education") and VFL5324 (₹20,000, "hospital work") — both stuck pending because nobody has supplied the real recovery-per-month figure. (A 3rd zero-deduction row, VFL4063, is already correctly voided/rejected from the 4 Nov reclassification — not a gap.)
+
+## PLAN — two new reminders, to build starting 05:30 IST 5 Nov 2026 (not yet started)
+
+Both follow the exact pattern fixed/proven tonight (`pune-attendance-reminder`, `payroll-feeds-approval-reminder`): a `verify_jwt:false` edge function + `cron.schedule()` with the Authorization-header fix from the start, `app_notifications` insert + push, dedup per IST day, live-fire verified by inserting a real row and independently re-querying it — never trust a "succeeded" cron status alone.
+
+**Build 1 — `plant-head-efficiency-reminder`**: nudges Fazal (role `plant_head`, role-queried not hardcoded) daily from the **1st of the IST calendar month** until a `payroll_efficiency_entries` row exists for that `payroll_month` (checked live: **0 rows exist for 2026-11** right now, so this would already be firing from 1 Nov if it existed). Stops firing for the month the moment a row appears — mirrors `pune-attendance-reminder`'s "stop once today's row exists" logic, just monthly instead of daily. Distinct from the existing `plant-head-form-reminder` (that one nudges about Fazal's Google Form, 1st-5th only, unrelated to this in-app efficiency entry).
+
+**Build 2 — `accounts-advance-recovery-reminder`**: nudges whoever is `role='manager' AND department='Accounts'` (dynamic match, same mechanism the Accounts approval stage itself already uses — never hardcode Bharat Salve's emp_code, he could change) about **advance_requests rows missing a usable monthly recovery figure** — scope: `status='pending' or (status='approved' and (monthly_deduction is null or monthly_deduction = 0))`, i.e. both of today's 2 pending gaps (VFL1556, VFL5324) AND any future approved advance someone forgot to put a real recovery amount on. Daily while any such row exists, same dedup pattern.
+
+**Not planned, flagged only, awaiting a yes**: the leave monitoring-table gap found above (Q1) — not started, no scope agreed yet.
+
+## Owner instruction, recorded the moment given
+
+"create plan for this and start working at 5.30 am ist on it" — plan is the two builds above; actual building (agent delegation, deploy, live-fire verification, independent re-check, commit/push, PR+merge into the long-lived branch, PENDING.md update) starts at the scheduled wake-up, not before.
 
 ## PATCH_128 — payroll-feeds-approval-reminder — DONE, deployed, independently verified (4 Nov night)
 
