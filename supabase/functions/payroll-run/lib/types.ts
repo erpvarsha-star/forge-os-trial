@@ -87,6 +87,17 @@ export interface EngineConfig {
   workerOtVdaBasis: 'CURRENT_RATE' | 'MASTER_SNAPSHOT';
   workerVdaRatePerDay: number;   // 103
   workerMasterVdaSnapshot?: number; // used only in MASTER_SNAPSHOT mode
+  /** Monthly-rate CONSULTANT day basis — OWNER DECISION 4 Nov 2026:
+   *  "consultant salaries are based on 26 days. they dont get weekly off.
+   *  so if salary is 26000 full 26 days attendance = 26000, if i attend 25
+   *  days i get 25000 one day salary deducted."
+   *  'FIXED_26_PRESENT_ONLY' (live default) -> dailyRate = monthlyGross / 26,
+   *     pay = dailyRate x days.present (no weekly-off/leave credit).
+   *  'CALENDAR_DAYS_PRORATED' -> legacy basis (gross x w / calendar-days-in-month,
+   *     w includes weekOff/leave credit) — kept ONLY to reproduce the actual
+   *     September 2026 payouts in the regression suite; never use for live runs.
+   */
+  monthlyConsultantDayBasis: 'FIXED_26_PRESENT_ONLY' | 'CALENDAR_DAYS_PRORATED';
   pfCeiling: number;             // 15000
   pfCappedAmount: number;        // 1800
   esiCeiling: number;            // 21000 (fixed gross)
@@ -99,6 +110,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   workerOtVdaBasis: 'CURRENT_RATE',
   workerVdaRatePerDay: 103,
   workerMasterVdaSnapshot: 2790,
+  monthlyConsultantDayBasis: 'FIXED_26_PRESENT_ONLY',
   pfCeiling: 15000,
   pfCappedAmount: 1800,
   esiCeiling: 21000,

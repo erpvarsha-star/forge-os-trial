@@ -6,6 +6,13 @@
  *
  * Monthly CONSULTANT OT is PAID (owner decision 31 Oct 2026): gross / days / 8 x hours, x1.
  *
+ * Monthly CONSULTANT base pay — OWNER DECISION 4 Nov 2026 (live default,
+ * cfg.monthlyConsultantDayBasis = 'FIXED_26_PRESENT_ONLY'): dailyRate =
+ * monthlyGross / 26, pay = dailyRate x days.present (no weekly-off/leave
+ * credit). The old calendar-days-prorated basis is kept ONLY as
+ * 'CALENDAR_DAYS_PRORATED' to reproduce actual Sept 2026 payouts in the
+ * regression suite — never use it for a live run.
+ *
  * Verified against actual September 2026 payouts:
  *   19 PERMANENT_WORKER + 7 CONSULTANT rows reproduce paid nets exactly
  *   (see scripts/payroll-engine.sept2026.test.ts).
@@ -120,27 +127,41 @@ function calcWorker(input: PayrollInput, cfg: EngineConfig): PayrollResult {
   return finish(res);
 }
 
+const MONTHLY_CONSULTANT_FIXED_DAYS = 26;
+
 function calcSimple(input: PayrollInput, cfg: EngineConfig): PayrollResult {
   const rp = input.rateProfile;
   const res = blank(input);
   if (!rp?.basis) { res.blockers.push('MISSING_RATE'); return finish(res); }
   const wd = input.workingDays, w = workedDays(input);
-  let gross: number, otPay = 0;
+  let gross: number, otPay = 0, worked = w;
   if (rp.basis === 'DAILY_RATE') {
     if (rp.rateAmount == null) { res.blockers.push('MISSING_RATE'); return finish(res); }
     gross = r2(rp.rateAmount * w);
     otPay = r2((rp.rateAmount / 8) * input.otHours); // x1, not x2
+  } else if (input.category === 'CONSULTANT' && cfg.monthlyConsultantDayBasis === 'FIXED_26_PRESENT_ONLY') {
+    // OWNER DECISION 4 Nov 2026: monthly consultants are on a fixed 26-day basis,
+    // paid only for physically present days — no weekly-off or leave credit.
+    // dailyRate = monthlyGross / 26; pay = dailyRate x days.present.
+    if (rp.monthlyGross == null) { res.blockers.push('MISSING_RATE'); return finish(res); }
+    const dailyRate = rp.monthlyGross / MONTHLY_CONSULTANT_FIXED_DAYS;
+    worked = input.days.present;
+    gross = r2(dailyRate * worked);
+    if (input.otHours > 0) {
+      otPay = r2((dailyRate / 8) * input.otHours); // same x1 OT basis, now on the 26-day daily rate
+    }
   } else {
     if (rp.monthlyGross == null) { res.blockers.push('MISSING_RATE'); return finish(res); }
     gross = r2(rp.monthlyGross * w / wd);
     // OWNER DECISION 31 Oct 2026: monthly consultants ARE paid OT, same formula as
     // PUNE_STAFF and the old Consultant sheet: master gross / days in month / 8 x hours, x1.
+    // (Legacy CALENDAR_DAYS_PRORATED basis — reproduces actual Sept 2026 payouts only.)
     if (input.otHours > 0) {
       otPay = r2((rp.monthlyGross / wd / 8) * input.otHours); // PUNE_STAFF + monthly CONSULTANT x1
     }
   }
   // No PF / ESI / PT / MLWF for consultant categories.
-  res.worked = w;
+  res.worked = worked;
   res.earnings = { GROSS: gross, OT: otPay };
   res.deductions = {
     CANTEEN: input.deductions.canteen, SOCIETY: input.deductions.society,

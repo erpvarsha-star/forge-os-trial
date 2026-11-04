@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router'
 import { RoleGate } from '@/components/RoleGate'
 import { useTaskBadgeSync } from '@/hooks/useAssignedTasks'
 import { useTranslation } from 'react-i18next'
-import { UserCheck, ShieldCheck, QrCode, MoreHorizontal, ClipboardCheck } from 'lucide-react-native'
+import { UserCheck, ShieldCheck, QrCode, MoreHorizontal, ClipboardCheck, BarChart3 } from 'lucide-react-native'
 
 export default function SecurityLayout() {
   const { t } = useTranslation()
@@ -11,12 +11,15 @@ export default function SecurityLayout() {
   return (
     <RoleGate allow={['security_guard']}>
   <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: '#E65C00', tabBarInactiveTintColor: '#9CA3AF', tabBarStyle: { paddingBottom: 8, height: 64 } }}>
+        {/* Owner decision 4 Nov 2026: security guards GPS check in like every other role.
+            CheckInCard was already wired into dashboard.tsx but the tab was href:null and
+            not linked anywhere in more.tsx — unreachable. Made a real, visible tab. */}
+        <Tabs.Screen name="dashboard" options={{ title: t('common.dashboard'), tabBarIcon: ({ color }) => <BarChart3 size={22} color={color} /> }} />
         <Tabs.Screen name="gate-qr" options={{ title: t('security.gateQr'), tabBarIcon: ({ color }) => <QrCode size={22} color={color} /> }} />
         <Tabs.Screen name="team" options={{ title: t('security.checkpoint2'), tabBarIcon: ({ color }) => <UserCheck size={22} color={color} /> }} />
         <Tabs.Screen name="eod-lock" options={{ title: t('security.eodConfirmation'), tabBarIcon: ({ color }) => <ShieldCheck size={22} color={color} /> }} />
         <Tabs.Screen name="forms" options={{ title: t('forms.tab'), tabBarIcon: ({ color }) => <ClipboardCheck size={22} color={color} /> }} />
         <Tabs.Screen name="more" options={{ tabBarBadge: badges.more, title: t('common.more'), tabBarIcon: ({ color }) => <MoreHorizontal size={22} color={color} /> }} />
-        <Tabs.Screen name="dashboard" options={{ href: null }} />
         <Tabs.Screen name="leave" options={{ href: null }} />
         <Tabs.Screen name="advance" options={{ href: null }} />
         <Tabs.Screen name="payslips" options={{ href: null }} />

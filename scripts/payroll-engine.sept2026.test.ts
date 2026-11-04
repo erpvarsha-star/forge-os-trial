@@ -10,7 +10,12 @@
 import { calculateOne, DEFAULT_ENGINE_CONFIG } from '../lib/payroll/engine';
 import { EngineConfig, PayrollInput } from '../lib/payroll/types';
 
-const SNAPSHOT: EngineConfig = { ...DEFAULT_ENGINE_CONFIG, workerOtVdaBasis: 'MASTER_SNAPSHOT', workerMasterVdaSnapshot: 2790 };
+const SNAPSHOT: EngineConfig = {
+  ...DEFAULT_ENGINE_CONFIG, workerOtVdaBasis: 'MASTER_SNAPSHOT', workerMasterVdaSnapshot: 2790,
+  // Historical reproduction only (actual Sept 2026 payouts used calendar-days proration,
+  // not the 26-day fixed basis the owner decided 4 Nov 2026 for live runs).
+  monthlyConsultantDayBasis: 'CALENDAR_DAYS_PRORATED',
+};
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean, detail = '') {
@@ -61,8 +66,12 @@ for (const f of CONSULTANTS) {
   check(`${f.emp} ot`, close(r.otPay, f.paidOT, 0.02), `got ${r.otPay} want ${f.paidOT}`);
 }
 
-console.log('== Monthly consultant OT (owner decision 31 Oct 2026) ==');
+console.log('== Monthly consultant OT, legacy calendar-days basis (owner decision 31 Oct 2026) ==');
 {
+  // Pinned to CALENDAR_DAYS_PRORATED: this block tests the 31 Oct 2026 OT-basis decision
+  // in isolation, on the legacy denominator it was decided against. Live runs default to
+  // FIXED_26_PRESENT_ONLY (owner decision 4 Nov 2026) — see the block below.
+  const legacyCfg: EngineConfig = { ...DEFAULT_ENGINE_CONFIG, monthlyConsultantDayBasis: 'CALENDAR_DAYS_PRORATED' };
   const mk = (ot: number): PayrollInput => ({
     empCode: 'CONTEST', category: 'CONSULTANT', month: 10, year: 2026, workingDays: 31,
     rateProfile: { basis: 'MONTHLY_GROSS_PRORATED', monthlyGross: 20000 },
@@ -70,10 +79,41 @@ console.log('== Monthly consultant OT (owner decision 31 Oct 2026) ==');
     otHours: ot, deductions: { canteen: 0, society: 0, advance: 0 },
   });
   const wantOt = Math.round((20000 / 31 / 8) * 10 * 100) / 100;
-  const r0 = calculateOne(mk(0)), r10 = calculateOne(mk(10));
+  const r0 = calculateOne(mk(0), legacyCfg), r10 = calculateOne(mk(10), legacyCfg);
   check('monthly consultant 10h OT: no blocker, not held', !r10.held && r10.blockers.length === 0, JSON.stringify(r10.blockers));
   check(`monthly consultant 10h OT = ${wantOt}`, r10.otPay === wantOt && r10.earnings.OT === wantOt, `got ${r10.otPay}`);
   check('monthly consultant OT added to net', close((r10.netPay ?? 0) - (r0.netPay ?? 0), wantOt, 0.005), `net ${r10.netPay} vs ${r0.netPay}`);
+}
+
+console.log('== Monthly consultant 26-day fixed basis (owner decision 4 Nov 2026, LIVE DEFAULT) ==');
+{
+  // Owner's own example, verbatim: "consultant salaries are based on 26 days. they dont get
+  // weekly off. so if salary is 26000 full 26 days attendance = 26000, if i attend 25 days
+  // i get 25000 one day salary deducted."
+  const mk = (present: number, ot = 0): PayrollInput => ({
+    empCode: 'CONTEST26', category: 'CONSULTANT', month: 11, year: 2026, workingDays: 30,
+    rateProfile: { basis: 'MONTHLY_GROSS_PRORATED', monthlyGross: 26000 },
+    days: { present, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: ot, deductions: { canteen: 0, society: 0, advance: 0 },
+  });
+  const r26 = calculateOne(mk(26)); // DEFAULT_ENGINE_CONFIG (no cfg arg) — live default basis
+  check('26000 salary, 26 present days -> gross 26000', r26.earnings.GROSS === 26000, `got ${r26.earnings.GROSS}`);
+  check('26000 salary, 26 present days -> net 26000', r26.netPay === 26000, `got ${r26.netPay}`);
+  const r25 = calculateOne(mk(25));
+  check('26000 salary, 25 present days -> gross 25000', r25.earnings.GROSS === 25000, `got ${r25.earnings.GROSS}`);
+  check('26000 salary, 25 present days -> net 25000', r25.netPay === 25000, `got ${r25.netPay}`);
+  // weekly-off/leave credit must NOT inflate pay under the fixed-26 basis
+  const rWeekOff: PayrollInput = { ...mk(25), days: { present: 25, ph: 0, el: 1, cl: 0, sl: 0, plo: 0, weekOff: 1 } };
+  const rwo = calculateOne(rWeekOff);
+  check('weekly-off/leave rows ignored under FIXED_26_PRESENT_ONLY', rwo.earnings.GROSS === 25000, `got ${rwo.earnings.GROSS}`);
+  // daily-rate consultants are untouched by this change
+  const rDaily = calculateOne({
+    empCode: 'CONTESTDAILY', category: 'CONSULTANT', month: 11, year: 2026, workingDays: 30,
+    rateProfile: { basis: 'DAILY_RATE', rateAmount: 700 },
+    days: { present: 25, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: 0, deductions: { canteen: 0, society: 0, advance: 0 },
+  });
+  check('daily-rate consultant unaffected (700 x 25 = 17500)', rDaily.earnings.GROSS === 17500, `got ${rDaily.earnings.GROSS}`);
 }
 
 console.log('== State machine sanity ==');
