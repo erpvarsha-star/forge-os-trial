@@ -71,18 +71,63 @@ console.log('== Monthly consultant OT, legacy calendar-days basis (owner decisio
   // Pinned to CALENDAR_DAYS_PRORATED: this block tests the 31 Oct 2026 OT-basis decision
   // in isolation, on the legacy denominator it was decided against. Live runs default to
   // FIXED_26_PRESENT_ONLY (owner decision 4 Nov 2026) — see the block below.
+  // empCode must be in the OT whitelist (owner decision 4 Nov 2026) for this to exercise
+  // the OT-basis formula at all — see the whitelist block further below for the gate itself.
   const legacyCfg: EngineConfig = { ...DEFAULT_ENGINE_CONFIG, monthlyConsultantDayBasis: 'CALENDAR_DAYS_PRORATED' };
   const mk = (ot: number): PayrollInput => ({
-    empCode: 'CONTEST', category: 'CONSULTANT', month: 10, year: 2026, workingDays: 31,
+    empCode: 'CON01', category: 'CONSULTANT', month: 10, year: 2026, workingDays: 31,
     rateProfile: { basis: 'MONTHLY_GROSS_PRORATED', monthlyGross: 20000 },
     days: { present: 31, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
     otHours: ot, deductions: { canteen: 0, society: 0, advance: 0 },
   });
   const wantOt = Math.round((20000 / 31 / 8) * 10 * 100) / 100;
   const r0 = calculateOne(mk(0), legacyCfg), r10 = calculateOne(mk(10), legacyCfg);
-  check('monthly consultant 10h OT: no blocker, not held', !r10.held && r10.blockers.length === 0, JSON.stringify(r10.blockers));
-  check(`monthly consultant 10h OT = ${wantOt}`, r10.otPay === wantOt && r10.earnings.OT === wantOt, `got ${r10.otPay}`);
-  check('monthly consultant OT added to net', close((r10.netPay ?? 0) - (r0.netPay ?? 0), wantOt, 0.005), `net ${r10.netPay} vs ${r0.netPay}`);
+  check('whitelisted monthly consultant 10h OT: no blocker, not held', !r10.held && r10.blockers.length === 0, JSON.stringify(r10.blockers));
+  check(`whitelisted monthly consultant 10h OT = ${wantOt}`, r10.otPay === wantOt && r10.earnings.OT === wantOt, `got ${r10.otPay}`);
+  check('whitelisted monthly consultant OT added to net', close((r10.netPay ?? 0) - (r0.netPay ?? 0), wantOt, 0.005), `net ${r10.netPay} vs ${r0.netPay}`);
+}
+
+console.log('== Consultant OT whitelist (owner decision 4 Nov 2026: ONLY CON01/CON20/CON24) ==');
+{
+  const mkMonthly = (emp: string, ot: number): PayrollInput => ({
+    empCode: emp, category: 'CONSULTANT', month: 11, year: 2026, workingDays: 30,
+    rateProfile: { basis: 'MONTHLY_GROSS_PRORATED', monthlyGross: 24000 },
+    days: { present: 30, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: ot, deductions: { canteen: 0, society: 0, advance: 0 },
+  });
+  const mkDaily = (emp: string, ot: number): PayrollInput => ({
+    empCode: emp, category: 'CONSULTANT', month: 11, year: 2026, workingDays: 30,
+    rateProfile: { basis: 'DAILY_RATE', rateAmount: 700 },
+    days: { present: 26, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: ot, deductions: { canteen: 0, society: 0, advance: 0 },
+  });
+  // Non-whitelisted monthly consultants (CON05/09/12/13) get NO OT line even with hours.
+  for (const emp of ['CON05', 'CON09', 'CON12', 'CON13']) {
+    const r = calculateOne(mkMonthly(emp, 20));
+    check(`${emp} (not whitelisted, monthly) gets NO OT despite 20h`, r.otPay === 0 && (r.earnings.OT ?? 0) === 0, `got otPay=${r.otPay} earnings.OT=${r.earnings.OT}`);
+    check(`${emp} not held/blocked just from the OT gate`, !r.held && r.blockers.length === 0, JSON.stringify(r.blockers));
+  }
+  // Non-whitelisted daily-rate consultants (CON16/18/21/22/23 etc.) get NO OT line either.
+  for (const emp of ['CON16', 'CON18', 'CON21', 'CON22', 'CON23']) {
+    const r = calculateOne(mkDaily(emp, 15));
+    check(`${emp} (not whitelisted, daily) gets NO OT despite 15h`, r.otPay === 0 && (r.earnings.OT ?? 0) === 0, `got otPay=${r.otPay} earnings.OT=${r.earnings.OT}`);
+  }
+  // Whitelisted consultants DO get OT, on either basis.
+  for (const emp of ['CON01', 'CON20', 'CON24']) {
+    const rM = calculateOne(mkMonthly(emp, 20));
+    check(`${emp} (whitelisted, monthly) DOES get OT for 20h`, rM.otPay > 0, `got otPay=${rM.otPay}`);
+    const rD = calculateOne(mkDaily(emp, 15));
+    check(`${emp} (whitelisted, daily) DOES get OT for 15h`, rD.otPay > 0, `got otPay=${rD.otPay}`);
+  }
+  // A non-consultant category (PUNE_STAFF) must be completely unaffected by the whitelist.
+  const rPune: PayrollInput = {
+    empCode: 'BUNG99', category: 'PUNE_STAFF', month: 11, year: 2026, workingDays: 27,
+    rateProfile: { basis: 'MONTHLY_GROSS_PRORATED', monthlyGross: 15000 },
+    days: { present: 27, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: 10, deductions: { canteen: 0, society: 0, advance: 0 },
+  };
+  const rp = calculateOne(rPune);
+  check('PUNE_STAFF (non-consultant) OT unaffected by consultant whitelist', rp.otPay > 0, `got otPay=${rp.otPay}`);
 }
 
 console.log('== Monthly consultant 26-day fixed basis (owner decision 4 Nov 2026, LIVE DEFAULT) ==');

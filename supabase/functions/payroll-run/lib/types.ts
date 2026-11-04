@@ -98,6 +98,13 @@ export interface EngineConfig {
    *     September 2026 payouts in the regression suite; never use for live runs.
    */
   monthlyConsultantDayBasis: 'FIXED_26_PRESENT_ONLY' | 'CALENDAR_DAYS_PRORATED';
+  /** OWNER DECISION 4 Nov 2026 (supersedes the 31 Oct "all monthly consultants
+   *  get OT" decision): only these 3 consultants are paid overtime at all —
+   *  CON01, CON20, CON24. Every other consultant (monthly: CON05/09/12/13;
+   *  daily: CON16/18/21/22/23) gets NO OT line, regardless of rate_type/basis
+   *  or hours worked. Gate is a pure emp_code whitelist, checked only for
+   *  category === 'CONSULTANT' — never widen this by rate_type or category. */
+  consultantOtWhitelist: string[];
   pfCeiling: number;             // 15000
   pfCappedAmount: number;        // 1800
   esiCeiling: number;            // 21000 (fixed gross)
@@ -111,6 +118,7 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   workerVdaRatePerDay: 103,
   workerMasterVdaSnapshot: 2790,
   monthlyConsultantDayBasis: 'FIXED_26_PRESENT_ONLY',
+  consultantOtWhitelist: ['CON01', 'CON20', 'CON24'],
   pfCeiling: 15000,
   pfCappedAmount: 1800,
   esiCeiling: 21000,

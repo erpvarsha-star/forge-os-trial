@@ -4,7 +4,10 @@
  *   calcStaff (gs ~6100), calcWorker (~6178), calc_simple_ (~6282),
  *   calc_pf_ (~6087), calc_mlwf_ (~6091), ptAmount (~5819), efficiencySlab (~5841).
  *
- * Monthly CONSULTANT OT is PAID (owner decision 31 Oct 2026): gross / days / 8 x hours, x1.
+ * Consultant OT — OWNER DECISION 4 Nov 2026 (supersedes the 31 Oct "all monthly
+ * consultants get OT" decision): only CON01, CON20, CON24 (cfg.consultantOtWhitelist)
+ * are paid overtime, for EITHER rate basis (daily or monthly-gross). Every other
+ * consultant gets otPay=0 regardless of hours, rate_type, or basis.
  *
  * Monthly CONSULTANT base pay — OWNER DECISION 4 Nov 2026 (live default,
  * cfg.monthlyConsultantDayBasis = 'FIXED_26_PRESENT_ONLY'): dailyRate =
@@ -129,16 +132,24 @@ function calcWorker(input: PayrollInput, cfg: EngineConfig): PayrollResult {
 
 const MONTHLY_CONSULTANT_FIXED_DAYS = 26;
 
+/** Consultant OT whitelist gate — OWNER DECISION 4 Nov 2026. Only ever gates
+ *  category CONSULTANT; PUNE_STAFF and everything else is unaffected. */
+function consultantOtAllowed(input: PayrollInput, cfg: EngineConfig): boolean {
+  if (input.category !== 'CONSULTANT') return true;
+  return cfg.consultantOtWhitelist.includes(input.empCode);
+}
+
 function calcSimple(input: PayrollInput, cfg: EngineConfig): PayrollResult {
   const rp = input.rateProfile;
   const res = blank(input);
   if (!rp?.basis) { res.blockers.push('MISSING_RATE'); return finish(res); }
   const wd = input.workingDays, w = workedDays(input);
+  const otAllowed = consultantOtAllowed(input, cfg);
   let gross: number, otPay = 0, worked = w;
   if (rp.basis === 'DAILY_RATE') {
     if (rp.rateAmount == null) { res.blockers.push('MISSING_RATE'); return finish(res); }
     gross = r2(rp.rateAmount * w);
-    otPay = r2((rp.rateAmount / 8) * input.otHours); // x1, not x2
+    if (otAllowed) otPay = r2((rp.rateAmount / 8) * input.otHours); // x1, not x2
   } else if (input.category === 'CONSULTANT' && cfg.monthlyConsultantDayBasis === 'FIXED_26_PRESENT_ONLY') {
     // OWNER DECISION 4 Nov 2026: monthly consultants are on a fixed 26-day basis,
     // paid only for physically present days — no weekly-off or leave credit.
@@ -147,17 +158,18 @@ function calcSimple(input: PayrollInput, cfg: EngineConfig): PayrollResult {
     const dailyRate = rp.monthlyGross / MONTHLY_CONSULTANT_FIXED_DAYS;
     worked = input.days.present;
     gross = r2(dailyRate * worked);
-    if (input.otHours > 0) {
+    if (otAllowed && input.otHours > 0) {
       otPay = r2((dailyRate / 8) * input.otHours); // same x1 OT basis, now on the 26-day daily rate
     }
   } else {
     if (rp.monthlyGross == null) { res.blockers.push('MISSING_RATE'); return finish(res); }
     gross = r2(rp.monthlyGross * w / wd);
-    // OWNER DECISION 31 Oct 2026: monthly consultants ARE paid OT, same formula as
-    // PUNE_STAFF and the old Consultant sheet: master gross / days in month / 8 x hours, x1.
-    // (Legacy CALENDAR_DAYS_PRORATED basis — reproduces actual Sept 2026 payouts only.)
-    if (input.otHours > 0) {
-      otPay = r2((rp.monthlyGross / wd / 8) * input.otHours); // PUNE_STAFF + monthly CONSULTANT x1
+    // OWNER DECISION 31 Oct 2026 (narrowed 4 Nov 2026 to the 3-person whitelist above):
+    // same formula as PUNE_STAFF and the old Consultant sheet: master gross /
+    // days in month / 8 x hours, x1. (Legacy CALENDAR_DAYS_PRORATED basis —
+    // reproduces actual Sept 2026 payouts only.)
+    if (otAllowed && input.otHours > 0) {
+      otPay = r2((rp.monthlyGross / wd / 8) * input.otHours); // PUNE_STAFF + whitelisted monthly CONSULTANT x1
     }
   }
   // No PF / ESI / PT / MLWF for consultant categories.
