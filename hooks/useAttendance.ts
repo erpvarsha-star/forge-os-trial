@@ -4,7 +4,7 @@ import { AttendanceRecord } from '@/types'
 import { istMonthYear, getMonthEndDay } from '@/lib/istDate'
 import { serverNowMs, serverAttendanceDateStr } from '@/lib/serverClock'
 import { withTimeout } from '@/lib/withTimeout'
-import { finalizeShiftAndOvertime, HALF_DAY_MAX_HOURS } from '@/lib/workingHours'
+import { finalizeShiftAndOvertime, HALF_DAY_MAX_HOURS, OPEN_RECORD_FALLBACK_HOURS } from '@/lib/workingHours'
 
 // Stored to one decimal; null when the phone reported no accuracy.
 const roundAccuracy = (m?: number | null) =>
@@ -55,8 +55,14 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
       )
       if (error || todayError) throw new Error((error || todayError)!.message)
 
-      // Night shifts (Shift 3, Security Night) check out after the 06:45 rollover,
-      // so fall back to a still-open record from the last 14h (the max sane shift).
+      // Night shifts (Shift 3/5, Security Night) check out after the 06:45
+      // rollover, so fall back to a still-open record within
+      // OPEN_RECORD_FALLBACK_HOURS (lib/workingHours.ts) — kept just under
+      // the 24h auto-checkout server cutoff so the UI never loses track of
+      // a row the server itself still considers open (real bug: a
+      // legitimate overtime check-in past the old, shorter window was
+      // "forgotten," leading to a duplicate same-day row and a subsequent
+      // lockout for the real next shift).
       let current = todayData as AttendanceRecord | null
       if (!current) {
         const { data: open } = await withTimeout(
@@ -65,7 +71,7 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
             .select('*')
             .eq('employee_id', employeeId)
             .is('check_out_time', null)
-            .gte('check_in_time', new Date(serverNowMs() - 14 * 60 * 60 * 1000).toISOString())
+            .gte('check_in_time', new Date(serverNowMs() - OPEN_RECORD_FALLBACK_HOURS * 60 * 60 * 1000).toISOString())
             .order('check_in_time', { ascending: false })
             .limit(1)
             .maybeSingle(),

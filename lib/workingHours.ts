@@ -139,3 +139,29 @@ export function canUndoCheckout(checkInTime?: string | null, checkOutTime?: stri
   const diffMinutes = (new Date(checkOutTime).getTime() - new Date(checkInTime).getTime()) / 60000
   return diffMinutes >= 0 && diffMinutes <= UNDO_CHECKOUT_WINDOW_MINUTES
 }
+
+// ---------------------------------------------------------------------------
+// Still-open-record fallback window — real production bug reported by the
+// owner, Nov 2026: a night-shift worker (Shift 3/5, ~19:00-07:00) who
+// legitimately works past shift end into real overtime (e.g. until 10:00)
+// was silently "forgotten" as checked-in once this window elapsed, since
+// `hooks/useAttendance.ts`'s fetchRecords() falls back to searching for any
+// still-open (`check_out_time is null`) row within this many hours of
+// `check_in_time` when there's no row for today's attendance date yet. If
+// the window is too short relative to the server-side auto-checkout cutoff
+// (`supabase/functions/auto-checkout/index.ts`, 24h), the UI loses track of
+// a row the server itself still considers open, the employee taps
+// "check in" again, a second row gets created for the current calendar
+// date, and checking out of THAT row leaves them unable to check in again
+// for their real next shift that evening.
+//
+// Set to just under the 24h server-side auto-checkout cutoff — not equal to
+// it — so the UI's own fallback window closes slightly before the server
+// would actually auto-checkout the row. This is a deliberate 1h margin, not
+// a precise requirement: the edge case it avoids (the UI treating a row as
+// still-open in the last hour before auto-checkout would close it anyway)
+// is harmless either way, since auto-checkout only fills in the checkout
+// fields using the same no-checkout convention this file already defines —
+// it was just safer to leave a small gap than to match the boundary
+// exactly.
+export const OPEN_RECORD_FALLBACK_HOURS = 23
