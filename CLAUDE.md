@@ -2979,6 +2979,17 @@ Implements items 1-2 of the "resolving the 3 excel-sheet contradictions" answers
 - **Regression**: `scripts/payroll-engine.sept2026.test.ts` extended with an explicit whitelist block (non-whitelisted monthly + daily consultants get no OT despite hours; CON01/CON20/CON24 do; PUNE_STAFF unaffected) — 87/0 passing (was 68/0 before this change). `scripts/payroll-feedsync.test.ts` 64/0 unaffected. `npx tsc --noEmit` still exactly the 7 pre-existing baseline errors.
 - **CON05/CON09/CON12/CON13 `rate_type` is UNTOUCHED, still `'monthly'`** — the owner has not given real daily-rate figures for them; do not guess one from their old monthly salary. Revisit only once those numbers arrive.
 
+## Owner decision of 4 Nov 2026 (evening) — day-count correction stays reporting-only
+
+**Clarification, not a correction to a prior fact — the "already corrected days in our tables" belief was checked live and found not to be true.** Claude queried `audit_log` directly: zero UPDATE/DELETE writes to `attendance_records` since 1 Nov 2026. The lesser-of-app-days-vs-sheet-days rule has only ever been applied inside the scratchpad comparison workbooks (Batch 1/Batch 2, consultant/Pune sheets) — nothing in the live `attendance_records` table has ever been edited to match it. **Owner's decision once told this: keep it that way — reporting-only.** `attendance_records` stays the real, unedited punch history; the payroll sheets apply the lesser-of rule when computing the payable figure, but no employee's stored attendance row is ever changed to force a match.
+
+## Owner instruction of 4 Nov 2026 (evening) — complete pending items, leave system live, >12h logging instructions
+
+1. **Complete what's pending** — the two items flagged in PENDING.md's 4 Nov resume block: the 47-person staff overtime whitelist (list already have, from `Salary_app_correction_points.xlsx`'s "Staff overtime employees list" tab) and the efficiency-slab wiring (replacing the flat production-allowance assumption with the real monthly slab table + HR/plant-head-entered "Days Payable" denominator).
+2. **Leave application + leave balances for worker and staff must go live** — in-app, for real use, not just built-and-tested.
+3. **Once both of the above are done, regenerate the full comparison/payable sheet for all populations** (staff, worker, consultant, Pune) under every rule decided so far.
+4. **Instructions needed**: how someone who stays past 12 hours and needs to come back the same day should log their extra hours.
+
 ## Owner instruction of 2 Nov 2026 — final shape of the October package
 
 **"I would like to see the tables as per HR for Ready - first pay, get them to answer for the balance day and no app use and give accounts second lot for payment. And consultant will be as per your calculation and the missing days as per attendance sheet will come in second batch."**
