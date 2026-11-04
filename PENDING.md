@@ -1,5 +1,11 @@
-# >>> RESUME STATE 4 Nov 2026, late night (round 2) — SESSION ENDED (LATEST — supersedes every block below where they conflict) <<<
-**Restart rule:** if work stops for any reason, read this block first. Branch `claude/forge-os-backend-setup-7woj4t`, HEAD = `8105e11` (PR #39 squash-merged), local checkout `ccr-8cdbca68-137bnz` merged up to match and pushed (`7957e67`). `git status` clean on both.
+# >>> RESUME STATE 4 Nov 2026, late night (round 3) — SESSION ENDED (LATEST — supersedes every block below where they conflict) <<<
+**Restart rule:** if work stops for any reason, read this block first. Branch `claude/forge-os-backend-setup-7woj4t`, HEAD = `6a7c323` (PR #39 + #40 both squash-merged), local checkout `ccr-8cdbca68-137bnz` merged up to match and pushed. `git status` clean on both.
+
+## Supabase "Branching" integration — RESOLVED, CLOSED (4 Nov 2026 late night)
+
+Owner saw repeated "MIGRATIONS: FAILED" runs in Supabase's Branching dashboard (screenshot). Root cause, confirmed: this project's org is on the Free tier, where real preview-branch databases aren't available — only the GitHub integration's "Deploy to production" auto-migrate-on-push step was active, and it kept failing because `list_migrations` shows only 58 entries tracked while this project has applied ~130 SQL patches directly via `execute_sql`/the dashboard (the project's actual, intentional workflow per the locked rules above) — the migration-history table Supabase's sync compares against has been drifted for months, unrelated to anything in this session. **Confirmed NOT caused by, and NOT affecting, any of this session's work**: both PRs (#39, #40) merged cleanly via GitHub's normal API, `Build Android APK` succeeded (apk-124), and `payroll-run` v16 was deployed + independently verified via a separate mechanism (Supabase MCP tool direct deploy, nothing to do with Branching/migrations sync).
+
+**Fix: owner turned OFF "Deploy to production" in Supabase → Project Settings → Integrations → GitHub, confirmed saved.** This stops the auto-apply-migrations-on-push step that was failing. Nothing else changed — live DB, edge functions, GitHub repo/branches/Actions all unaffected (verified reasoning given to owner before the toggle; owner applied it and confirmed). **No further action needed on this. Do not re-investigate in a future session** — if "Branching"/migration-sync questions come up again, this is already closed, same instinct as the project's own "stale note" rule.
 
 ## PATCH_127 MERGED + `payroll-run` REDEPLOYED to v16 — DONE, verified, this round
 
