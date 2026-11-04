@@ -50,7 +50,7 @@ async function loadFeeds(supabase: any, year: number, month: number) {
   const mm = String(month).padStart(2, '0');
   const payrollMonth = `${year}-${mm}`; // PATCH_91 feed key
   const periodEnd = `${year}-${mm}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`;
-  const [employees, salaries, attendance, leaves, advances, canteen, society, efficiency, adjustments, statusEvents, recurring] =
+  const [employees, salaries, attendance, leaves, advances, canteen, society, efficiency, efficiencySlabs, adjustments, statusEvents, recurring] =
     await Promise.all([
       safe(supabase.from('employees').select('id,emp_code,name,category,work_location,gender,is_active,weekly_off_day,pt_exempt')),
       safe(supabase.from('employee_salary_structure').select('*')),
@@ -62,15 +62,17 @@ async function loadFeeds(supabase: any, year: number, month: number) {
         .eq('payroll_month', payrollMonth)),
       safe(supabase.from('payroll_society_recoveries').select('employee_id,total_recovery_inr,approval_status')
         .eq('payroll_month', payrollMonth)),
-      safe(supabase.from('payroll_efficiency_entries').select('employee_id,efficiency_pct,approval_status')
+      safe(supabase.from('payroll_efficiency_entries').select('employee_id,efficiency_pct,approval_status,days_payable')
         .eq('payroll_month', payrollMonth)),
+      // PATCH_125 — static slab lookup (rarely changes); not month-scoped.
+      safe(supabase.from('payroll_efficiency_slabs').select('slab_pct,amount_post_aug2025')),
       safe(supabase.from('payroll_adjustments').select('employee_id,adjustment_type,signed_amount_inr,approval_status,reason')
         .eq('payroll_month', payrollMonth)),
       safe(supabase.from('employee_status_history').select('employee_id,status,effective_from')),
       safe(supabase.from('recurring_adjustments').select('employee_id,kind,label,amount,active_from,active_to,is_active')),
     ]);
   return { mm, payrollMonth, periodEnd, employees, salaries, attendance, leaves, advances, canteen, society,
-    efficiency, adjustments, statusEvents, recurring };
+    efficiency, efficiencySlabs, adjustments, statusEvents, recurring };
 }
 
 type Feeds = Awaited<ReturnType<typeof loadFeeds>>;
@@ -82,7 +84,7 @@ async function buildRunInputs(supabase: any, run: any, year: number, month: numb
     advances: f.advances,
     canteen: f.canteen.filter((c: any) => c.approval_status === 'approved'),
     society: f.society.filter((c: any) => c.approval_status === 'approved'),
-    efficiency: f.efficiency, adjustments: f.adjustments, statusEvents: f.statusEvents,
+    efficiency: f.efficiency, efficiencySlabs: f.efficiencySlabs, adjustments: f.adjustments, statusEvents: f.statusEvents,
   });
   const idByCode = new Map(f.employees.map((e: any) => [e.emp_code, e.id]));
   const topup = !!run.adjustment_of;

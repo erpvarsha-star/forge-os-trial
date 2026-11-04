@@ -222,5 +222,44 @@ check('Pune Oct-2026 wd = 27 (4 Sundays off)', workingDaysInMonth(2026, 10, WEEK
 check('Waluj Sep-2026 wd = 26 (4 Fridays off)', workingDaysInMonth(2026, 9, WEEKLY_OFF_WEEKDAY.WALUJ) === 26);
 check('Monthly-prorated wd = full calendar', workingDaysInMonth(2026, 10, null) === 31);
 
+console.log('== Worker production allowance: slab + Days Payable override (PATCH_125, Salary_app_correction_points.xlsx) ==');
+{
+  // VFL4008's real October 2026 row from the owner's Efficiency sheet, read directly
+  // with openpyxl: Physical Present Days 21, Efficiency Amount Applicable 4500 (slab
+  // for 81%), Days Payable 25 (HR-entered, NOT wd=26) -> Payable Efficiency Amount
+  // (per the sheet's own column) = 3780.
+  const mk = (present: number, extra: Partial<PayrollInput> = {}): PayrollInput => ({
+    empCode: 'VFL4008', category: 'PERMANENT_WORKER', month: 10, year: 2026, workingDays: 26,
+    masters: { BASIC: 15756, HRA: 3555.84, CONVEYANCE: 3334, WASHING: 3111, EDUCATION: 3334, HEAT: 0, FIXED_GROSS: 40380.84 },
+    days: { present, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: 0, deductions: { canteen: 0, society: 0, advance: 0 },
+    ...extra,
+  });
+
+  const withOverride = calculateOne(mk(21, { efficiencyPct: 81, efficiencyAmountOverride: 4500, daysPayableOverride: 25 }));
+  check('Oct-2026 worked example (21 present, 81%->4500, Days Payable 25) = 3780',
+    withOverride.earnings.PROD_ALLOWANCE === 3780, `got ${withOverride.earnings.PROD_ALLOWANCE}`);
+
+  // No override supplied (e.g. a month with no payroll_efficiency_slabs/entries row yet) ->
+  // falls back to the documented default: PROD_SLAB[81]=4500 x present / wd(26), NOT the
+  // Oct-specific 25. This is the exact pre-PATCH_125 behaviour, still correct for months
+  // (like Sept-2026) where Days Payable happens to equal wd.
+  const fallback = calculateOne(mk(21, { efficiencyPct: 81 }));
+  check('No override -> falls back to PROD_SLAB x present / workingDays (26), not Oct Days Payable (25)',
+    fallback.earnings.PROD_ALLOWANCE === Math.round(4500 * 21 / 26), `got ${fallback.earnings.PROD_ALLOWANCE}`);
+  check('Fallback result differs from the override result (proves the override actually changes the denominator)',
+    fallback.earnings.PROD_ALLOWANCE !== withOverride.earnings.PROD_ALLOWANCE);
+
+  // Override present but no efficiencyPct at all -> still MISSING, prod=0, unaffected by the new fields.
+  const missing = calculateOne(mk(21, { daysPayableOverride: 25 }));
+  check('Missing efficiencyPct still warns + prod=0 regardless of daysPayableOverride',
+    missing.earnings.PROD_ALLOWANCE === 0 && missing.warnings.some((w) => w.includes('EFFICIENCY_MISSING')));
+
+  // The frozen Sept-2026 fixtures themselves (all 19 workers, full "== PERMANENT_WORKER x19 =="
+  // block above — unchanged by this patch, no override fields set there) already prove the
+  // no-override path still reproduces real paid nets exactly; this block only isolates the
+  // PROD_ALLOWANCE line to show the override vs. fallback denominators diverge as expected.
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

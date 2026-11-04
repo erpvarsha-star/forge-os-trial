@@ -116,9 +116,17 @@ function calcWorker(input: PayrollInput, cfg: EngineConfig): PayrollResult {
   const edu = perDay(m.EDUCATION ?? 0);
   const heat = (m.HEAT ?? 0) === 150 ? r2(w * 5.78) : 0;
   const vda = r2(cfg.workerVdaRatePerDay * pp); // VDA on PHYSICAL present days only
-  const slab = prodSlabFor(input.efficiencyPct ?? null);
+  // Production allowance — OWNER DATA 4 Nov 2026 (Salary_app_correction_points.xlsx,
+  // Efficiency sheet). Live runs supply `efficiencyAmountOverride` (the month's
+  // slab-resolved flat amount, from payroll_efficiency_slabs) and `daysPayableOverride`
+  // (the month's HR-entered "Days Payable", e.g. Oct 2026 = 25 — NOT always equal to
+  // `wd`). Falls back to the PROD_SLAB table + `wd` only when no month entry exists
+  // (documented default; also what the frozen Sept-2026 fixtures rely on, where
+  // Days Payable happened to equal wd).
+  const slab = input.efficiencyAmountOverride ?? prodSlabFor(input.efficiencyPct ?? null);
   if (slab === null) res.warnings.push('EFFICIENCY_MISSING: production allowance set to 0');
-  const prod = r2(Math.min(slab ?? 0, Math.round((slab ?? 0) * pp / wd)));
+  const prodDenominator = input.daysPayableOverride ?? wd;
+  const prod = r2(Math.min(slab ?? 0, Math.round((slab ?? 0) * pp / prodDenominator)));
   const vdaForOt = cfg.workerOtVdaBasis === 'MASTER_SNAPSHOT'
     ? (cfg.workerMasterVdaSnapshot ?? 0)
     : cfg.workerVdaRatePerDay * wd;

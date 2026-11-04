@@ -43,6 +43,15 @@ export interface PayrollInput {
   days: DayCounts;
   otHours: number;
   efficiencyPct?: number | null;  // workers; null/undefined => WARN + slab 0
+  /** Worker production allowance — OWNER DATA 4 Nov 2026 (Salary_app_correction_points.xlsx,
+   *  Efficiency sheet). When the month has an HR-entered slab-table lookup, feedSync resolves
+   *  it to a flat amount + denominator and passes both here; the engine then prorates
+   *  `efficiencyAmountOverride x present / daysPayableOverride` instead of
+   *  `prodSlabFor(efficiencyPct) x present / workingDays`. Either/both undefined => engine
+   *  falls back to the PROD_SLAB table + `workingDays`, the documented default used when no
+   *  month entry exists yet, and exactly what historical/frozen fixtures already rely on. */
+  efficiencyAmountOverride?: number;
+  daysPayableOverride?: number;
   deductions: {
     canteen: number;
     society: number;

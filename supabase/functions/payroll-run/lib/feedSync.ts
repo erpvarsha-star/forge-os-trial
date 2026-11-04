@@ -45,7 +45,8 @@ export interface AttendanceRow {
 export interface LeaveRow { employee_id: string; type: string; start_date: string; end_date: string; days: number; status: string }
 export interface AdvanceRow { employee_id: string; monthly_deduction: number | null; outstanding_balance: number | null; status: string }
 export interface FeedAmountRow { employee_id: string; amount_inr?: number; total_recovery_inr?: number; approval_status: string }
-export interface EfficiencyRow { employee_id: string | null; efficiency_pct: number; approval_status: string }
+export interface EfficiencyRow { employee_id: string | null; efficiency_pct: number; approval_status: string; days_payable?: number | null }
+export interface EfficiencySlabRow { slab_pct: number; amount_post_aug2025: number }
 export interface AdjustmentRow { employee_id: string; adjustment_type: string; signed_amount_inr: number; approval_status: string }
 export interface StatusEventRow { employee_id: string; status: EmployeeStatus; effective_from: string }
 
@@ -59,6 +60,7 @@ export interface FeedBundle {
   canteen: FeedAmountRow[];         // approved only (PATCH_91)
   society: FeedAmountRow[];         // approved only (PATCH_91)
   efficiency: EfficiencyRow[];      // approved only (PATCH_91); null employee_id = plant-wide
+  efficiencySlabs?: EfficiencySlabRow[]; // PATCH_125 — static slab lookup table (payroll_efficiency_slabs)
   adjustments?: AdjustmentRow[];    // PATCH_91; approved rows. Negative amounts are applied
                                     // as deductions.other; positive amounts (arrears /
                                     // incentive / encashment) are flagged as warnings until
@@ -258,6 +260,18 @@ export function assemblePayrollInputs(year: number, month: number, feeds: FeedBu
     if (cat === 'PERMANENT_WORKER' && efficiencyPct === null) {
       warnings.push(`${emp.emp_code}: no approved efficiency % for ${year}-${mm} — production allowance 0, flagged`);
     }
+    // PATCH_125 — slab-resolved flat amount + the month's HR-entered Days Payable
+    // (Salary_app_correction_points.xlsx Efficiency sheet). Both stay undefined when
+    // no month entry/slab row exists, so the engine falls back to its own PROD_SLAB +
+    // workingDays default — never guessed here.
+    let efficiencyAmountOverride: number | undefined;
+    let daysPayableOverride: number | undefined;
+    if (cat === 'PERMANENT_WORKER' && efficiencyPct !== null && efficiencyPct !== undefined) {
+      const slabRow = (feeds.efficiencySlabs ?? []).find((s) => s.slab_pct === Math.floor(Number(efficiencyPct)));
+      if (slabRow) efficiencyAmountOverride = Number(slabRow.amount_post_aug2025);
+      const dp = effMine?.days_payable;
+      if (dp !== null && dp !== undefined && Number(dp) > 0) daysPayableOverride = Number(dp);
+    }
 
     // Consultant rate profile (PATCH_97): rate_type 'daily' -> DAILY_RATE with daily_rate;
     // a daily row with no usable rate stays rateAmount-less so the engine holds it
@@ -278,7 +292,7 @@ export function assemblePayrollInputs(year: number, month: number, feeds: FeedBu
       empCode: emp.emp_code, category: cat, month, year, workingDays: wd,
       masters: cat === 'STAFF' || cat === 'PERMANENT_WORKER' ? (sal ? mastersFrom(sal, cat) : undefined) : undefined,
       rateProfile,
-      days: day, otHours, efficiencyPct,
+      days: day, otHours, efficiencyPct, efficiencyAmountOverride, daysPayableOverride,
       deductions: { canteen, society, advance: advanceFinal, other: otherDeduction || undefined },
       ptExempt: emp.pt_exempt === true,
       gender: (() => { const g = (emp.gender ?? '').trim().toLowerCase(); return g === 'female' || g === 'f' ? 'F' : 'M'; })(),

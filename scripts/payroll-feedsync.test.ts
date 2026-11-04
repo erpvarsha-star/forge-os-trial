@@ -26,7 +26,12 @@ const bundle: FeedBundle = {
   advances: [{ employee_id: 'w1', monthly_deduction: 500, outstanding_balance: 300, status: 'approved' }], // capped at balance
   canteen: [{ employee_id: 'w1', amount_inr: 120, approval_status: 'approved' }],
   society: [{ employee_id: 'w1', total_recovery_inr: 450, approval_status: 'approved' }],
-  efficiency: [{ employee_id: null, efficiency_pct: 83, approval_status: 'approved' }],
+  efficiency: [{ employee_id: null, efficiency_pct: 83, approval_status: 'approved', days_payable: 25 }],
+  efficiencySlabs: [
+    { slab_pct: 81, amount_post_aug2025: 4500 }, { slab_pct: 82, amount_post_aug2025: 5000 },
+    { slab_pct: 83, amount_post_aug2025: 6500 }, { slab_pct: 84, amount_post_aug2025: 7500 },
+    { slab_pct: 85, amount_post_aug2025: 8500 },
+  ],
   statusEvents: [
     { employee_id: 'x1', status: 'left', effective_from: '2026-09-20' }, // excluded from Oct
   ],
@@ -43,6 +48,8 @@ check('approved EL added', w1.days.el === 2);
 check('advance capped at outstanding', w1.deductions.advance === 300, `got ${w1.deductions.advance}`);
 check('canteen+society read', w1.deductions.canteen === 120 && w1.deductions.society === 450);
 check('plant-wide efficiency applied', w1.efficiencyPct === 83);
+check('PATCH_125: slab-resolved amount applied (83% -> 6500)', w1.efficiencyAmountOverride === 6500, `got ${w1.efficiencyAmountOverride}`);
+check('PATCH_125: days_payable passed through as daysPayableOverride (25, not wd 26)', w1.daysPayableOverride === 25, `got ${w1.daysPayableOverride}`);
 check('masters mapped', w1.masters?.BASIC === 15756 && w1.masters?.HEAT === 0);
 
 const p1 = r.inputs.find((i) => i.empCode === 'BUNG01')!;
@@ -231,6 +238,15 @@ check('daily with null daily_rate -> warning', cr.warnings.includes('CON18: dail
   const ar = assemblePayrollInputs(2026, 10, adjB);
   const sIn = ar.inputs.find((i) => i.empCode === 'VFL1201')!;
   check('negative adjustment still -> deductions.other; positive not warned as unapplied', sIn.deductions.other === 150 && !ar.warnings.some((w) => w.includes('not applied')));
+}
+
+{
+  // PATCH_125: no efficiencySlabs/days_payable fed at all (e.g. no month entry exists yet) ->
+  // engine receives no override, falls back to its own documented default (PROD_SLAB + wd).
+  const noSlabBundle: FeedBundle = { ...bundle, efficiencySlabs: undefined, efficiency: [{ employee_id: null, efficiency_pct: 83, approval_status: 'approved' }] };
+  const r2 = assemblePayrollInputs(2026, 10, noSlabBundle);
+  const w1b = r2.inputs.find((i) => i.empCode === 'VFL4008')!;
+  check('PATCH_125: no slab table/days_payable fed -> both overrides undefined', w1b.efficiencyAmountOverride === undefined && w1b.daysPayableOverride === undefined);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
