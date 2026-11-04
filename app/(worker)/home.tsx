@@ -25,11 +25,12 @@ import { MapPin, Clock, CheckSquare, AlertCircle, Camera, QrCode, CheckCircle2, 
 import { CameraView, Camera as ExpoCamera } from 'expo-camera'
 import { router } from 'expo-router'
 import { attendanceDateStr, istDateStr, istStartOfDayUTC } from '@/lib/istDate'
+import { canUndoCheckout } from '@/lib/workingHours'
 
 export default function WorkerHome() {
   const { t } = useTranslation()
   const { employee } = useAuth()
-  const { todayRecord, checkIn, checkOut, confirmQrOut, refresh, isLoading: attendanceLoading, loadError } = useAttendance(employee?.id || '')
+  const { todayRecord, checkIn, checkOut, undoCheckout, confirmQrOut, refresh, isLoading: attendanceLoading, loadError } = useAttendance(employee?.id || '')
   const [shift, setShift] = useState<EmployeeShift | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [showLateModal, setShowLateModal] = useState(false)
@@ -364,8 +365,37 @@ export default function WorkerHome() {
     await handleCheckIn()
   }
 
+  const handleUndoCheckout = () => {
+    Alert.alert(
+      t('worker.undoCheckoutConfirmTitle'),
+      t('worker.undoCheckoutConfirmMsg'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.confirm'),
+          onPress: async () => {
+            setIsLoading(true)
+            try {
+              const { error } = await undoCheckout()
+              if (error) {
+                alertError(t, error)
+              } else {
+                await refresh()
+              }
+            } catch (e) {
+              alertError(t, e)
+            } finally {
+              setIsLoading(false)
+            }
+          },
+        },
+      ]
+    )
+  }
+
   const isCheckedIn = !!todayRecord?.check_in_time && !todayRecord?.check_out_time
   const isCheckedOut = !!todayRecord?.check_out_time
+  const canUndo = isCheckedOut && canUndoCheckout(todayRecord?.check_in_time, todayRecord?.check_out_time)
 
   if (!employee) return <LoadingScreen />
 
@@ -423,6 +453,16 @@ export default function WorkerHome() {
                     <Text className="text-xs text-ink-500 text-center">
                       {t('worker.checkedOutAt', { time: formatTime(todayRecord.check_out_time) })}
                     </Text>
+                  )}
+                  {canUndo && (
+                    <Button
+                      title="worker.undoCheckout"
+                      onPress={handleUndoCheckout}
+                      loading={isLoading}
+                      variant="outline"
+                      size="sm"
+                      className="mt-4"
+                    />
                   )}
                 </View>
               ) : (

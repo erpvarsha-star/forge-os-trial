@@ -244,6 +244,62 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     return { data, error }
   }
 
+  // Undo an accidental immediate checkout (within UNDO_CHECKOUT_WINDOW_MINUTES
+  // of check-in, gated by the caller via lib/workingHours.ts's
+  // canUndoCheckout() before this is even offered/called). A plain UPDATE,
+  // not an upsert — unlike checkIn(), this must never touch check_in_time
+  // (or late_minutes/late_reason/qr_verified/mock_location_detected/
+  // device_id), only reverse what checkOut() itself set.
+  //
+  // Status revert: checkOut() may have flipped status to 'HL' via the
+  // HALF_DAY_MAX_HOURS branch; undoing the checkout means that threshold no
+  // longer applies, so status reverts to whatever check-in time alone would
+  // have produced — 'L' if late_minutes is set and > 0, else 'P' — same
+  // derivation checkIn() itself uses.
+  //
+  // Shift reclassification (Shift 1->4 / Shift 3->5 at 12h+ hours_worked,
+  // via set_my_shift_for_date p_source:'system_reclassified') is
+  // deliberately NOT reverted here: that branch only fires at 12h+
+  // hours_worked, which cannot happen within the short undo window this is
+  // gated to, so it's out of scope by construction.
+  const undoCheckout = async () => {
+    if (!todayRecord?.check_out_time) return { data: null, error: new Error('No checkout to undo') }
+
+    const revertedStatus =
+      typeof todayRecord.late_minutes === 'number' && todayRecord.late_minutes > 0 ? 'L' : 'P'
+
+    const updatePayload: Record<string, unknown> = {
+      check_out_time: null,
+      check_out_lat: null,
+      check_out_lng: null,
+      check_out_accuracy_m: null,
+      hours_worked: null,
+      overtime_hours: null,
+      status: revertedStatus,
+    }
+
+    let data: any = null
+    let error: any = null
+    try {
+      const res = await withTimeout(
+        supabase.from('attendance_records').update(updatePayload).eq('id', todayRecord.id).select().single(),
+        15000,
+        'Undo checkout save'
+      )
+      data = res.data
+      error = res.error
+    } catch (e) {
+      error = e
+    }
+
+    if (!error && data) {
+      setTodayRecord(data as AttendanceRecord)
+      await fetchRecords()
+    }
+
+    return { data, error }
+  }
+
   const confirmQr = async () => {
     if (!todayRecord) return { data: null, error: new Error('No open attendance record') }
     let data: any = null
@@ -292,5 +348,5 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     return { data, error }
   }
 
-  return { records, todayRecord, isLoading, loadError, checkIn, checkOut, confirmQr, confirmQrOut, refresh: fetchRecords }
+  return { records, todayRecord, isLoading, loadError, checkIn, checkOut, undoCheckout, confirmQr, confirmQrOut, refresh: fetchRecords }
 }

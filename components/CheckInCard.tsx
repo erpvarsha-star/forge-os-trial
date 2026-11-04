@@ -26,6 +26,7 @@ import { MapPin, CheckCircle2, QrCode, Star, X } from 'lucide-react-native'
 import { CameraView, Camera } from 'expo-camera'
 import { isPresentStatus } from '@/constants'
 import { attendanceDateStr } from '@/lib/istDate'
+import { canUndoCheckout } from '@/lib/workingHours'
 
 /**
  * Every non-worker role (manager, hr-admin, supervisor, plant-head,
@@ -42,7 +43,7 @@ import { attendanceDateStr } from '@/lib/istDate'
 export function CheckInCard() {
   const { t } = useTranslation()
   const { employee } = useAuth()
-  const { records, todayRecord, checkIn, checkOut, confirmQr, confirmQrOut, refresh, isLoading: attendanceLoading, loadError } = useAttendance(
+  const { records, todayRecord, checkIn, checkOut, undoCheckout, confirmQr, confirmQrOut, refresh, isLoading: attendanceLoading, loadError } = useAttendance(
     employee?.id || ''
   )
   const presentDaysThisMonth = records.filter(r => isPresentStatus(r.status)).length
@@ -405,8 +406,37 @@ export function CheckInCard() {
     await handleCheckIn()
   }
 
+  const handleUndoCheckout = () => {
+    Alert.alert(
+      t('worker.undoCheckoutConfirmTitle'),
+      t('worker.undoCheckoutConfirmMsg'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.confirm'),
+          onPress: async () => {
+            setIsLoading(true)
+            try {
+              const { error } = await undoCheckout()
+              if (error) {
+                alertError(t, error)
+              } else {
+                await refresh()
+              }
+            } catch (e) {
+              alertError(t, e)
+            } finally {
+              setIsLoading(false)
+            }
+          },
+        },
+      ]
+    )
+  }
+
   const isCheckedIn = !!todayRecord?.check_in_time && !todayRecord?.check_out_time
   const isCheckedOut = !!todayRecord?.check_out_time
+  const canUndo = isCheckedOut && canUndoCheckout(todayRecord?.check_in_time, todayRecord?.check_out_time)
 
   const formatTime = (iso: string) =>
     new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -442,6 +472,16 @@ export function CheckInCard() {
                 <Text className="text-xs text-ink-500 text-center">
                   {t('worker.checkedOutAt', { time: formatTime(todayRecord.check_out_time) })}
                 </Text>
+              )}
+              {canUndo && (
+                <Button
+                  title="worker.undoCheckout"
+                  onPress={handleUndoCheckout}
+                  loading={isLoading}
+                  variant="outline"
+                  size="sm"
+                  className="mt-4"
+                />
               )}
             </View>
           ) : (

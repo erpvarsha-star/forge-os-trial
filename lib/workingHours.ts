@@ -114,3 +114,28 @@ export function finalizeShiftAndOvertime(
 export function effectiveHoursWorked(hoursWorked: number | null | undefined, shiftName: string | null | undefined): number {
   return typeof hoursWorked === 'number' ? hoursWorked : defaultHoursForShift(shiftName)
 }
+
+// ---------------------------------------------------------------------------
+// Undo an accidental immediate checkout — real production bug reported by
+// Yash: an employee checks in, then taps check-out within minutes by
+// mistake, and before this had no way back to checked-in for the rest of
+// the day (CheckInCard.tsx / app/(worker)/home.tsx both rendered a
+// no-check-in-button "checked out" view the moment check_out_time was set).
+//
+// Gated to a short window after the check-in itself — this is for undoing a
+// genuine slip of the thumb, not a general "edit my attendance" escape
+// hatch. UNDO_CHECKOUT_WINDOW_MINUTES = 30 is Claude's own default (no
+// number was given); change it here, in the one place both screens read it
+// from, if a different window is wanted.
+export const UNDO_CHECKOUT_WINDOW_MINUTES = 30
+
+// Pure duration math on two already-stored timestamps (checkout minus
+// check-in) — timezone-invariant by construction, so this is NOT a "what
+// calendar day/time is it" read and does not need an IST helper or the
+// server clock (see CLAUDE.md's locked IST rule and its own duration-math
+// exception).
+export function canUndoCheckout(checkInTime?: string | null, checkOutTime?: string | null): boolean {
+  if (!checkInTime || !checkOutTime) return false
+  const diffMinutes = (new Date(checkOutTime).getTime() - new Date(checkInTime).getTime()) / 60000
+  return diffMinutes >= 0 && diffMinutes <= UNDO_CHECKOUT_WINDOW_MINUTES
+}
