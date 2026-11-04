@@ -122,8 +122,12 @@ const ctx = (feeds: ExtrasFeeds) => ({ periodStart: PS, periodEnd: PE, feeds });
   // non-PUNE never gets BUNG lines, engine OT kept
   const st = computeExtras({ employeeId: 'p', empCode: 'S', category: 'STAFF', periodStart: PS, periodEnd: PE, feeds });
   check('non-PUNE: no BUNG OT / travel', st.items.length === 0 && st.warnings.length === 0);
-  const stOt = calculateWithExtras(staffIn({ otHours: 3 }), 'p', ctx(feeds), DEFAULT_ENGINE_CONFIG);
-  check('STAFF keeps engine OT', stOt.result.earnings.OT > 0);
+  // empCode must be on the staff OT whitelist (owner decision, Salary_app_correction_points.xlsx)
+  // for engine OT to be nonzero at all — 'S' isn't a real emp_code so use a real whitelisted one.
+  const stOt = calculateWithExtras(staffIn({ empCode: 'VFL1066', otHours: 3 }), 'p', ctx(feeds), DEFAULT_ENGINE_CONFIG);
+  check('STAFF (whitelisted) keeps engine OT', stOt.result.earnings.OT > 0);
+  const stOtNotWhitelisted = calculateWithExtras(staffIn({ empCode: 'S', otHours: 3 }), 'p', ctx(feeds), DEFAULT_ENGINE_CONFIG);
+  check('STAFF (not whitelisted) gets no engine OT', stOtNotWhitelisted.result.earnings.OT === 0);
   // top-up / determinism
   const r2 = calculateWithExtras(pune(), 'p', ctx(feeds), DEFAULT_ENGINE_CONFIG);
   check('PUNE idempotent', JSON.stringify(r.result) === JSON.stringify(r2.result));

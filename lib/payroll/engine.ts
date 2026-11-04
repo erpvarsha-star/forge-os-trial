@@ -9,6 +9,11 @@
  * are paid overtime, for EITHER rate basis (daily or monthly-gross). Every other
  * consultant gets otPay=0 regardless of hours, rate_type, or basis.
  *
+ * Staff OT — OWNER DECISION (Salary_app_correction_points.xlsx, "Staff overtime
+ * employees list" tab): only the 47 named emp_codes in cfg.staffOtWhitelist are
+ * paid overtime. Every other STAFF employee gets otPay=0 regardless of hours.
+ * Gate is a pure emp_code whitelist, checked only for category === 'STAFF'.
+ *
  * Monthly CONSULTANT base pay — OWNER DECISION 4 Nov 2026 (live default,
  * cfg.monthlyConsultantDayBasis = 'FIXED_26_PRESENT_ONLY'): dailyRate =
  * monthlyGross / 26, pay = dailyRate x days.present (no weekly-off/leave
@@ -57,6 +62,14 @@ function mlwf(input: PayrollInput, cfg: EngineConfig): number {
   return (input.month === 6 || input.month === 12) ? cfg.mlwfAmount : 0;
 }
 
+/** Staff OT whitelist gate — OWNER DECISION (Salary_app_correction_points.xlsx,
+ *  "Staff overtime employees list", 47 named emp_codes). Only ever gates
+ *  category STAFF; every other category is unaffected. */
+function staffOtAllowed(input: PayrollInput, cfg: EngineConfig): boolean {
+  if (input.category !== 'STAFF') return true;
+  return cfg.staffOtWhitelist.includes(input.empCode);
+}
+
 function calcStaff(input: PayrollInput, cfg: EngineConfig): PayrollResult {
   const m = input.masters;
   const res = blank(input);
@@ -69,7 +82,7 @@ function calcStaff(input: PayrollInput, cfg: EngineConfig): PayrollResult {
   const pf = pfEmployee(pfWage, cfg);
   const esi = m.FIXED_GROSS <= cfg.esiCeiling ? r2(m.FIXED_GROSS * 0.0075 / wd * w) : 0;
   const basicPM = STAFF_COMPONENT_PCTS.BASIC * m.FIXED_GROSS;
-  const otPay = r2((basicPM / wd / 8) * 2 * input.otHours);
+  const otPay = staffOtAllowed(input, cfg) ? r2((basicPM / wd / 8) * 2 * input.otHours) : 0;
   const pt = ptFor(gross, input, cfg);
   const mlf = mlwf(input, cfg);
   res.worked = w;

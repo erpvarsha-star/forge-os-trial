@@ -104,6 +104,14 @@ export interface EngineConfig {
    *  or hours worked. Gate is a pure emp_code whitelist, checked only for
    *  category === 'CONSULTANT' — never widen this by rate_type or category. */
   consultantOtWhitelist: string[];
+  /** STAFF OT WHITELIST — OWNER DECISION (Salary_app_correction_points.xlsx,
+   *  "Staff overtime employees list" tab, 47 named emp_codes). Only these 47
+   *  STAFF employees are paid overtime; every other STAFF employee gets no OT
+   *  line regardless of otHours fed in. Gate is a pure emp_code whitelist,
+   *  checked only for category === 'STAFF' — never widen this by department,
+   *  role or any other field, and never let it affect WORKER/CONSULTANT/
+   *  PUNE_STAFF OT logic. */
+  staffOtWhitelist: string[];
   pfCeiling: number;             // 15000
   pfCappedAmount: number;        // 1800
   esiCeiling: number;            // 21000 (fixed gross)
@@ -118,6 +126,15 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   workerMasterVdaSnapshot: 2790,
   monthlyConsultantDayBasis: 'FIXED_26_PRESENT_ONLY',
   consultantOtWhitelist: ['CON01', 'CON20', 'CON24'],
+  staffOtWhitelist: [
+    'VFL1066', 'VFL1272', 'VFL1290', 'VFL1327', 'VFL1391', 'VFL1446', 'VFL1450',
+    'VFL1453', 'VFL1482', 'VFL1516', 'VFL1520', 'VFL1527', 'VFL1543', 'VFL1549',
+    'VFL1556', 'VFL1562', 'VFL5237', 'VFL5272', 'VFL5273', 'VFL5302', 'VFL5303',
+    'VFL5318', 'VFL5321', 'VFL5322', 'VFL5324', 'VFL5347', 'VFL5382', 'VFL5397',
+    'VFL5399', 'VFL5400', 'VFL5405', 'VFL5409', 'VFL5413', 'VFL5430', 'VFL5433',
+    'VFL5439', 'VFL5444', 'VFL5448', 'VFL5449', 'VFL5450', 'VFL5452', 'VFL5458',
+    'VFL5459', 'VFL5460', 'VFL5463', 'VFL5465', 'VFL5466',
+  ],
   pfCeiling: 15000,
   pfCappedAmount: 1800,
   esiCeiling: 21000,

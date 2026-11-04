@@ -161,6 +161,53 @@ console.log('== Monthly consultant 26-day fixed basis (owner decision 4 Nov 2026
   check('daily-rate consultant unaffected (700 x 25 = 17500)', rDaily.earnings.GROSS === 17500, `got ${rDaily.earnings.GROSS}`);
 }
 
+console.log('== Staff OT whitelist (owner decision, Salary_app_correction_points.xlsx "Staff overtime employees list", 47 named emp_codes) ==');
+{
+  const mkStaff = (emp: string, ot: number): PayrollInput => ({
+    empCode: emp, category: 'STAFF', month: 11, year: 2026, workingDays: 26,
+    masters: { FIXED_GROSS: 45000 },
+    days: { present: 26, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: ot, deductions: { canteen: 0, society: 0, advance: 0 },
+  });
+  // A spread sample of the 47 whitelisted codes gets OT when hours are fed in.
+  for (const emp of ['VFL1066', 'VFL1482', 'VFL5322', 'VFL5450', 'VFL5466']) {
+    const r = calculateOne(mkStaff(emp, 20));
+    check(`${emp} (whitelisted staff) DOES get OT for 20h`, r.otPay > 0 && (r.earnings.OT ?? 0) > 0, `got otPay=${r.otPay}`);
+  }
+  // A staff employee NOT on the list gets NO OT line despite nonzero OT hours.
+  for (const emp of ['VFL1001', 'VFL5440', 'VFL9999']) {
+    const r = calculateOne(mkStaff(emp, 20));
+    check(`${emp} (not whitelisted staff) gets NO OT despite 20h`, r.otPay === 0 && (r.earnings.OT ?? 0) === 0, `got otPay=${r.otPay} earnings.OT=${r.earnings.OT}`);
+    check(`${emp} not held/blocked just from the OT gate`, !r.held && r.blockers.length === 0, JSON.stringify(r.blockers));
+  }
+  // WORKER/CONSULTANT/PUNE_STAFF OT must be completely unaffected by the staff whitelist
+  // (i.e. a non-STAFF emp_code that happens NOT to be in staffOtWhitelist still gets OT).
+  const rWorker: PayrollInput = {
+    empCode: 'VFL4008', category: 'PERMANENT_WORKER', month: 11, year: 2026, workingDays: 26,
+    masters: { BASIC: 15756, HRA: 3555.84, CONVEYANCE: 3334, WASHING: 3111, EDUCATION: 3334, HEAT: 0, FIXED_GROSS: 40380.84 },
+    days: { present: 25, ph: 1, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: 20, efficiencyPct: 81, deductions: { canteen: 0, society: 0, advance: 0 },
+  };
+  const rw = calculateOne(rWorker);
+  check('PERMANENT_WORKER (not in staffOtWhitelist, irrelevant) OT unaffected', rw.otPay > 0, `got otPay=${rw.otPay}`);
+  const rCon: PayrollInput = {
+    empCode: 'CON01', category: 'CONSULTANT', month: 11, year: 2026, workingDays: 30,
+    rateProfile: { basis: 'DAILY_RATE', rateAmount: 700 },
+    days: { present: 26, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: 15, deductions: { canteen: 0, society: 0, advance: 0 },
+  };
+  const rc = calculateOne(rCon);
+  check('CONSULTANT (on consultant whitelist, not staff list) OT unaffected by staff gate', rc.otPay > 0, `got otPay=${rc.otPay}`);
+  const rPuneStaff: PayrollInput = {
+    empCode: 'BUNG99', category: 'PUNE_STAFF', month: 11, year: 2026, workingDays: 27,
+    rateProfile: { basis: 'MONTHLY_GROSS_PRORATED', monthlyGross: 15000 },
+    days: { present: 27, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: 10, deductions: { canteen: 0, society: 0, advance: 0 },
+  };
+  const rps = calculateOne(rPuneStaff);
+  check('PUNE_STAFF (category name resembles staff, but not STAFF category) OT unaffected by staff gate', rps.otPay > 0, `got otPay=${rps.otPay}`);
+}
+
 console.log('== State machine sanity ==');
 import { canTransition, assertTransition } from '../lib/payroll/payRunStateMachine';
 check('draft -> calculating', canTransition('draft', 'calculating'));
