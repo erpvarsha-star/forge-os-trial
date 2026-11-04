@@ -42,7 +42,7 @@ export interface AttendanceRow {
   check_in_time: string | null; check_out_time: string | null;
 }
 export interface LeaveRow { employee_id: string; type: string; start_date: string; end_date: string; days: number; status: string }
-export interface AdvanceRow { employee_id: string; monthly_deduction: number | null; outstanding_balance: number | null; status: string }
+export interface AdvanceRow { employee_id: string; monthly_deduction: number | null; outstanding_balance: number | null; status: string; first_recovery_month?: string | null }
 export interface FeedAmountRow { employee_id: string; amount_inr?: number; total_recovery_inr?: number; approval_status: string }
 export interface EfficiencyRow { employee_id: string | null; efficiency_pct: number; approval_status: string; days_payable?: number | null }
 export interface EfficiencySlabRow { slab_pct: number; amount_post_aug2025: number }
@@ -240,8 +240,13 @@ export function assemblePayrollInputs(year: number, month: number, feeds: FeedBu
     if (!sal) warnings.push(`${emp.emp_code}: no salary structure as of ${periodEnd} — will be held by engine`);
     const canteen = feeds.canteen.filter((c) => c.employee_id === emp.id).reduce((s, c) => s + num(c.amount_inr), 0);
     const society = feeds.society.filter((c) => c.employee_id === emp.id).reduce((s, c) => s + num(c.total_recovery_inr), 0);
+    // PATCH_127: an advance whose first_recovery_month is set and in the future
+    // (relative to this period) contributes no deduction yet — it was disbursed
+    // separately (payroll_adjustments) but recovery hasn't started.
+    const periodYm = `${year}-${mm}`;
     const advance = feeds.advances
-      .filter((a) => a.employee_id === emp.id && a.status === 'approved')
+      .filter((a) => a.employee_id === emp.id && a.status === 'approved'
+        && (!a.first_recovery_month || a.first_recovery_month <= periodYm))
       .reduce((s, a) => s + Math.min(num(a.monthly_deduction), num(a.outstanding_balance)), 0);
     // Zero paid days (no present day, no approved leave, no PH): no pay, so no advance instalment.
     const advanceFinal = paidDays === 0 && advance > 0 ? 0 : advance;
