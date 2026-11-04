@@ -1,5 +1,17 @@
-# >>> RESUME STATE 4 Nov 2026, late night (round 4) — SESSION ENDED (LATEST — supersedes every block below where they conflict) <<<
-**Restart rule:** if work stops for any reason, read this block first. Branch `claude/forge-os-backend-setup-7woj4t`, HEAD = `2cfc139` (PRs #39/#40/#41/#42 all squash-merged), local checkout `ccr-8cdbca68-137bnz` merged up to match and pushed. `git status` clean on both.
+# >>> RESUME STATE 4 Nov 2026, late night (round 5) — SESSION ENDED (LATEST — supersedes every block below where they conflict) <<<
+**Restart rule:** if work stops for any reason, read this block first. Branch `claude/forge-os-backend-setup-7woj4t`, HEAD = `330ab80` (PRs #39-#44 all squash-merged), local checkout `ccr-8cdbca68-137bnz` merged up to match and pushed. `git status` clean on both.
+
+## PATCH_128 — payroll-feeds-approval-reminder — DONE, deployed, independently verified (4 Nov night)
+
+Owner said "yes" to building the HR canteen/society approval reminder flagged earlier tonight. Built with this same session's Authorization-header lesson applied from the start. **Real design catch during the build, not a silent assumption**: scoping to "current IST calendar month" would have made the reminder permanently silent for the actual live case — HR entered October's feed rows on 2 Nov, after the calendar month had already rolled to November, so a current-month-only reminder would never have fired. Corrected to scan every `payroll_month` with pending rows. Recipients: active `hr_admin` only (role-queried, never hardcoded — currently resolves to VFL5440 only, untested with >1 recipient since there's only one live). Deployed `payroll-feeds-approval-reminder` v2, `verify_jwt: false`. Cron jobid 31, `30 3 * * *` UTC (09:00 IST daily) — does not touch `pune-attendance-reminder`'s 13:30 UTC slot or `shift-reminder-default` in any way.
+
+**Verified independently by Claude, not taken on the building agent's word**: re-checked `list_edge_functions` (v2, ACTIVE, verify_jwt false), re-checked `cron.job` (jobname/schedule/active only — deliberately never selected `command`, to avoid any repeat of the key-exposure incident), and separately re-queried `app_notifications` myself — found the exact row: VFL5440, "51 canteen/society entries are awaiting your approval for 2026-10 (31 canteen, 20 society)" / correct Hindi, `created_at` 21:40 UTC 4 Nov. PR #44 merged. No new UI/badge built (deliberately out of scope; agent suggested a `my_action_counts()` key as a future option, not started).
+
+## Owner's three answers tonight, all acted on
+
+1. **"yes" (build the canteen/society reminder) — DONE**, see above.
+2. **"now" (rotate the exposed `shift-reminder-default` key) — steps given to the owner, waiting on him** (Project Settings → API Keys → Secret keys → revoke the old `sb_secret_...` key → create a new one → update the cron via `cron.alter_job` directly in the SQL Editor, so the new key never passes through chat). **Not yet confirmed done — check at the next session.**
+3. **"if they got the reminders then they should finish it today by 11 am"** — owner's deadline for Kajal (October BUNG attendance) and HR (canteen/society approval), now that both reminders actually deliver. **A wakeup is scheduled to check progress around 11am IST and report back — if this session ended before that fired, a future session should check: BUNG October attendance rows, and `payroll_canteen_entries`/`payroll_society_recoveries` approval_status, right away.**
 
 ## pune-attendance-reminder NEVER actually delivered, found + fixed 4 Nov 2026 night — real finding, not hypothetical
 
