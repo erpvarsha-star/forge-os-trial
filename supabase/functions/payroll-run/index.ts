@@ -57,7 +57,7 @@ async function loadFeeds(supabase: any, year: number, month: number) {
       safe(supabase.from('attendance_records').select('employee_id,date,status,overtime_hours,ot_hours,outstation_travel,check_in_time,check_out_time,late_minutes,late_reason')
         .gte('date', `${year}-${mm}-01`).lte('date', periodEnd)),
       safe(supabase.from('leave_requests').select('employee_id,type,start_date,end_date,days,status')),
-      safe(supabase.from('advance_requests').select('employee_id,monthly_deduction,outstanding_balance,status')),
+      safe(supabase.from('advance_requests').select('employee_id,monthly_deduction,outstanding_balance,status,first_recovery_month')),
       safe(supabase.from('payroll_canteen_entries').select('employee_id,amount_inr,approval_status')
         .eq('payroll_month', payrollMonth)),
       safe(supabase.from('payroll_society_recoveries').select('employee_id,total_recovery_inr,approval_status')

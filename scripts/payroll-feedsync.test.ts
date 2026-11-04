@@ -249,5 +249,36 @@ check('daily with null daily_rate -> warning', cr.warnings.includes('CON18: dail
   check('PATCH_125: no slab table/days_payable fed -> both overrides undefined', w1b.efficiencyAmountOverride === undefined && w1b.daysPayableOverride === undefined);
 }
 
+{
+  // PATCH_127: first_recovery_month gates when an approved advance's instalment
+  // actually starts being deducted. Period under test is 2026-10 (October).
+  const frmBundle: FeedBundle = {
+    ...bundle,
+    employees: [bundle.employees[0]], // VFL4008 / id 'w1'
+    salaries: [bundle.salaries[0]],
+    attendance: [{ employee_id: 'w1', date: '2026-10-05', status: 'present', overtime_hours: 0, check_in_time: '2026-10-05T08:00:00Z', check_out_time: '2026-10-05T17:00:00Z' }],
+    canteen: [], society: [], efficiency: [], statusEvents: [], leaves: [],
+  };
+  const future = assemblePayrollInputs(2026, 10, { ...frmBundle, advances: [{ employee_id: 'w1', monthly_deduction: 500, outstanding_balance: 5000, status: 'approved', first_recovery_month: '2026-11' }] });
+  check('PATCH_127: first_recovery_month in a future period (2026-11 > 2026-10) -> 0 deducted',
+    future.inputs.find((i) => i.empCode === 'VFL4008')!.deductions.advance === 0,
+    `got ${future.inputs.find((i) => i.empCode === 'VFL4008')!.deductions.advance}`);
+
+  const current = assemblePayrollInputs(2026, 11, { ...frmBundle, attendance: [{ employee_id: 'w1', date: '2026-11-05', status: 'present', overtime_hours: 0, check_in_time: '2026-11-05T08:00:00Z', check_out_time: '2026-11-05T17:00:00Z' }], advances: [{ employee_id: 'w1', monthly_deduction: 500, outstanding_balance: 5000, status: 'approved', first_recovery_month: '2026-11' }] });
+  check('PATCH_127: first_recovery_month equal to the current period (2026-11) -> deducted',
+    current.inputs.find((i) => i.empCode === 'VFL4008')!.deductions.advance === 500,
+    `got ${current.inputs.find((i) => i.empCode === 'VFL4008')!.deductions.advance}`);
+
+  const past = assemblePayrollInputs(2026, 11, { ...frmBundle, attendance: [{ employee_id: 'w1', date: '2026-11-05', status: 'present', overtime_hours: 0, check_in_time: '2026-11-05T08:00:00Z', check_out_time: '2026-11-05T17:00:00Z' }], advances: [{ employee_id: 'w1', monthly_deduction: 500, outstanding_balance: 5000, status: 'approved', first_recovery_month: '2026-09' }] });
+  check('PATCH_127: first_recovery_month in the past -> still deducted (regression safety)',
+    past.inputs.find((i) => i.empCode === 'VFL4008')!.deductions.advance === 500,
+    `got ${past.inputs.find((i) => i.empCode === 'VFL4008')!.deductions.advance}`);
+
+  const nullFrm = assemblePayrollInputs(2026, 10, { ...frmBundle, advances: [{ employee_id: 'w1', monthly_deduction: 500, outstanding_balance: 5000, status: 'approved' }] });
+  check('PATCH_127: no first_recovery_month set (null/absent) -> deducted as before (regression safety)',
+    nullFrm.inputs.find((i) => i.empCode === 'VFL4008')!.deductions.advance === 500,
+    `got ${nullFrm.inputs.find((i) => i.empCode === 'VFL4008')!.deductions.advance}`);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

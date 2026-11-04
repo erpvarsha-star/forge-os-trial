@@ -1,15 +1,27 @@
-# >>> RESUME STATE 4 Nov 2026, ~22:15 IST — SESSION ENDED (LATEST — supersedes every block below where they conflict) <<<
-**Restart rule:** if work stops for any reason, resume at **07:15 IST, 5 Nov 2026** (wake-up scheduled via send_later) and read this block first. Branch `claude/forge-os-backend-setup-7woj4t`, HEAD = commit `0bc32bd`, pushed, remote matches local exactly, `git status` clean.
+# >>> RESUME STATE 4 Nov 2026, late night — SESSION ENDED (LATEST — supersedes every block below where they conflict) <<<
+**Restart rule:** if work stops for any reason, read this block first. Branch `claude/forge-os-backend-setup-7woj4t` (local checkout shows as `ccr-8cdbca68-137bnz`, tracks the same remote branch), HEAD pushed, `git status` clean.
 
-## NEXT PRIORITY TICKET (start here)
+## NEXT PRIORITY TICKET (start here) — unchanged from the previous session
 
-**Get HR/owner to actually trigger the real October per-population payroll runs in-app** (PUNE_STAFF → STAFF → PERMANENT_WORKER → CONSULTANT, per PATCH_112/v9's `create`→`generate_warnings`→HR decisions→AI review→`calculate`→arrears→approve→finalize flow). This needs a live authenticated owner/HR session — Claude only prepares/verifies, never triggers it. Blockers that must clear first, in order of urgency:
-1. **Kajal (VFL1567) must actually enter October BUNG attendance** in the app (More → Pune Attendance) — screen confirmed reachable and live, but 0 rows exist for any BUNG code as of 4 Nov. Without this, PUNE_STAFF cannot calculate for real (the comparison workbook used her raw HR sheet instead).
-2. **26-30 Sep arrears sourcing** — owner said use HR's own "26 to 30 Sep" sheet tab, not the app's `attach_arrears_sep26_30()` mechanism; that tab is not yet in Claude's hands. Get it or get owner confirmation of the figures before this line is computed.
-3. **Plant head must enter October worker efficiency %** (More → Payroll Feeds / Efficiency screen) — still the standing blocker on worker production allowance beyond the one company-wide 81%/Days-Payable-25 entry already live.
-4. HR must enter canteen/society/adjustments for October before the STAFF/WORKER calculate.
+**Get HR/owner to actually trigger the real October per-population payroll runs in-app** (PUNE_STAFF → STAFF → PERMANENT_WORKER → CONSULTANT, per PATCH_112/v9's `create`→`generate_warnings`→HR decisions→AI review→`calculate`→arrears→approve→finalize flow). This needs a live authenticated owner/HR session — Claude only prepares/verifies, never triggers it. Blockers, re-checked live this session:
+1. **Kajal (VFL1567) must actually enter October BUNG attendance** — still 0 rows for any BUNG code. Unchanged, still blocking PUNE_STAFF.
+2. **26-30 Sep arrears sourcing** — still not in hand (need HR's own "26-30 Sep" tab, not `attach_arrears_sep26_30()`). Unchanged.
+3. **Plant head October efficiency %** — **CORRECTION: this is actually DONE**, not open. Verified live: one company-wide `payroll_efficiency_entries` row, `payroll_month='2026-10'`, 81%, `days_payable=25`, `approval_status='approved'`. The previous session's note undersold this.
+4. **HR canteen/society/adjustments for October** — HR *has* entered the data (31 canteen rows + 20 society rows, entered 2 Nov 2026) but **has not clicked approve on any of them yet** — all sit at `approval_status='pending'`. Not a bug, just an unfinished HR step in the Payroll Feeds screen. The one `payroll_adjustments` row (VFL4063's ₹21,000 reclassification) is correctly entered and already approved.
 
-Everything below this ticket is DONE/verified or explicitly deferred — do not re-do it.
+## NEW FINDING + FIX THIS SESSION (4 Nov, late) — PATCH_127, commit pending at end of this block
+
+**Bug found (not a hypothetical — would have corrupted the October run if calculated as-is):** the 21 "Diwali advance" rows the owner approved 2 Nov 2026 (₹15,000 each, `monthly_deduction=1500`, `outstanding_balance=15000`) had no way to defer their first recovery instalment to November. `lib/payroll/feedSync.ts` deducts `min(monthly_deduction, outstanding_balance)` in every pay period processed, unconditionally, as long as `outstanding_balance>0` — there was no "don't start deducting until month X" column. The owner's explicit instruction (CLAUDE.md, "Owner answers of 2 Nov 2026 (second afternoon batch)" item 3): the ₹15,000 is disbursed TO the employee IN October pay (handled separately, already done via `payroll_adjustments` precedent — see VFL4063), but the ₹1,500/month recovery must not start until the **November** pay run. Without a fix, calculating the October run today would have wrongly deducted ₹1,500 from all 21 people in October.
+
+**Fix, built by a Sonnet agent, independently verified by Claude:**
+- New nullable column `advance_requests.first_recovery_month` (text, 'YYYY-MM'; NULL = unchanged existing behavior). `scripts/PATCH_127_advance_first_recovery_month_04Nov2026.sql` — applied live via `execute_sql`. Verified live: exactly 21 rows now have `first_recovery_month='2026-11'`, all matching `reason ilike '%Diwali advance, owner-approved 2 Nov 2026%'`; 0 unintended rows touched (VFL1556/VFL5324/the rejected VFL4063 row all untouched).
+- `lib/payroll/feedSync.ts` (+ vendored copy in `supabase/functions/payroll-run/lib/feedSync.ts`): the advance filter now skips a row when `first_recovery_month` is set and lexicographically greater than the period's `YYYY-MM` (string comparison works since `mm` is zero-padded). `supabase/functions/payroll-run/index.ts`'s `loadFeeds()` now selects the new column too — without that the gate would silently do nothing in the deployed function.
+- Tests: `scripts/payroll-feedsync.test.ts` extended with 4 new PATCH_127 cases (future month → 0 deducted; equal month → deducted; past month → still deducted, regression; no column set → still deducted, regression). Claude independently re-ran: **71/0 feedsync, 105/0 engine regression.**
+- `tsc --noEmit`: could NOT establish a real baseline in this sandbox — `npm ci` succeeded (1386 packages) but the installed `expo` package is missing `tsconfig.base`, so tsc fails at config-resolution before checking any file (2 config errors, 0 file-level errors either way). This is an environment artifact (matches the 31-Oct-documented sandbox-reset caveat), not something this diff caused — the change itself is a one-field-addition + string comparison with no Expo/RN type surface.
+- **NOT YET DONE: `payroll-run` redeploy.** The edge function source changed (`index.ts` + vendored `feedSync.ts`) but was deliberately NOT redeployed by the agent per instruction — live `payroll-run` is still v14 and does NOT yet have the PATCH_127 gate. **Someone must redeploy (verify_jwt true) and Claude must verify the deployed source matches the repo before the October run is calculated for anyone with a Diwali advance** — otherwise the live function will still wrongly deduct in October even though the DB column and local code are fixed.
+- Commit: see `git log` after this file is pushed (same commit as this PENDING.md update).
+
+Everything else below this ticket is DONE/verified or explicitly deferred from the prior session — do not re-do it.
 
 ## DONE and verified by Claude this session (4 Nov), all pushed
 
