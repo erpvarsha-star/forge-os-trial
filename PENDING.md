@@ -1,13 +1,35 @@
-# >>> RESUME STATE 5 Nov 2026 (end of session) — READ THIS FIRST <<<
-**Branch:** `claude/forge-os-backend-setup-7woj4t`, HEAD = `1d3d3dc`, local checkout `ccr-8cdbca68-137bnz` matches and pushed. `git status` clean.
+# >>> RESUME STATE 5 Nov 2026 (session continued) — READ THIS FIRST <<<
+**Branch:** PR open from `ccr-3459d9e7-xosjyv` → `claude/forge-os-backend-setup-7woj4t` (PR #47, draft). Commit `e4343e7` on `ccr-3459d9e7-xosjyv`, pushed. Not yet merged — merge is this session's next step pending CI. `git status` clean.
 
-## NEXT PRIORITY — fix Payroll Feeds screen's month default (not started)
+## NEXT PRIORITY — none open from this ticket; see "still not done" below
 
-**`app/(hr-admin)/payroll-feeds.tsx`** defaults its month selector to the current IST calendar month (`istMonthYear()`), not to the month that actually has pending entries. Payroll for a month is always approved the FOLLOWING month (October pay is approved in November — owner-confirmed 5 Nov 2026), so this default is structurally wrong every month, not just today: HR opens the screen, sees the current month with nothing in it, and has no cue to tap ‹ back to find the real pending entries. Today's concrete case: 31 canteen + 20 society entries, all `payroll_month='2026-10'`, all still `approval_status='pending'` — confirmed live — sitting unseen while the screen shows November by default.
+**Payroll Feeds screen's month default — FIXED, this session, verified, PR open (not yet merged).**
 
-**Fix direction (not yet built):** on load, query each tab's table for the most recent `payroll_month` with any `approval_status='pending'` row and default to that month instead of `istMonthYear()`; fall back to the current month only when nothing is pending anywhere. Apply to all 4 tabs (canteen, society, adjustments, efficiency) for consistency, not just the two reported today. Delegate to a Sonnet agent per the locked rule; verify independently before pushing (re-read diff, tsc, i18n, and re-query the live tables to confirm the right month surfaces).
+`app/(hr-admin)/payroll-feeds.tsx` now queries all 4 feed tables (`payroll_canteen_entries`, `payroll_society_recoveries`, `payroll_adjustments`, `payroll_efficiency_entries`) on mount for the most recent `payroll_month` with any `approval_status='pending'` row, across all 4 combined (one shared month selector, not per-tab — matches the screen's existing structure), and defaults there instead of `istMonthYear()`; falls back to the current month only if nothing is pending anywhere. Commit `e4343e7`, PR #47 (draft) into `claude/forge-os-backend-setup-7woj4t`.
 
-## DONE this session (5 Nov 2026)
+**Verified independently by Claude, not taken on the building agent's word:**
+- Diff scope: exactly 29 lines added, only this one file touched (`git diff --stat` confirmed).
+- Logic re-read by hand: lexicographic max across the 4 tables' own max-pending-month queries is correct because `payroll_month` is a zero-padded `YYYY-MM` text column (same convention `lib/payroll/feedSync.ts`'s `first_recovery_month` already relies on).
+- Re-queried Supabase directly (not trusting the agent's claim): confirms the fix resolves to `2026-10` today (31 pending canteen rows + 20 pending society rows for that month; 0 pending adjustments/efficiency rows anywhere).
+- `npx tsc --noEmit`: 2 errors, both pre-existing tsconfig deprecation warnings from a fresh sandbox checkout (`node_modules` had to be reinstalled this session via `npm ci --ignore-scripts`, matching the documented `react-native-screens` postinstall-script bug) — this is the documented "fresh sandbox" baseline (2 errors), not the 7-error warm-sandbox baseline; either way, **zero new errors, none in this file**.
+- `node scripts/check-i18n.mjs`: clean, no new keys needed (correct — no new user-facing text).
+
+**Not yet done, next step for a resuming session:** merge PR #47 into `claude/forge-os-backend-setup-7woj4t` once CI (Build APK / Deploy Edge Functions, if they run on this PR) is green or confirmed irrelevant to this change (this touches only `app/`, which does trigger `build-apk.yml`'s `paths:` filter, so expect a new APK build off the merge commit). After merge: fast-forward/update any other local checkout tracking the long-lived branch, confirm the new APK publishes, and tell the owner HR will now see October's pending entries by default when she opens Payroll Feeds.
+
+## Still not done (unchanged from before this ticket)
+
+- **Real daily-rate figures for CON05/CON09/CON12/CON13** (needed to convert them to `rate_type='daily'` in the DB).
+- **Security guards have no self check-in screen** (owner flagged 4 Nov; HR attendance CSV used as a stand-in for now).
+- **26-30 Sep arrears sourcing** — HR's own tab, not yet in hand.
+- **HR has not entered real leave-balance opening figures for VFL5463/64/65/66** — owner said "leave this in pending" (not a bug — see below).
+- **Get HR/owner to actually trigger the real October per-population payroll runs in-app** (PUNE_STAFF → STAFF → PERMANENT_WORKER → CONSULTANT) — still blocked on Kajal entering October BUNG attendance (still 0 rows) and HR clicking Approve on the October canteen/society entries now that she can actually see them.
+
+## Clarified by the owner, 5 Nov 2026 — both closed, not bugs
+
+- **VFL5463/64/65/66 "missing leave data"**: NOT a gap. Confirmed live they are real, active employees (added Sep 2026) — HR's "not in records" meant her own offline salary sheet, not the app. Owner confirmed: **new joiners get no leave entitlement in their joining year** — so having no `leave_balances` row for these 4 is **correct policy**, not a missing-data bug. Added to CLAUDE.md as a standing rule (see Leave & Advance section).
+- **Payroll Feeds month default**: owner confirmed the screen SHOULD surface October's pending entries even while the calendar is in November, because pay for a month is always approved the following month. **Now fixed, see above** — PR open, not yet merged.
+
+## DONE earlier this session (5 Nov 2026)
 
 1. **Exit QR "No open attendance record" after night-shift checkout** — fixed in `hooks/useAttendance.ts` (`fetchRecords()`'s fallback logic clobbered `todayRecord` to null right after a Shift 3/5/Security-Night checkout past the 06:45 IST rollover). Commit `b3cdcd8`. Published `apk-125`.
 2. **Leave-form dates parsed backwards** — `components/LeaveScreen.tsx` + `components/TwoStepFormModal.tsx` sent free-typed DD/MM/YYYY dates straight to Postgres (DateStyle `ISO,MDY`), which either crashed (day >12) or silently stored the wrong date (day ≤12, no error). Fixed via `lib/leaveForm.ts`'s new `normalizeDateInput()`. Commit `00cadd7`.
@@ -15,11 +37,6 @@
 4. **Round 6 reminders** — `plant-head-efficiency-reminder` (jobid 32, 09:30 IST) and `accounts-advance-recovery-reminder` (jobid 33, 10:30 IST), both deployed v1 and live-fire verified against real `app_notifications` rows. Commit `7048680`.
 
 Full root-cause narrative, log evidence, and verification detail for all 4 is preserved in the "OLDER" section directly below and in each commit's own message — not repeated here.
-
-## Clarified by the owner, 5 Nov 2026 (end of session) — both now closed, not bugs
-
-- **VFL5463/64/65/66 "missing leave data"**: NOT a gap. Confirmed live they are real, active employees (added Sep 2026) — HR's "not in records" meant her own offline salary sheet, not the app. Owner confirmed: **new joiners get no leave entitlement in their joining year** — so having no `leave_balances` row for these 4 is **correct policy**, not a missing-data bug. Added to CLAUDE.md as a standing rule (see Leave & Advance section).
-- **Payroll Feeds month default**: owner confirmed the screen SHOULD surface October's pending entries even while the calendar is in November, because pay for a month is always approved the following month. This is the next-priority ticket above, not closed yet — only the diagnosis is confirmed, the fix isn't built.
 
 # >>> OLDER (4-5 Nov 2026, late night, round 6 planning) — context for the above, not a to-do <<<
 
