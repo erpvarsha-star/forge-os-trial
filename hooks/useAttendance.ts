@@ -4,7 +4,7 @@ import { AttendanceRecord } from '@/types'
 import { istMonthYear, getMonthEndDay } from '@/lib/istDate'
 import { serverNowMs, serverAttendanceDateStr } from '@/lib/serverClock'
 import { withTimeout } from '@/lib/withTimeout'
-import { finalizeShiftAndOvertime, HALF_DAY_MAX_HOURS, OPEN_RECORD_FALLBACK_HOURS } from '@/lib/workingHours'
+import { finalizeShiftAndOvertime, HALF_DAY_MAX_HOURS, OPEN_RECORD_FALLBACK_HOURS, UNDO_CHECKOUT_WINDOW_MINUTES } from '@/lib/workingHours'
 
 // Stored to one decimal; null when the phone reported no accuracy.
 const roundAccuracy = (m?: number | null) =>
@@ -79,6 +79,26 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
           'Attendance load'
         )
         current = open as AttendanceRecord | null
+      }
+      // Still nothing open? A night-shift checkout just past the 06:45 rollover closes
+      // check_out_time right before this same function re-runs (checkOut()'s own
+      // fetchRecords() call) — the open-record fallback above then misses it too, wrongly
+      // clearing todayRecord and breaking Exit QR. Catch that narrow just-closed case only.
+      if (!current) {
+        const { data: justClosed } = await withTimeout(
+          supabase
+            .from('attendance_records')
+            .select('*')
+            .eq('employee_id', employeeId)
+            .gte('check_out_time', new Date(serverNowMs() - UNDO_CHECKOUT_WINDOW_MINUTES * 60 * 1000).toISOString())
+            .gte('check_in_time', new Date(serverNowMs() - OPEN_RECORD_FALLBACK_HOURS * 60 * 60 * 1000).toISOString())
+            .order('check_out_time', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          15000,
+          'Attendance load'
+        )
+        current = justClosed as AttendanceRecord | null
       }
       setTodayRecord(current)
     } catch (e) {
