@@ -38,7 +38,34 @@
 **Next step for whoever resumes**: decide whether/when to redeploy `payroll-run` (needed for PATCH_132's confirmation gate to take effect live; `pune_bulk_set_attendance` needed no edge-function deploy, it's live already) via the Supabase MCP tool (NOT via CI), re-fetching and grep-verifying the deployed source before calling it done (standing lesson from the v15 self-caught transcription bug). Also: a new APK build should already be queued/published off the two app-touching merges (`88f62b8`, `b13d30a`) — confirm it published before telling Kajal/HR to reinstall and actually try the new screens.
 
 **Still open, blocked on data Claude does not have — asked back to Yash:**
-- Security guard October attendance: Yash gave VFL1520=26 days, VFL1527=31 days directly, but these **do not match the HR CSV already on file** for the same two people (CSV: VFL1520 21P/4A/4WO, VFL1527 25P/4WO). 31 is also every single day of October. **Not entered into the DB** — flagged back, not guessed in. Need clarification on which figure is right (and what "26"/"31" actually count — present days? something else?) before writing anything to `attendance_records`.
+- **✅ RESOLVED, Yash, 5 Nov 2026 — VFL1520/VFL1527 day counts explained, no longer a discrepancy.** "26 is total for 1520, he was absent for 4 days so weekly off considered for him are 4. and october had one paid holiday so 21+4+1" and "1527 - 25 present 5 weekly off and 1 paid holiday = 31. october had 5 fridays." So: the HR CSV's 4 "A" (absent) rows for VFL1520 were actually his Friday weekly-offs, wrongly marked absent instead of WO (exactly the "a weekly-off day is not an absence" rule already locked elsewhere in this file) — reclassified, giving 21P + 4WO + 1H(20 Oct) = **26**. VFL1527 similarly: 25P + 5WO (all 5 Fridays in October) + 1H = **31** (the full month, zero real absences — explains why 31 looked "suspiciously like every day"). **Still not yet entered into `attendance_records`** — this is the correct basis to use whenever that's done (per-day breakdown, not just the totals, since the app writes individual date rows).
+- Still need: which specific dates were WO vs P vs H for each (the totals are confirmed, not yet the day-by-day breakdown needed to actually write `attendance_records` rows) — October 2026's 5 Fridays are 2, 9, 16, 23, 30 Oct (standard calendar check), so VFL1527's WO dates should be exactly those 5; VFL1520's 4 WO dates are a subset of them (one Friday he was genuinely absent for another reason, or the 5th Friday fell outside his tenure/the window — not yet asked). VFL5439's October figure is still not given at all.
+
+## Advances cross-check, 5 Nov 2026 — Yash's own pending item, delivered + checked
+
+Yash uploaded `STAFF_ADVANCE_SHEET.xlsx` (the real company advance ledger, "as of 5th November"), the source he'd said he still needed to share for the cross-check. Checked every emp_code in it against live `advance_requests` directly — real, substantive discrepancies found, **none fixed, all flagged for Yash's decision**:
+
+**Codes in the sheet don't use the app's `VFL`/`BUNG` prefix — resolved by name-matching, not guessed:** sheet code `1323` = VFL1482 Brahmanand Kaduba Tajne; sheet code `377` = VFL1567 Kajal Balkrishna Sutar (her own full name, confirmed — not a different person as an earlier note in this session briefly worried). Both confirmed live via `employees.name`, not assumed from the number alone.
+
+**5 employees: app's outstanding balance is HIGHER than the sheet's current ("as of 5 Nov") balance, same monthly_deduction in both — meaning HR's own ledger shows these advances already partly recovered through the old manual process, while the app's "opening balance from Yash, 24 Sep 2026" snapshot was never adjusted down to match:**
+| Employee | App amount/outstanding | Sheet's current balance | Difference | Monthly deduction |
+|---|---|---|---|---|
+| VFL1389 Tushar Shirgire | 95,000 | 85,000 | app +10,000 | 5,000 — matches |
+| VFL1441 Jitendrasingh Nainsingh | 253,000 | 248,000 | app +5,000 | 5,000 — matches |
+| VFL1520 Shrawan Rewant Singh | 142,000 | 134,000 | app +8,000 | 4,000 — matches |
+| VFL1567 Kajal Balkrishna Sutar | 168,000 | 152,000 | app +16,000 | 8,000 — matches |
+| VFL5079 Sudeep Singh | 169,000 | 119,000 | app +50,000 | 5,000 — matches |
+
+**3 employees have a real advance on the sheet but NO `advance_requests` row at all in the app (any status) — a genuine gap, not a mismatch:**
+| Employee | Sheet balance | Monthly deduction (sheet) |
+|---|---|---|
+| VFL1482 Brahmanand Kaduba Tajne | 12,000 | 3,000 |
+| BUNG30 Pankaj Bansi Ghisadi | 40,706 | 5,000 |
+| VFL5439 Bhanwar Singh Rathod | 25,000 | 5,000 (0 deducted in Oct — advance given 26-10-2026, too recent) |
+
+**1 real finding on the Diwali advances (PATCH_127, 21 rows, all currently `monthly_deduction=1500` in the app): the sheet shows the 4 STAFF recipients at `monthly_deduction=2500`, not 1500 — only the 17 WORKER recipients are 1500.** VFL1453, VFL5237, VFL5465, VFL5466 (the 4 staff Diwali recipients per the 1 Nov decision) show 2,500/month on the sheet (15,000/2,500 = 6-month recovery) vs the 17 workers' 1,500/month (15,000/1,500 = 10-month recovery) — i.e. staff and workers were meant to have *different* repayment schedules for the same ₹15,000, and the app currently has all 21 on the worker schedule. **Not fixed — needs Yash's confirmation before touching live `advance_requests` rows**, since this changes real recovery amounts starting November.
+
+All other sheet rows not listed above (the 16 Diwali-worker codes) matched the app exactly on amount, outstanding, and monthly_deduction — no discrepancy.
 - VFL5439 (the 3rd security guard, Pune-based) wasn't mentioned in this answer — still need his October figure too, whichever source is confirmed correct.
 - **Advances cross-check: Yash's own pending item, 5 Nov 2026 ("one thing pending at my end is sharing the advances with you though you have them for cross check").** Claude already has the live `advance_requests` table to cross-check against; waiting on whatever additional source/list Yash is preparing to compare it to (not yet specified which sheet/list this is).
 
