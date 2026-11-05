@@ -3,6 +3,8 @@
 
 **Advances cross-check (see its own section below): APPLIED LIVE 5 Nov 2026, Yash confirmed before and after.** 6 balances corrected, 2 rows created, 4 Diwali staff rates fixed, all 8 given `first_recovery_month='2026-11'` to prevent double-deduction in the real October run. Nothing further to do here unless Yash raises something new.
 
+**VFL1520/VFL1527/VFL5439 October attendance — WRITTEN, one cleanup step left for Yash (can't run DELETE from this tool). apk-130 confirmed as the latest APK (published 11:19 UTC, off `b13d30a`).** Full detail in its own section below.
+
 ## NEXT PRIORITY — none open from this ticket; see "still not done" below
 
 **Payroll Feeds screen's month default — FIXED, MERGED, verified. Done.**
@@ -55,8 +57,24 @@ Yash uploaded `STAFF_ADVANCE_SHEET.xlsx` (the real ledger, "01/10/2026 TO 31/10/
 - Re-queried all 12 touched employees after the batch — every value matches the plan exactly, no silent mismatch.
 
 **Not yet done / still open:**
-- VFL5439 (3rd security guard, Pune-based) October attendance figure still not given — separate from the advance row just created for him.
-- Day-by-day WO/P/H breakdown for VFL1520/VFL1527 (totals 26/31 confirmed 5 Nov, not yet written to `attendance_records`) — still pending.
+- (resolved below — see "VFL1520/VFL1527/VFL5439 October attendance written" section)
+
+## VFL1520/VFL1527/VFL5439 October attendance — written 5 Nov 2026, Yash gave VFL5439's breakdown + day-placement calls
+
+Yash gave VFL5439's October breakdown: **5P + 1WO + 16EL + 5CL + 3SL + 1PH = 31** (schema has no EL/CL/SL attendance status — Yash confirmed these go in as approved `leave_requests`, not `attendance_records`). Before writing anything, found all three already had partial October rows (from the old `mark_weekly_offs()` cron, pre-4-Nov-fix, which had wrongly given security guards Friday weekly-offs):
+
+- **VFL1527**: existing WO on all 5 Fridays + 2 real GPS check-ins (3, 6 Oct) + H on 20 Oct matched Yash's 25P+5WO+1PH=31 exactly, no conflict — added the remaining 23 P-days. **Done, no outstanding cleanup.**
+- **VFL1520**: existing WO on all 5 Fridays conflicted with Yash's 21P+**4**WO+1PH=26 (5 days meant to be unaccounted). Yash: drop 30 Oct's WO to no-record. Added H on 20 Oct + 21 P-days (1,3-8,10-15,17-19,21,22,24-26) for the remaining 4 unaccounted days (27,28,29,31 — never inserted, by design, "no record" rather than guessed). **`attendance_records` still shows WO=5, not 4 — the stale 30 Oct WO row needs deleting; Supabase MCP's DELETE confirmation never resolves from this tool, so Yash needs to run it himself** (exact statement below).
+- **VFL5439**: existing WO on all 5 Fridays + a no-checkin P on 29 Oct. Yash: keep 2 Oct as the one real WO, fold 9/16/23/30 Oct into his leave. Added H on 20 Oct + P on 1,3,4,5 Oct (4 more, plus the existing 29 Oct P = 5 total) + 3 `leave_requests` rows: EL 6–22 Oct (16 days, 20 Oct excluded as the paid holiday within that span), CL 23–27 Oct (5 days), SL 28–31 Oct (3 days, 29 Oct excluded since he was present that day) — all `status='approved'`, dated/approved now, reason citing this exchange. **`attendance_records` still shows WO=5, not 1 — the 4 stale WO rows (9, 16, 23, 30 Oct) overlap his new approved leave and need deleting, same blocker as above.**
+
+**⚠ Exact SQL for Yash to run himself in the Supabase SQL Editor** (5 rows total, scoped by id so nothing else is touched):
+```sql
+delete from attendance_records where employee_id = '6bae3383-9f1a-4401-b86c-9d9cb0725668' and date = '2026-10-30' and status = 'WO';
+delete from attendance_records where employee_id = 'd4c1ef34-ee62-4f8d-8eea-65a40e2fb5bd' and date in ('2026-10-09','2026-10-16','2026-10-23','2026-10-30') and status = 'WO';
+```
+Until these run, VFL1520 and VFL5439 both show 5 WO instead of the correct 4/1 — a cosmetic overcount in `attendance_records` only (the new P/H rows and, for VFL5439, the 3 leave_requests are all already correct and live). Re-verify counts after: VFL1520 should read 21P/4WO/1H, VFL5439 should read 5P/1WO/1H + the 3 leave rows.
+
+**Day placement (which calendar date got which status, inside the Yash-confirmed totals) was Claude's own reasonable default, not individually confirmed date-by-date** — flagged per Yash's own "use a reasonable default" instruction. If any specific date turns out to matter (e.g. for a shift/OT reconciliation), re-ask before relying on it.
 
 ## Still not done (unchanged, not part of today's exchange)
 
