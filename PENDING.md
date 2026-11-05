@@ -29,7 +29,9 @@ Yash sent a third screenshot: VFL5324 (member) applying for leave hit "Something
 
 **Second bug, also found and fixed (same commit range, landed just after the date fix):** the same `postgres_logs` window showed three `null value in column "days"` NOT NULL violations (05:36:13, 05:36:24, 05:37:22 UTC). My own brief to the agent wrongly claimed `TwoStepFormModal.tsx` has no Days-override input — it does (`leave.days` field, `daysOverride`/`daysTouched` state), and that's exactly the leak: unlike `LeaveScreen.tsx` (which falls back via `finalDays = days || computedDays`), `TwoStepFormModal.tsx`'s `days = (daysTouched && daysOverride !== '') ? parseFloat(daysOverride) : (computed || 0.5)` has NO outer fallback when `daysTouched` is true — a garbage override value (e.g. "-", ".", a value left mid-edit) makes `parseFloat` return `NaN`, which `JSON.stringify` silently turns into `null`, reaching the DB as a NOT NULL violation. Fixed: validates the override is a finite number before submitting, alerts with a new `leave.invalidDaysOverride` key (EN+HI) instead of letting it reach the insert. Re-verified independently after it landed: tsc still 7, i18n clean (845 referenced, Hindi complete), both test suites still passing, working tree clean.
 
-**Not done:** no SQL/edge-function change — pure client-side. Needs a new APK build to reach phones — `components/**`, `i18n/**`, `lib/**` are all in `build-apk.yml`'s `paths:` filter (confirmed directly), so this push triggers one automatically.
+**Not done:** no SQL/edge-function change — pure client-side.
+
+**Published: `apk-127`**, built from `5c30f3f` (includes both the date fix and the NaN-days fix), release live 05 Nov 2026 06:25:45 UTC — confirmed via `get_latest_release` (correct commit, asset uploaded). Not yet installed on any phone.
 
 ## Round 6 reminders — DONE prior wake-up (commit `7048680`)
 
