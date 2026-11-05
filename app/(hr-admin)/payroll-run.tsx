@@ -10,13 +10,16 @@ import { LoadingScreen } from '@/components/LoadingScreen'
 import { supabase } from '@/lib/supabase'
 import * as FileSystem from 'expo-file-system'
 import * as Sharing from 'expo-sharing'
-import { payrollRun, exportPayRun, createPayRun, createTopupRun, transitionRun, generateWarnings, reviewWarning, PAYROLL_MONTH_LABEL, VDA_RATE_MISSING_ERROR, WARNINGS_PENDING_ERROR, WARNINGS_NOT_READY_ERROR, CalculateResult, PayRunPopulation, RunSummary, TransitionResult } from '@/lib/payroll/client'
+import { payrollRun, exportPayRun, createPayRun, createTopupRun, transitionRun, generateWarnings, reviewWarning, confirmPayRunFeeds, PAYROLL_MONTH_LABEL, VDA_RATE_MISSING_ERROR, WARNINGS_PENDING_ERROR, WARNINGS_NOT_READY_ERROR, FEEDS_NOT_CONFIRMED_ERROR, CalculateResult, PayRunPopulation, RunSummary, TransitionResult } from '@/lib/payroll/client'
 import { buildSalarySheetCsv, buildBankFileCsv } from '@/lib/payroll/exportCsv'
 import { istMonthYear } from '@/lib/istDate'
 import { BRAND, STATUS, INK } from '@/components/theme'
 import { ChevronLeft, ChevronRight, CheckCircle2, Circle, AlertTriangle, Play, Send, Stamp, IndianRupee, Download } from 'lucide-react-native'
 
-type Run = { id: string; status: string; name: string; adjustment_of: string | null }
+type Run = {
+  id: string; status: string; name: string; adjustment_of: string | null
+  feeds_confirmed_by: string | null; feeds_confirmed_at: string | null
+}
 
 const EXPORTABLE = ['finalized', 'payment_file_generated', 'paid', 'archived']
 
@@ -59,6 +62,10 @@ export default function PayrollRunScreen() {
   const [population, setPopulation] = useState<'' | PayRunPopulation>('')
   const [busy, setBusy] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  // Who confirmed "feeds are final" on the current draft run, resolved to a display name
+  const [feedsConfirmedName, setFeedsConfirmedName] = useState<string | null>(null)
+  // 422 'feeds not confirmed' from Calculate (rare client-side — the button is disabled first)
+  const [feedsNotConfirmed, setFeedsNotConfirmed] = useState<{ hint: string | null } | null>(null)
 
   const payrollMonth = `${year}-${String(month).padStart(2, '0')}`
 
@@ -70,7 +77,7 @@ export default function PayrollRunScreen() {
     let r: Run | null = null
     if (period) {
       const { data: runs } = await supabase
-        .from('pay_runs').select('id, status, name, adjustment_of')
+        .from('pay_runs').select('id, status, name, adjustment_of, feeds_confirmed_by, feeds_confirmed_at')
         .eq('pay_period_id', period.id).neq('status', 'cancelled')
         .order('created_at', { ascending: false }).limit(1)
       r = runs?.[0] ?? null
@@ -80,6 +87,10 @@ export default function PayrollRunScreen() {
       const { data: parent } = await supabase.from('pay_runs').select('name').eq('id', r.adjustment_of).maybeSingle()
       setParentName(parent?.name ?? null)
     } else setParentName(null)
+    if (r?.feeds_confirmed_by) {
+      const { data: confirmer } = await supabase.from('employees').select('name, emp_code').eq('id', r.feeds_confirmed_by).maybeSingle()
+      setFeedsConfirmedName(confirmer ? `${confirmer.name} (${confirmer.emp_code})` : null)
+    } else setFeedsConfirmedName(null)
     const counts: Record<string, number> = {}
     for (const f of FEED_TABLES) {
       const { count } = await supabase
@@ -96,7 +107,7 @@ export default function PayrollRunScreen() {
 
   useEffect(() => { refresh() }, [refresh])
   // Month change shows a different run — drop the previous run's transient results
-  useEffect(() => { setCalc(null); setVdaMissing(null); setRecovery(null); setWarnPending(null); setPrecheck(null); setNotReady(null) }, [month, year])
+  useEffect(() => { setCalc(null); setVdaMissing(null); setRecovery(null); setWarnPending(null); setPrecheck(null); setNotReady(null); setFeedsNotConfirmed(null) }, [month, year])
 
   if (!employee) return <LoadingScreen />
 
@@ -259,7 +270,28 @@ export default function PayrollRunScreen() {
                 </View>
               )}
               {run?.status === 'draft' && (
+                <View className="mt-2 border border-ink-100 rounded-xl p-3">
+                  <Text className="text-sm font-semibold text-ink-900">{t('payroll.confirmFeedsTitle')}</Text>
+                  <Text className="text-xs text-ink-500 mt-0.5">{t('payroll.confirmFeedsHint')}</Text>
+                  {run.feeds_confirmed_at ? (
+                    <Text className="text-xs font-semibold mt-2" style={{ color: STATUS.approved.fg }}>
+                      {t('payroll.feedsConfirmedBy', {
+                        name: feedsConfirmedName ?? t('payroll.feedsConfirmedByUnknown'),
+                        date: new Date(run.feeds_confirmed_at).toLocaleString('en-IN'),
+                      })}
+                    </Text>
+                  ) : (
+                    <Button title="payroll.confirmFeedsButton" variant="secondary" size="md" className="mt-2" loading={busy === 'confirmfeeds'}
+                      onPress={() => act('confirmfeeds', async () => {
+                        await confirmPayRunFeeds(run.id)
+                        setFeedsNotConfirmed(null)
+                      }, t('payroll.confirmFeedsConfirm'))} />
+                  )}
+                </View>
+              )}
+              {run?.status === 'draft' && (
                 <Button title="payroll.calculate" variant="primary" size="md" className="mt-2" loading={busy === 'calc'}
+                  disabled={!run.feeds_confirmed_at}
                   icon={<Play size={18} color="white" />}
                   onPress={() => act('calc',
                     async () => {
@@ -277,16 +309,32 @@ export default function PayrollRunScreen() {
                           setVdaMissing({ hint: e?.detail?.hint ?? null })
                           return
                         }
+                        // 422: HR has not confirmed the feeds are final yet (the button above should
+                        // normally prevent this, but the DB trigger can un-confirm between render and tap)
+                        if (String(e?.message ?? '') === FEEDS_NOT_CONFIRMED_ERROR) {
+                          setFeedsNotConfirmed({ hint: e?.detail?.hint ?? null })
+                          return
+                        }
                         throw e
                       }
                       setVdaMissing(null)
                       setNotReady(null)
+                      setFeedsNotConfirmed(null)
                       setCalc({ runId: run.id, result: r })
                       setWarnPending(r.warningsCount ?? 0)
                       Alert.alert(t('payroll.calculated', { count: r.calculated }),
                         (r.held.length ? t('payroll.heldNote', { count: r.held.length }) + '\n' : '')
                         + (r.warnings.length ? t('payroll.warningsNote', { count: r.warnings.length }) : ''))
                     }, t('payroll.calculateConfirm'))} />
+              )}
+              {feedsNotConfirmed && run?.status === 'draft' && (
+                <View className="mt-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                  <View className="flex-row items-center gap-2">
+                    <AlertTriangle size={16} color="#B45309" />
+                    <Text className="text-sm font-bold text-amber-700 flex-1">{t('payroll.confirmFeedsTitle')}</Text>
+                  </View>
+                  <Text className="text-xs text-amber-700 mt-1">{feedsNotConfirmed.hint ?? t('payroll.confirmFeedsHint')}</Text>
+                </View>
               )}
               {warnPending ? (
                 <View className="mt-2 bg-amber-50 border border-amber-200 rounded-xl p-3">

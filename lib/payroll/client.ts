@@ -42,6 +42,11 @@ export interface TopupResult {
 // The server answers calculate with HTTP 422 + this message when no VDA rate is entered for the month.
 export const VDA_RATE_MISSING_ERROR = 'monthly VDA rate not entered'
 
+// The server answers calculate with HTTP 422 + this message (err.detail.hint) until HR has confirmed
+// (confirm_pay_run_feeds) that the canteen/society/adjustments/efficiency feeds are final for this
+// run's period. A DB trigger auto-clears the confirmation the moment one of those tables changes.
+export const FEEDS_NOT_CONFIRMED_ERROR = 'feeds not confirmed'
+
 // calculated -> in_review answers HTTP 409 with this message (err.detail.pendingCount) while any pay_run_warnings row is undecided.
 export const WARNINGS_PENDING_ERROR = 'warnings pending decision'
 
@@ -188,3 +193,21 @@ export interface DecideWarningResult {
 /** Record a Waive/Deduct decision. Server applies the deduction rule (from the 4th over-30 late) and stamps decided_by/at. */
 export const decideWarning = (warningId: string, decision: 'waived' | 'deduct') =>
   payrollRun<DecideWarningResult>('decide_warning', { warningId, decision })
+
+export interface ConfirmFeedsResult {
+  payRunId: string
+  feedsConfirmedBy: string | null
+  feedsConfirmedAt: string | null
+}
+
+/**
+ * HR/owner confirms the canteen/society/adjustments/efficiency feeds are final for a draft run.
+ * This is a direct Postgres RPC (confirm_pay_run_feeds), not a payroll-run edge-function action —
+ * it is cheap, needs no engine inputs, and the edge function only ever reads the stamp it leaves.
+ * Throws (with a plain message) if the run is not draft or the caller is not owner/hr_admin.
+ */
+export async function confirmPayRunFeeds(payRunId: string): Promise<ConfirmFeedsResult> {
+  const { data, error } = await supabase.rpc('confirm_pay_run_feeds', { p_run_id: payRunId })
+  if (error) throw new Error(error.message)
+  return data as ConfirmFeedsResult
+}
