@@ -16,30 +16,32 @@
 - **Git-history incident during verification, caught and fixed, no data lost:** the building subagent misread my own `git commit` of this fix as an unexpected auto-commit and ran `git reset --soft HEAD~1` on the shared sandbox filesystem, moving local HEAD back one commit (content on disk was untouched — confirmed byte-identical to the already-pushed commit via `git diff e4343e7`). Reconciled by stashing the in-progress PENDING.md edit, hard-resetting local to match what was already pushed to `origin/ccr-3459d9e7-xosjyv`, and reapplying the stash — verified identical to the pre-incident version before committing. Nothing was lost or duplicated.
 - CI on the merge commit not yet re-checked by this session — next step for a resuming session only if the owner asks whether a new APK has published (this touches `app/`, inside `build-apk.yml`'s `paths:` filter, so a new APK build is expected off `2a918b9`).
 
-## Owner's status check, 5 Nov 2026 — answered several opens, found 2 real limitations, gave the CON daily rates
+## Owner's status check, 5 Nov 2026 — answered, several items closed, 2 builds now IN FLIGHT
 
 **🔒 CLOSED, do not re-raise:**
-- **26-30 Sep arrears** — paid directly outside the app; calculation already shared separately. No app action needed; removed from this list for good. See CLAUDE.md.
-- **Key rotation** (Anthropic key, Supabase key(s), any other flagged key) — Yash: stop tracking, mark done, do not remind unless there's an actual problem (misuse/unauthorized call). Not a deferred item any more — closed.
-- **Security guards' self check-in screen** — was already built same-day 4 Nov (commit `06bf0cc`, `CheckInCard` in `app/(security)/dashboard.tsx`) and re-verified live today (3 guards, real GPS rows from 4 Nov). This list's earlier "not done" note was stale — my mistake, corrected.
-- **VFL5463/64/65/66 leave balances** — confirmed correct policy (new joiners get no EL/CL/SL until 1 year of service — exact threshold now an open question below), not a data gap. Not re-flagging.
+- **26-30 Sep arrears** — paid directly outside the app; calculation already shared separately. No app action needed. See CLAUDE.md.
+- **Key rotation** — Yash: stop tracking, mark done, do not remind unless there's an actual problem (misuse/unauthorized call). Closed, not deferred.
+- **Security guards' self check-in screen** — already built 4 Nov (`06bf0cc`), re-verified live (3 guards, real GPS rows from 4 Nov). Earlier "not done" note was stale, corrected.
+- **VFL5463/64/65/66 leave balances** — correct policy, not a gap. Not re-flagging.
+- **New-joiner leave rule** — RESOLVED: anniversary-based (12 months from `employees.created_at`), not calendar-year. No code to fix (no automated creation job exists). See CLAUDE.md.
 
-**✅ Given by Yash, not yet applied — needs his confirmation before building (he asked to be asked first):**
-- **Consultant daily rates**: CON05 ₹770/day, CON09 ₹884/day, CON12 ₹1846/day, CON13 ₹2115/day (CON01/CON20/CON24 unchanged, already live at 700/762/500). Converting these 4 from `rate_type='monthly'` to `'daily'` with these rates is queued — confirm effective date and that `ctc_annual` stops being read for them once converted.
+**✅ Applied live — consultant daily rates (`PATCH_130`).** CON05/09/12/13 converted to `rate_type='daily'` effective 1 Oct 2026 (Yash: "yes apply 01/10/2026") with the given rates (770/884/1846/2115). Verified: 8 rows total, no stray rows, `pickSalary()` already honors the effective window. PR #50 merged (`493c387`).
 
-**🆕 Real limitation found, needs a decision — Kajal's Pune attendance screen hard-caps at 7 days back.** Both `pune_set_attendance()` (DB) and `components/PuneAttendance.tsx`'s `MAX_DAYS_BACK = 7` enforce this. As of 5 Nov she can reach back only to 29 Oct — she cannot enter 1-28 Oct through this screen as built. Not a misunderstanding on her part. Needs Yash's call: widen the window (how far?), or a separate bulk "enter a whole past month" flow.
+**🔧 IN FLIGHT — 2 Sonnet agents building now, not yet verified or merged:**
+1. **Kajal's Pune attendance: bulk-upload screen + existing single-day window tightened 7→3 days.** Yash: "build bulk upload and retain 3 days window." New RPC `pune_bulk_set_attendance` (whole-month entry, range = previous calendar month through today), new screen `components/PuneBulkAttendance.tsx`. Agent branch: `claude/pune-bulk-attendance`.
+2. **Payroll-run pre-calculate confirmation gate.** Yash clarified the "month lock" question was really: "ask them for confirmation before the payroll run function is activated... confirm all fields like canteen efficiency are final." New `pay_runs.feeds_confirmed_by`/`feeds_confirmed_at` + `confirm_pay_run_feeds()` RPC + auto-unconfirm trigger if a feed table changes after confirming + a 422 gate in `calculate` + an HR screen step. Agent branch: `claude/payroll-feeds-confirm-gate`.
 
-**🆕 Real gap found, needs a decision — no "month data entry locked" step exists anywhere.** `payroll-run`'s `calculate` re-reads canteen/society/adjustments/efficiency live every time it's called, filtered to `approval_status='approved'` only (a pending row is silently excluded, no warning) — and nothing stops a new feed row being added for a month even after that month's run has calculated or finalized. HR's own approve-each-row discipline is the only safeguard today. Needs Yash's call: acceptable as-is, or build a real lock.
+**⚠ Shared-sandbox hazard hit this session, worth knowing for next time:** mid-build, a background agent's `git checkout -b` switched the MAIN working directory's branch out from under an in-progress `git commit`, landing a PENDING.md update on the agent's own branch instead of this one. Recovered via an isolated `git worktree add` pointed at this branch (never touches the shared main working directory), rather than touching the main worktree while agents might still be writing files there. **Going forward: any doc-only commit while a background agent might be mid-checkout should go through a separate worktree, not the shared main directory.**
 
-**Confirmed, not a bug:** `apk-128` (built off today's `2a918b9` merge) was already published by GitHub Actions before Yash reported the HR screen issue — his phone is on an older APK (apk-127 or earlier). He needs to reinstall from the latest-release link to see the Payroll Feeds fix.
+**Next step for whoever resumes**: wait for / check both agent branches, verify independently (diff, tsc, i18n, re-run their rolled-back SQL tests myself, check live grants/schema match what they reported), merge, and — for item 2 only — deploy `payroll-run` manually via the Supabase MCP tool (NOT via CI, same as every other payroll-run deploy) after reviewing the `index.ts` diff, then re-fetch the deployed source and grep-verify it before calling it done (standing lesson from the v15 self-caught transcription bug).
 
 **Still open, blocked on data Claude does not have — asked back to Yash:**
-- The HR day-by-day attendance CSV (`VFL_HR_OS_2026_27 - ATTENDANCE_DAILY.csv`) for pulling October security-guard attendance into the app is not present in this session's files — only its monthly totals were recorded in a past session (VFL1520 21P/4A/4WO, VFL1527 25P/4WO, VFL5439 13P/10EL/6WO), which isn't enough to insert real per-day rows (never fabricated from a total). Needs the actual file re-shared.
-- New-joiner leave rule: "after 1 year of service" — calendar-year (as built: qualifies the following Jan 1) or anniversary-year (12 full months from the actual join date)? These give different real dates. See CLAUDE.md.
+- Security guard October attendance: Yash gave VFL1520=26 days, VFL1527=31 days directly, but these **do not match the HR CSV already on file** for the same two people (CSV: VFL1520 21P/4A/4WO, VFL1527 25P/4WO). 31 is also every single day of October. **Not entered into the DB** — flagged back, not guessed in. Need clarification on which figure is right (and what "26"/"31" actually count — present days? something else?) before writing anything to `attendance_records`.
+- VFL5439 (the 3rd security guard, Pune-based) wasn't mentioned in this answer — still need his October figure too, whichever source is confirmed correct.
 
 ## Still not done (unchanged, not part of today's exchange)
 
-- **Get HR/owner to actually trigger the real October per-population payroll runs in-app** (PUNE_STAFF → STAFF → PERMANENT_WORKER → CONSULTANT) — still blocked on Kajal entering October BUNG attendance (0 rows; see the 7-day-window limitation above) and HR clicking Approve on the October canteen/society entries now that she can actually see them (apk-128).
+- **Get HR/owner to actually trigger the real October per-population payroll runs in-app** (PUNE_STAFF → STAFF → PERMANENT_WORKER → CONSULTANT) — still blocked on Kajal entering October BUNG attendance (0 rows; the new bulk-upload screen above is meant to unblock this once built/verified) and HR clicking Approve on the October canteen/society entries now that she can actually see them (apk-128).
 
 ## DONE earlier this session (5 Nov 2026)
 
