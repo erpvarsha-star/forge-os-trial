@@ -871,6 +871,8 @@ Built by Sonnet agents, merged and gate-checked by Claude (58/0, 22/0, 15/0 payr
 - **Onboarding:** `(hr-admin)/onboarding.tsx`, 8 departments from `onboarding_departments`; rows created app-side by `ensureChecklist` (no trigger).
 - **Statutory:** `lib/statutory/*` + `(hr-admin)/statutory-reports.tsx` (PF ECR '#~#' text, ESI CSV, PT CSV, MLWF June/Dec) for approved/finalized/paid/archived runs. Assumptions: EE EPF = PF actually deducted; ER share = EE share; NCP days salaried only; ESI rounded up.
 
+**🔒 A pay month is always approved the FOLLOWING calendar month — decision from Yash, 5 Nov 2026.** October's pay feeds (canteen/society/etc., `payroll_month='2026-10'`) are worked on by HR in November, confirmed live (31 canteen + 20 society rows, all tagged `2026-10`, still pending on 5 Nov). Any screen or reminder that shows/approves these feeds must default to the most recent month that still has pending rows, never to the current IST calendar month (`istMonthYear()`) — that always shows an empty screen for the real work. `app/(hr-admin)/payroll-feeds.tsx` currently gets this wrong (defaults to "now"); fixing it is the top PENDING.md ticket as of 5 Nov 2026.
+
 ## Pune attendance clerk + uses_app + September gate — 26 Oct 2026
 
 **Kajal (VFL1567, member) can now enter BUNG attendance in the app** (PR #27, apk-105): More -> Pune Attendance, shown only when `employees.attendance_clerk_location` is set. Reads via `pune_attendance_roster`, saves via `pune_set_attendance` (RLS stops a member reading/writing others directly, so both are SECURITY DEFINER RPCs). HR keeps the original direct-table screen (`components/PuneAttendance.tsx`, `clerk` prop). Not yet tested on a device.
@@ -1689,6 +1691,8 @@ Every row this table used to list is fixed. Kept as a record, not a to-do:
 ---
 
 ## Leave & Advance approval chains — frozen 27 Sep 2026, decisions from Yash
+
+**🔒 New joiners get no leave entitlement in their joining year — decision from Yash, 5 Nov 2026.** Flagged when HR reported VFL5463/5464/5465/5466 as "missing from the records": checked live, all four are real, active employees (added Sep 2026) — the actual gap is that none of them has a `leave_balances` row. Yash: "they have joined only this year so they do not get leaves from the year that they join... they do not qualify for paid leaves." **This is correct, expected behavior, not a data gap to fill** — a new hire's first `leave_balances` row (EL/CL/SL) is only created starting the FOLLOWING calendar year, never backdated into their joining year. Do not insert a leave_balances row for an employee's joining-year, and do not flag its absence as missing data again — verify `employees.created_at`'s year against the current year before treating a missing `leave_balances` row as a bug.
 
 **Implemented 27 Sep 2026, same session as the design freeze** —
 `PATCH_53_staged_leave_advance_approvals_27Sep2026.sql` (schema + triggers +
