@@ -11,7 +11,9 @@ Yash sent two screenshots: VFL5444 (supervisor) scanning "Exit QR" at 07:00 got 
 
 **Verification — by a Sonnet agent (build), independently re-checked by me (not taken on faith):** read the actual diff in the file myself (matches the agent's report exactly); re-ran `npx tsc --noEmit` myself — exactly 7 errors, identical pre-existing set, none in `hooks/useAttendance.ts`; confirmed `UNDO_CHECKOUT_WINDOW_MINUTES = 30` really is exported from `lib/workingHours.ts`. **Caught a gap the agent's report didn't**: it pushed only to `ccr-8cdbca68-137bnz`, not to `claude/forge-os-backend-setup-7woj4t` (the actual CI-triggering branch) — its claim that the push "WILL trigger an automatic APK rebuild" was therefore not yet true. Pushed it onto `claude/forge-os-backend-setup-7woj4t` myself (fast-forward, `9597709..b3cdcd8`) and confirmed via GitHub Actions that `Build Android APK` run #125 is genuinely queued at `b3cdcd8` — not assumed from the paths-filter theory alone.
 
-**Not done:** no SQL/edge-function change (pure client-side fix, nothing to deploy there). Not yet on any phone — needs the new APK (once run #125 finishes) installed.
+**Not done:** no SQL/edge-function change (pure client-side fix, nothing to deploy there).
+
+**Published: `apk-125`**, built from `b3cdcd8`, run #125 succeeded, release live 05 Nov 2026 06:00:18 UTC — confirmed via `get_workflow_run` (conclusion: success) and `get_latest_release` (tag `apk-125`, correct commit). Not yet installed on any phone — needs reinstall per the "only download the newest APK" rule.
 
 ## Round 6 reminders — DONE prior wake-up (commit `7048680`)
 
