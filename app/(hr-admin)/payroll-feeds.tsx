@@ -60,6 +60,35 @@ export default function PayrollFeedsScreen() {
 
   useEffect(() => { refresh() }, [refresh])
 
+  // HR finalises a pay month's feed entries the FOLLOWING calendar month (see
+  // CLAUDE.md's "pay month is always approved the following calendar month"
+  // rule) — default the shared month selector to the most recent month with
+  // any pending row across all 4 feed tables, instead of always opening on
+  // istMonthYear() where it's empty. Runs once on mount; falls back to the
+  // istMonthYear() default already set above if nothing is pending anywhere.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const results = await Promise.all(
+        TABS.map(({ table: t }) =>
+          supabase.from(t).select('payroll_month').eq('approval_status', 'pending')
+            .order('payroll_month', { ascending: false }).limit(1)
+        )
+      )
+      if (cancelled) return
+      let latest: string | null = null
+      for (const { data } of results) {
+        const m = data?.[0]?.payroll_month as string | undefined
+        if (m && (!latest || m > latest)) latest = m
+      }
+      if (latest) {
+        const [y, m] = latest.split('-')
+        setYear(Number(y)); setMonth(Number(m))
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
   if (!employee) return <LoadingScreen />
 
   const shiftMonth = (d: number) => {
