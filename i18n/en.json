@@ -1188,6 +1188,7 @@
     "half_first": "First half",
     "half_second": "Second half",
     "invalidDateFormat": "Enter the date as DD/MM/YYYY or YYYY-MM-DD — check the day and month aren't swapped.",
+    "invalidDaysOverride": "Enter a valid number of days, or leave this field blank to use the computed value.",
     "odFieldsRequired": "Please fill place, purpose and time range for OD.",
     "odPlace": "Place",
     "odPurpose": "Purpose",

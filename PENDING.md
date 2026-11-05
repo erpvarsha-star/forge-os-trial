@@ -15,6 +15,22 @@ Yash sent two screenshots: VFL5444 (supervisor) scanning "Exit QR" at 07:00 got 
 
 **Published: `apk-125`**, built from `b3cdcd8`, run #125 succeeded, release live 05 Nov 2026 06:00:18 UTC — confirmed via `get_workflow_run` (conclusion: success) and `get_latest_release` (tag `apk-125`, correct commit). Not yet installed on any phone — needs reinstall per the "only download the newest APK" rule.
 
+## Found + fixed 5 Nov 2026 (commit `00cadd7`) — second real bug: leave-form dates parsed backwards
+
+Yash sent a third screenshot: VFL5324 (member) applying for leave hit "Something went wrong" on Submit.
+
+**Confirmed live via `postgres_logs`, not guessed:** `date/time field value out of range: "23/11/2026"` at 05:44:42 UTC (right at report time) — plus the SAME error for `"31/10/2026"` (5x, different submissions) and `"26/09/26"` earlier the same day, across multiple employees, not a VFL5324-only incident.
+
+**Root cause:** `components/LeaveScreen.tsx` and `components/TwoStepFormModal.tsx` (kind='leave') both have Start/End Date fields that are plain free text labeled "YYYY-MM-DD" with zero validation. Users naturally type DD/MM/YYYY (the Indian convention). This project's Postgres `DateStyle` is `ISO, MDY` (confirmed via `SHOW DATESTYLE`), so a typed slash-date is parsed as MM/DD/YYYY: day >12 throws a hard Postgres error (the visible crash); day ≤12 (e.g. the screenshot's own "9/11/2026") parses **silently as the wrong date** — no error, just a wrongly-dated leave record nobody is told about. The silent case is the worse of the two.
+
+**Fix:** `lib/leaveForm.ts` gained `normalizeDateInput()` — accepts strict ISO or D/M/YYYY (always read day-first), validates it's a real calendar date (catches Feb 30, month 13, a bare shape match isn't enough), returns `null` on anything else so the caller shows a specific message instead of a generic one. Wired into both components' submit paths, the computed-days preview, and COFF extra-work block dates. Also fixed a second, smaller bug found in the same pass: `LeaveScreen.tsx`'s `submitLeave()` never checked `applyLeave()`'s returned error — a genuine insert failure was silently treated as success (modal closed, form reset, no alert). Now matches `TwoStepFormModal.tsx`'s existing error-surfacing pattern.
+
+**Verification — independently re-checked by me, not taken on the agent's word:** read every file's diff myself; ran the new `scripts/leave-form-dates.test.ts` myself (20/20, including the critical "09/11/2026 → 2026-11-09, not 2026-09-11" case — the exact silent-corruption scenario); re-ran the existing `leave-form-days.test.ts` myself (21/0, unaffected); re-ran `npx tsc --noEmit` myself (exactly 7, unchanged baseline); re-ran `node scripts/check-i18n.mjs` myself (clean); read the new `leave.invalidDateFormat` Hindi translation myself and confirmed it's accurate, not garbled. Pushed to both `ccr-8cdbca68-137bnz` and `claude/forge-os-backend-setup-7woj4t`.
+
+**Still open, not yet resolved:** the same `postgres_logs` window also showed three separate `null value in column "days"` NOT NULL violations within about a minute of the date errors (05:36:13, 05:36:24, 05:37:22 UTC). I could not find a code path in the CURRENT repo producing that (both components' `days` computation has a `|| computedDays`/`|| 0.5` fallback that should prevent NaN/null reaching the insert) — asked the same agent to re-trace and either fix or confirm it's from a stale older APK still in use by someone. Agent was still running when this was recorded — **check its report before closing this out.**
+
+**Not done:** no SQL/edge-function change — pure client-side. Needs a new APK build to reach phones — `components/**`, `i18n/**`, `lib/**` are all in `build-apk.yml`'s `paths:` filter (confirmed directly), so this push triggers one automatically.
+
 ## Round 6 reminders — DONE prior wake-up (commit `7048680`)
 
 ## DONE this wake-up (5 Nov 2026, commit `7048680`) — both reminders built, deployed, live-fire verified

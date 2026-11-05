@@ -92,8 +92,19 @@ export function TwoStepFormModal({ visible, kind, formUrl, onClose }: Props) {
         Alert.alert(t('common.error'), t('leave.invalidDateFormat'))
         return
       }
-      setIsSubmitting(true)
       const computed = computeDays(normalizedStart, normalizedEnd, startHalf, endHalf)
+      // Real bug found while investigating a live "null value in column days"
+      // DB error: an override value that doesn't parse (e.g. "-", ".", left
+      // mid-edit) made parseFloat return NaN here, and JSON.stringify(NaN) is
+      // "null" — so the row's days column was silently sent as null, with
+      // no fallback to the computed value (unlike LeaveScreen.tsx, which
+      // already guards this via `days || computedDays`). Validate instead of
+      // silently substituting, so a bad override is caught, not swallowed.
+      if (daysTouched && daysOverride !== '' && !Number.isFinite(parseFloat(daysOverride))) {
+        Alert.alert(t('common.error'), t('leave.invalidDaysOverride'))
+        return
+      }
+      setIsSubmitting(true)
       const days = (daysTouched && daysOverride !== '') ? parseFloat(daysOverride) : (computed || 0.5)
       const detail: Record<string, unknown> = {}
       if (startHalf) detail.start_half = startHalf
