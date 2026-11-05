@@ -45,6 +45,7 @@ export default function WorkerMore() {
     { icon: <Wallet size={20} color="#E65C00" />, label: 'common.advance', onPress: () => router.push('/(worker)/advance') },
     { icon: <QrCode size={20} color="#E65C00" />, label: 'worker.qrCheckIn', onPress: () => router.push('/(worker)/qr') },
     ...(employee.attendance_clerk_location ? [{ icon: <ClipboardList size={20} color="#E65C00" />, label: 'hrAdmin.puneAttendance', onPress: () => router.push('/(worker)/pune-attendance') }] : []),
+    ...(employee.attendance_clerk_location ? [{ icon: <ClipboardList size={20} color="#E65C00" />, label: 'puneBulk.menuLabel', onPress: () => router.push('/(worker)/pune-bulk-attendance') }] : []),
     ...(isCoffDecider ? [{ icon: <CalendarClock size={20} color="#E65C00" />, label: 'halfDayCoff.menuLabel', count: halfdayCoffCount, onPress: () => router.push('/(worker)/halfday-coff') }] : []),
     { icon: <Globe size={20} color="#E65C00" />, label: 'common.language', onPress: () => setShowLangModal(true), value: language === 'hi' ? 'हिंदी' : 'English' },
   ]
