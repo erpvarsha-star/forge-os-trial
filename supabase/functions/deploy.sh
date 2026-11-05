@@ -20,6 +20,8 @@ FUNCTIONS=(
   "auto-checkout"
   "pune-attendance-reminder"
   "payroll-feeds-approval-reminder"
+  "plant-head-efficiency-reminder"
+  "accounts-advance-recovery-reminder"
 )
 
 # Deliberately NOT `set -e` around the loop: with it, the first bad function
