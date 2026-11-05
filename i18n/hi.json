@@ -1187,6 +1187,7 @@
     "daysOverridden": "संशोधित",
     "half_first": "पहला आधा",
     "half_second": "दूसरा आधा",
+    "invalidDateFormat": "तारीख DD/MM/YYYY या YYYY-MM-DD के रूप में डालें — देखें कि दिन और महीना आपस में न बदले हों।",
     "odFieldsRequired": "OD के लिए स्थान, उद्देश्य और समय भरें।",
     "odPlace": "स्थान",
     "odPurpose": "उद्देश्य",

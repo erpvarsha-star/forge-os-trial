@@ -7,7 +7,7 @@ import { useAdvance } from '@/hooks/useAdvance'
 import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { LEAVE_TYPES } from '@/constants'
-import { computeDays, hoursBetween, EXTRA_WORK_MAX, ExtraWorkBlock, HalfDay } from '@/lib/leaveForm'
+import { computeDays, hoursBetween, normalizeDateInput, EXTRA_WORK_MAX, ExtraWorkBlock, HalfDay } from '@/lib/leaveForm'
 import { CheckCircle2, X } from 'lucide-react-native'
 
 const emptyExtraWork = (): ExtraWorkBlock => ({ date: '', time_from: '', time_to: '', hours: 0, details: '' })
@@ -71,6 +71,12 @@ export function TwoStepFormModal({ visible, kind, formUrl, onClose }: Props) {
         Alert.alert(t('common.error'), t('common.required'))
         return
       }
+      const normalizedStart = normalizeDateInput(startDate)
+      const normalizedEnd = normalizeDateInput(endDate)
+      if (!normalizedStart || !normalizedEnd) {
+        Alert.alert(t('common.error'), t('leave.invalidDateFormat'))
+        return
+      }
       if (leaveType === 'OD' && (!odPlace || !odPurpose || !odTimeFrom || !odTimeTo)) {
         Alert.alert(t('common.error'), t('leave.odFieldsRequired'))
         return
@@ -79,8 +85,15 @@ export function TwoStepFormModal({ visible, kind, formUrl, onClose }: Props) {
         Alert.alert(t('common.error'), t('leave.extraWorkRequired'))
         return
       }
+      const normalizedExtraWork = leaveType === 'COFF'
+        ? extraWork.filter(b => !!b.date).map(b => ({ ...b, date: normalizeDateInput(b.date) as string }))
+        : []
+      if (leaveType === 'COFF' && normalizedExtraWork.some(b => !b.date)) {
+        Alert.alert(t('common.error'), t('leave.invalidDateFormat'))
+        return
+      }
       setIsSubmitting(true)
-      const computed = computeDays(startDate, endDate, startHalf, endHalf)
+      const computed = computeDays(normalizedStart, normalizedEnd, startHalf, endHalf)
       const days = (daysTouched && daysOverride !== '') ? parseFloat(daysOverride) : (computed || 0.5)
       const detail: Record<string, unknown> = {}
       if (startHalf) detail.start_half = startHalf
@@ -90,10 +103,10 @@ export function TwoStepFormModal({ visible, kind, formUrl, onClose }: Props) {
         detail.time_from = odTimeFrom; detail.time_to = odTimeTo
       }
       if (leaveType === 'COFF') {
-        detail.extra_work = extraWork.filter(b => !!b.date)
+        detail.extra_work = normalizedExtraWork
       }
       const { error } = await applyLeave({
-        type: leaveType as any, start_date: startDate, end_date: endDate, days, reason: leaveReason,
+        type: leaveType as any, start_date: normalizedStart, end_date: normalizedEnd, days, reason: leaveReason,
         detail: Object.keys(detail).length ? detail as any : null,
       })
       setIsSubmitting(false)
@@ -177,7 +190,7 @@ export function TwoStepFormModal({ visible, kind, formUrl, onClose }: Props) {
                     label={t('leave.days') + (daysTouched ? ` (${t('leave.daysOverridden')})` : '')}
                     value={daysOverride}
                     onChangeText={v => { setDaysOverride(v); setDaysTouched(true) }}
-                    placeholder={String(computeDays(startDate, endDate, startHalf, endHalf) || '0.5')}
+                    placeholder={String(computeDays(normalizeDateInput(startDate) || '', normalizeDateInput(endDate) || '', startHalf, endHalf) || '0.5')}
                     keyboardType="numeric"
                   />
                   {leaveType === 'OD' && (

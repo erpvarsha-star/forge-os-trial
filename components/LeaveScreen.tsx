@@ -10,7 +10,7 @@ import { Input } from '@/components/Input'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { LEAVE_TYPES } from '@/constants'
 import { stageProgressLabel } from '@/lib/approvalStages'
-import { computeDays, hoursBetween, EXTRA_WORK_MAX, ExtraWorkBlock, HalfDay } from '@/lib/leaveForm'
+import { computeDays, hoursBetween, normalizeDateInput, EXTRA_WORK_MAX, ExtraWorkBlock, HalfDay } from '@/lib/leaveForm'
 import { Plus, FileText } from 'lucide-react-native'
 
 const emptyExtraWork = (): ExtraWorkBlock => ({ date: '', time_from: '', time_to: '', hours: 0, details: '' })
@@ -38,7 +38,7 @@ export function LeaveScreen() {
 
   if (!employee || isLoading) return <LoadingScreen />
 
-  const computedDays = computeDays(startDate, endDate, startHalf, endHalf)
+  const computedDays = computeDays(normalizeDateInput(startDate) || '', normalizeDateInput(endDate) || '', startHalf, endHalf)
   const days = daysTouched && daysOverride !== '' ? parseFloat(daysOverride) : computedDays
 
   // Sheet rule: warn but NEVER block when the request exceeds the remaining balance.
@@ -73,12 +73,22 @@ export function LeaveScreen() {
       Alert.alert(t('common.error'), t('common.required'))
       return
     }
+    const normalizedStart = normalizeDateInput(startDate)
+    const normalizedEnd = normalizeDateInput(endDate)
+    if (!normalizedStart || !normalizedEnd) {
+      Alert.alert(t('common.error'), t('leave.invalidDateFormat'))
+      return
+    }
     if (leaveType === 'OD' && (!odPlace || !odPurpose || !odTimeFrom || !odTimeTo)) {
       Alert.alert(t('common.error'), t('leave.odFieldsRequired'))
       return
     }
     if (leaveType === 'COFF' && extraWork.every(b => !b.date)) {
       Alert.alert(t('common.error'), t('leave.extraWorkRequired'))
+      return
+    }
+    if (leaveType === 'COFF' && extraWork.some(b => !!b.date && !normalizeDateInput(b.date))) {
+      Alert.alert(t('common.error'), t('leave.invalidDateFormat'))
       return
     }
     const finalDays = days || computedDays
@@ -89,15 +99,15 @@ export function LeaveScreen() {
         t('leave.insufficientBalanceMsg', { requested: finalDays, remaining, type: leaveType }),
         [
           { text: t('common.cancel'), style: 'cancel' },
-          { text: t('leave.proceedAnyway'), onPress: () => submitLeave(finalDays) },
+          { text: t('leave.proceedAnyway'), onPress: () => submitLeave(finalDays, normalizedStart, normalizedEnd) },
         ]
       )
       return
     }
-    await submitLeave(finalDays)
+    await submitLeave(finalDays, normalizedStart, normalizedEnd)
   }
 
-  const submitLeave = async (finalDays: number) => {
+  const submitLeave = async (finalDays: number, normalizedStart: string, normalizedEnd: string) => {
     setIsSubmitting(true)
     const detail: Record<string, unknown> = {}
     if (startHalf) detail.start_half = startHalf
@@ -107,17 +117,18 @@ export function LeaveScreen() {
       detail.time_from = odTimeFrom; detail.time_to = odTimeTo
     }
     if (leaveType === 'COFF') {
-      detail.extra_work = extraWork.filter(b => !!b.date)
+      detail.extra_work = extraWork.filter(b => !!b.date).map(b => ({ ...b, date: normalizeDateInput(b.date) as string }))
     }
-    await applyLeave({
+    const { error } = await applyLeave({
       type: leaveType as any,
-      start_date: startDate,
-      end_date: endDate,
+      start_date: normalizedStart,
+      end_date: normalizedEnd,
       days: finalDays,
       reason,
       detail: Object.keys(detail).length ? detail as any : null,
     })
     setIsSubmitting(false)
+    if (error) { Alert.alert(t('common.error'), t('common.somethingWentWrong')); return }
     setShowModal(false)
     resetForm()
   }

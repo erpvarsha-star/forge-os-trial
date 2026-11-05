@@ -1187,6 +1187,7 @@
     "daysOverridden": "edited",
     "half_first": "First half",
     "half_second": "Second half",
+    "invalidDateFormat": "Enter the date as DD/MM/YYYY or YYYY-MM-DD — check the day and month aren't swapped.",
     "odFieldsRequired": "Please fill place, purpose and time range for OD.",
     "odPlace": "Place",
     "odPurpose": "Purpose",
