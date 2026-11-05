@@ -1,5 +1,7 @@
 # >>> RESUME STATE 5 Nov 2026 (session continued) — READ THIS FIRST <<<
-**Branch:** `claude/forge-os-backend-setup-7woj4t`, HEAD = `2a918b9` (PR #47 squash-merged, confirmed on GitHub). Local checkout `ccr-3459d9e7-xosjyv` has the pre-merge commits (`e4343e7`/`8613c1b`) in its own history plus this note — content-identical to the merged branch's payroll-feeds.tsx. `git status` clean.
+**Branch:** `claude/forge-os-backend-setup-7woj4t`, HEAD = `a046659` at last doc merge. Local checkout `ccr-3459d9e7-xosjyv` tracks it; doc-only edits go through the isolated worktree at `/tmp/claude-0/wt/ccr-pending` (branch `ccr-3459d9e7-xosjyv-fix`), never the shared main directory. `git status` clean.
+
+**Advances cross-check (see its own section below): APPLIED LIVE 5 Nov 2026, Yash confirmed before and after.** 6 balances corrected, 2 rows created, 4 Diwali staff rates fixed, all 8 given `first_recovery_month='2026-11'` to prevent double-deduction in the real October run. Nothing further to do here unless Yash raises something new.
 
 ## NEXT PRIORITY — none open from this ticket; see "still not done" below
 
@@ -41,33 +43,20 @@
 - **✅ RESOLVED, Yash, 5 Nov 2026 — VFL1520/VFL1527 day counts explained, no longer a discrepancy.** "26 is total for 1520, he was absent for 4 days so weekly off considered for him are 4. and october had one paid holiday so 21+4+1" and "1527 - 25 present 5 weekly off and 1 paid holiday = 31. october had 5 fridays." So: the HR CSV's 4 "A" (absent) rows for VFL1520 were actually his Friday weekly-offs, wrongly marked absent instead of WO (exactly the "a weekly-off day is not an absence" rule already locked elsewhere in this file) — reclassified, giving 21P + 4WO + 1H(20 Oct) = **26**. VFL1527 similarly: 25P + 5WO (all 5 Fridays in October) + 1H = **31** (the full month, zero real absences — explains why 31 looked "suspiciously like every day"). **Still not yet entered into `attendance_records`** — this is the correct basis to use whenever that's done (per-day breakdown, not just the totals, since the app writes individual date rows).
 - Still need: which specific dates were WO vs P vs H for each (the totals are confirmed, not yet the day-by-day breakdown needed to actually write `attendance_records` rows) — October 2026's 5 Fridays are 2, 9, 16, 23, 30 Oct (standard calendar check), so VFL1527's WO dates should be exactly those 5; VFL1520's 4 WO dates are a subset of them (one Friday he was genuinely absent for another reason, or the 5th Friday fell outside his tenure/the window — not yet asked). VFL5439's October figure is still not given at all.
 
-## Advances cross-check, 5 Nov 2026 — Yash's own pending item, delivered + checked
+## Advances cross-check, 5 Nov 2026 — ✅ APPLIED LIVE, Yash confirmed before and after
 
-Yash uploaded `STAFF_ADVANCE_SHEET.xlsx` (the real company advance ledger, "as of 5th November"), the source he'd said he still needed to share for the cross-check. Checked every emp_code in it against live `advance_requests` directly — real, substantive discrepancies found, **none fixed, all flagged for Yash's decision**:
+Yash uploaded `STAFF_ADVANCE_SHEET.xlsx` (the real ledger, "01/10/2026 TO 31/10/2026", opening/closing balances as of 5 Nov). Per Yash's own explicit instruction ("confirm to me your figures IN APP ARE GIVEN to you which month first before correcting anything"), Claude first confirmed: all 6 affected app rows carried `created_at = 2026-09-24 13:37:54`, `reason = "Opening balance recorded from Yash, 24 Sep 2026"`, and **every one still had `outstanding_balance == amount`** — i.e. never deducted a single rupee in-app since that day. Yash: "your difference is coz your data is from august and deduction is happened from september salary and october salary, sheet figures are correct and i confirm to delete the previous figures and embed these. note their deduction for october is done." Presented the full reconciliation table + the two code-typo flags; Yash confirmed both typos ("yes it is a typo from accounts") and the Diwali rate split ("worker category is @ 1500 staff as mentioned for the 15000" = staff 2,500/worker 1,500, confirming the sheet) — then "go".
 
-**Codes in the sheet don't use the app's `VFL`/`BUNG` prefix — resolved by name-matching, not guessed:** sheet code `1323` = VFL1482 Brahmanand Kaduba Tajne; sheet code `377` = VFL1567 Kajal Balkrishna Sutar (her own full name, confirmed — not a different person as an earlier note in this session briefly worried). Both confirmed live via `employees.name`, not assumed from the number alone.
+**Applied live (one SQL batch, re-verified after):**
+- **6 stale balances corrected** to the sheet's post-October closing balance (October's recovery already done manually by HR, so the sheet's *closing*, not opening, figure is correct): VFL1389 95,000→**80,000**; VFL1441 253,000→**243,000**; VFL1567 168,000→**144,000** (sheet's code `377` = her own name, not a different person); VFL1520 142,000→**130,000**; VFL5079 169,000→**114,000**; VFL1482 18,000→**9,000** (sheet's code `1323`, confirmed by Yash as an accounts typo — this one was **stale, not missing** as an earlier note in this session had wrongly said; it already existed in the app at 18,000).
+- **2 missing rows created**: VFL5439 Bhanwar Singh Rathod (25,000/25,000, monthly 5,000); BUNG30 Pankaj Bansi Ghisadi (46,706/**35,706** — October's 5,000 already recovered per the sheet, monthly 5,000).
+- **All 8 of the above given `first_recovery_month='2026-11'`** — this is the "add back deduction in row L" fix: since October's recovery already happened outside the app (or, for VFL5439, hasn't started yet), the real in-app October payroll run will skip these 8 entirely and start recovering from November, avoiding any double-deduction.
+- **Diwali staff rate fixed**: VFL5237, VFL1453, VFL5465, VFL5466 `monthly_deduction` 1,500→**2,500** (first UPDATE attempt matched 0 rows — exact-string `reason` match failed because the stored text has extra detail appended; fixed by targeting the 4 rows' real `id`s directly, re-verified all 4 now show 2,500). The 17 worker Diwali rows confirmed correct at 1,500, untouched, per Yash's explicit confirmation.
+- Re-queried all 12 touched employees after the batch — every value matches the plan exactly, no silent mismatch.
 
-**5 employees: app's outstanding balance is HIGHER than the sheet's current ("as of 5 Nov") balance, same monthly_deduction in both — meaning HR's own ledger shows these advances already partly recovered through the old manual process, while the app's "opening balance from Yash, 24 Sep 2026" snapshot was never adjusted down to match:**
-| Employee | App amount/outstanding | Sheet's current balance | Difference | Monthly deduction |
-|---|---|---|---|---|
-| VFL1389 Tushar Shirgire | 95,000 | 85,000 | app +10,000 | 5,000 — matches |
-| VFL1441 Jitendrasingh Nainsingh | 253,000 | 248,000 | app +5,000 | 5,000 — matches |
-| VFL1520 Shrawan Rewant Singh | 142,000 | 134,000 | app +8,000 | 4,000 — matches |
-| VFL1567 Kajal Balkrishna Sutar | 168,000 | 152,000 | app +16,000 | 8,000 — matches |
-| VFL5079 Sudeep Singh | 169,000 | 119,000 | app +50,000 | 5,000 — matches |
-
-**3 employees have a real advance on the sheet but NO `advance_requests` row at all in the app (any status) — a genuine gap, not a mismatch:**
-| Employee | Sheet balance | Monthly deduction (sheet) |
-|---|---|---|
-| VFL1482 Brahmanand Kaduba Tajne | 12,000 | 3,000 |
-| BUNG30 Pankaj Bansi Ghisadi | 40,706 | 5,000 |
-| VFL5439 Bhanwar Singh Rathod | 25,000 | 5,000 (0 deducted in Oct — advance given 26-10-2026, too recent) |
-
-**1 real finding on the Diwali advances (PATCH_127, 21 rows, all currently `monthly_deduction=1500` in the app): the sheet shows the 4 STAFF recipients at `monthly_deduction=2500`, not 1500 — only the 17 WORKER recipients are 1500.** VFL1453, VFL5237, VFL5465, VFL5466 (the 4 staff Diwali recipients per the 1 Nov decision) show 2,500/month on the sheet (15,000/2,500 = 6-month recovery) vs the 17 workers' 1,500/month (15,000/1,500 = 10-month recovery) — i.e. staff and workers were meant to have *different* repayment schedules for the same ₹15,000, and the app currently has all 21 on the worker schedule. **Not fixed — needs Yash's confirmation before touching live `advance_requests` rows**, since this changes real recovery amounts starting November.
-
-All other sheet rows not listed above (the 16 Diwali-worker codes) matched the app exactly on amount, outstanding, and monthly_deduction — no discrepancy.
-- VFL5439 (the 3rd security guard, Pune-based) wasn't mentioned in this answer — still need his October figure too, whichever source is confirmed correct.
-- **Advances cross-check: Yash's own pending item, 5 Nov 2026 ("one thing pending at my end is sharing the advances with you though you have them for cross check").** Claude already has the live `advance_requests` table to cross-check against; waiting on whatever additional source/list Yash is preparing to compare it to (not yet specified which sheet/list this is).
+**Not yet done / still open:**
+- VFL5439 (3rd security guard, Pune-based) October attendance figure still not given — separate from the advance row just created for him.
+- Day-by-day WO/P/H breakdown for VFL1520/VFL1527 (totals 26/31 confirmed 5 Nov, not yet written to `attendance_records`) — still pending.
 
 ## Still not done (unchanged, not part of today's exchange)
 
