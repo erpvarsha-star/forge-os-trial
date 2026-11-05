@@ -16,18 +16,30 @@
 - **Git-history incident during verification, caught and fixed, no data lost:** the building subagent misread my own `git commit` of this fix as an unexpected auto-commit and ran `git reset --soft HEAD~1` on the shared sandbox filesystem, moving local HEAD back one commit (content on disk was untouched — confirmed byte-identical to the already-pushed commit via `git diff e4343e7`). Reconciled by stashing the in-progress PENDING.md edit, hard-resetting local to match what was already pushed to `origin/ccr-3459d9e7-xosjyv`, and reapplying the stash — verified identical to the pre-incident version before committing. Nothing was lost or duplicated.
 - CI on the merge commit not yet re-checked by this session — next step for a resuming session only if the owner asks whether a new APK has published (this touches `app/`, inside `build-apk.yml`'s `paths:` filter, so a new APK build is expected off `2a918b9`).
 
-## Still not done (unchanged from before this ticket)
+## Owner's status check, 5 Nov 2026 — answered several opens, found 2 real limitations, gave the CON daily rates
 
-- **Real daily-rate figures for CON05/CON09/CON12/CON13** (needed to convert them to `rate_type='daily'` in the DB).
-- **Security guards have no self check-in screen** (owner flagged 4 Nov; HR attendance CSV used as a stand-in for now).
-- **26-30 Sep arrears sourcing** — HR's own tab, not yet in hand.
-- **HR has not entered real leave-balance opening figures for VFL5463/64/65/66** — owner said "leave this in pending" (not a bug — see below).
-- **Get HR/owner to actually trigger the real October per-population payroll runs in-app** (PUNE_STAFF → STAFF → PERMANENT_WORKER → CONSULTANT) — still blocked on Kajal entering October BUNG attendance (still 0 rows) and HR clicking Approve on the October canteen/society entries now that she can actually see them.
+**🔒 CLOSED, do not re-raise:**
+- **26-30 Sep arrears** — paid directly outside the app; calculation already shared separately. No app action needed; removed from this list for good. See CLAUDE.md.
+- **Key rotation** (Anthropic key, Supabase key(s), any other flagged key) — Yash: stop tracking, mark done, do not remind unless there's an actual problem (misuse/unauthorized call). Not a deferred item any more — closed.
+- **Security guards' self check-in screen** — was already built same-day 4 Nov (commit `06bf0cc`, `CheckInCard` in `app/(security)/dashboard.tsx`) and re-verified live today (3 guards, real GPS rows from 4 Nov). This list's earlier "not done" note was stale — my mistake, corrected.
+- **VFL5463/64/65/66 leave balances** — confirmed correct policy (new joiners get no EL/CL/SL until 1 year of service — exact threshold now an open question below), not a data gap. Not re-flagging.
 
-## Clarified by the owner, 5 Nov 2026 — both closed, not bugs
+**✅ Given by Yash, not yet applied — needs his confirmation before building (he asked to be asked first):**
+- **Consultant daily rates**: CON05 ₹770/day, CON09 ₹884/day, CON12 ₹1846/day, CON13 ₹2115/day (CON01/CON20/CON24 unchanged, already live at 700/762/500). Converting these 4 from `rate_type='monthly'` to `'daily'` with these rates is queued — confirm effective date and that `ctc_annual` stops being read for them once converted.
 
-- **VFL5463/64/65/66 "missing leave data"**: NOT a gap. Confirmed live they are real, active employees (added Sep 2026) — HR's "not in records" meant her own offline salary sheet, not the app. Owner confirmed: **new joiners get no leave entitlement in their joining year** — so having no `leave_balances` row for these 4 is **correct policy**, not a missing-data bug. Added to CLAUDE.md as a standing rule (see Leave & Advance section).
-- **Payroll Feeds month default**: owner confirmed the screen SHOULD surface October's pending entries even while the calendar is in November, because pay for a month is always approved the following month. **Now fixed and merged, see above.**
+**🆕 Real limitation found, needs a decision — Kajal's Pune attendance screen hard-caps at 7 days back.** Both `pune_set_attendance()` (DB) and `components/PuneAttendance.tsx`'s `MAX_DAYS_BACK = 7` enforce this. As of 5 Nov she can reach back only to 29 Oct — she cannot enter 1-28 Oct through this screen as built. Not a misunderstanding on her part. Needs Yash's call: widen the window (how far?), or a separate bulk "enter a whole past month" flow.
+
+**🆕 Real gap found, needs a decision — no "month data entry locked" step exists anywhere.** `payroll-run`'s `calculate` re-reads canteen/society/adjustments/efficiency live every time it's called, filtered to `approval_status='approved'` only (a pending row is silently excluded, no warning) — and nothing stops a new feed row being added for a month even after that month's run has calculated or finalized. HR's own approve-each-row discipline is the only safeguard today. Needs Yash's call: acceptable as-is, or build a real lock.
+
+**Confirmed, not a bug:** `apk-128` (built off today's `2a918b9` merge) was already published by GitHub Actions before Yash reported the HR screen issue — his phone is on an older APK (apk-127 or earlier). He needs to reinstall from the latest-release link to see the Payroll Feeds fix.
+
+**Still open, blocked on data Claude does not have — asked back to Yash:**
+- The HR day-by-day attendance CSV (`VFL_HR_OS_2026_27 - ATTENDANCE_DAILY.csv`) for pulling October security-guard attendance into the app is not present in this session's files — only its monthly totals were recorded in a past session (VFL1520 21P/4A/4WO, VFL1527 25P/4WO, VFL5439 13P/10EL/6WO), which isn't enough to insert real per-day rows (never fabricated from a total). Needs the actual file re-shared.
+- New-joiner leave rule: "after 1 year of service" — calendar-year (as built: qualifies the following Jan 1) or anniversary-year (12 full months from the actual join date)? These give different real dates. See CLAUDE.md.
+
+## Still not done (unchanged, not part of today's exchange)
+
+- **Get HR/owner to actually trigger the real October per-population payroll runs in-app** (PUNE_STAFF → STAFF → PERMANENT_WORKER → CONSULTANT) — still blocked on Kajal entering October BUNG attendance (0 rows; see the 7-day-window limitation above) and HR clicking Approve on the October canteen/society entries now that she can actually see them (apk-128).
 
 ## DONE earlier this session (5 Nov 2026)
 
