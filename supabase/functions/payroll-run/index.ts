@@ -426,10 +426,20 @@ Deno.serve(async (req) => {
     if (action === 'calculate') {
       const { payRunId, force } = body;
       const { data: run } = await supabase
-        .from('pay_runs').select('status, adjustment_of, pay_period_id, population, pay_periods(month, year)').eq('id', payRunId).single();
+        .from('pay_runs').select('status, adjustment_of, pay_period_id, population, feeds_confirmed_at, pay_periods(month, year)').eq('id', payRunId).single();
       if (!run) return json({ error: 'pay run not found' }, 404);
       if (run.status !== 'draft') {
         return json({ error: `calculate only from draft (current: ${run.status}). For a recalc, cancel and create a fresh run.` }, 409);
+      }
+      // PATCH_132: HR/owner must confirm the 4 feed tables (canteen/society/adjustments/efficiency)
+      // are final for this period before calculating — see confirm_pay_run_feeds(). A DB trigger
+      // auto-clears this the moment one of those tables changes for the period, so a stale
+      // confirmation can never slip through.
+      if (!run.feeds_confirmed_at) {
+        return json({
+          error: 'feeds not confirmed',
+          hint: 'HR must confirm canteen, society, adjustments and efficiency entries are final for this period before calculating.',
+        }, 422);
       }
       const month = Number(run.pay_periods.month);
       const year = Number(run.pay_periods.year);
