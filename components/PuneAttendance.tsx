@@ -14,7 +14,7 @@ import { ChevronLeft, ChevronRight, Info } from 'lucide-react-native'
 type Code = 'P' | 'L' | 'HL' | 'WO'
 // No absent chip — absent means no row, and HR-entered rows cannot be deleted (no DELETE policy)
 const CODES: Code[] = ['P', 'L', 'HL', 'WO']
-const MAX_DAYS_BACK = 7
+const MAX_DAYS_BACK = 3
 
 type Emp = { id: string; emp_code: string; name: string }
 type RosterRow = { employee_id: string; emp_code: string; name: string; status: string | null; check_in_time: string | null; ot_hours: number | null; outstation_travel: boolean | null }
