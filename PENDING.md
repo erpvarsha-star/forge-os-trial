@@ -1,20 +1,20 @@
 # >>> RESUME STATE 5 Nov 2026 (session continued) — READ THIS FIRST <<<
-**Branch:** PR open from `ccr-3459d9e7-xosjyv` → `claude/forge-os-backend-setup-7woj4t` (PR #47, draft). Commit `e4343e7` on `ccr-3459d9e7-xosjyv`, pushed. Not yet merged — merge is this session's next step pending CI. `git status` clean.
+**Branch:** `claude/forge-os-backend-setup-7woj4t`, HEAD = `2a918b9` (PR #47 squash-merged, confirmed on GitHub). Local checkout `ccr-3459d9e7-xosjyv` has the pre-merge commits (`e4343e7`/`8613c1b`) in its own history plus this note — content-identical to the merged branch's payroll-feeds.tsx. `git status` clean.
 
 ## NEXT PRIORITY — none open from this ticket; see "still not done" below
 
-**Payroll Feeds screen's month default — FIXED, this session, verified, PR open (not yet merged).**
+**Payroll Feeds screen's month default — FIXED, MERGED, verified. Done.**
 
-`app/(hr-admin)/payroll-feeds.tsx` now queries all 4 feed tables (`payroll_canteen_entries`, `payroll_society_recoveries`, `payroll_adjustments`, `payroll_efficiency_entries`) on mount for the most recent `payroll_month` with any `approval_status='pending'` row, across all 4 combined (one shared month selector, not per-tab — matches the screen's existing structure), and defaults there instead of `istMonthYear()`; falls back to the current month only if nothing is pending anywhere. Commit `e4343e7`, PR #47 (draft) into `claude/forge-os-backend-setup-7woj4t`.
+`app/(hr-admin)/payroll-feeds.tsx` now queries all 4 feed tables (`payroll_canteen_entries`, `payroll_society_recoveries`, `payroll_adjustments`, `payroll_efficiency_entries`) on mount for the most recent `payroll_month` with any `approval_status='pending'` row, across all 4 combined (one shared month selector, not per-tab — matches the screen's existing structure), and defaults there instead of `istMonthYear()`; falls back to the current month only if nothing is pending anywhere. PR #47 squash-merged into `claude/forge-os-backend-setup-7woj4t` as `2a918b9`.
 
 **Verified independently by Claude, not taken on the building agent's word:**
 - Diff scope: exactly 29 lines added, only this one file touched (`git diff --stat` confirmed).
 - Logic re-read by hand: lexicographic max across the 4 tables' own max-pending-month queries is correct because `payroll_month` is a zero-padded `YYYY-MM` text column (same convention `lib/payroll/feedSync.ts`'s `first_recovery_month` already relies on).
 - Re-queried Supabase directly (not trusting the agent's claim): confirms the fix resolves to `2026-10` today (31 pending canteen rows + 20 pending society rows for that month; 0 pending adjustments/efficiency rows anywhere).
-- `npx tsc --noEmit`: 2 errors, both pre-existing tsconfig deprecation warnings from a fresh sandbox checkout (`node_modules` had to be reinstalled this session via `npm ci --ignore-scripts`, matching the documented `react-native-screens` postinstall-script bug) — this is the documented "fresh sandbox" baseline (2 errors), not the 7-error warm-sandbox baseline; either way, **zero new errors, none in this file**.
+- `npx tsc --noEmit`: first pass (fresh sandbox, `npm ci --ignore-scripts`) showed 2 errors — both pre-existing tsconfig deprecation warnings, a known fresh-sandbox artifact. Re-ran a second time after the sandbox settled: the real **7-error baseline** (`permissions-onboarding.tsx` ×1, `FormsScreen.tsx` ×6), matching the documented baseline exactly. **Zero new errors either time, none in this file.**
 - `node scripts/check-i18n.mjs`: clean, no new keys needed (correct — no new user-facing text).
-
-**Not yet done, next step for a resuming session:** merge PR #47 into `claude/forge-os-backend-setup-7woj4t` once CI (Build APK / Deploy Edge Functions, if they run on this PR) is green or confirmed irrelevant to this change (this touches only `app/`, which does trigger `build-apk.yml`'s `paths:` filter, so expect a new APK build off the merge commit). After merge: fast-forward/update any other local checkout tracking the long-lived branch, confirm the new APK publishes, and tell the owner HR will now see October's pending entries by default when she opens Payroll Feeds.
+- **Git-history incident during verification, caught and fixed, no data lost:** the building subagent misread my own `git commit` of this fix as an unexpected auto-commit and ran `git reset --soft HEAD~1` on the shared sandbox filesystem, moving local HEAD back one commit (content on disk was untouched — confirmed byte-identical to the already-pushed commit via `git diff e4343e7`). Reconciled by stashing the in-progress PENDING.md edit, hard-resetting local to match what was already pushed to `origin/ccr-3459d9e7-xosjyv`, and reapplying the stash — verified identical to the pre-incident version before committing. Nothing was lost or duplicated.
+- CI on the merge commit not yet re-checked by this session — next step for a resuming session only if the owner asks whether a new APK has published (this touches `app/`, inside `build-apk.yml`'s `paths:` filter, so a new APK build is expected off `2a918b9`).
 
 ## Still not done (unchanged from before this ticket)
 
@@ -27,7 +27,7 @@
 ## Clarified by the owner, 5 Nov 2026 — both closed, not bugs
 
 - **VFL5463/64/65/66 "missing leave data"**: NOT a gap. Confirmed live they are real, active employees (added Sep 2026) — HR's "not in records" meant her own offline salary sheet, not the app. Owner confirmed: **new joiners get no leave entitlement in their joining year** — so having no `leave_balances` row for these 4 is **correct policy**, not a missing-data bug. Added to CLAUDE.md as a standing rule (see Leave & Advance section).
-- **Payroll Feeds month default**: owner confirmed the screen SHOULD surface October's pending entries even while the calendar is in November, because pay for a month is always approved the following month. **Now fixed, see above** — PR open, not yet merged.
+- **Payroll Feeds month default**: owner confirmed the screen SHOULD surface October's pending entries even while the calendar is in November, because pay for a month is always approved the following month. **Now fixed and merged, see above.**
 
 ## DONE earlier this session (5 Nov 2026)
 
