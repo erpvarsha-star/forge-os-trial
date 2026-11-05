@@ -1,5 +1,19 @@
-# >>> RESUME STATE 5 Nov 2026, 05:30 IST wake-up (round 6) — BOTH REMINDERS DONE, READ THIS FIRST <<<
-**Restart rule:** if work stops for any reason, read this block first. Branch `claude/forge-os-backend-setup-7woj4t`, HEAD = `7048680` (direct push, not yet via PR — see below), local checkout `ccr-8cdbca68-137bnz` matches and pushed. `git status` clean. The two builds planned below are DONE as of this wake-up.
+# >>> RESUME STATE 5 Nov 2026 — ROUND 6 REMINDERS + EXIT-QR BUG FIX, READ THIS FIRST <<<
+**Restart rule:** if work stops for any reason, read this block first. Branch `claude/forge-os-backend-setup-7woj4t`, HEAD = `b3cdcd8` (direct push, no PR this round), local checkout `ccr-8cdbca68-137bnz` matches and pushed. `git status` clean. `Build Android APK` run #125 queued at `b3cdcd8` — this fix needs that new APK installed to reach any phone.
+
+## Found + fixed 5 Nov 2026 (commit `b3cdcd8`) — real production bug: Exit QR "No open attendance record"
+
+Yash sent two screenshots: VFL5444 (supervisor) scanning "Exit QR" at 07:00 got "Error: Something went wrong. No open attendance record" — "a lot of people got to see this while checking in [out]."
+
+**Root cause (`hooks/useAttendance.ts`):** `checkOut()` correctly sets `todayRecord` to the just-closed record, then immediately calls `fetchRecords()` to refresh the month list — which re-derives `todayRecord` from scratch and clobbers it back to `null` for anyone whose shift crosses the 06:45 IST day rollover (Shift 3/5, Security Night): the by-date lookup misses (record's `date` column is still "yesterday"), and the existing open-record fallback also misses (checkout just set `check_out_time`, so it's no longer `IS NULL`). `confirmQrOut()` then refuses with exactly this error because `todayRecord` is null. Affects **every role** (shared hook, used by both `CheckInCard.tsx` and `app/(worker)/home.tsx`) with `requires_qr=true`, checking out right after a night shift — matches "a lot of people" and the 07:00 timestamp exactly.
+
+**Fix:** added a third, narrow fallback in `fetchRecords()` — a record whose `check_out_time` was set within the last `UNDO_CHECKOUT_WINDOW_MINUTES` (30 min, reused from `lib/workingHours.ts`, not a new constant) and whose `check_in_time` is still within `OPEN_RECORD_FALLBACK_HOURS` (23h). Deliberately narrow, not a blanket widening of the 23h fallback — a wider window would risk resurrecting a shift finished hours ago as "today's record" before the next real check-in (traced and ruled out as scenario B in the build). Fixed once at the shared root, so both `CheckInCard.tsx` and `home.tsx` inherit it with no changes of their own.
+
+**Verification — by a Sonnet agent (build), independently re-checked by me (not taken on faith):** read the actual diff in the file myself (matches the agent's report exactly); re-ran `npx tsc --noEmit` myself — exactly 7 errors, identical pre-existing set, none in `hooks/useAttendance.ts`; confirmed `UNDO_CHECKOUT_WINDOW_MINUTES = 30` really is exported from `lib/workingHours.ts`. **Caught a gap the agent's report didn't**: it pushed only to `ccr-8cdbca68-137bnz`, not to `claude/forge-os-backend-setup-7woj4t` (the actual CI-triggering branch) — its claim that the push "WILL trigger an automatic APK rebuild" was therefore not yet true. Pushed it onto `claude/forge-os-backend-setup-7woj4t` myself (fast-forward, `9597709..b3cdcd8`) and confirmed via GitHub Actions that `Build Android APK` run #125 is genuinely queued at `b3cdcd8` — not assumed from the paths-filter theory alone.
+
+**Not done:** no SQL/edge-function change (pure client-side fix, nothing to deploy there). Not yet on any phone — needs the new APK (once run #125 finishes) installed.
+
+## Round 6 reminders — DONE prior wake-up (commit `7048680`)
 
 ## DONE this wake-up (5 Nov 2026, commit `7048680`) — both reminders built, deployed, live-fire verified
 
