@@ -8,7 +8,8 @@
  * CURRENT_RATE mode documents the intentional OT delta (VDA basis 103 x wd).
  */
 import { calculateOne, DEFAULT_ENGINE_CONFIG } from '../lib/payroll/engine';
-import { EngineConfig, PayrollInput } from '../lib/payroll/types';
+import { EngineConfig, PayrollInput, ptAmount } from '../lib/payroll/types';
+import { finalizeShiftAndOvertime, MIN_WORKING_HOURS } from '../lib/workingHours';
 
 const SNAPSHOT: EngineConfig = {
   ...DEFAULT_ENGINE_CONFIG, workerOtVdaBasis: 'MASTER_SNAPSHOT', workerMasterVdaSnapshot: 2790,
@@ -259,6 +260,214 @@ console.log('== Worker production allowance: slab + Days Payable override (PATCH
   // block above — unchanged by this patch, no override fields set there) already prove the
   // no-override path still reproduces real paid nets exactly; this block only isolates the
   // PROD_ALLOWANCE line to show the override vs. fallback denominators diverge as expected.
+}
+
+console.log('== NET_NEGATIVE (held=true, netPay=null, blocker NET_NEGATIVE) — audit gap 1 ==');
+{
+  // STAFF: tiny gross, huge advance deduction forces net below zero.
+  const rStaff = calculateOne({
+    empCode: 'VFLNEGTEST', category: 'STAFF', month: 11, year: 2026, workingDays: 26,
+    masters: { FIXED_GROSS: 5000 },
+    days: { present: 26, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: 0, deductions: { canteen: 0, society: 0, advance: 50000 },
+  });
+  check('STAFF net-negative -> held', rStaff.held === true, `held=${rStaff.held}`);
+  check('STAFF net-negative -> netPay null', rStaff.netPay === null, `netPay=${rStaff.netPay}`);
+  check('STAFF net-negative -> blockers includes NET_NEGATIVE', rStaff.blockers.includes('NET_NEGATIVE'), JSON.stringify(rStaff.blockers));
+  check('STAFF net-negative -> totalEarnings/totalDeductions still populated (not blank)',
+    rStaff.totalEarnings > 0 && rStaff.totalDeductions > rStaff.totalEarnings,
+    `TE=${rStaff.totalEarnings} TD=${rStaff.totalDeductions}`);
+
+  // A non-negative case must NOT carry the blocker (sanity control for the check above).
+  const rStaffOk = calculateOne({
+    empCode: 'VFLNEGTEST', category: 'STAFF', month: 11, year: 2026, workingDays: 26,
+    masters: { FIXED_GROSS: 40000 },
+    days: { present: 26, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: 0, deductions: { canteen: 0, society: 0, advance: 0 },
+  });
+  check('STAFF ordinary case -> not held, no NET_NEGATIVE', !rStaffOk.held && !rStaffOk.blockers.includes('NET_NEGATIVE'), JSON.stringify(rStaffOk.blockers));
+
+  // CONSULTANT (DAILY_RATE) — small gross, large "other" deduction forces net negative too,
+  // proving the NET_NEGATIVE check applies uniformly via finish(), not only in calcStaff/calcWorker.
+  const rCon = calculateOne({
+    empCode: 'CONNEGTEST', category: 'CONSULTANT', month: 11, year: 2026, workingDays: 30,
+    rateProfile: { basis: 'DAILY_RATE', rateAmount: 500 },
+    days: { present: 10, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: 0, deductions: { canteen: 0, society: 0, advance: 0, other: 20000 },
+  });
+  check('CONSULTANT net-negative -> held, netPay null, NET_NEGATIVE', rCon.held && rCon.netPay === null && rCon.blockers.includes('NET_NEGATIVE'), JSON.stringify(rCon));
+}
+
+console.log('== Half-day (HL) attendance flowing through engine day-count — audit gap 2 ==');
+{
+  // The engine itself is status-agnostic: it only ever sees DayCounts.present as a number.
+  // feedSync's statusEffect() maps DB status 'hl'/'half_day' -> present:0.5 BEFORE the engine
+  // runs (see scripts/payroll-feedsync.test.ts for that mapping's own coverage). This block
+  // confirms a fractional `days.present` (as a half-day would produce) flows correctly
+  // through calcStaff/calcWorker's day-count and proration arithmetic.
+  const half = calculateOne({
+    empCode: 'VFLHALFTEST', category: 'STAFF', month: 11, year: 2026, workingDays: 26,
+    masters: { FIXED_GROSS: 26000 }, // 1000/day at wd=26
+    days: { present: 0.5, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: 0, deductions: { canteen: 0, society: 0, advance: 0 },
+  });
+  check('STAFF: 0.5 present day -> worked = 0.5', half.worked === 0.5, `got ${half.worked}`);
+  check('STAFF: 0.5 present day -> gross prorated to half of a full day (500)', half.totalEarnings === 500, `got ${half.totalEarnings}`);
+
+  const full = calculateOne({
+    empCode: 'VFLHALFTEST', category: 'STAFF', month: 11, year: 2026, workingDays: 26,
+    masters: { FIXED_GROSS: 26000 },
+    days: { present: 1, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: 0, deductions: { canteen: 0, society: 0, advance: 0 },
+  });
+  check('STAFF: half-day earns exactly half of a full present-day (gross)', close(half.totalEarnings, full.totalEarnings / 2, 0.01),
+    `half=${half.totalEarnings} full=${full.totalEarnings}`);
+
+  // Two half-days (e.g. HL on two separate dates, aggregated by feedSync into days.present=1.0)
+  // must be indistinguishable from one full present day.
+  const twoHalves = calculateOne({
+    empCode: 'VFLHALFTEST', category: 'STAFF', month: 11, year: 2026, workingDays: 26,
+    masters: { FIXED_GROSS: 26000 },
+    days: { present: 1.0, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: 0, deductions: { canteen: 0, society: 0, advance: 0 },
+  });
+  check('STAFF: two aggregated half-days (present=1.0) == one full present day', twoHalves.totalEarnings === full.totalEarnings,
+    `got ${twoHalves.totalEarnings} want ${full.totalEarnings}`);
+
+  // Same fractional-day arithmetic for PERMANENT_WORKER (VDA is keyed on pp = days.present directly).
+  const halfWorker = calculateOne({
+    empCode: 'VFL4008', category: 'PERMANENT_WORKER', month: 11, year: 2026, workingDays: 26,
+    masters: { BASIC: 15756, HRA: 3555.84, CONVEYANCE: 3334, WASHING: 3111, EDUCATION: 3334, HEAT: 0, FIXED_GROSS: 40380.84 },
+    days: { present: 0.5, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: 0, efficiencyPct: 81, deductions: { canteen: 0, society: 0, advance: 0 },
+  });
+  check('PERMANENT_WORKER: half-day VDA = half of the per-day VDA rate (103/2 = 51.5)', halfWorker.earnings.VDA === 51.5, `got ${halfWorker.earnings.VDA}`);
+  check('PERMANENT_WORKER: half-day -> worked = 0.5', halfWorker.worked === 0.5, `got ${halfWorker.worked}`);
+}
+
+console.log('== Overtime boundary conditions (lib/workingHours.ts finalizeShiftAndOvertime) — audit gap 3 ==');
+{
+  // NOTE: this is the ONLY overtime-from-hours boundary logic that exists in the TypeScript
+  // codebase. It is explicitly VISIBILITY ONLY (lib/workingHours.ts's own header comment:
+  // "never read by payroll") — it is NOT the same as the owner's 1 Nov 2026 ">8h = overtime"
+  // Extras-report rule, which has no TypeScript implementation at all (HR decides each month's
+  // extras by hand per CLAUDE.md's "two-report principle" — see the final report for this gap).
+  // Tested here because it is real, exported, reachable code with its own exact numeric
+  // boundaries (8.5h/9h nominal, 12h reclassification threshold) that had no test at all.
+  // Exactly at nominal (8.5h for a rotating shift) -> OT = 0.
+  const atNominal = finalizeShiftAndOvertime('Shift 1', MIN_WORKING_HOURS);
+  check('Shift 1 at exactly nominal (8.5h) -> overtimeHours = 0, no reclassification',
+    atNominal.overtimeHours === 0 && atNominal.reclassifyToShiftName === null, JSON.stringify(atNominal));
+
+  // Just over nominal -> OT starts accruing (0.01h over).
+  const justOverNominal = finalizeShiftAndOvertime('Shift 1', MIN_WORKING_HOURS + 0.01);
+  check('Shift 1 at nominal+0.01h -> overtimeHours = 0.01, no reclassification',
+    close(justOverNominal.overtimeHours, 0.01, 0.001) && justOverNominal.reclassifyToShiftName === null,
+    JSON.stringify(justOverNominal));
+
+  // Just under the 12h reclassification threshold -> stays on Shift 1, OT = hours - 8.5.
+  const justUnder12 = finalizeShiftAndOvertime('Shift 1', 11.99);
+  check('Shift 1 at 11.99h -> stays Shift 1 (no reclassify), OT = 11.99 - 8.5 = 3.49',
+    justUnder12.reclassifyToShiftName === null && close(justUnder12.overtimeHours, 3.49, 0.001),
+    JSON.stringify(justUnder12));
+
+  // Exactly at the 12h threshold -> reclassifies to the OT shift, OT = hours - 12 = 0.
+  const atThreshold = finalizeShiftAndOvertime('Shift 1', 12);
+  check('Shift 1 at exactly 12h -> reclassifies to Shift 4, OT = 12 - 12 = 0',
+    atThreshold.reclassifyToShiftName === 'Shift 4' && atThreshold.overtimeHours === 0, JSON.stringify(atThreshold));
+
+  // Owner's own worked example: a completed 12h shift = 4h of overtime above the reclassified
+  // shift's own 12h nominal — i.e. 16h worked on what was Shift 1 reclassifies to Shift 4 with
+  // OT = 16 - 12 = 4.
+  const sixteenHours = finalizeShiftAndOvertime('Shift 1', 16);
+  check('Shift 1 at 16h -> reclassifies to Shift 4, OT = 16 - 12 = 4',
+    sixteenHours.reclassifyToShiftName === 'Shift 4' && sixteenHours.overtimeHours === 4, JSON.stringify(sixteenHours));
+
+  // Night-shift variant (Shift 3 -> Shift 5) uses the identical threshold/math.
+  const night = finalizeShiftAndOvertime('Shift 3', 12);
+  check('Shift 3 at exactly 12h -> reclassifies to Shift 5, OT = 0',
+    night.reclassifyToShiftName === 'Shift 5' && night.overtimeHours === 0, JSON.stringify(night));
+  const nightUnder = finalizeShiftAndOvertime('Shift 3', 11.99);
+  check('Shift 3 at 11.99h -> no reclassify, OT = 11.99 - 8.5 = 3.49',
+    nightUnder.reclassifyToShiftName === null && close(nightUnder.overtimeHours, 3.49, 0.001), JSON.stringify(nightUnder));
+
+  // General shift has a 9h nominal, not 8.5h, and is never reclassified (not in OVERTIME_RECLASSIFY_TARGET).
+  const generalAt9 = finalizeShiftAndOvertime('General', 9);
+  check('General at exactly 9h nominal -> OT = 0, never reclassified', generalAt9.overtimeHours === 0 && generalAt9.reclassifyToShiftName === null, JSON.stringify(generalAt9));
+  const generalAt12 = finalizeShiftAndOvertime('General', 12);
+  check('General at 12h -> NOT reclassified (General has no OT-variant target), OT = 12 - 9 = 3',
+    generalAt12.reclassifyToShiftName === null && generalAt12.overtimeHours === 3, JSON.stringify(generalAt12));
+}
+
+console.log('== Deduction boundaries: PF cap, ESI cutoff, PT slabs — audit gap 6 ==');
+{
+  // PF cap: pfWage = BASIC+CONVEYANCE+EDUCATION+MEDICAL (0.40+0.06+0.06+0.06 = 0.58 of gross
+  // for STAFF). gross=25800 -> pfWage=14964 (<=15000, 12% uncapped); gross=26000 -> pfWage=15080
+  // (>15000, capped flat 1800).
+  const underCap = calculateOne({
+    empCode: 'VFLPFTEST', category: 'STAFF', month: 11, year: 2026, workingDays: 1,
+    masters: { FIXED_GROSS: 25800 },
+    days: { present: 1, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: 0, deductions: { canteen: 0, society: 0, advance: 0 },
+  });
+  check('PF: pfWage 14964 (<= 15000 ceiling) -> 12% uncapped = 1795.68', underCap.deductions.PF === 1795.68, `got ${underCap.deductions.PF}`);
+
+  const overCap = calculateOne({
+    empCode: 'VFLPFTEST', category: 'STAFF', month: 11, year: 2026, workingDays: 1,
+    masters: { FIXED_GROSS: 26000 },
+    days: { present: 1, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: 0, deductions: { canteen: 0, society: 0, advance: 0 },
+  });
+  check('PF: pfWage 15080 (> 15000 ceiling) -> flat capped 1800', overCap.deductions.PF === 1800, `got ${overCap.deductions.PF}`);
+
+  // ESI: fixed gross exactly at the 21000 ceiling -> included; one rupee above -> excluded.
+  const esiAtCeiling = calculateOne({
+    empCode: 'VFLESITEST', category: 'STAFF', month: 11, year: 2026, workingDays: 1,
+    masters: { FIXED_GROSS: 21000 },
+    days: { present: 1, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: 0, deductions: { canteen: 0, society: 0, advance: 0 },
+  });
+  check('ESI: fixed gross exactly 21000 (at ceiling) -> ESI applied (157.5)', esiAtCeiling.deductions.ESI === 157.5, `got ${esiAtCeiling.deductions.ESI}`);
+
+  const esiOverCeiling = calculateOne({
+    empCode: 'VFLESITEST', category: 'STAFF', month: 11, year: 2026, workingDays: 1,
+    masters: { FIXED_GROSS: 21000.01 },
+    days: { present: 1, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: 0, deductions: { canteen: 0, society: 0, advance: 0 },
+  });
+  check('ESI: fixed gross 21000.01 (just over ceiling) -> ESI = 0 (excluded)', esiOverCeiling.deductions.ESI === 0, `got ${esiOverCeiling.deductions.ESI}`);
+
+  // PT slabs (exported ptAmount()), exact boundaries: <=7500 nil, <=10000 => 175, else 200
+  // (300 in February). Tested directly against the exported function, same one the engine calls.
+  check('PT: gross exactly 7500 -> 0', ptAmount(7500, 11, DEFAULT_ENGINE_CONFIG) === 0);
+  check('PT: gross 7500.01 -> 175', ptAmount(7500.01, 11, DEFAULT_ENGINE_CONFIG) === 175);
+  check('PT: gross exactly 10000 -> 175', ptAmount(10000, 11, DEFAULT_ENGINE_CONFIG) === 175);
+  check('PT: gross 10000.01 -> 200 (non-February)', ptAmount(10000.01, 11, DEFAULT_ENGINE_CONFIG) === 200);
+  check('PT: gross 10000.01 in February -> 300 (ptFebAmount)', ptAmount(10000.01, 2, DEFAULT_ENGINE_CONFIG) === 300);
+}
+
+console.log('== Consultant/staff OT whitelist boundary — audit gap 4 (already covered; cross-check) ==');
+{
+  // The "== Consultant OT whitelist ==" and "== Staff OT whitelist ==" blocks earlier in this
+  // file (added when PATCH_124/the 47-code whitelist shipped) already check: a non-whitelisted
+  // consultant/staff employee with high hours gets otPay=0, and a whitelisted one is paid OT,
+  // for both CONSULTANT rate bases and for STAFF. This block only adds the one boundary those
+  // didn't explicitly name: otHours fed in but exactly 0 for a non-whitelisted employee (should
+  // also be 0, trivially) vs a whitelisted employee with otHours=0 (should also be 0 — the gate
+  // allows OT, but 0 hours still pays 0) — proving the whitelist gate and the hours-based amount
+  // are independent checks, not conflated.
+  const mkStaff = (emp: string, ot: number): PayrollInput => ({
+    empCode: emp, category: 'STAFF', month: 11, year: 2026, workingDays: 26,
+    masters: { FIXED_GROSS: 45000 },
+    days: { present: 26, ph: 0, el: 0, cl: 0, sl: 0, plo: 0, weekOff: 0 },
+    otHours: ot, deductions: { canteen: 0, society: 0, advance: 0 },
+  });
+  const whitelistedZeroHours = calculateOne(mkStaff('VFL1066', 0));
+  check('Whitelisted staff with otHours=0 -> otPay still 0 (gate allows OT, but no hours means no amount)',
+    whitelistedZeroHours.otPay === 0, `got ${whitelistedZeroHours.otPay}`);
+  const notWhitelistedZeroHours = calculateOne(mkStaff('VFL1001', 0));
+  check('Non-whitelisted staff with otHours=0 -> otPay 0 (same result, different reason)',
+    notWhitelistedZeroHours.otPay === 0, `got ${notWhitelistedZeroHours.otPay}`);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
