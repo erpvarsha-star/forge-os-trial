@@ -1,0 +1,45 @@
+name: Feature Request
+description: Suggest a new feature or improvement for Forge OS
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What do you want built?
+      description: Describe the feature or change clearly and concisely.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why is this needed?
+      description: What problem does this solve, or what decision/need prompted it?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: role
+    attributes:
+      label: Which role needs this?
+      options:
+        - owner
+        - plant_head
+        - hr_admin
+        - manager
+        - supervisor
+        - security_guard
+        - member
+        - Multiple roles / everyone
+        - Not role-specific
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Mockups, examples, related screens, or anything else useful.
+    validations:
+      required: false
