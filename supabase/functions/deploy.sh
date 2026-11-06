@@ -32,7 +32,7 @@ FUNCTIONS=(
 failed=()
 for fn in "${FUNCTIONS[@]}"; do
   echo "Deploying $fn ..."
-  if ! supabase functions deploy "$fn" --no-verify-jwt; then
+  if ! supabase functions deploy "$fn" --no-verify-jwt --yes; then
     echo "::error::Failed to deploy $fn"
     failed+=("$fn")
   fi
