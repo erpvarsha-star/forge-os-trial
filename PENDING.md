@@ -1,21 +1,17 @@
-# >>> RESUME STATE 5 Nov 2026 (session continued) — READ THIS FIRST <<<
-**Branch:** `claude/forge-os-backend-setup-7woj4t`, HEAD = `346f245` at last doc merge. Local checkout `ccr-3459d9e7-xosjyv` tracks it; doc-only edits go through the isolated worktree at `/tmp/claude-0/wt/ccr-pending` (branch `ccr-3459d9e7-xosjyv-fix`), never the shared main directory. `git status` clean.
+# >>> RESUME STATE 6 Nov 2026 — READ THIS FIRST <<<
+**Branch:** `claude/forge-os-backend-setup-7woj4t`, HEAD = `19f3927` at last doc merge. Local checkout `ccr-3459d9e7-xosjyv` tracks it; doc-only edits go through the isolated worktree at `/tmp/claude-0/wt/ccr-pending` (branch `ccr-3459d9e7-xosjyv-fix`), never the shared main directory. `git status` clean.
 
-**Advances cross-check (see its own section below): APPLIED LIVE 5 Nov 2026, Yash confirmed before and after.** 6 balances corrected, 2 rows created, 4 Diwali staff rates fixed, all 8 given `first_recovery_month='2026-11'` to prevent double-deduction in the real October run. Nothing further to do here unless Yash raises something new.
+## NEXT PRIORITY — October payroll run is LIVE and IN PROGRESS. Just watch it, don't touch pay_runs.
 
-**VFL1520/VFL1527/VFL5439 October attendance — DONE, fully closed.** Yash ran the 2-row/5-row cleanup DELETE himself; re-verified live: VFL1520 21P/4WO/1H(26), VFL1527 25P/5WO/1H(31), VFL5439 5P/1WO/1H+24 leave days(31) — all three match his numbers exactly. apk-130 confirmed as the latest APK (published 11:19 UTC, off `b13d30a`). Nothing further here.
+**The October whole-company run (`2026-10 regular`, id `d5c1e25a-bd3e-425a-8db0-540ef2734a2e`, `status='draft'`, `population=null`) is ACTIVE — HR is mid-way through deciding its 74 generated warnings as of this session's end.** Do NOT cancel, re-create, or otherwise touch this run's `status` without first checking the HR Payroll Run screen is not actively open/in-use — see the incident below for exactly why.
 
-**✅ `payroll-run` REDEPLOYED to v17, 5 Nov 2026 — PATCH_132's confirmation gate is now LIVE.** Built by a Sonnet deploy agent (`model:"sonnet"`, read all 12 files verbatim off disk, no retyping — the exact discipline that failed as "v15" earlier this project). **Independently re-verified by Claude, not taken on the agent's word:** `list_edge_functions` directly — version 17 (was 16), `verify_jwt:true`, status ACTIVE, `updated_at` moved. Fetched the deployed source back myself and grepped it (not the agent's grep, a fresh one, correcting for a `grep -c` single-line-count pitfall the agent's method could have hit): `feeds not confirmed` → exactly 1 occurrence; `first_recovery_month` → exactly 5 occurrences; `workingDaysInMonth`/`countWeekdayInMonth` (the two functions that got corrupted in the "v15 incident") → both present, distinct, complete, no merge/truncation. **This is a data/infra-only change — no app code touched, no new APK needed.** `payroll-feeds-approval-reminder`/`plant-head-efficiency-reminder`/`accounts-advance-recovery-reminder` crons (jobids 31/32/33) were already confirmed live+active before this deploy, nothing further needed on those.
+**Next priority for whoever resumes**: check in on this run's progress (`select status, feeds_confirmed_at from pay_runs where id='d5c1e25a-bd3e-425a-8db0-540ef2734a2e'`; `select count(*), count(*) filter (where decision is null) as undecided from pay_run_warnings where run_id='d5c1e25a-bd3e-425a-8db0-540ef2734a2e'`). Once all 74 are decided and AI-reviewed, HR taps **"Confirm feeds are final"** then **Calculate**. Be ready to help interpret calculate results (held employees, warnings) and walk through Approve → Finalize. This run stays whole-company (not split by population) — that decision was forced by the incident below, not re-opened unless Yash says so.
 
-**No pg_cron trigger needs running for the gate itself** — `confirm_pay_run_feeds()` is an RPC called from the HR screen's new "Confirm feeds are final" button, not a scheduled job. **The real "what needs to happen next" is the October payroll run itself, still not started at all** — confirmed live: `pay_periods` has **zero rows for 2026/10**. Exact in-app sequence HR/owner needs to run, per population (PUNE_STAFF → STAFF → PERMANENT_WORKER → CONSULTANT, per the per-population PATCH_112/v9 design):
-1. HR Payroll Run screen → Create run (creates the `pay_periods` row for Oct if it doesn't exist yet, then a `draft` `pay_runs` row for the chosen population).
-2. Generate warnings (`generate_warnings` action) → review/decide each flagged warning (late >30min from the 4th occurrence, no_punch, punched_absent, missing_efficiency) → AI review runs automatically on `decide_warning`.
-3. Once `pay_run_warnings_resolved` is true, tap **"Confirm feeds are final"** (new, PATCH_132) — this is the step that was just unlocked by this deploy; it was previously a no-op dead button pointing at a 404'd gate.
-4. Calculate → review `held`/warning employees → Approve → Finalize (fires `payslip_ready` notifications, BUNG09/Diwali/VFL4063-style advance recoveries where `first_recovery_month` has arrived, arrears attach where applicable).
-5. Repeat for the next population.
-Blocked on, same as before this deploy: Kajal entering October BUNG attendance (bulk screen now live via apk-130, not yet used), plant head entering October efficiency %, HR approving the pending canteen/society/adjustment rows (she can now see the right month by default since the payroll-feeds fix).
+**🔴 Incident this session, now fully resolved — record for future caution.** Claude cancelled this run (to free up the population picker for a planned PUNE_STAFF/STAFF/WORKER/CONSULTANT split) while HR had the screen open live. She ran pre-check against the now-cancelled run anyway and decided all 74 warnings — real work, against a cancelled run. `cancelled` is a terminal state in `trg_pay_run_transition` (no path back to `draft`). Recovered using the same safe pattern as PATCH_96 (disable `trg_pay_run_transition` → `UPDATE status='draft'` → re-enable trigger) — verified after: trigger back on and enforcing, all 74 warnings/decisions intact, run back in `draft`. **Lesson: never cancel/mutate a `pay_runs` row without first confirming no one has the HR Payroll Run screen open and mid-action — a backend "safe, empty draft" check (0 warnings, 0 pay_run_items) is not enough if a human is actively driving it in real time.** Net effect: October stays ONE whole-company run; the per-population split is abandoned for October (would have meant discarding HR's 74 decisions) unless Yash explicitly asks to redo it.
 
-## NEXT PRIORITY — none open from this ticket; see "still not done" below
+**✅ `payroll-run` is at v17 — PATCH_132's "Confirm feeds are final" gate is LIVE and working** (confirmed: it's what unblocked HR to reach the warnings step in the first place). No further deploy needed. No new APK needed for any of this session's work (all DB/infra only). apk-130 is still the current build.
+
+## Earlier context (resolved, kept for reference — see sections below for full detail)
 
 **Payroll Feeds screen's month default — FIXED, MERGED, verified. Done.**
 
@@ -81,9 +77,16 @@ Yash gave VFL5439's October breakdown: **5P + 1WO + 16EL + 5CL + 3SL + 1PH = 31*
 
 **Day placement (which calendar date got which status, inside the Yash-confirmed totals) was Claude's own reasonable default, not individually confirmed date-by-date** — flagged per Yash's own "use a reasonable default" instruction. If any specific date turns out to matter (e.g. for a shift/OT reconciliation), re-ask before relying on it.
 
-## Still not done (unchanged, not part of today's exchange)
+## Still not done
 
-- **Get HR/owner to actually trigger the real October per-population payroll runs in-app** (PUNE_STAFF → STAFF → PERMANENT_WORKER → CONSULTANT) — still blocked on Kajal entering October BUNG attendance (0 rows; the new bulk-upload screen above is meant to unblock this once built/verified) and HR clicking Approve on the October canteen/society entries now that she can actually see them (apk-128).
+- **✅ SUPERSEDED 6 Nov 2026** — see the RESUME STATE block at the top. The per-population split is no longer the plan; a single whole-company October run is now live and in progress (HR actively deciding its 74 warnings). Kajal's BUNG bulk-attendance entry and the plant head's efficiency % are still outstanding and still feed into this one run.
+
+## DONE 5-6 Nov 2026
+
+- **October payroll run started in-app** — whole-company run created, pre-check run (74 warnings generated), HR actively deciding them as of session end. `payroll-run` v17's confirmation gate is what unblocked this. See RESUME STATE block for the cancel/recover incident and current exact state.
+- **Advances cross-check** — 6 balances corrected, 2 rows created, 4 Diwali staff rates fixed, all applied live and confirmed by Yash. See its own section below.
+- **VFL1520/VFL1527/VFL5439 October attendance** — written and closed, all three match Yash's numbers exactly. See its own section below.
+- **`payroll-run` redeployed to v17** — PATCH_132's confirmation gate live, independently verified.
 
 ## DONE earlier this session (5 Nov 2026)
 
