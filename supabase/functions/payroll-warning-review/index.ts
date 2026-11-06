@@ -77,7 +77,10 @@ Deno.serve(async (req) => {
 
     // ---- Anthropic Messages API
     const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!apiKey) return json({ error: 'ANTHROPIC_API_KEY not configured' }, 502);
+    if (!apiKey) {
+      console.error('payroll-warning-review: ANTHROPIC_API_KEY not configured');
+      return json({ error: 'ANTHROPIC_API_KEY not configured' }, 502);
+    }
     let text = '';
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -88,13 +91,24 @@ Deno.serve(async (req) => {
           messages: [{ role: 'user', content: prompt }],
         }),
       });
-      if (!res.ok) return json({ error: `llm http ${res.status}` }, 502);
+      if (!res.ok) {
+        let bodyText = '';
+        try { bodyText = await res.text(); } catch (readErr) { bodyText = '<failed to read body: ' + String(readErr) + '>'; }
+        console.error(`payroll-warning-review: llm http ${res.status}`, bodyText);
+        return json({ error: `llm http ${res.status}` }, 502);
+      }
       const out = await res.json();
       text = (out?.content ?? []).filter((b: any) => b?.type === 'text').map((b: any) => b.text).join('\n');
-    } catch (e) { return json({ error: 'llm request failed: ' + String(e) }, 502); }
+    } catch (e) {
+      console.error('payroll-warning-review: llm request failed: ' + String(e));
+      return json({ error: 'llm request failed: ' + String(e) }, 502);
+    }
 
     const review = extractReview(text);
-    if (!review) return json({ error: 'could not parse llm response' }, 502);
+    if (!review) {
+      console.error('payroll-warning-review: could not parse llm response', text);
+      return json({ error: 'could not parse llm response' }, 502);
+    }
 
     // ---- persist (only if still unreviewed)
     const { error: uErr } = await supabase.from('pay_run_warnings')
