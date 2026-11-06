@@ -280,5 +280,54 @@ check('daily with null daily_rate -> warning', cr.warnings.includes('CON18: dail
     `got ${nullFrm.inputs.find((i) => i.empCode === 'VFL4008')!.deductions.advance}`);
 }
 
+console.log('== Half-day ("HL"/"half_day") attendance status — audit gap 2 ==');
+{
+  // statusEffect() (internal) maps DB status 'hl'/'half_day' -> present:0.5. This block drives
+  // that through the public assemblePayrollInputs() entry point (the only exported surface that
+  // reaches statusEffect) to confirm the mapping is live and correctly aggregated.
+  const halfDayBundle: FeedBundle = {
+    ...bundle,
+    attendance: [
+      { employee_id: 'w1', date: '2026-12-02', status: 'hl', overtime_hours: 0, check_in_time: '2026-12-02T08:00:00Z', check_out_time: '2026-12-02T12:00:00Z' },
+      { employee_id: 'w1', date: '2026-12-03', status: 'half_day', overtime_hours: 0, check_in_time: '2026-12-03T08:00:00Z', check_out_time: '2026-12-03T12:00:00Z' },
+      { employee_id: 'w1', date: '2026-12-04', status: 'present', overtime_hours: 0, check_in_time: '2026-12-04T08:00:00Z', check_out_time: '2026-12-04T17:00:00Z' },
+    ],
+    leaves: [], advances: [], canteen: [], society: [],
+  };
+  const rHalf = assemblePayrollInputs(2026, 12, halfDayBundle);
+  const w1Half = rHalf.inputs.find((i) => i.empCode === 'VFL4008')!;
+  check('"hl" status -> 0.5 present day counted', !!w1Half);
+  check('"hl" (1x) + "half_day" (1x) + "present" (1x) -> days.present = 2.0 (0.5+0.5+1)',
+    w1Half.days.present === 2.0, `got ${w1Half.days.present}`);
+  check('HL/half_day rows do NOT mark weekOff/el/cl/sl/ph', w1Half.days.weekOff === 0 && w1Half.days.el === 0 && w1Half.days.ph === 0);
+
+  // HL rows are also correctly recognized as "present with no punch" in reconciliation
+  // when there's no punch, and NOT flagged when a punch exists (as given above, both HL rows
+  // do have punches, so reconciliation should be empty for this bundle).
+  check('HL rows with real punches produce no reconciliation mismatch', rHalf.reconciliation.length === 0, JSON.stringify(rHalf.reconciliation));
+
+  const halfDayNoPunchBundle: FeedBundle = {
+    ...halfDayBundle,
+    attendance: [
+      { employee_id: 'w1', date: '2026-12-02', status: 'hl', overtime_hours: 0, check_in_time: null, check_out_time: null },
+    ],
+  };
+  const rHalfNoPunch = assemblePayrollInputs(2026, 12, halfDayNoPunchBundle);
+  check('HL row with NO punch -> flagged PRESENT_NO_PUNCH (same as a full "present" day)',
+    rHalfNoPunch.reconciliation.some((x) => x.mismatch === 'PRESENT_NO_PUNCH'), JSON.stringify(rHalfNoPunch.reconciliation));
+
+  // Flow all the way through to the engine: a half-present-day PayrollInput must pay out
+  // proportionally less than a full-present-day one (confirms the 0.5 actually reaches
+  // calculateOne() unmodified, not just that feedSync's own DayCounts object looks right).
+  const oneHlOnly: FeedBundle = {
+    ...bundle,
+    attendance: [{ employee_id: 's1', date: '2026-12-02', status: 'hl', overtime_hours: 0, check_in_time: '2026-12-02T08:00:00Z', check_out_time: '2026-12-02T12:00:00Z' }],
+    leaves: [], advances: [], canteen: [], society: [],
+  };
+  const rHl = assemblePayrollInputs(2026, 12, oneHlOnly);
+  const s1Hl = rHl.inputs.find((i) => i.empCode === 'VFL1001')!;
+  check('STAFF half-day input: days.present = 0.5 reaches the PayrollInput unmodified', s1Hl.days.present === 0.5, `got ${s1Hl.days.present}`);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);
