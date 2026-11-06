@@ -164,7 +164,7 @@ jobs:
           ./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a,arm64-v8a
 
       - name: Upload APK (workflow artifact, 14-day retention)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: forge-os-apk
           path: android/app/build/outputs/apk/release/app-release.apk
