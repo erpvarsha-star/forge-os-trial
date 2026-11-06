@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: TypeScript check (baseline-aware)
+        run: |
+          set -o pipefail
+          BASELINE=7
+          OUTPUT="$(npx tsc --noEmit 2>&1 || true)"
+          echo "$OUTPUT"
+          COUNT="$(echo "$OUTPUT" | grep -c "error TS" || true)"
+          echo "tsc error count: $COUNT (baseline: $BASELINE)"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::tsc --noEmit reported $COUNT errors, above the documented baseline of $BASELINE. See CLAUDE.md's tsc baseline convention."
+            exit 1
+          fi
+
+      - name: i18n coverage check
+        run: node scripts/check-i18n.mjs
+
+      - name: Run test scripts
+        run: |
+          set -o pipefail
+          FAILED=0
+          for f in scripts/*.test.ts; do
+            echo "=== Running $f ==="
+            if ! npx tsx "$f"; then
+              echo "::error::$f failed"
+              FAILED=1
+            fi
+          done
+          if [ "$FAILED" -ne 0 ]; then
+            exit 1
+          fi
