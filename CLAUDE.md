@@ -3,7 +3,45 @@
 **Company**: Varsha Forgings Pvt Ltd (VFPL), Aurangabad  
 **App**: Forge OS — bilingual (EN/HI) React Native attendance + HR system  
 **Last full audit**: 10 August 2026  
-**Branch**: `claude/forge-os-backend-setup-7woj4t`
+**Control-file audit**: 10 November 2026 (CLAUDE.md / PENDING.md / ARCHIVE.md split audited; see below)  
+**Branch**: `claude/forge-os-backend-setup-7woj4t` — ⚠ stale, see the "BRANCH REALITY" note at the top of PENDING.md
+
+---
+
+## 🔒 The three-file contract — read before editing ANY of them
+
+| File | Holds | Authority |
+|---|---|---|
+| **CLAUDE.md** (this file) | Active locked rules, architecture, schema, guardrails, standing owner decisions | **Binding.** If a rule is not here, it does not exist. |
+| **PENDING.md** | The RESUME STATE block, active sprint work, unresolved issues, open owner decisions | **Binding for what to do next.** Its top RESUME STATE block is the only current one. |
+| **ARCHIVE.md** | Fully closed / superseded history — the "why" record | **Never binding. Never a to-do.** Context only. |
+
+**A decision or constraint exists only if it is in CLAUDE.md or PENDING.md.**
+ARCHIVE.md is readable background; nothing in it may be actioned, re-opened,
+or treated as current without first being restated in one of the other two.
+
+**🔒 Archiving discipline — the rule that exists because this went wrong.**
+Moving a section to ARCHIVE.md is a safety-critical edit, not housekeeping: a
+"resolved" narrative routinely has a live constraint or an unchecked item
+buried inside it, and archiving the paragraph silently deletes the rule. The
+10 Nov 2026 audit found exactly this — the 10 Nov split had swept out the
+intentional no-DELETE-policy guardrail, the PATCH_12 "why policies are
+stricter than FINAL_SCHEMA" rationale, the `RoleGate` second auth layer, and
+the `lib/deviceId.ts` invariant; and the PENDING.md narrative hid three
+unchecked items plus the `gps_check` fail-open rule inside sections titled
+"found and fixed". **Before archiving any section, you must:**
+1. grep it for `- [ ]`, "still open", "not yet", "not done", "needs", `⏳` —
+   lift every hit back into PENDING.md verbatim;
+2. grep it for "never", "must", "do not", "always", "keep in sync" — decide
+   per hit whether it is historical prose or a **live constraint**, and
+   promote every live constraint into CLAUDE.md;
+3. prove conservation: every substantive line must exist in the destination
+   file afterwards — nothing is condensed, summarised or dropped;
+4. leave a pointer where the section was, so the trail is never broken.
+
+This is why the IST-date, Shift 4/5 tie-breaker and approved-leave regressions
+happened: the rule survived, but the *reason* was removed, so a later session
+"simplified" it away. Keep the reason attached to the rule.
 
 ---
 
@@ -213,7 +251,7 @@ the user operates on IST, never UTC, and never "whatever the device thinks."
 - **Login accepts employee code _or_ mobile number.** Both are needed: ~a third of employees have no phone in the DB (VFL1527 deliberately NULL; only ~96 of 120 got numbers in PATCH_03), so phone alone would lock people out.
 - **Identifier → email resolution** goes through `public.resolve_login_identifier()`, a SECURITY DEFINER function returning *only* the synthetic email. Needed because the lookup happens while still anonymous, when RLS correctly hides `employees`. It does reveal whether a code exists — accepted, since emp_codes are printed on ID cards and the PIN is the secret.
 - **Starting PIN = emp_code digits padded to 6.** `VFL1001` → `001001`. Per-employee, *not* one shared default — a shared default would let anyone sign in as any colleague who hadn't logged in yet.
-- **`must_change_pin` forces a change on first login**, gated in `app/index.tsx` (the only auth guard) and in `login.tsx`. Cleared via `public.mark_pin_changed()` — a SECURITY DEFINER function rather than an RLS update policy, because any policy broad enough to let employees update their own row would also let them edit their own `role`, `salary` or `supervisor_id`.
+- **`must_change_pin` forces a change on first login**, gated in `app/index.tsx` (the role router / first auth gate — note `components/RoleGate.tsx` guards each role group as well, see "Live code invariants") and in `login.tsx`. Cleared via `public.mark_pin_changed()` — a SECURITY DEFINER function rather than an RLS update policy, because any policy broad enough to let employees update their own row would also let them edit their own `role`, `salary` or `supervisor_id`.
 
 **⚠ Starting PINs are guessable by design.** Anyone who has seen an ID card can derive a colleague's starting PIN. The window is "until that person first logs in". HR should push everyone through first login promptly.
 
@@ -1292,7 +1330,7 @@ Two separate fixes, both same day:
 
 ```
 app/
-├── index.tsx              — role router (the only auth guard; routes on the EFFECTIVE role, see view-as)
+├── index.tsx              — role router (first auth gate; RoleGate.tsx guards each group too; routes on the EFFECTIVE role, see view-as)
 ├── view-as.tsx            — admin inspection: render the app as any role/department/category
 ├── (auth)/login.tsx       — employee code / mobile + PIN login
 ├── (auth)/change-pin.tsx  — forced PIN change on first login
@@ -1511,7 +1549,92 @@ Script Property, not two — every send function reads that same one).
 
 ---
 
-> Moved to ARCHIVE.md: "RLS — all known holes closed (PATCH_12, confirmed 11 Aug)" and "Screen-level issues — none open (found stale while re-auditing 13 Aug)" (both fully closed historical records, no open items).
+## 🔒 RLS posture — ACTIVE constraints, not history (why policies are stricter than FINAL_SCHEMA)
+
+**Read this before "fixing" any RLS policy that looks stricter than
+`scripts/FINAL_SCHEMA_02Aug2026.sql` suggests.** FINAL_SCHEMA is the
+authoritative *schema*, but it is NOT the authoritative *policy* text —
+`PATCH_12_rls_hardening_11Aug2026.sql` (applied + confirmed 11 Aug 2026)
+deliberately tightened six policies past what FINAL_SCHEMA shows. A model
+diffing live policies against FINAL_SCHEMA will see a mismatch; reverting it
+re-opens a privilege-escalation hole. The six, with the insecure shape each
+replaced:
+
+1. `employees` INSERT — was `is_management() OR auth.role() = 'authenticated'`;
+   the second branch made it **trivially true for any signed-in user** (any
+   employee could insert employee rows). Now `is_management()` only.
+2. `notifications` INSERT — was `with check (true)`. Now `is_management()`
+   only, plus a UPDATE policy scoped to `user_id = current_employee_id()` so
+   the bell can still be cleared by its owner.
+3. `fraud_alerts` / `fraud_flags` INSERT — were unscoped for any authenticated
+   user. Now scoped to the reporting employee.
+4. `attendance_records` write — now scoped to a supervisor's own team.
+5. `leave_requests` UPDATE — now scoped to a supervisor's own team.
+6. `mrm_reviews` SELECT — was readable by every authenticated user. Now
+   manager-and-above only.
+
+**🔒 There are no DELETE policies on any table, and that is intentional — the
+audit trail depends on it.** Never add a DELETE policy to satisfy a screen or
+a cleanup task; soft-delete (`is_active=false`, `status`, a `reviewed`/
+`resolved` flag) or a SECURITY DEFINER RPC with its own role check is the
+pattern this project uses everywhere. An absent DELETE policy is a designed
+guardrail, never an oversight to close.
+
+The closed historical narrative of this hardening pass lives in ARCHIVE.md;
+the constraints above are current and binding.
+
+---
+
+## 🔒 Live code invariants — restored 10 Nov 2026 (each one was a real bug once; do not undo)
+
+These are not historical anecdotes. Each is a property live code depends on
+*today*, where the failure mode is silent — nothing throws, nothing logs, the
+feature just stops being true. The narrative of how each was found is in
+ARCHIVE.md; the invariant itself is binding here.
+
+- **Auth guarding is TWO layers, not one.** `app/index.tsx` is the role
+  *router* and the first gate, but `components/RoleGate.tsx` has wrapped **all
+  seven role groups** since 13 Aug 2026, because expo-router will happily
+  render a group's screens on a deep link / restored navigation state without
+  ever passing through `index.tsx`. **Never remove `RoleGate` from a group
+  layout on the belief that `index.tsx` already guards it, and always add it
+  when creating a new role group.** (Older lines in this file calling
+  `index.tsx` "the only auth guard" predate `RoleGate` and are corrected
+  in place.)
+- **Device identity must be a persisted per-install id — `lib/deviceId.ts`.**
+  The buddy-punching fraud check compares "same device, different employee,
+  same day". `Constants.deviceId` was removed from Expo years before SDK 51,
+  so it is **always `undefined`**, and the original
+  `Constants.deviceId || Constants.sessionId` fallback wrote a *fresh* id on
+  every app launch — the lookup could therefore never match and the check had
+  **never once fired** before it was fixed 12 Aug 2026. Never substitute
+  `Constants.deviceId`, `sessionId`, or any per-launch value here.
+- **`supervisor/casual-workers.tsx`'s upsert conflict key is
+  `supervisor_id,date`** and matches `unique (supervisor_id, date)` in
+  FINAL_SCHEMA exactly (verified 13 Aug 2026). An upsert whose conflict target
+  does not match a real unique constraint fails at runtime, not at build.
+- **`fraud-detector`'s `gps_check` FAILS OPEN on a network error, deliberately.**
+  `worker/home.tsx` / `CheckInCard` still run the client-side geofence check
+  above it, which blocks the obvious cases even offline — so **a plant with
+  patchy signal must never lose a legitimate check-in because the fraud check
+  itself was unreachable.** Never "harden" this path to fail closed; a mock-
+  location *flag* hard-blocks (policy), an unreachable *detector* does not.
+- **Any importer of the form registry must read the Cutting table's `Shift`
+  column as a SUBMITTER NAME, not a shift.** It holds a person ("B.S. Todmal")
+  where HT/Final hold "First/Second/Third/General Shift" — confirmed deliberate
+  by Yash, it records who is responsible for filling that form. Responsibility
+  is **many-to-many**: Todmal covers Cutting AND Heat Treatment, and Ashok
+  Sharma also covers Cutting, so **never assume one-owner-per-department.**
+  (This is the "Todmal name-variant" case the Telegram onboarding section above
+  refers to when it insists on exactly-one-match-or-skip, never guessing.)
+- **Photo capture goes through `components/PhotoCapture`**, never a
+  hardcoded/placeholder URL. `worker/5s.tsx` and `worker/observation.tsx` both
+  once wrote a `placeholder.com` URL, so submissions carried no real photo;
+  the private `submission-photos` bucket (PATCH_13) is the destination.
+
+---
+
+> Historical detail moved to ARCHIVE.md: the full "RLS — all known holes closed (PATCH_12)" narrative and the "Screen-level issues — none open (13 Aug)" table. The still-binding constraints from both were restored above and under "Live code invariants".
 ## Leave & Advance approval chains — frozen 27 Sep 2026, decisions from Yash
 
 **🔒 New joiners get no leave entitlement until completing 1 year of service — decision from Yash, 5 Nov 2026, restated and generalized 5 Nov 2026 (second message).** Flagged when HR reported VFL5463/5464/5465/5466 as "missing from the records": checked live, all four are real, active employees (added Sep 2026) — the actual gap is that none of them has a `leave_balances` row. Yash's first wording: "they have joined only this year so they do not get leaves from the year that they join... they do not qualify for paid leaves." Yash then explicitly generalized this into a standing rule, same day: **"the others do not get leave till the complete one year of service in the company... a new joining only get leaves after 1 year... this is applicable for EL CL SL."** **This is correct, expected behavior, not a data gap to fill** — remove any "missing leave_balances row" flag for a recent hire and do not re-raise it.
@@ -2465,6 +2588,9 @@ exercised on a real device** — screen behind auth. New APK build needed
 - Reference `types/database.ts` column names (old schema) — always use `types/index.ts`
 - Use `shift_date`, `full_name`, `employee_code`, `department_id`, `reporting_manager_id`, `salary_structure` — these are old schema names that don't exist in FINAL_SCHEMA
 - **Compute "today," "this month," or any date-boundary/deadline check from a plain `new Date()`/`.getMonth()`/`.getFullYear()`/`.getDate()`/`.getDay()` call, in frontend or edge-function code.** Always use `lib/istDate.ts` (frontend) or `supabase/functions/_shared/istDate.ts` (edge functions) — see the locked IST rule above. This is not a style preference; it was a live production bug (wrong calendar date, missing attendance data) until the 27 Sep 2026 audit fixed it, and it must never be reintroduced.
+- **Add a DELETE policy to any table, or hard-delete a row to satisfy a screen or a cleanup task.** The complete absence of DELETE policies is a deliberate audit-trail guardrail (see "RLS posture"), not a gap. Use soft-delete (`is_active=false`, a `status`/`resolved`/`reviewed` flag) or a SECURITY DEFINER RPC with its own role check.
+- **Revert an RLS policy because it looks stricter than `scripts/FINAL_SCHEMA_02Aug2026.sql` shows.** FINAL_SCHEMA is authoritative for the schema, NOT for policy text — PATCH_12 (and PATCH_99/100/101/102) deliberately tightened policies past it. Reverting to match FINAL_SCHEMA re-opens a privilege-escalation hole. See "RLS posture".
+- **Remove `components/RoleGate.tsx` from a role-group layout, or create a new role group without it**, on the belief that `app/index.tsx` already guards access. See "Live code invariants".
 - **Cancel, finalize, or otherwise mutate a `pay_runs` row's `status` (or any live, human-driven workflow row) without first checking whether someone has that screen open and mid-action right now.** A 6 Nov 2026 incident: Claude cancelled an empty, zero-item draft payroll run believing it safe (0 warnings, 0 pay_run_items at the time) to free up the population picker — but HR had the screen open live, ran pre-check against it anyway, and decided all 74 resulting warnings against a run that was already cancelled. `cancelled` turned out to be a terminal state in `trg_pay_run_transition` (no path back to `draft`) — recovered only by briefly disabling that trigger, same pattern as PATCH_96's repair. A backend "looks empty/safe" check is not sufficient — if a human-facing workflow row might be in active use, ask first or wait for confirmation it's idle, never assume from table emptiness alone.
 
 ---
