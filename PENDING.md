@@ -1,9 +1,7 @@
 # >>> RESUME STATE 6 Nov 2026 (session close) — READ THIS FIRST <<<
 **Branch:** `claude/forge-os-backend-setup-7woj4t`, HEAD = `d120d62`. Local checkout `ccr-e6455619-qd283w` tracks it. `git status` clean.
 
-## ✅ CLOSED this session — Deploy Edge Functions CI, root-caused and fixed
-
-Had been red on every push since 4 Nov (`supabase functions deploy` needing `--yes` on a newer CLI — a tooling issue, confirmed via actual job logs, NOT caused by any code change and NOT a token/auth problem — `supabase link` succeeded every time). Fixed: `supabase/functions/deploy.sh` line 35 now has `--yes`. **Run #52 confirmed green, all 12 functions deployed.** No DB/SQL step needed, no further action.
+**Deploy Edge Functions CI** was fixed this session (`supabase/functions/deploy.sh` line 35 now has `--yes`; run #52 confirmed green, all 12 functions deployed) — fully closed, no follow-up.
 
 ## NEXT PRIORITY — October run still blocked on AI review (110/110 unreviewed); separately, 6 Nov Friday attendance needs fixing
 
@@ -159,12 +157,6 @@ Owner asked whether Kajal/HR had actually received any reminder about missing Oc
 **Still true, not yet addressed**: there is still no reminder mechanism at all for HR approving the pending canteen/society Payroll Feeds entries she's already entered (31 canteen + 20 society rows, sitting at `approval_status='pending'` since 2 Nov). Nothing was built for this — flagged to the owner, not started, since it's a new feature, not a bug fix.
 
 **Lesson for this project, now worth checking on any cron health question going forward**: "cron.job shows active + job_run_details shows succeeded" does NOT mean a cron-triggered edge function actually ran or delivered anything — `pg_net`'s queue-insert succeeding is a different claim from the HTTP request actually reaching the function. Check `app_notifications`/the function's own real side-effect, or the edge-function gateway logs, before trusting a cron's "active" status as proof of working delivery. The `pune-attendance-reminder` cron had this exact failure mode for 9 days (26 Oct – 4 Nov) with nobody noticing until asked directly.
-
-## Supabase "Branching" integration — RESOLVED, CLOSED (4 Nov 2026 late night)
-
-Owner saw repeated "MIGRATIONS: FAILED" runs in Supabase's Branching dashboard (screenshot). Root cause, confirmed: this project's org is on the Free tier, where real preview-branch databases aren't available — only the GitHub integration's "Deploy to production" auto-migrate-on-push step was active, and it kept failing because `list_migrations` shows only 58 entries tracked while this project has applied ~130 SQL patches directly via `execute_sql`/the dashboard (the project's actual, intentional workflow per the locked rules above) — the migration-history table Supabase's sync compares against has been drifted for months, unrelated to anything in this session. **Confirmed NOT caused by, and NOT affecting, any of this session's work**: both PRs (#39, #40) merged cleanly via GitHub's normal API, `Build Android APK` succeeded (apk-124), and `payroll-run` v16 was deployed + independently verified via a separate mechanism (Supabase MCP tool direct deploy, nothing to do with Branching/migrations sync).
-
-**Fix: owner turned OFF "Deploy to production" in Supabase → Project Settings → Integrations → GitHub, confirmed saved.** This stops the auto-apply-migrations-on-push step that was failing. Nothing else changed — live DB, edge functions, GitHub repo/branches/Actions all unaffected (verified reasoning given to owner before the toggle; owner applied it and confirmed). **No further action needed on this. Do not re-investigate in a future session** — if "Branching"/migration-sync questions come up again, this is already closed, same instinct as the project's own "stale note" rule.
 
 ## PATCH_127 MERGED + `payroll-run` REDEPLOYED to v16 — DONE, verified, this round
 
@@ -619,8 +611,6 @@ Yash sent a "Left Employees List" (25 names/emp_codes, no longer working). All 2
 **Confirmed safe, no changes:** `app/(plant-head)/approvals.tsx`, `app/(owner)/approvals.tsx`, `app/(supervisor)/approvals.tsx`, `app/(supervisor)/5s-verify.tsx`, `app/(manager)/approvals.tsx` (all just store raw timestamps or compute elapsed-time durations), `lib/notifications.ts`, `components/SafetyTip.tsx` (cosmetic day-of-week rotation only), `shift-reminder`/`mrm-reminder` (already IST-correct before centralizing).
 
 **Verified:** `npx tsc --noEmit` clean (pre-existing unrelated errors in `permissions-onboarding.tsx`/`FormsScreen.tsx` confirmed present on the base branch too, via `git stash`). `npx expo export --platform web` bundled all 2929 modules with zero errors.
-
-**✅ RESOLVED 27 Sep 2026 — `Deploy Edge Functions` CI is working again.** Was broken for 5 runs (#17-21, 24-27 Sep) with `supabase link ... Unauthorized` — the `SUPABASE_ACCESS_TOKEN` GitHub secret had gone stale. During the outage, **no edge function code change committed since 24 Sep actually reached the live project via CI**; this session's own 5 changed functions (nightly-scoring, five-s-challenge-generator, fraud-detector, mrm-reminder, shift-reminder) were deployed by hand via the Supabase MCP tool instead, to actually take effect. **Yash rotated the token** (new token valid to 25 Sep 2027, recorded in CLAUDE.md's Supabase project section) and **run #22 confirmed green** (`conclusion: success`) — normal auto-deploy-on-push is restored. No further action needed unless the same "Unauthorized" failure reappears after 25 Sep 2027, which would mean this token has expired.
 
 **[Fixed 27 Sep 2026, session 14] Attendance calendar timezone bug:** Calendar showing wrong date + yesterday's (Sep 26) attendance missing.
 
@@ -1913,30 +1903,6 @@ radius).
 
 ## 🔵 Known gaps still in the code
 
-- [x] **QR check-in secret — CONFIRMED SET 13 Aug.** `is_set=true, length=48`.
-- [x] **QR gate mechanism — FULLY CLOSED 25 Sep 2026.** `gate-qr.tsx`
-      confirmed working at the gate (tested live, scanned successfully).
-      Both scan paths are already on the strict salted check
-      (`${plant.id}-${today}-${plant.qr_secret_salt}`, exact match) —
-      workers via `app/(worker)/qr.tsx`, all other roles via the
-      `CheckInCard` modal. The loose interim check that once existed in an
-      earlier version of home.tsx was removed when QR scanning was moved to
-      its own route. No further code change needed — strict validation is
-      live for all 138 employees.
-- [x] **Alert copy in Hindi — VERIFIED DONE 12 Aug.** All 38 `Alert.alert()`
-      calls already use `t()`. Audited properly with `scripts/check-i18n.mjs`:
-      Hindi covers 100% of English, and one key used on two dashboards
-      (`common.overview`) had no entry at all — it was rendering the literal
-      text "common.overview" as a section heading. Now added.
-- [x] **`types/database.ts` — DELETED 12 Aug.** It mirrored the old schema and
-      nothing imported it; it existed only to mislead. `types/index.ts` is the
-      single type source.
-- [x] **Buddy-device fraud check — FIXED 12 Aug, it had never fired.**
-      `worker/home.tsx` used `Constants.deviceId || Constants.sessionId`.
-      `Constants.deviceId` was removed from Expo years before SDK 51, so it is
-      always undefined and every check-in wrote a fresh `sessionId` — meaning
-      the "same device, different employee, same day" lookup could never match.
-      Now a stable per-install id in `lib/deviceId.ts`.
 - [ ] **Rotating supervisor assignment** — HR/IR decide weekly; no in-app flow.
       Currently a manual `supervisor_id` UPDATE. Closed as out of scope 10 Aug,
       but will keep needing manual SQL.
