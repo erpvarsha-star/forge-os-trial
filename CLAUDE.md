@@ -45,6 +45,101 @@ happened: the rule survived, but the *reason* was removed, so a later session
 
 ---
 
+## 🚀 Session-start protocol — do these five things before anything else
+
+Yash pastes a short starter prompt (kept verbatim at the bottom of this
+section). Whether or not he does, **every new session on this project starts
+with these five steps, in order:**
+
+1. **Read PENDING.md's top RESUME STATE block first.** It is the only current
+   one — later blocks further down the file are older history, including one
+   that used to be mislabelled "latest". Do not scroll for context before
+   reading it.
+2. **Check the branch reality note under that block, then confirm it yourself**
+   (`git log --oneline -3`, `git status`, `git branch -a`). The `Branch:` line
+   at the top of this file has been stale before. Never start editing until you
+   know which branch is authoritative and whether an open PR already carries
+   the work.
+3. **Verify live, never recite.** Before stating any headcount, who is active,
+   what is pending, a config value, a cron's health or a deployed function's
+   version, query it. Notes here are "true when written." A cron showing
+   `active` is not proof it delivered; a deploy call returning success is not
+   proof the deployed source matches the repo (fetch it back and grep).
+4. **Say what you are picking up and get agreement before touching live state.**
+   Especially: `pay_runs` status, `attendance_records`, `advance_requests`,
+   RLS policies, or anything HR/Kajal may have open on screen right now.
+5. **Do not read ARCHIVE.md** unless one of the triggers in the section above
+   fires.
+
+Then, while working: every code edit, research sweep, review or deploy goes to
+an Agent call with `model: "sonnet"` (Claude plans, briefs, verifies, and does
+git/doc bookkeeping); record each of Yash's decisions into this file **in the
+same turn he gives it**; update PENDING.md's RESUME STATE at the end of every
+stage and push; and finish with the full brief plus numbered open questions.
+
+**The starter prompt (paste this into a new session):**
+
+```
+Forge OS session start. Before anything else:
+1. Read PENDING.md's TOP "RESUME STATE" block — it is the only current one.
+2. Read the "BRANCH REALITY" note under it, then confirm with git yourself
+   (log/status/branch -a) and tell me which branch is authoritative and
+   whether an open PR already carries the work.
+3. Tell me, from LIVE data not from notes: anything you are about to quote
+   about headcount, who is active, pending approvals, cron health, the live
+   October pay run's state, or a deployed edge function's version.
+4. Then tell me the top 3 things you believe are outstanding, and ask me
+   anything you need before you touch live state.
+Do NOT read ARCHIVE.md unless a trigger in CLAUDE.md's "When to read
+ARCHIVE.md" section actually fires. Do not edit code yourself — brief a
+Sonnet agent and verify its work. End with the full brief + numbered
+questions.
+```
+
+---
+
+## 🔎 When to read ARCHIVE.md — and when not to
+
+ARCHIVE.md is ~935 lines across 17 closed sections. It is **not** read at
+session start and **never** read whole — `grep` it for the specific thing you
+need. It is the answer to "**why is it like this?**", never to "what do I do
+next?".
+
+**Read it when any of these is true:**
+1. **You are about to change, simplify, remove or "fix" an existing rule,
+   constant or policy, and the reason it exists is not stated where you found
+   it.** The reason is probably archived. This is the single most important
+   trigger — the IST-date, Shift 4/5 tie-breaker and approved-leave
+   regressions all happened because a rule was changed by someone who could
+   not see why it was written.
+2. **A value looks arbitrary or wrong** (why 45 m and not 100 m? why does
+   `gps_check` fail open? why is there no DELETE policy? why is `nativewind`
+   pinned to `~4.1.23`?). Those all have a documented, hard-won reason.
+3. **A bug smells familiar** — something that "should work" doesn't, and the
+   symptom resembles a past incident (a consultant's PIN resetting itself,
+   `payroll-run/index.ts` blanked by a stray "noop" commit, Apps Script
+   triggers ballooning, a deployed edge function not matching the repo).
+   Check whether it is a recurrence before root-causing from scratch.
+4. **A pointer line in CLAUDE.md or PENDING.md says "moved to ARCHIVE.md"** —
+   follow it if you need that detail.
+5. **Yash asks "why is it like this", "didn't we already do this", "have we
+   tried X", or "what happened with Y"** — check before answering from memory.
+6. **Before archiving anything new** — to match the existing format and avoid
+   filing a duplicate.
+
+**Do NOT read it:**
+- routinely at session start, or "to get context" — that is CLAUDE.md (rules)
+  and PENDING.md's RESUME STATE (what's next);
+- to decide what to work on; nothing in it is a to-do, however it is worded;
+- to justify an action. If something there is still live, it is a bug in
+  CLAUDE.md or PENDING.md — restate it there first, then act on it there.
+
+**Treat every date in it as "true when written."** A closed section can name a
+headcount, an employee's status or a config value that has since changed; the
+live-data rule above still applies, with no exception for archived text.
+
+---
+
 ## Working rules
 
 **Prefer connectors, plugins and scripts over manual user steps.** Target
