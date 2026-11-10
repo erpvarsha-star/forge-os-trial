@@ -1,0 +1,935 @@
+# Forge OS — Archived History
+
+> **⚠ THIS FILE IS NOT AUTHORITATIVE. Nothing here is a to-do.**
+> It is the closed "why" record only. A rule, constraint or task exists only if
+> it is in **CLAUDE.md** (rules) or **PENDING.md** (work). Do not action,
+> re-open, or cite anything below as current without first restating it there.
+> If you believe something here is still live, that is a bug in CLAUDE.md /
+> PENDING.md — fix it there, then leave this file alone.
+>
+> Audited 10 Nov 2026: four guardrails and three unchecked items that had been
+> archived here were promoted back out (see CLAUDE.md "The three-file contract"
+> → archiving discipline). Read that before archiving anything else.
+
+
+Fully resolved/closed/superseded sections moved out of CLAUDE.md on 10 Nov 2026 to reduce active context size. Nothing here governs current behavior — if you're looking for an active rule or decision, it's still in CLAUDE.md. This file is historical record only.
+
+Contents:
+- Daily + month-end attendance to Google Sheet + email — built 28 Sep 2026 (superseded)
+- Daily attendance in Google Sheets — Whalesync, not Apps Script (6 Oct 2026) (superseded)
+- RLS — all known holes closed (PATCH_12, confirmed 11 Aug)
+- Screen-level issues — none open (found stale while re-auditing 13 Aug)
+
+---
+
+## Daily + month-end attendance to Google Sheet + email — built 28 Sep 2026
+
+Yash: wants attendance visible outside the app, so a Sheet that stays
+updated + email, not just the in-app dashboards. Confirmed via
+`AskUserQuestion`: both Sheet and email; the Sheet is his own existing
+**"VFL HR OS 2026 27"** spreadsheet (`10-OpV86Gvi_TlBPQ6zKQC6y7MLWqietELGU3G06exIM`),
+not a new one; email recipients TBD ("I will give you the email addresses
+when you need them").
+
+**`scripts/AttendanceReport.gs`** (new file, lives in the SAME Apps
+Script project as `ALERT.gs` — reuses its `SUPABASE_URL`/
+`SUPABASE_SERVICE_ROLE_KEY` Script Properties and `getSupabaseCredentials_()`,
+zero new credentials). Not yet pasted into the live Apps Script editor —
+that one-time paste + running `installAttendanceReportTrigger()` once is
+still Yash/HR's step.
+
+- **"Daily Attendance" tab**: one row per *every active employee* per
+  day, not just those who checked in — an absent employee gets a blank
+  row rather than being dropped, matching this session's own "never
+  silently drop people from the denominator" fix for the in-app
+  dashboards. Columns: Date, Emp Code, Name, Department, Check In,
+  Check Out, Working Hrs, Late Mins.
+- **"Monthly Attendance Summary" tab**: rebuilt on the 1st of each month
+  for the month that just closed. Columns: Month, Emp Code, Name,
+  Department, Total Present Days, Avg Working Hrs/Day, Times Late
+  (>grace). **"Total Present Days" is read as days present (P/L/HL),
+  not calendar days in the month — an assumption, not confirmed by
+  Yash**, since his spec paired it with "average working hrs per day,"
+  which only makes sense per-present-day.
+- **Late Mins reuses existing data, no new math**: `attendance_records.late_minutes`
+  is already grace-adjusted at write time (`hooks/useAttendance.ts`'s
+  `checkIn()`), so "only shown if crossed grace" just means "blank when
+  null/0" — nothing new to compute.
+- **No-checkout rule applied, same as the app** (28 Sep decision above):
+  if someone checked in but `hours_worked` is null, the row gets the
+  shift's default (General=9h, else 8.5h floor) — but ONLY when they
+  actually checked in; a true absence (no check-in at all) stays blank,
+  not defaulted. `lib/workingHours.ts`'s logic is hand-replicated since
+  Apps Script can't import it — **keep both in sync by hand if that rule
+  ever changes**, same duplication risk already flagged for the IST
+  helpers.
+- **Trigger design, fixed after an independent review caught a real
+  bug**: v1 used `.timeBased().atHour(8).inTimezone('Asia/Kolkata')` —
+  `.inTimezone()` does not exist on Apps Script's `ClockTriggerBuilder`
+  and would have thrown at install time. Fixed to the same pattern this
+  project's own `runShiftAlerts15min_` already uses: an **hourly**
+  trigger whose handler explicitly checks `Utilities.formatDate(now,
+  'Asia/Kolkata', ...)` before doing real work (gated to the 07:00-07:59
+  IST hour, deduped via Script Properties so it only fires once per IST
+  day) — never relying on the Apps Script project's own timezone
+  setting, which nothing in this repo confirms is set to IST.
+- **07:00 IST, reporting on "yesterday," self-healing "day before
+  yesterday" too**: chosen because Shift 3 (00:00-07:00) belongs to the
+  *previous* working day (see "Shift 3 belongs to the previous working
+  day" above) — 07:00 is right after that window closes. Re-processing
+  the day before yesterday every run means a Shift-3 checkout landing
+  slightly late (e.g. 07:15-07:45, after this run already fired) gets
+  corrected automatically the next morning, via upsert-in-place —
+  without any special-case code.
+- **Idempotent by upsert-in-place**, not delete-then-append: each row
+  carries a hidden `_key` column (date+employee, or month+employee); a
+  re-run overwrites the matching row instead of duplicating it.
+- **Failure handling**: a Supabase read failure aborts before touching
+  the Sheet or sending the real report — Yash still gets alerted, via
+  `MailApp` to `OWNER_EMAIL` (already defined in `ALERT.gs`) plus
+  whatever `ATTENDANCE_REPORT_RECIPIENTS` holds, so a broken job is
+  never silent (this project's own `sendTelegramAlert` incident is the
+  cautionary precedent).
+
+**Still open, not decided — needs Yash before/around first real use:**
+1. Email recipient addresses (he'll provide).
+2. "Total Present Days" definition (see assumption above).
+3. Whether this should start running now (test mode until 1 Oct) or
+   stay installed-but-inert until go-live — harmless either way since
+   it's read-only, but confirm.
+4. The "VFL HR OS 2026 27" spreadsheet has more tabs than could be
+   enumerated from here (confirmed at least "Overtime_Form", ~25k
+   rows) — worth a glance that "Daily Attendance"/"Monthly Attendance
+   Summary" don't collide with anything already there before the first
+   real run.
+
+**⚠ SUPERSEDED 6 Oct 2026 — Apps Script approach abandoned, see below.**
+Yash: "your code .gs for pulling from supabase into sheet is not working."
+(Root cause was almost certainly that the one-time paste-into-editor +
+`installAttendanceReportTrigger()` step above was never done, not a bug in
+the script — but Yash wants a different method either way, so this file
+no longer tracks `AttendanceReport.gs` as the live path forward. The file
+itself is left in `scripts/` but should not be pasted into Apps Script
+going forward; the sections above are kept only as a record of what was
+built and why, not as a to-do.)
+
+## Daily attendance in Google Sheets — Whalesync, not Apps Script (6 Oct 2026)
+
+**⚠ SUPERSEDED same day — Whalesync dropped, too expensive (Yash's own
+words).** See "Self-serve data review" below for the final answer: Table
+Editor + SQL views directly in Supabase, no sync tool at all. The
+`daily_attendance_report` view this section built is still live and still
+useful — just browsed directly, not synced anywhere.
+
+**Decision from Yash, 6 Oct 2026**: no Apps Script, no Claude-orchestrated
+automation tool (Make/Zapier) either — "you need connectors that supabase
+can use and not you," i.e. a tool that connects directly to Supabase and
+Google Sheets on its own, continuously, rather than Claude scripting a
+daily batch job through a third-party automation platform.
+
+**Chosen tool: Whalesync** (not a Supabase product, but a well-known
+third-party continuous-sync tool many Supabase users pair with it for
+exactly this — DB table/view → Google Sheet, kept live, no cron needed).
+
+**What's ready on the Supabase side, done 6 Oct 2026**: Whalesync syncs
+tables/views as-is — it cannot run custom SQL — but the daily attendance
+report is a computed join (formatted check-in/out times, default hours
+for a no-checkout day, department sort), not a raw table. So
+`PATCH_74_daily_attendance_report_view_06Oct2026.sql` adds a Postgres
+**view**, `public.daily_attendance_report`, with exactly that shape —
+Date, Emp Code, Name, Department, Check In, Check Out, Working Hrs, Late
+Mins, Overtime Hrs, one row per active employee per day (absent employees
+get a blank row, never dropped, same "never silently drop people" rule as
+the in-app dashboards) — so Whalesync has one clean source to point at.
+Re-evaluates `now()` on every read, so "today" is always actually today in
+IST, no stored/stale date. **Not granted to `anon`/`authenticated`** —
+only readable via the `service_role` key, same key this project's other
+admin-side integrations already use, never the app's own client queries.
+Verified live: 99 rows on creation, matching the active headcount that day.
+
+**Still Yash's own step, not done yet**: sign up at whalesync.com, connect
+Supabase (needs the project's `service_role` key — pasted directly into
+Whalesync's own connection form, never into this chat, same rule as every
+other key in this file), connect the Google account that owns the "Forge
+OS - Daily Attendance - 2026-10-06" sheet (OAuth, no key to paste), then
+create a one-way sync: source = `daily_attendance_report` view → that
+sheet's "Daily Attendance" tab. Whalesync keeps it continuously current
+after that — no daily cron, no scenario to maintain, nothing further for
+Claude to build unless Yash wants the Monthly Attendance Summary tab done
+the same way (a second view, same pattern, not yet built — ask before
+building it).
+
+**Abandoned for this**: the Make.com scenario (scheduler → Postgres query
+→ Google Sheets bulk-write) that was mid-build before Yash's "connectors
+that supabase can use and not you" clarification — no Make credential
+request was created, nothing to undo.
+
+---
+
+## RLS — all known holes closed (PATCH_12, confirmed 11 Aug)
+
+This section used to list 6 open holes. **Stale — found while re-auditing
+13 Aug.** All 6 were closed by `PATCH_12_rls_hardening_11Aug2026.sql`, which
+has been applied and confirmed by Yash since 11 Aug (see the patches table
+above). Keeping the record of what was fixed, since it explains why several
+policies look stricter than a first read of FINAL_SCHEMA suggests:
+
+1. `employees` INSERT — was `is_management() OR auth.role() = 'authenticated'`
+   (the second branch made it trivially true for any signed-in user); now
+   `is_management()` only.
+2. `notifications` INSERT — was `with check (true)`; now `is_management()`
+   only, plus a UPDATE policy scoped to `user_id = current_employee_id()` so
+   the bell can be cleared.
+3. `fraud_alerts` / `fraud_flags` INSERT — were unscoped for any authenticated
+   user; now scoped to the reporting employee.
+4. `attendance_records` write — now scoped to a supervisor's own team.
+5. `leave_requests` UPDATE — now scoped to a supervisor's own team.
+6. `mrm_reviews` SELECT — was readable by every authenticated user; now
+   manager-and-above only.
+
+No DELETE policies on any table remains intentional — audit trail.
+
+---
+
+## Screen-level issues — none open (found stale while re-auditing 13 Aug)
+
+Every row this table used to list is fixed. Kept as a record, not a to-do:
+
+| Screen | Was | Status |
+|---|---|---|
+| `worker/home.tsx` | `Constants.deviceId` doesn't exist in Expo SDK 51 — buddy-device fraud check compared a fresh `sessionId` every launch, could never match | ✅ Fixed 12 Aug — `lib/deviceId.ts`, persisted per install |
+| `worker/5s.tsx` | Camera `takePhoto()` wrote a hardcoded placeholder URL | ✅ Wired to `PhotoCapture` — verified in code, not just claimed |
+| `worker/observation.tsx` | Camera not wired | ✅ Same `PhotoCapture` component wired in |
+| `supervisor/casual-workers.tsx` | Upsert conflict key `supervisor_id,date` — unverified against schema | ✅ Verified 13 Aug — matches `unique (supervisor_id, date)` in FINAL_SCHEMA exactly |
+| All screens | No auth guard in individual route layouts | ✅ Fixed 13 Aug — `components/RoleGate.tsx` on all seven groups |
+
+---
+
+---
+
+# Archived from PENDING.md — 10 Nov 2026 audit
+
+The thirteen sections below were moved out of `PENDING.md` on 10 Nov 2026 after
+a line-by-line audit of its historical narrative block. Each was verified to
+contain **no unchecked item and no live constraint** before being moved. The
+three unchecked items and one open follow-up that *were* found inside them were
+lifted back into `PENDING.md` under "Still open — items rescued from sections
+archived 10 Nov 2026", and two live constraints found inside them (the
+`gps_check` fail-open rule, and the form-registry submitter-column rule) were
+promoted into `CLAUDE.md`. Nothing here is a to-do; this is the "why" record.
+
+---
+
+## ✅ Security forms tab — live 25 Sep 2026 (PATCH_36)
+
+`app/(security)/forms.tsx` is built, wired into the security tab bar, and
+populated. Applied via Supabase MCP. Two changes:
+
+1. **Security guards' department corrected** from `Human Resource` → `Security`
+   (the registry lists them under Security; the old value was making their
+   Forms tab show Pallavi's HR manpower forms instead of gate forms).
+
+2. **4 gate forms added to `form_links` under `Security`:**
+   - Gate Pass (sort 10) — from forms registry
+   - 57F4 Inward ("57 AT" in Yash's terminology, sort 20) — same URL as Final Shop
+   - 57F4 Outward ("Out Material In", sort 30) — same URL as Final Shop
+   - Late Attendance (sort 40) — from forms registry
+
+`send_in_reminder = false` for all 4 — security guards don't get shift-based
+form nudges (those are scoped to production departments).
+
+---
+
+---
+
+## 🔴 GPS→QR check-in — found and fixed 24 Sep 2026
+
+Reported: after GPS check-in, opening the QR screen sometimes said "check
+in with GPS first" even though the worker just had, and separately looked
+like it was blocking QR entirely once GPS was done.
+
+Two real bugs found in `hooks/useAttendance.ts`:
+
+1. **`checkIn()`'s `.upsert()` had no `onConflict` target.** Supabase then
+   defaults to resolving conflicts on the primary key (`id`) — never in the
+   payload, so never a conflict, so every call was a plain INSERT. A
+   double-tap, or a retry after a slow/dropped response (this site's
+   flaky network), threw a real Postgres unique-constraint violation
+   (`unique(employee_id, date)`) on the second attempt instead of updating
+   the existing row — silently, since `home.tsx`'s `handleCheckIn` never
+   checked `checkIn()`'s returned error. **Fixed**: added
+   `{ onConflict: 'employee_id,date' }`, and `handleCheckIn` now alerts on
+   a real error instead of failing silently.
+2. **`qr.tsx` had no loading gate.** Its own `useAttendance` instance
+   starts with `todayRecord = null` until its fetch resolves, but the
+   screen decided "GPS first required" vs. "show scanner" immediately, with
+   no check for whether that fetch had finished — so every navigation here
+   showed the wrong "GPS first" screen for a beat, and on this site's slow
+   network that beat could last long enough to look like a real bug even
+   though check-in had genuinely already happened. **Fixed**: added the
+   same `isLoading` guard `home.tsx` already uses for its own screen.
+
+Also brought `useAttendance`'s today-lookup from `.single()` to
+`.maybeSingle()` — matches `home.tsx`'s `fetchShift` convention (its own
+comment already documents exactly this anti-pattern) and avoids an error
+being generated (and silently discarded) on the normal "no check-in yet"
+case.
+
+**Untested on a real device** — fixed from direct code reading against the
+two reported symptoms, not reproduced live. Worth a real check-in→QR
+round-trip once there's device access to confirm.
+
+---
+
+---
+
+## 🔴 Security had no logout; 6 roles had GPS check-in but no QR — found and fixed 24 Sep 2026
+
+Two reports, both real gaps:
+
+1. **Security had no `more.tsx` at all** — `(security)/_layout.tsx` only
+   had `gate-qr`, `dashboard`, `team`, `eod-lock`: no tab anywhere led to a
+   logout button. Every other role group has a `more.tsx` with one; security
+   was simply missing it. **Fixed**: added `app/(security)/more.tsx`
+   (mirrors `(manager)/more.tsx`) and wired it into the tab bar.
+
+2. **Manager (and 5 other roles) had GPS check-in but no way to do the QR
+   half.** `components/CheckInCard.tsx` — used by manager, hr-admin,
+   supervisor, plant-head, security, AND owner dashboards — implements GPS
+   check-in/out but never had a QR follow-up, unlike
+   `worker/home.tsx`/`worker/qr.tsx`. Worse than just a missing button:
+   even if one existed pointing at `/(worker)/qr`, that route's
+   `RoleGate allow={['member']}` would bounce every one of these 6 roles
+   straight back out. Since GPS+QR together are what the attendance score
+   treats as 100% (GPS alone is 50%), **every non-worker employee has been
+   structurally capped at 50% attendance score** with no way to reach 100%.
+   **Fixed**: added the same "scan QR for star" card `worker/home.tsx` has,
+   directly into `CheckInCard`, opening the scanner in a `Modal` (not a
+   route) so it works from any dashboard without new per-role routes or
+   RoleGate changes. Scanning/validation logic mirrors `worker/qr.tsx`'s.
+
+**Untested on a real device** — same as the GPS→QR fix above, fixed from
+code reading against the two reports, not reproduced live yet.
+
+---
+
+---
+
+## 🔴 Push notifications never actually worked for anyone — found and fixed 24 Sep 2026
+
+Reported: no OS-level push/badge for anyone, notifications only ever seen
+after opening the app; asked to verify push works and that check-in data
+starts recording reliably from 1 Oct.
+
+**Root cause 1 (FIXED, code): `push_tokens` was completely empty — 0 rows,
+for every single employee including the owner.** `app/(auth)/login.tsx`
+called `registerForPushNotificationsAsync(session.user.id)` — but
+`push_tokens.user_id` is a foreign key to `employees(id)`, not
+`auth.users`. `session.user.id` is the auth user's own id, a different
+UUID. Every registration attempt violated that FK and was silently
+discarded (`lib/notifications.ts` deliberately never throws, so a push
+failure can't strand someone on the login screen after a real login
+success) — so `push_tokens` has been empty since push was first wired up,
+despite "FCM push confirmed 9 Sep 2026" elsewhere in this file (that
+confirmed the edge function secret was set, not that any token had ever
+actually reached the table). This fully explains the reported symptom —
+there was never anything to send a real push to, for anyone, ever.
+Fixed by moving registration into `useAuth`'s `loadEmployee` (which has
+the correct `employee.id`, and fires on every app launch — including an
+already-logged-in session resuming, not just a fresh login — so simply
+*opening* the new build re-registers, no forced logout/login needed).
+
+**Root cause 2 (NOT a code bug — a data/process gap): `employee_shifts` is
+completely empty — 0 rows, ever, for anyone.** This is why the "Shift
+starting soon" / "You haven't checked in yet" reminders
+(`shift-reminder`'s `daily_checkin_reminder` mode) have never fired even
+once — confirmed by `notifications` type counts: `form_due_reminder`
+(2,391) and `shift_gap_alert` (174, weekly, to HR/plant_head — "nobody has
+a shift assigned") both fire regularly and are current as of today, but
+`checkin_reminder`/`missed_checkin_reminder`/`weekly_shift_assigned` have
+**zero rows, ever**. The mechanism needs an `employee_shifts` row for that
+employee that day to know when their shift starts; with none, there's
+nothing to trigger off. **This needs a real HR action, not a guess from
+me**: assign shifts via `(hr-admin)/shifts.tsx`. Check-in itself does NOT
+require a shift assignment (`home.tsx`'s `handleCheckIn` treats "no shift"
+as just "not late" and proceeds normally) — so tomorrow's check-in rollout
+itself is not blocked by this, only the proactive reminder pushes are.
+
+**Checked and ruled out**: every `cron.job` row calling these functions
+(`shift-reminder`, `mrm-reminder`, etc.) has a literal, never-substituted
+`Authorization: Bearer PASTE_YOUR_KEY_HERE` header — looks alarming, but
+confirmed harmless: all of them have `verify_jwt: false`
+(`list_edge_functions`), so the gateway never checks that header. Real
+activity (form/mrm reminders firing today) confirms this. Worth tidying
+eventually, not worth chasing under this deadline.
+
+**Yash's own attendance IS recording correctly** — checked directly:
+VFL1001 has 4 real `attendance_records` rows in September (4th, 10th,
+14th, 23rd, all `status: 'P'` with a real `check_in_time`). The check-in
+mechanism itself works; "no count of attendance" is very likely about
+there being no personal attendance-count view anywhere in the `(owner)`
+screens (the role has no equivalent of `worker/attendance.tsx`), not
+missing data. Worth adding a small stat if wanted, not chased further
+without confirming that's actually what's meant.
+
+**"Welcome to Varsha" onboarding message does not exist anywhere in the
+code** — nothing to fix, would need to be built new (e.g. triggered once
+after first PIN change via `mark_pin_changed`). Not built yet — holding
+off until confirmed it's wanted as a real feature vs. just an example
+message for testing delivery.
+
+### ✅ Confirmed working end-to-end, 24 Sep 2026, later same day
+
+After the push-token fix shipped, two real employees opened the updated
+app and registered successfully — Tushar Abasaheb Shirgire (VFL1389) and
+Brahmanand Kaduba Tajne (VFL1482), both real Android FCM tokens,
+`push_tokens` timestamps ~13:33 UTC. Sent a real test push to both via
+`send-push-notification` (through `net.http_post`, same internal path
+pg_cron uses) — response: `{"success":true,"notified":2,"pushed":2}`.
+**Both actually received it.** FCM delivery is proven working end-to-end,
+not just theoretically fixed.
+
+**Yash's own device still has no token after logging out and back in.**
+Given two other people's devices registered successfully the same day on
+the same build, the mechanism itself is proven — his device specifically
+hasn't picked up the new APK (most likely didn't redownload the release
+after the fix landed) or has a device-specific issue (platform, denied
+notification permission). Worth checking with him directly which build
+number he's on rather than assuming further.
+
+**Attendance count for the other 128** — confirmed important to Yash
+(his own count isn't). `worker/attendance.tsx` reads `useAttendance`'s
+monthly `records` and counts `status === 'P'` rows directly from
+`attendance_records` — logically correct, and now benefits from the same
+day's `checkIn()` upsert fix (repeat check-ins across different days no
+longer silently fail). No further bug found here; flagging as confirmed
+rather than newly fixed.
+
+---
+
+---
+
+## ✅ Database is fully migrated as of 12 Aug
+
+PATCH_13 (photo storage), PATCH_14 (form registry + the notifications columns)
+and PATCH_15 (ops sync landing tables) are all applied and confirmed by Yash.
+Nothing in `scripts/*.sql` is outstanding.
+
+**What that unblocks, and what it does not.** The tables now exist, so the app
+will not error — but `form_submissions` and `production_records` stay empty,
+and therefore the Forms tab's shift chips and the production panels stay blank,
+until the Apps Script sync actually runs. That needs the two Script Properties
+below. Empty tables and a broken sync look identical from the app.
+
+---
+
+---
+
+## ✅ Unblocked — confirmed done (Sep 2026)
+
+- [x] Multi-point geofence: COMBINED_DEPLOY_21to22 + PATCH_23 (Pune 200m) applied
+- [x] FCM_SERVICE_ACCOUNT_JSON pasted into Supabase Edge Function Secrets
+- [x] five-s-challenge-generator deployed with gemini-2.0-flash + responseMimeType
+- [x] Device testing: GPS check-in, 5S photo upload, push notification confirmed
+- [x] PR #2 merged: shifts seeded (S1/S2/S3), HR Admin create-shift flow live
+- [x] PR #6 merged: DME (Amit) Telegram routing, VMC Shop added to ALERT.gs
+- [x] Supervisors onboarding to @Form_mgr_bot (in progress — Amit confirmed, others ongoing)
+
+---
+
+---
+
+## 🔎 Google Forms / Factory OS — investigated 12 Aug via Drive connector
+
+Found the real setup rather than asking. Live files:
+
+| File | ID | Note |
+|---|---|---|
+| **VFPL Factory OS — Supervisor Data Entry (Dynamic)** (Form) | `1Op5qSke8gYYVKeTXA6YhsuqRfEWM-y8Oc9lLlWwcsJI` | created 4 Aug, modified 10 Aug — the daily-entry form |
+| **VFPL Operations Dashboard 2026-27** (Sheet) | `1GHdhrRtOhQFshsAOCK4n3GiJp-6a03k8bn0V_M04wSY` | **modified 12 Aug 04:50 — actively in use** |
+| Per-shop forms | various | Cutting / Press / Forge / HT / Final / Machine, "Planning" + shift variants |
+
+### What the dashboard actually contains
+
+- **Supervisor weekly registration**: Timestamp, Email, Department, Supervisor Name,
+  Phone, **Telegram Chat ID**, Week Start (Sat) / Week End (Thu)
+- **Cutting production**: `Date | Machine | Shift | VF_No | Qty` — real rows since 1 Apr
+- **HT production**: `Date | Furnace | Shift | Qty` — First/Second/Third Shift
+- **Final production**: `Date | Process | Shift | VF_No | Qty` — e.g. Shot Blasting
+- **Energy**: ~25 meters mapped to shops, kWh MTD and % of total per department
+- **Consumables**: Zycril mixing, avg daily Forge/HT litres
+- **Shift master**: S1 08:30-15:30, S2 15:30-23:30, S3 23:30-08:30, 60 min break.
+  **Grace is 60 minutes, not 15** — corrected 12 Aug from the live `ALERT.gs`.
+  The `15` in that config is `reminder` (minutes *before* the deadline). Real
+  deadlines: **S1 16:30, S2 00:30, S3 09:30**.
+- **Ten departments, not six**: Cutting, Forge, Press, Machine, HT, Final,
+  Electricity, Oil, Staff Manpower, Contract Manpower.
+
+### Two things this changes
+
+1. **Production data DOES exist** — contradicting the basis on which I removed the
+   production component from `nightly-scoring`. Important nuance: it is per
+   **machine/furnace/process per shift**, NOT per employee. So removing it from the
+   *individual* score was still correct, but it can absolutely drive
+   **department-level production on the owner/manager dashboards**. Currently the app
+   shows nothing from it.
+2. **Supervisors already have Telegram Chat IDs on file.** That is a notification
+   channel needing no Firebase, no FCM, and no Play Store — a working alternative
+   to the Expo Push route that is currently blocked.
+
+### Column mislabelled, but the data is deliberate — corrected 12 Aug
+The Cutting table's `Shift` column holds a **person's name** ("B.S. Todmal") where
+HT/Final hold "First/Second/Third/General Shift". Yash confirmed this is not bad
+data: it records **who is responsible for filling that form**. Todmal covers
+**Cutting AND HT**; **Ashok Sharma also covers Cutting**. So responsibility is
+many-to-many — one person can own several departments, and one department can have
+several responsible people. Any importer must read this column as a submitter, not
+a shift, and the model must not assume one-owner-per-department.
+
+---
+
+---
+
+## 🔴 ALERT.gs — audited 12 Aug, three defects found and fixed in repo
+
+The Apps Script running on the Operations Dashboard is now checked in at
+`scripts/ALERT.gs` (baseline commit `1e5283e`, fixes `eb70e8f`).
+
+**⚠ ACTION FOR YASH — paste the fixed `scripts/ALERT.gs` over ALERT.gs in the
+Apps Script editor, then run `testComplianceScoring()`, then
+`setupDynamicSupervisorTabs()`, then `deployShiftTrackingTriggers()`.**
+That is one paste and three menu clicks; nothing needs retyping.
+
+| # | Defect | Status |
+|---|---|---|
+| 1 | Reminder ended with the literal text `[Google Form Link]` — supervisors told to upload with no link | ✅ fixed; links now come from a new `FORM_LINKS` tab |
+| 2 | `hasDataForShift_` could never return true → **every alert since 5 Aug has been a false positive** | ✅ fixed |
+| 3 | `DATA_SUBMISSION_LOG` / `WEEKLY_PERFORMANCE` had headers but nothing ever wrote to them | ✅ fixed |
+
+**Defect 2 in detail.** The function parsed the RAW tabs' first column as a
+timestamp and required `getHours() >= 8/15/23`. Those columns hold a date only
+(`4/1/2026`), so `getHours()` is always 0 and the test never passed.
+`ESCALATION_LOG` confirms it: 29 of 37 sweeps between 5 and 12 Aug escalated
+**all ten departments at once**, the rest being one sweep split over a minute
+boundary. Supervisors have been receiving alerts that are wrong every single
+time — which is the likeliest reason they are ignored.
+
+**Scoring — REMOVED 12 Aug, later the same day.** Yash: the dashboard timings
+are for notifications in the app, not for scoring. `scoreForDelay_()`, the
+`Points` column, `Score %` and the performance band are gone from ALERT.gs.
+What remains is the factual record — on time / late / missing, and the delay in
+minutes — which is what tells the app what is outstanding. Restore from commit
+`eb70e8f` if that decision ever reverses.
+
+### Still open on the Sheets side
+
+- [x] **Form links — SOLVED 12 Aug** from Yash's form registry sheet
+      (`1M2E83q64BXzfGwZsNQ_9u2jdfzwJPrJlD8WKRKgG554`), which lists every form
+      by department, responsible person and frequency with the **published
+      `/forms/d/e/.../viewform` responder links**. Replaces the guessed `/edit`
+      URLs entirely. 24 daily forms seeded across the six shop departments.
+- [ ] **Which daily form feeds the production dashboard?** Each shop has 3–6
+      daily forms (`<Shop> PMS`, `<Shop> Daily check sheet`, `<Shop> Planning`,
+      plus dispatch/57F4 on Machine and Final). The reminder currently lists
+      all of them. Two mute switches now exist, both data not code:
+      `Send in reminder?` = `NO` in the sheet's `FORM_LINKS` tab (Telegram
+      side), and `send_in_reminder = false` in the `form_links` table (app
+      side). Say which forms should not be chased per shift and I will set
+      both, or set them yourself — nothing needs a redeploy.
+- [x] **RESOLVED 13 Aug — verified against the live registry, not guessed.**
+      Electricity + Oil are Maintenance-department forms (4 real Daily forms:
+      check sheet + 2 electricity forms + oil). Both manpower forms are listed
+      under Security AND HR Dept in the registry (same 2 forms, different
+      responsible people) — marked "As & When Required" by the registry
+      itself, not Daily. `PATCH_19_dept_expansion_13Aug2026.sql` seeds all of
+      it into `form_links`; ALERT.gs's `DEPT_RESPONSIBILITY_FALLBACK` routes
+      compliance-supervisor lookups for the 4 pseudo-departments to
+      Maintenance / Security / HR. Also added: VMC Shop's real "VMC Daily
+      check sheet" form — this is the VMC per-shift output tracking asked
+      for. ⚠ VMC has no RAW tab on the dashboard yet (checked — genuinely
+      absent), so it gets the form + reminder but not on-time/late/missing
+      compliance tracking until one exists.
+- [x] **RESOLVED 13 Aug.** Yash: the work week is Saturday-to-Thursday,
+      Friday off, "unless we have urgent production Friday is working — 90% of
+      the time Friday is off." Matches the live form exactly. Fixed on both
+      ends: `weekStartFor_()` in ALERT.gs now computes Saturday (was Monday),
+      and `shift-reminder`'s weekly notify window is now Saturday-Thursday
+      (was Monday-Sunday — this one is real app code, not just the dashboard
+      script, and was simply wrong before). The prefix-match column fix from
+      12 Aug already made `processFormSubmissions()` work with the Saturday
+      header regardless. No schema change needed for the Friday exception
+      itself — `employee_shifts` is already per-date, so a working Friday is
+      just a Friday HR assigns shifts for.
+- [x] **Phone numbers — CLOSED 12 Aug.** Yash: "you dont need phone numbers."
+      Not asked for again.
+
+- [ ] **Supervisors onboard to @Form_mgr_bot** — Telegram working (10 Sep).
+      Draft sent to DME/HR to circulate. Each supervisor messages @Form_mgr_bot
+      with their exact name; bot auto-fills their Chat ID in SUPERVISOR_MAP. *Correction to what this
+      line said before: there is no group-chat fallback.* When a supervisor
+      has no chat ID, `sendGentleReminder` now tells the OWNER directly
+      instead ("no Telegram registered for X"), not a group. Lower stakes
+      regardless, now that the in-app Forms tab is a second route needing no
+      chat ID at all.
+      **✅ Amit Bhagvan Shirsath (VFL5434, DME) — registered 10 Sep 2026.**
+      `DME_TELEGRAM_CHAT_ID` Script Property set automatically via
+      `processTelegramOnboarding()`. Receives all 4 plant-wide Telegram
+      reports (deadline, follow-up, daily summary, weekly performance).
+      Remaining: all per-department supervisors listed in SUPERVISOR_MAP.
+
+### Still open on the app side
+
+- [x] **Forms tab — BUILT 12 Aug.** Yash: "we give one tab on their page for
+      forms .... where we give them the list of forms." `components/FormsScreen.tsx`,
+      mounted as a tab on the supervisor and manager layouts. Lists that
+      employee's department forms from the `form_links` table (PATCH_14), tap
+      to open the responder link, with the next shift deadline at the top.
+      Reaches the phone without Firebase — it is a screen, not a push.
+- [x] **Shift-timing notifications — BUILT 12 Aug.** Yash: the dashboard
+      timings are for app notifications, not scoring. `shift-reminder` gained a
+      `forms_due_reminder` mode firing 15 min before each deadline
+      (16:30 / 00:30 / 09:30), deduped so one nudge goes out per shift.
+- [x] **Cron entry for `forms_due_reminder`** — ✅ PATCH_18 applied 13 Aug, pg_cron job active. Fires every 15 min.
+- [x] **Pending-forms status on the tab — BUILT 12 Aug.** Forms → Supabase went
+      with option (a), the Apps Script push, as recommended. `syncOpsDashboardToSupabase()`
+      in ALERT.gs pushes DATA_SUBMISSION_LOG into `form_submissions` every 15
+      minutes, and the tab shows a submitted/pending chip per shift.
+      ⚠ **Per shift, not per form** — the RAW tabs record that a department
+      submitted for a shift, never which of its 3-6 daily forms it was.
+
+- [ ] **Per-form ticking — `resolveFormSheets.gs` run 10 Sep, 22 of 28 forms
+      returned NO MATCH.** The script does an exact-title search (`title = "…"`
+      in Drive). A NO MATCH means the form's real title in Drive differs from
+      what `FORM_NAMES_TO_RESOLVE` has — even one extra character, year suffix,
+      or case difference fails it. Only 6 forms matched.
+      **Next step:** run `listAllFormsInDrive()` in the Apps Script editor (any
+      project with Drive access) to see every Google Form's real name, then
+      update `FORM_NAMES_TO_RESOLVE` in `scripts/resolveFormSheets.gs` with the
+      exact titles, and re-run `resolveFormSheets()`.
+      ```javascript
+      function listAllFormsInDrive() {
+        var it = DriveApp.searchFiles(
+          'mimeType = "application/vnd.google-apps.form" and trashed = false');
+        var rows = [];
+        while (it.hasNext()) { var f = it.next(); rows.push(f.getName()); }
+        rows.sort();
+        Logger.log(rows.length + ' forms found:\n' + rows.join('\n'));
+      }
+      ```
+      Paste that into Apps Script → Run → check the Execution Log. The names
+      there are the exact strings to put in `FORM_NAMES_TO_RESOLVE`.
+- [x] **Department production on the dashboards — BUILT 12 Aug.**
+      `production_records` (PATCH_15) + `components/ProductionSummary.tsx`,
+      mounted on manager → Reports (scoped to their shop, grouped by machine)
+      and owner → KPI (all shops). Renders nothing until the sync has run, so
+      it is safe to ship before Yash sets the Script Properties.
+- [x] **Script Properties for the sync — DONE 9 Sep 2026.** `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` set; `testSupabaseSync()` confirmed: 145 form_submissions + 8160 production_records pushed. Forms tab and production dashboard now have real data.
+- [x] **Telegram onboarding — BUILT 13 Aug.** `processTelegramOnboarding()`
+      in ALERT.gs polls the bot every 5 minutes; a supervisor messages their
+      name, it's matched against this week's SUPERVISOR_MAP and the chat ID is
+      written in automatically — no more typing a Telegram numeric ID into the
+      registration form by hand. Matching is deliberately conservative: exactly
+      one name match required, or it's logged and skipped, never guessed.
+      Owner uses the SAME flow — message the bot with "Yash Munot" (or
+      "owner") and it sets `OWNER_TELEGRAM_CHAT_ID` instead of a sheet row.
+      **New bot created 13 Aug** — @Form_mgr_bot, token in `TELEGRAM_BOT_TOKEN`.
+
+- [x] **`sendTelegramAlert()` DID NOT EXIST — found and fixed 13 Aug.** Called
+      from 7 places (sendGentleReminder's fallback, sendDMEDeadlineAlert,
+      sendFollowUpAlert, sendDailySummary, 2 registration confirmations) and
+      defined nowhere. Every call threw `ReferenceError`. Worse than one
+      broken alert: Apps Script does not catch a throw inside a `forEach`
+      callback, so in `sendGentleReminder()` the first department with no
+      registered chat ID (which, before today, was every department) killed
+      every department AFTER it in that same run too — even ones with a
+      working chat ID. `sendDMEDeadlineAlert`/`sendFollowUpAlert`/
+      `sendDailySummary` called it unconditionally, so those three have never
+      delivered a single message, ever.
+      Fixed by defining it: it now delivers to `OWNER_TELEGRAM_CHAT_ID`. Those
+      three functions already compose a plant-wide, every-department report —
+      that's what "an entire report" was always going to be — so no new
+      report format was needed, just a working delivery path. Individual
+      per-supervisor reminders (`sendGentleReminder`) also hardened with a
+      per-department `try`/`catch` so this class of bug cannot recur.
+      Verified with isolated Node tests, not just the syntax check: confirmed
+      `sendTelegramAlert` no-ops (does not throw) with no owner registered,
+      delivers correctly once one is, and that a chat-id-less department no
+      longer blocks the departments after it.
+
+- [x] **"Too many triggers" — found the real cause and fixed 13 Aug.** Not an
+      ALERT.gs bug on its own: this script shares its Apps Script PROJECT
+      (and therefore its 20-trigger-per-project quota) with `Code.gs`, the
+      Operations Dashboard's own pull/alert script, which Yash pasted in for
+      review. Code.gs already runs 11 triggers of its own (6 `runDashboardPull`
+      + 4 `checkShiftEnd_*` + 1 `refreshCache15min`). `deployShiftTrackingTriggers()`
+      used to create 15 more — 26 total, over Google's ceiling.
+      Every alert function already no-ops safely when there is nothing to do
+      right now (`getShiftToCheck_()` returns null outside a shift's window),
+      so the fix was fewer triggers, not different code: `deployShiftTrackingTriggers()`
+      now creates exactly 2 — `runShiftAlerts15min_()` (everything shift-
+      boundary-shaped, every 15 min) and `runDailyMaintenance_()` (everything
+      end-of-day-shaped, once daily). 2 + Code.gs's 11 = 13, comfortable
+      headroom rather than sitting on the ceiling. Verified in Node: exactly 2
+      triggers created, and the deletion pass — which only ever removes
+      ALERT.gs's own stale trigger names — never touches `runDashboardPull`,
+      `checkShiftEnd_*`, or `refreshCache15min`.
+
+- [x] **Telegram token — inline slot added 13 Aug, same pattern as Supabase's.**
+      `TELEGRAM_BOT_TOKEN_INLINE` and `OWNER_TELEGRAM_CHAT_ID_INLINE` at the top
+      of the file, both blank in git for the same reason `SUPABASE_SERVICE_ROLE_KEY_INLINE`
+      is: a live bot token lets anyone send as the bot and read everything sent
+      to it, and a secret committed once is in the repository's history
+      permanently even after a later commit removes it. Paste the token and
+      (optionally) your numeric chat id into the LIVE Apps Script copy only —
+      Script Properties still win if set there instead. Verified in Node: both
+      inline values are used when no Script Properties are set, and Script
+      Properties correctly override them when present.
+
+---
+
+---
+
+## 🔴 In-app notifications have never worked — found and fixed 12 Aug
+
+`supabase/functions/_shared/push.ts` writes every notification row as
+`{ user_id, type, title, body, related_entity_type, related_entity_id }`.
+The last two columns exist **only** in `supabase/migrations/20260803090000_initial_schema.sql`
+— the old spec schema CLAUDE.md says to ignore. They are not in
+`FINAL_SCHEMA_02Aug2026.sql`, which is what is deployed.
+
+PostgREST rejects an insert naming a column that does not exist, and
+`notifyEmployees()` never checked the error:
+
+```ts
+await db.from('notifications').insert(rows);   // error discarded
+```
+
+So the insert has failed every time, for every caller — `nightly-scoring`,
+`fraud-detector`, `mrm-reminder`, `shift-reminder`. **The notification bell has
+never received a single row from the server.** It stayed invisible because
+Android push was separately broken on FCM, so "no notification arrived" already
+had an accepted explanation.
+
+- ✅ PATCH_14 adds both columns (`text`, not `uuid` — the forms reminder keys
+  on `yyyy-mm-dd|Shift n`).
+- ✅ `push.ts` now throws on insert failure instead of swallowing it.
+- ⏳ Verify after running the combined deploy: trigger any edge function and
+  check `select count(*) from notifications`.
+
+---
+
+---
+
+## 🔴 Fraud detection — found and fixed 13 Aug: two of three fraud types were invisible to the owner
+
+**`fraud-detector` (the edge function implementing GPS + bulk-confirmation
+fraud checks) was never invoked by anything in the app.** Deployed since the
+edge functions first shipped, called from nowhere — the same "deployed but
+never invoked" pattern already found three times this session for cron jobs.
+`worker/home.tsx` did its own client-only geofence check (blocks correctly,
+but a modified APK could skip it, and it never wrote a record anywhere) and
+computed a `mockLocationDetected` boolean that was stored on
+`attendance_records` but never acted on or surfaced anywhere.
+
+**Worse: even when called, both of `fraud-detector`'s actions wrote to the
+wrong table.** `fraud_alerts` (`type` CHECK 'mock_location'/'buddy_punching'/
+'bulk_confirm', `severity`, `status`) is the table every owner-facing surface
+reads — `owner/alerts.tsx`, `owner/kpi.tsx`'s open-alerts count,
+`dashboard/index.html`. `fraud_flags` is a different, narrower table
+FINAL_SCHEMA's own "SECTION O" comment reserves for the buddy-device check
+only (`worker/home.tsx`'s client-side same-device-different-employee check,
+which was already correct). `fraud-detector` wrote mock-location and
+bulk-confirmation flags into `fraud_flags` instead — so even a hypothetical
+caller would have raised alerts nobody could ever see. Only `bulk_confirm`
+alerts were ever visible, because `supervisor/team.tsx` has its own
+parallel, correct, client-side implementation that writes directly to
+`fraud_alerts` (works today, but its in-memory counter resets on remount and
+it has no monthly escalation tiers).
+
+**Fixed:**
+- `handleGpsCheck` now writes `mock_location` alerts to `fraud_alerts`
+  (human-readable description, `severity:'high'`, `status:'open'`) and
+  notifies plant_head + owner. Being merely outside the geofence still blocks
+  the check-in but no longer writes any row — matches the schema's own type
+  CHECK, which has no slot for "outside radius" as a distinct alert type;
+  that's not fraud on its own.
+- `handleBulkConfirmationCheck` now writes to `fraud_alerts` too, and its
+  monthly-count query for the 2-flags/3-flags escalation tiers reads from
+  `fraud_alerts` filtered on `type='bulk_confirm'`, so if this action is ever
+  wired up, escalation will actually work.
+- `worker/home.tsx` now calls `fraud-detector`'s `gps_check` action on every
+  check-in (new i18n key `worker.mockLocationDetected`, EN+HI). Fails open on
+  a network error — the client-side geofence check above it still blocks
+  obvious cases even offline, and a plant with patchy signal must never lose
+  a legitimate check-in because the fraud check itself was unreachable.
+- `supervisor/team.tsx`'s bulk-confirm path was deliberately **left alone** —
+  it already writes to the right table with the right shape and is the only
+  thing making bulk-confirm alerts visible today. Rewiring it to call the
+  edge function (to get the escalation tiers and a check that survives a
+  remount) is real future work, not done now because it changes tested,
+  working behavior with no device available here to verify against.
+- Verified with an isolated Node/tsx harness mocking the Supabase query
+  builder (mirrors the resolveFormSheets.gs verification pattern from
+  earlier today): 16/16 checks pass — mock-location blocks + alerts
+  correctly, plain outside-geofence blocks but raises no alert, inside-
+  geofence-no-mock allows cleanly, bulk-confirm-over-threshold alerts with a
+  readable description and correct first-month count, under-threshold does
+  nothing. `npx tsc --noEmit` and `expo export --platform web` (2892
+  modules) both clean. The full headless-Chromium render check could not be
+  completed — the sandbox container restarted mid-run — but this is a small,
+  additive change to an already-verified screen (worker/home.tsx), and the
+  bundler step that catches real syntax/type breakage passed.
+
+**Still not done, and not urgent:** wiring `supervisor/team.tsx` to the edge
+function for real monthly escalation tiers (2nd flag → HR Admin, 3rd+ →
+Owner + Plant Head), which today never fire.
+
+---
+
+---
+
+## 🔴 mrm-reminder / shift-reminder — audited 13 Aug: two real bugs found and fixed, one dead reference cleaned up
+
+Line-by-line pass over the two edge functions that hadn't had one yet
+(`nightly-scoring` and `fraud-detector` already did — see above). Both are
+already known to be "deployed but never invoked" (PATCH_18/PATCH_20 exist to
+fix that, neither run yet) — that part isn't new. What's new is what turned
+up reading the logic itself against FINAL_SCHEMA and against what actually
+gets seeded into `plant_config`.
+
+**1. `mrm-reminder`'s escalation had no de-dup, and never could — the column
+its own docstring said it wrote doesn't exist.** The docstring claimed step 3
+"sets `escalated_at`" on the `mrm_reviews` row once a department is
+overdue. There is no `escalated_at` column on `mrm_reviews` in FINAL_SCHEMA —
+it exists only on unrelated tables in the old, ignored
+`supabase/migrations/20260803090000_initial_schema.sql`, and the code never
+actually attempted to write one. So every run past the 10th re-sent the Plant
+Head an "MRM overdue" notification for the same still-pending department,
+forever, once a day, with no way for the code to tell "already escalated"
+from "escalate again." Fixed by de-duplicating against `notifications`
+instead — checking for an existing `mrm_overdue` row keyed on the review's
+own id (already unique per department/month/year) before sending another —
+the same pattern `forms_due_reminder` already uses for its own dedup, so no
+schema change was needed.
+
+**2. That fix exposed a second, smaller bug: PATCH_20's single 09:00 IST
+daily cron could never trigger the "10th at/after 17:00" branch the code
+itself promises.** `isEscalationTime = dayOfMonth > dueDay || (dayOfMonth ===
+dueDay && hour >= 17)`. With only one invocation a day, at 09:00, the
+same-day-at-17:00 half of that condition is unreachable — 09:00 is always
+before 17:00 — so the earliest the code could ever actually observe "past
+due" was the 11th's 09:00 run, a full day later than documented. Fixed in
+`scripts/PATCH_20_missing_crons_13Aug2026.sql` (not yet run — see below) by
+adding a fifth cron job, `mrm-reminder-escalation`, pinned to day-of-month 10
+at 17:00 IST only (`30 11 10 * *`), so that branch has an actual invocation
+to fire on. Safe to run alongside the 09:00 job on the same day precisely
+*because* of fix #1 above — without the dedup, this second run would have
+double-escalated every department that went overdue on the 10th.
+
+**3. `shift-reminder`'s `daily_checkin_reminder` mode has never fired for
+anyone — the config key it read was never seeded under FINAL_SCHEMA, and its
+hardcoded fallback doesn't match any real shift.** It read
+`plant_config.shift_start_times` with a fallback of `{morning:'06:00',
+evening:'14:00', night:'22:00', general:'09:00'}`. Those exact values are the
+seed from the OLD, ignored `initial_schema.sql` — FINAL_SCHEMA never carried
+that `plant_config` row forward, and no patch has ever inserted a
+`shift_start_times` key under FINAL_SCHEMA either. So in the real, deployed
+database `getPlantConfig()` always missed and silently fell back to those
+stale values — which don't match this plant's real shifts (08:30 / 15:30 /
+23:30, per `plant_config.form_shift_schedule`, seeded and live since
+PATCH_14). Every real `employee_shifts.shift.start_time` this got compared
+against would read `"08:30"` etc., never `"06:00"`, so the match could never
+succeed — this reminder has been silently doing nothing since it was
+written. Fixed by reading `form_shift_schedule` (the one shift-timing source
+that actually is seeded under FINAL_SCHEMA — the same one
+`forms_due_reminder` already reads) instead of maintaining a second,
+never-seeded config key in parallel.
+⚠ **Not fully closed even after this fix**: the `shifts` table itself has no
+seed data anywhere in `scripts/*.sql`, and `app/(hr-admin)/shifts.tsx` only
+*assigns* an existing shift to an employee — there is no screen or script
+that *creates* a row in `shifts`. Until some `shifts` row exists with
+`start_time` values matching `form_shift_schedule` (`08:30`/`15:30`/`23:30`),
+`employee_shifts` cannot be populated at all (FK: `shift_id not null
+references shifts(id)`) and this reminder still has nothing to match against
+in practice. That gap is outside this fix's scope — it needs either a seed
+script or a "create shift" flow, a real product decision, not a bug fix — but
+it's the reason this reminder, while now correct, may still show `notified:
+0` until it exists.
+
+**4. Minor cleanup, not a functional bug:** `weeklyShiftNotify`'s "who should
+have a shift" query excluded roles `('owner','ai_agent')`. `ai_agent` is not
+a value FINAL_SCHEMA's `employees.role` CHECK constraint permits — it only
+exists in the old, ignored schema — so no row could ever match it and the
+exclusion was a harmless no-op. Still exactly the kind of stale reference to
+the old schema CLAUDE.md's "What Claude must NEVER do" section warns about,
+so simplified to `.neq('role', 'owner')`.
+
+**`send-push-notification`** was also checked (lower priority — funnels
+through the already-audited `_shared/push.ts`). No bugs found: it's
+correctly invoked (`lib/notifications.ts`'s `notifyEmployeesByRole`, called
+from `supervisor/team.tsx`'s bulk-confirm path), and every table/column it
+touches (`employees.id`, `employees.emp_code`) matches FINAL_SCHEMA.
+
+**Verified:** isolated Node/tsx harness (same technique as the fraud-detector
+audit — mocked Supabase query builder, mocked `_shared/cors.ts` /
+`supabaseAdmin.ts` / `push.ts`) exercising both fixed functions directly:
+24/24 checks pass, covering — before-the-reminder-window (step 1 still
+upserts, no notifications), in-window reminder with no escalation, exact-due-
+day before 17:00 (not yet escalation), exact-due-day at 17:00 first
+escalation (sends), a day later already-escalated (does NOT re-send, daily
+manager reminder still does), `nextSaturdayToThursday` date math sanity, and
+`dailyCheckinReminder` correctly matching a real 08:30 shift 15 minutes out
+while leaving an unrelated Shift 3 employee alone. Two of those checks were
+also run against an unmodified copy of the pre-fix code to confirm they
+actually catch the bugs (both reproduce: the escalation double-fires, the
+check-in reminder never fires) rather than passing regardless. `npx tsc
+--noEmit -p .` clean. No `app/`/`hooks/`/`lib/` files were touched, so
+`expo export --platform web` wasn't re-run (out of this change's blast
+radius).
+
+---
+
+---
+
+## ✅ SQL deployed — PATCH_24 + PATCH_25 + PATCH_26 (23 Sep 2026)
+
+All three deployed directly via Supabase MCP connector.
+
+| File | Purpose | Status |
+|---|---|---|
+| `PATCH_24_leave_balances_22Sep2026.sql` | Seeds `leave_balances` for all 129 employees. 24 staff corrected from salary slip actuals. VFL1527 overdrawn at EL=-12/CL=-1/SL=-4. | ✅ Applied — 129 rows confirmed |
+| `PATCH_25_payroll_records_22Sep2026.sql` | 19 active VFL4xxx workers, Aug 2026 payroll, net_pay only. | ✅ Applied |
+| `PATCH_26_staff_payroll_23Sep2026.sql` | 36 active staff, Aug 2026, full per-component breakdown. | ✅ Applied |
+| `PATCH_27_shifts_seed_23Sep2026.sql` | Shifts S1/S2/S3 — already present from PR #2; no-op. | ✅ Verified — 3 rows live |
+
+**Confirmed in DB:**
+- `leave_balances` WHERE year=2026 → 129 rows ✅
+- `payroll_records` WHERE year=2026 AND month='08' → 55 rows ✅ (19 workers + 36 staff)
+- `shifts` → 3 rows (Shift 1 08:30, Shift 2 15:30, Shift 3 23:30) ✅
+
+**Staff not in salary slip** (VFL1319, VFL1465, VFL1550, VFL1553, VFL1568, VFL5074, VFL5083, etc.): payslip screen will show blank — acceptable until HR provides data.
+
+---
+
+---
+
+## ✅ Done and verified
+
+- [x] APK builds, installs, and launches (was crashing on open — CI never
+      embedded the Supabase credentials)
+- [x] PIN login: employee code **or** mobile + 6-digit PIN (PATCH_10)
+- [x] Forced PIN change on first login
+- [x] RLS infinite recursion fixed — login used to dead-end silently (PATCH_11)
+- [x] 7 open RLS security holes closed, incl. privilege escalation (PATCH_12)
+- [x] Photo storage bucket + RLS (PATCH_13)
+- [x] NativeWind wired up — it had never been active, so **no** styling applied
+      anywhere in the app
+- [x] Full design pass across all 7 role groups, consistent palette
+- [x] Varsha branding: app icon, splash, notification icon, in-app header
+- [x] Camera capture wired on 5S + maintenance (was a hardcoded placeholder URL)
+- [x] `nightly-scoring` rewritten off three non-existent tables
+- [x] `manager/reports.tsx` implemented, department-scoped
+- [x] `owner/kpi.tsx` wired to real data (was hardcoded chart values)
+- [x] In-app update banner + build number on the update row
+- [x] EAS `projectId` set (push token registration unblocked; delivery still needs FCM)
+- [x] `HR_reset_pin.sql` utility for role testing

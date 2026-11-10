@@ -3,7 +3,140 @@
 **Company**: Varsha Forgings Pvt Ltd (VFPL), Aurangabad  
 **App**: Forge OS — bilingual (EN/HI) React Native attendance + HR system  
 **Last full audit**: 10 August 2026  
-**Branch**: `claude/forge-os-backend-setup-7woj4t`
+**Control-file audit**: 10 November 2026 (CLAUDE.md / PENDING.md / ARCHIVE.md split audited; see below)  
+**Branch**: `claude/forge-os-backend-setup-7woj4t` — ⚠ stale, see the "BRANCH REALITY" note at the top of PENDING.md
+
+---
+
+## 🔒 The three-file contract — read before editing ANY of them
+
+| File | Holds | Authority |
+|---|---|---|
+| **CLAUDE.md** (this file) | Active locked rules, architecture, schema, guardrails, standing owner decisions | **Binding.** If a rule is not here, it does not exist. |
+| **PENDING.md** | The RESUME STATE block, active sprint work, unresolved issues, open owner decisions | **Binding for what to do next.** Its top RESUME STATE block is the only current one. |
+| **ARCHIVE.md** | Fully closed / superseded history — the "why" record | **Never binding. Never a to-do.** Context only. |
+
+**A decision or constraint exists only if it is in CLAUDE.md or PENDING.md.**
+ARCHIVE.md is readable background; nothing in it may be actioned, re-opened,
+or treated as current without first being restated in one of the other two.
+
+**🔒 Archiving discipline — the rule that exists because this went wrong.**
+Moving a section to ARCHIVE.md is a safety-critical edit, not housekeeping: a
+"resolved" narrative routinely has a live constraint or an unchecked item
+buried inside it, and archiving the paragraph silently deletes the rule. The
+10 Nov 2026 audit found exactly this — the 10 Nov split had swept out the
+intentional no-DELETE-policy guardrail, the PATCH_12 "why policies are
+stricter than FINAL_SCHEMA" rationale, the `RoleGate` second auth layer, and
+the `lib/deviceId.ts` invariant; and the PENDING.md narrative hid three
+unchecked items plus the `gps_check` fail-open rule inside sections titled
+"found and fixed". **Before archiving any section, you must:**
+1. grep it for `- [ ]`, "still open", "not yet", "not done", "needs", `⏳` —
+   lift every hit back into PENDING.md verbatim;
+2. grep it for "never", "must", "do not", "always", "keep in sync" — decide
+   per hit whether it is historical prose or a **live constraint**, and
+   promote every live constraint into CLAUDE.md;
+3. prove conservation: every substantive line must exist in the destination
+   file afterwards — nothing is condensed, summarised or dropped;
+4. leave a pointer where the section was, so the trail is never broken.
+
+This is why the IST-date, Shift 4/5 tie-breaker and approved-leave regressions
+happened: the rule survived, but the *reason* was removed, so a later session
+"simplified" it away. Keep the reason attached to the rule.
+
+---
+
+## 🚀 Session-start protocol — do these five things before anything else
+
+Yash pastes a short starter prompt (kept verbatim at the bottom of this
+section). Whether or not he does, **every new session on this project starts
+with these five steps, in order:**
+
+1. **Read PENDING.md's top RESUME STATE block first.** It is the only current
+   one — later blocks further down the file are older history, including one
+   that used to be mislabelled "latest". Do not scroll for context before
+   reading it.
+2. **Check the branch reality note under that block, then confirm it yourself**
+   (`git log --oneline -3`, `git status`, `git branch -a`). The `Branch:` line
+   at the top of this file has been stale before. Never start editing until you
+   know which branch is authoritative and whether an open PR already carries
+   the work.
+3. **Verify live, never recite.** Before stating any headcount, who is active,
+   what is pending, a config value, a cron's health or a deployed function's
+   version, query it. Notes here are "true when written." A cron showing
+   `active` is not proof it delivered; a deploy call returning success is not
+   proof the deployed source matches the repo (fetch it back and grep).
+4. **Say what you are picking up and get agreement before touching live state.**
+   Especially: `pay_runs` status, `attendance_records`, `advance_requests`,
+   RLS policies, or anything HR/Kajal may have open on screen right now.
+5. **Do not read ARCHIVE.md** unless one of the triggers in the section above
+   fires.
+
+Then, while working: every code edit, research sweep, review or deploy goes to
+an Agent call with `model: "sonnet"` (Claude plans, briefs, verifies, and does
+git/doc bookkeeping); record each of Yash's decisions into this file **in the
+same turn he gives it**; update PENDING.md's RESUME STATE at the end of every
+stage and push; and finish with the full brief plus numbered open questions.
+
+**The starter prompt (paste this into a new session):**
+
+```
+Forge OS session start. Before anything else:
+1. Read PENDING.md's TOP "RESUME STATE" block — it is the only current one.
+2. Read the "BRANCH REALITY" note under it, then confirm with git yourself
+   (log/status/branch -a) and tell me which branch is authoritative and
+   whether an open PR already carries the work.
+3. Tell me, from LIVE data not from notes: anything you are about to quote
+   about headcount, who is active, pending approvals, cron health, the live
+   October pay run's state, or a deployed edge function's version.
+4. Then tell me the top 3 things you believe are outstanding, and ask me
+   anything you need before you touch live state.
+Do NOT read ARCHIVE.md unless a trigger in CLAUDE.md's "When to read
+ARCHIVE.md" section actually fires. Do not edit code yourself — brief a
+Sonnet agent and verify its work. End with the full brief + numbered
+questions.
+```
+
+---
+
+## 🔎 When to read ARCHIVE.md — and when not to
+
+ARCHIVE.md is ~935 lines across 17 closed sections. It is **not** read at
+session start and **never** read whole — `grep` it for the specific thing you
+need. It is the answer to "**why is it like this?**", never to "what do I do
+next?".
+
+**Read it when any of these is true:**
+1. **You are about to change, simplify, remove or "fix" an existing rule,
+   constant or policy, and the reason it exists is not stated where you found
+   it.** The reason is probably archived. This is the single most important
+   trigger — the IST-date, Shift 4/5 tie-breaker and approved-leave
+   regressions all happened because a rule was changed by someone who could
+   not see why it was written.
+2. **A value looks arbitrary or wrong** (why 45 m and not 100 m? why does
+   `gps_check` fail open? why is there no DELETE policy? why is `nativewind`
+   pinned to `~4.1.23`?). Those all have a documented, hard-won reason.
+3. **A bug smells familiar** — something that "should work" doesn't, and the
+   symptom resembles a past incident (a consultant's PIN resetting itself,
+   `payroll-run/index.ts` blanked by a stray "noop" commit, Apps Script
+   triggers ballooning, a deployed edge function not matching the repo).
+   Check whether it is a recurrence before root-causing from scratch.
+4. **A pointer line in CLAUDE.md or PENDING.md says "moved to ARCHIVE.md"** —
+   follow it if you need that detail.
+5. **Yash asks "why is it like this", "didn't we already do this", "have we
+   tried X", or "what happened with Y"** — check before answering from memory.
+6. **Before archiving anything new** — to match the existing format and avoid
+   filing a duplicate.
+
+**Do NOT read it:**
+- routinely at session start, or "to get context" — that is CLAUDE.md (rules)
+  and PENDING.md's RESUME STATE (what's next);
+- to decide what to work on; nothing in it is a to-do, however it is worded;
+- to justify an action. If something there is still live, it is a bug in
+  CLAUDE.md or PENDING.md — restate it there first, then act on it there.
+
+**Treat every date in it as "true when written."** A closed section can name a
+headcount, an employee's status or a config value that has since changed; the
+live-data rule above still applies, with no exception for archived text.
 
 ---
 
@@ -213,7 +346,7 @@ the user operates on IST, never UTC, and never "whatever the device thinks."
 - **Login accepts employee code _or_ mobile number.** Both are needed: ~a third of employees have no phone in the DB (VFL1527 deliberately NULL; only ~96 of 120 got numbers in PATCH_03), so phone alone would lock people out.
 - **Identifier → email resolution** goes through `public.resolve_login_identifier()`, a SECURITY DEFINER function returning *only* the synthetic email. Needed because the lookup happens while still anonymous, when RLS correctly hides `employees`. It does reveal whether a code exists — accepted, since emp_codes are printed on ID cards and the PIN is the secret.
 - **Starting PIN = emp_code digits padded to 6.** `VFL1001` → `001001`. Per-employee, *not* one shared default — a shared default would let anyone sign in as any colleague who hadn't logged in yet.
-- **`must_change_pin` forces a change on first login**, gated in `app/index.tsx` (the only auth guard) and in `login.tsx`. Cleared via `public.mark_pin_changed()` — a SECURITY DEFINER function rather than an RLS update policy, because any policy broad enough to let employees update their own row would also let them edit their own `role`, `salary` or `supervisor_id`.
+- **`must_change_pin` forces a change on first login**, gated in `app/index.tsx` (the role router / first auth gate — note `components/RoleGate.tsx` guards each role group as well, see "Live code invariants") and in `login.tsx`. Cleared via `public.mark_pin_changed()` — a SECURITY DEFINER function rather than an RLS update policy, because any policy broad enough to let employees update their own row would also let them edit their own `role`, `salary` or `supervisor_id`.
 
 **⚠ Starting PINs are guessable by design.** Anyone who has seen an ID card can derive a colleague's starting PIN. The window is "until that person first logs in". HR should push everyone through first login promptly.
 
@@ -517,147 +650,7 @@ be written to a `timestamptz` column or read with local getters.**
 
 ---
 
-## Daily + month-end attendance to Google Sheet + email — built 28 Sep 2026
-
-Yash: wants attendance visible outside the app, so a Sheet that stays
-updated + email, not just the in-app dashboards. Confirmed via
-`AskUserQuestion`: both Sheet and email; the Sheet is his own existing
-**"VFL HR OS 2026 27"** spreadsheet (`10-OpV86Gvi_TlBPQ6zKQC6y7MLWqietELGU3G06exIM`),
-not a new one; email recipients TBD ("I will give you the email addresses
-when you need them").
-
-**`scripts/AttendanceReport.gs`** (new file, lives in the SAME Apps
-Script project as `ALERT.gs` — reuses its `SUPABASE_URL`/
-`SUPABASE_SERVICE_ROLE_KEY` Script Properties and `getSupabaseCredentials_()`,
-zero new credentials). Not yet pasted into the live Apps Script editor —
-that one-time paste + running `installAttendanceReportTrigger()` once is
-still Yash/HR's step.
-
-- **"Daily Attendance" tab**: one row per *every active employee* per
-  day, not just those who checked in — an absent employee gets a blank
-  row rather than being dropped, matching this session's own "never
-  silently drop people from the denominator" fix for the in-app
-  dashboards. Columns: Date, Emp Code, Name, Department, Check In,
-  Check Out, Working Hrs, Late Mins.
-- **"Monthly Attendance Summary" tab**: rebuilt on the 1st of each month
-  for the month that just closed. Columns: Month, Emp Code, Name,
-  Department, Total Present Days, Avg Working Hrs/Day, Times Late
-  (>grace). **"Total Present Days" is read as days present (P/L/HL),
-  not calendar days in the month — an assumption, not confirmed by
-  Yash**, since his spec paired it with "average working hrs per day,"
-  which only makes sense per-present-day.
-- **Late Mins reuses existing data, no new math**: `attendance_records.late_minutes`
-  is already grace-adjusted at write time (`hooks/useAttendance.ts`'s
-  `checkIn()`), so "only shown if crossed grace" just means "blank when
-  null/0" — nothing new to compute.
-- **No-checkout rule applied, same as the app** (28 Sep decision above):
-  if someone checked in but `hours_worked` is null, the row gets the
-  shift's default (General=9h, else 8.5h floor) — but ONLY when they
-  actually checked in; a true absence (no check-in at all) stays blank,
-  not defaulted. `lib/workingHours.ts`'s logic is hand-replicated since
-  Apps Script can't import it — **keep both in sync by hand if that rule
-  ever changes**, same duplication risk already flagged for the IST
-  helpers.
-- **Trigger design, fixed after an independent review caught a real
-  bug**: v1 used `.timeBased().atHour(8).inTimezone('Asia/Kolkata')` —
-  `.inTimezone()` does not exist on Apps Script's `ClockTriggerBuilder`
-  and would have thrown at install time. Fixed to the same pattern this
-  project's own `runShiftAlerts15min_` already uses: an **hourly**
-  trigger whose handler explicitly checks `Utilities.formatDate(now,
-  'Asia/Kolkata', ...)` before doing real work (gated to the 07:00-07:59
-  IST hour, deduped via Script Properties so it only fires once per IST
-  day) — never relying on the Apps Script project's own timezone
-  setting, which nothing in this repo confirms is set to IST.
-- **07:00 IST, reporting on "yesterday," self-healing "day before
-  yesterday" too**: chosen because Shift 3 (00:00-07:00) belongs to the
-  *previous* working day (see "Shift 3 belongs to the previous working
-  day" above) — 07:00 is right after that window closes. Re-processing
-  the day before yesterday every run means a Shift-3 checkout landing
-  slightly late (e.g. 07:15-07:45, after this run already fired) gets
-  corrected automatically the next morning, via upsert-in-place —
-  without any special-case code.
-- **Idempotent by upsert-in-place**, not delete-then-append: each row
-  carries a hidden `_key` column (date+employee, or month+employee); a
-  re-run overwrites the matching row instead of duplicating it.
-- **Failure handling**: a Supabase read failure aborts before touching
-  the Sheet or sending the real report — Yash still gets alerted, via
-  `MailApp` to `OWNER_EMAIL` (already defined in `ALERT.gs`) plus
-  whatever `ATTENDANCE_REPORT_RECIPIENTS` holds, so a broken job is
-  never silent (this project's own `sendTelegramAlert` incident is the
-  cautionary precedent).
-
-**Still open, not decided — needs Yash before/around first real use:**
-1. Email recipient addresses (he'll provide).
-2. "Total Present Days" definition (see assumption above).
-3. Whether this should start running now (test mode until 1 Oct) or
-   stay installed-but-inert until go-live — harmless either way since
-   it's read-only, but confirm.
-4. The "VFL HR OS 2026 27" spreadsheet has more tabs than could be
-   enumerated from here (confirmed at least "Overtime_Form", ~25k
-   rows) — worth a glance that "Daily Attendance"/"Monthly Attendance
-   Summary" don't collide with anything already there before the first
-   real run.
-
-**⚠ SUPERSEDED 6 Oct 2026 — Apps Script approach abandoned, see below.**
-Yash: "your code .gs for pulling from supabase into sheet is not working."
-(Root cause was almost certainly that the one-time paste-into-editor +
-`installAttendanceReportTrigger()` step above was never done, not a bug in
-the script — but Yash wants a different method either way, so this file
-no longer tracks `AttendanceReport.gs` as the live path forward. The file
-itself is left in `scripts/` but should not be pasted into Apps Script
-going forward; the sections above are kept only as a record of what was
-built and why, not as a to-do.)
-
-## Daily attendance in Google Sheets — Whalesync, not Apps Script (6 Oct 2026)
-
-**⚠ SUPERSEDED same day — Whalesync dropped, too expensive (Yash's own
-words).** See "Self-serve data review" below for the final answer: Table
-Editor + SQL views directly in Supabase, no sync tool at all. The
-`daily_attendance_report` view this section built is still live and still
-useful — just browsed directly, not synced anywhere.
-
-**Decision from Yash, 6 Oct 2026**: no Apps Script, no Claude-orchestrated
-automation tool (Make/Zapier) either — "you need connectors that supabase
-can use and not you," i.e. a tool that connects directly to Supabase and
-Google Sheets on its own, continuously, rather than Claude scripting a
-daily batch job through a third-party automation platform.
-
-**Chosen tool: Whalesync** (not a Supabase product, but a well-known
-third-party continuous-sync tool many Supabase users pair with it for
-exactly this — DB table/view → Google Sheet, kept live, no cron needed).
-
-**What's ready on the Supabase side, done 6 Oct 2026**: Whalesync syncs
-tables/views as-is — it cannot run custom SQL — but the daily attendance
-report is a computed join (formatted check-in/out times, default hours
-for a no-checkout day, department sort), not a raw table. So
-`PATCH_74_daily_attendance_report_view_06Oct2026.sql` adds a Postgres
-**view**, `public.daily_attendance_report`, with exactly that shape —
-Date, Emp Code, Name, Department, Check In, Check Out, Working Hrs, Late
-Mins, Overtime Hrs, one row per active employee per day (absent employees
-get a blank row, never dropped, same "never silently drop people" rule as
-the in-app dashboards) — so Whalesync has one clean source to point at.
-Re-evaluates `now()` on every read, so "today" is always actually today in
-IST, no stored/stale date. **Not granted to `anon`/`authenticated`** —
-only readable via the `service_role` key, same key this project's other
-admin-side integrations already use, never the app's own client queries.
-Verified live: 99 rows on creation, matching the active headcount that day.
-
-**Still Yash's own step, not done yet**: sign up at whalesync.com, connect
-Supabase (needs the project's `service_role` key — pasted directly into
-Whalesync's own connection form, never into this chat, same rule as every
-other key in this file), connect the Google account that owns the "Forge
-OS - Daily Attendance - 2026-10-06" sheet (OAuth, no key to paste), then
-create a one-way sync: source = `daily_attendance_report` view → that
-sheet's "Daily Attendance" tab. Whalesync keeps it continuously current
-after that — no daily cron, no scenario to maintain, nothing further for
-Claude to build unless Yash wants the Monthly Attendance Summary tab done
-the same way (a second view, same pattern, not yet built — ask before
-building it).
-
-**Abandoned for this**: the Make.com scenario (scheduler → Postgres query
-→ Google Sheets bulk-write) that was mid-build before Yash's "connectors
-that supabase can use and not you" clarification — no Make credential
-request was created, nothing to undo.
+> Moved to ARCHIVE.md: "Daily + month-end attendance to Google Sheet + email — built 28 Sep 2026" and "Daily attendance in Google Sheets — Whalesync, not Apps Script (6 Oct 2026)" (both fully superseded, no open items; final answer is "Self-serve data review" below).
 
 ## Self-serve data review — Table Editor + SQL views, no Claude needed (6 Oct 2026)
 
@@ -1432,7 +1425,7 @@ Two separate fixes, both same day:
 
 ```
 app/
-├── index.tsx              — role router (the only auth guard; routes on the EFFECTIVE role, see view-as)
+├── index.tsx              — role router (first auth gate; RoleGate.tsx guards each group too; routes on the EFFECTIVE role, see view-as)
 ├── view-as.tsx            — admin inspection: render the app as any role/department/category
 ├── (auth)/login.tsx       — employee code / mobile + PIN login
 ├── (auth)/change-pin.tsx  — forced PIN change on first login
@@ -1651,45 +1644,92 @@ Script Property, not two — every send function reads that same one).
 
 ---
 
-## RLS — all known holes closed (PATCH_12, confirmed 11 Aug)
+## 🔒 RLS posture — ACTIVE constraints, not history (why policies are stricter than FINAL_SCHEMA)
 
-This section used to list 6 open holes. **Stale — found while re-auditing
-13 Aug.** All 6 were closed by `PATCH_12_rls_hardening_11Aug2026.sql`, which
-has been applied and confirmed by Yash since 11 Aug (see the patches table
-above). Keeping the record of what was fixed, since it explains why several
-policies look stricter than a first read of FINAL_SCHEMA suggests:
+**Read this before "fixing" any RLS policy that looks stricter than
+`scripts/FINAL_SCHEMA_02Aug2026.sql` suggests.** FINAL_SCHEMA is the
+authoritative *schema*, but it is NOT the authoritative *policy* text —
+`PATCH_12_rls_hardening_11Aug2026.sql` (applied + confirmed 11 Aug 2026)
+deliberately tightened six policies past what FINAL_SCHEMA shows. A model
+diffing live policies against FINAL_SCHEMA will see a mismatch; reverting it
+re-opens a privilege-escalation hole. The six, with the insecure shape each
+replaced:
 
-1. `employees` INSERT — was `is_management() OR auth.role() = 'authenticated'`
-   (the second branch made it trivially true for any signed-in user); now
-   `is_management()` only.
-2. `notifications` INSERT — was `with check (true)`; now `is_management()`
+1. `employees` INSERT — was `is_management() OR auth.role() = 'authenticated'`;
+   the second branch made it **trivially true for any signed-in user** (any
+   employee could insert employee rows). Now `is_management()` only.
+2. `notifications` INSERT — was `with check (true)`. Now `is_management()`
    only, plus a UPDATE policy scoped to `user_id = current_employee_id()` so
-   the bell can be cleared.
+   the bell can still be cleared by its owner.
 3. `fraud_alerts` / `fraud_flags` INSERT — were unscoped for any authenticated
-   user; now scoped to the reporting employee.
+   user. Now scoped to the reporting employee.
 4. `attendance_records` write — now scoped to a supervisor's own team.
 5. `leave_requests` UPDATE — now scoped to a supervisor's own team.
-6. `mrm_reviews` SELECT — was readable by every authenticated user; now
+6. `mrm_reviews` SELECT — was readable by every authenticated user. Now
    manager-and-above only.
 
-No DELETE policies on any table remains intentional — audit trail.
+**🔒 There are no DELETE policies on any table, and that is intentional — the
+audit trail depends on it.** Never add a DELETE policy to satisfy a screen or
+a cleanup task; soft-delete (`is_active=false`, `status`, a `reviewed`/
+`resolved` flag) or a SECURITY DEFINER RPC with its own role check is the
+pattern this project uses everywhere. An absent DELETE policy is a designed
+guardrail, never an oversight to close.
+
+The closed historical narrative of this hardening pass lives in ARCHIVE.md;
+the constraints above are current and binding.
 
 ---
 
-## Screen-level issues — none open (found stale while re-auditing 13 Aug)
+## 🔒 Live code invariants — restored 10 Nov 2026 (each one was a real bug once; do not undo)
 
-Every row this table used to list is fixed. Kept as a record, not a to-do:
+These are not historical anecdotes. Each is a property live code depends on
+*today*, where the failure mode is silent — nothing throws, nothing logs, the
+feature just stops being true. The narrative of how each was found is in
+ARCHIVE.md; the invariant itself is binding here.
 
-| Screen | Was | Status |
-|---|---|---|
-| `worker/home.tsx` | `Constants.deviceId` doesn't exist in Expo SDK 51 — buddy-device fraud check compared a fresh `sessionId` every launch, could never match | ✅ Fixed 12 Aug — `lib/deviceId.ts`, persisted per install |
-| `worker/5s.tsx` | Camera `takePhoto()` wrote a hardcoded placeholder URL | ✅ Wired to `PhotoCapture` — verified in code, not just claimed |
-| `worker/observation.tsx` | Camera not wired | ✅ Same `PhotoCapture` component wired in |
-| `supervisor/casual-workers.tsx` | Upsert conflict key `supervisor_id,date` — unverified against schema | ✅ Verified 13 Aug — matches `unique (supervisor_id, date)` in FINAL_SCHEMA exactly |
-| All screens | No auth guard in individual route layouts | ✅ Fixed 13 Aug — `components/RoleGate.tsx` on all seven groups |
+- **Auth guarding is TWO layers, not one.** `app/index.tsx` is the role
+  *router* and the first gate, but `components/RoleGate.tsx` has wrapped **all
+  seven role groups** since 13 Aug 2026, because expo-router will happily
+  render a group's screens on a deep link / restored navigation state without
+  ever passing through `index.tsx`. **Never remove `RoleGate` from a group
+  layout on the belief that `index.tsx` already guards it, and always add it
+  when creating a new role group.** (Older lines in this file calling
+  `index.tsx` "the only auth guard" predate `RoleGate` and are corrected
+  in place.)
+- **Device identity must be a persisted per-install id — `lib/deviceId.ts`.**
+  The buddy-punching fraud check compares "same device, different employee,
+  same day". `Constants.deviceId` was removed from Expo years before SDK 51,
+  so it is **always `undefined`**, and the original
+  `Constants.deviceId || Constants.sessionId` fallback wrote a *fresh* id on
+  every app launch — the lookup could therefore never match and the check had
+  **never once fired** before it was fixed 12 Aug 2026. Never substitute
+  `Constants.deviceId`, `sessionId`, or any per-launch value here.
+- **`supervisor/casual-workers.tsx`'s upsert conflict key is
+  `supervisor_id,date`** and matches `unique (supervisor_id, date)` in
+  FINAL_SCHEMA exactly (verified 13 Aug 2026). An upsert whose conflict target
+  does not match a real unique constraint fails at runtime, not at build.
+- **`fraud-detector`'s `gps_check` FAILS OPEN on a network error, deliberately.**
+  `worker/home.tsx` / `CheckInCard` still run the client-side geofence check
+  above it, which blocks the obvious cases even offline — so **a plant with
+  patchy signal must never lose a legitimate check-in because the fraud check
+  itself was unreachable.** Never "harden" this path to fail closed; a mock-
+  location *flag* hard-blocks (policy), an unreachable *detector* does not.
+- **Any importer of the form registry must read the Cutting table's `Shift`
+  column as a SUBMITTER NAME, not a shift.** It holds a person ("B.S. Todmal")
+  where HT/Final hold "First/Second/Third/General Shift" — confirmed deliberate
+  by Yash, it records who is responsible for filling that form. Responsibility
+  is **many-to-many**: Todmal covers Cutting AND Heat Treatment, and Ashok
+  Sharma also covers Cutting, so **never assume one-owner-per-department.**
+  (This is the "Todmal name-variant" case the Telegram onboarding section above
+  refers to when it insists on exactly-one-match-or-skip, never guessing.)
+- **Photo capture goes through `components/PhotoCapture`**, never a
+  hardcoded/placeholder URL. `worker/5s.tsx` and `worker/observation.tsx` both
+  once wrote a `placeholder.com` URL, so submissions carried no real photo;
+  the private `submission-photos` bucket (PATCH_13) is the destination.
 
 ---
 
+> Historical detail moved to ARCHIVE.md: the full "RLS — all known holes closed (PATCH_12)" narrative and the "Screen-level issues — none open (13 Aug)" table. The still-binding constraints from both were restored above and under "Live code invariants".
 ## Leave & Advance approval chains — frozen 27 Sep 2026, decisions from Yash
 
 **🔒 New joiners get no leave entitlement until completing 1 year of service — decision from Yash, 5 Nov 2026, restated and generalized 5 Nov 2026 (second message).** Flagged when HR reported VFL5463/5464/5465/5466 as "missing from the records": checked live, all four are real, active employees (added Sep 2026) — the actual gap is that none of them has a `leave_balances` row. Yash's first wording: "they have joined only this year so they do not get leaves from the year that they join... they do not qualify for paid leaves." Yash then explicitly generalized this into a standing rule, same day: **"the others do not get leave till the complete one year of service in the company... a new joining only get leaves after 1 year... this is applicable for EL CL SL."** **This is correct, expected behavior, not a data gap to fill** — remove any "missing leave_balances row" flag for a recent hire and do not re-raise it.
@@ -2643,6 +2683,10 @@ exercised on a real device** — screen behind auth. New APK build needed
 - Reference `types/database.ts` column names (old schema) — always use `types/index.ts`
 - Use `shift_date`, `full_name`, `employee_code`, `department_id`, `reporting_manager_id`, `salary_structure` — these are old schema names that don't exist in FINAL_SCHEMA
 - **Compute "today," "this month," or any date-boundary/deadline check from a plain `new Date()`/`.getMonth()`/`.getFullYear()`/`.getDate()`/`.getDay()` call, in frontend or edge-function code.** Always use `lib/istDate.ts` (frontend) or `supabase/functions/_shared/istDate.ts` (edge functions) — see the locked IST rule above. This is not a style preference; it was a live production bug (wrong calendar date, missing attendance data) until the 27 Sep 2026 audit fixed it, and it must never be reintroduced.
+- **Merge a dependency bump (Dependabot or manual) that raises `expo`, `expo-constants`, `tailwindcss`, `nativewind`, `react`, `react-native`, `react-native-reanimated`, `react-native-screens`, `expo-linking`, `@react-native-async-storage/async-storage` or `typescript` without first re-reading the "App build" section above.** Every one of those versions is pinned deliberately, each because it already broke this APK once (SDK 51 compatibility, the NativeWind 4.1.x / css-interop 0.1.x / Reanimated 3 chain, the `expo-linking` wildcard, the `react-native-screens` postinstall). A bot does not read this file. A TypeScript bump also invalidates the documented 7-error `tsc` baseline every PR gate is measured against. Same caution for the APK workflow's own actions — `supabase/setup-cli` especially, since the 6 Nov 2026 CI outage was a Supabase CLI version change. See the open-risk entry in PENDING.md.
+- **Add a DELETE policy to any table, or hard-delete a row to satisfy a screen or a cleanup task.** The complete absence of DELETE policies is a deliberate audit-trail guardrail (see "RLS posture"), not a gap. Use soft-delete (`is_active=false`, a `status`/`resolved`/`reviewed` flag) or a SECURITY DEFINER RPC with its own role check.
+- **Revert an RLS policy because it looks stricter than `scripts/FINAL_SCHEMA_02Aug2026.sql` shows.** FINAL_SCHEMA is authoritative for the schema, NOT for policy text — PATCH_12 (and PATCH_99/100/101/102) deliberately tightened policies past it. Reverting to match FINAL_SCHEMA re-opens a privilege-escalation hole. See "RLS posture".
+- **Remove `components/RoleGate.tsx` from a role-group layout, or create a new role group without it**, on the belief that `app/index.tsx` already guards access. See "Live code invariants".
 - **Cancel, finalize, or otherwise mutate a `pay_runs` row's `status` (or any live, human-driven workflow row) without first checking whether someone has that screen open and mid-action right now.** A 6 Nov 2026 incident: Claude cancelled an empty, zero-item draft payroll run believing it safe (0 warnings, 0 pay_run_items at the time) to free up the population picker — but HR had the screen open live, ran pre-check against it anyway, and decided all 74 resulting warnings against a run that was already cancelled. `cancelled` turned out to be a terminal state in `trg_pay_run_transition` (no path back to `draft`) — recovered only by briefly disabling that trigger, same pattern as PATCH_96's repair. A backend "looks empty/safe" check is not sufficient — if a human-facing workflow row might be in active use, ask first or wait for confirmation it's idle, never assume from table emptiness alone.
 
 ---
