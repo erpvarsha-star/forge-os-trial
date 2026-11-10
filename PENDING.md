@@ -1254,6 +1254,36 @@ queued as the next build task.
 
 ---
 
+## 🔴 OPEN RISK — 16 Dependabot PRs propose bumps this project deliberately pinned AGAINST (found 10 Nov 2026)
+
+`.github/dependabot.yml` reached the base branch via `05a541c` (PR #61) and has
+since opened **PRs #62–#76**, all targeting `claude/forge-os-backend-setup-7woj4t`.
+**Dependabot does not read CLAUDE.md**, so several of these propose exactly the
+upgrades CLAUDE.md's "App build" section documents as having already broken this
+APK once. Verified against `package.json` on 10 Nov 2026:
+
+| PR | Bump | Why it is dangerous here |
+|---|---|---|
+| #69 | `expo-constants` ~16.0.0 → **58.0.15** | Project is **Expo SDK 51**. expo-constants 58 targets SDK 58. `lib/deviceId.ts` exists *because* of this package's API behaviour. |
+| #72 | `tailwindcss` ^3.4.0 → **4.3.4** | NativeWind is pinned `~4.1.23` precisely to stay on Tailwind 3 / `react-native-css-interop` 0.1.x. Tailwind 4 reopens the css-interop → `react-native-worklets` (Reanimated 4) cascade against our pinned `reanimated ~3.10.0`. |
+| #68 | `typescript` ~5.3.0 → **7.0.2** | Would invalidate the documented **7-error `tsc --noEmit` baseline** that every PR gate in this project is measured against. |
+| #74 | `react` 18.2.0 → major | `react-native` is pinned `0.74.0`, which expects React 18.2. |
+| #73 | `async-storage` 1.23.0 → **3.1.1** | Exact-pinned deliberately. |
+| #76, #75, #70, #71, #67 | eslint 8→10, chart-kit 6→7, typescript-eslint 7→8, minor group | Lower risk, still untested against the APK build. |
+| #63, #65, #66, #62, #64 | setup-java 4→6, setup-node 4→7, gradle/actions 4→6, upload-artifact 4→7, **supabase/setup-cli 1→3** | The APK workflow is documented as fragile. `supabase/setup-cli` is the highest risk of these: the **6 Nov 2026** CI outage was caused by exactly a Supabase CLI version change (deploy needing `--yes`). |
+
+**Nothing has been merged or closed — this is the owner's call.** Recommendation:
+close #68, #69, #72, #73, #74 outright (they contradict documented pins), and
+hold the Actions bumps until an APK build is verified green on each. Do not
+batch-merge any of them.
+
+**Root cause worth noting:** the pins are documented in CLAUDE.md with full
+rationale, but nothing *enforces* them — an automated bot and a future session
+can both act against them. A NEVER-do entry was added to CLAUDE.md on 10 Nov
+2026; a `package.json` comment or a CI pin-check would enforce it properly.
+
+---
+
 ## 🔶 Still open — items rescued from sections archived 10 Nov 2026
 
 These were the ONLY unresolved items inside the thirteen fully-resolved
