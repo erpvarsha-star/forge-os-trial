@@ -64,3 +64,53 @@ REVOKE ALL ON FUNCTION public.allocate_team_shift_day(uuid, uuid, date) FROM PUB
 GRANT EXECUTE ON FUNCTION public.allocate_team_shift_day(uuid, uuid, date) TO authenticated;
 
 COMMIT;
+
+-- ---------------------------------------------------------------------------
+-- Cron jobs for the two new shift-reminder modes (19:00 IST / 21:00 IST).
+-- IST = UTC+5:30, so 19:00 IST = 13:30 UTC, 21:00 IST = 15:30 UTC.
+--
+-- Authorization header: `shift-reminder` is deployed with --no-verify-jwt
+-- (supabase/functions/deploy.sh), so the gateway never checks this header's
+-- value — it only needs to be PRESENT. Same "dummy but present" pattern as
+-- PATCH_129_efficiency_and_advance_recovery_reminders_05Nov2026.sql, chosen
+-- deliberately over pasting a real key: pune-attendance-reminder went 9 days
+-- with NO Authorization header at all before that lesson was learned, and
+-- a real key must never be printed/selected into a chat transcript (see the
+-- 1 Oct 2026 "Incidental key exposure" note in CLAUDE.md). A 13:30 UTC job
+-- (pune-attendance-reminder) already exists at that same minute for a
+-- different function — no conflict, pg_cron runs jobs independently.
+--
+-- Rollback:
+--   select cron.unschedule('daily-allocator-reminder');
+--   select cron.unschedule('daily-allocator-hr-escalation');
+-- ---------------------------------------------------------------------------
+
+do $$
+begin
+  if exists (select 1 from cron.job where jobname = 'daily-allocator-reminder') then
+    perform cron.unschedule('daily-allocator-reminder');
+  end if;
+  if exists (select 1 from cron.job where jobname = 'daily-allocator-hr-escalation') then
+    perform cron.unschedule('daily-allocator-hr-escalation');
+  end if;
+end $$;
+
+select cron.schedule(
+  'daily-allocator-reminder',
+  '30 13 * * *',
+  $$select net.http_post(
+      url := 'https://odfwtdpvpfzdrznvurru.supabase.co/functions/v1/shift-reminder',
+      headers := jsonb_build_object('Content-Type','application/json','Authorization','Bearer no-auth-required'),
+      body := '{"mode":"daily_allocator_reminder"}'::jsonb
+  )$$
+);
+
+select cron.schedule(
+  'daily-allocator-hr-escalation',
+  '30 15 * * *',
+  $$select net.http_post(
+      url := 'https://odfwtdpvpfzdrznvurru.supabase.co/functions/v1/shift-reminder',
+      headers := jsonb_build_object('Content-Type','application/json','Authorization','Bearer no-auth-required'),
+      body := '{"mode":"daily_allocator_hr_escalation"}'::jsonb
+  )$$
+);

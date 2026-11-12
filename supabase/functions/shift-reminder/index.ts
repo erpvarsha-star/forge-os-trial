@@ -21,11 +21,25 @@
  *    plant_config.form_shift_schedule; the forms come from form_links
  *    (PATCH_14), so muting a form is a boolean in the table, not a redeploy.
  *
+ * 4. `daily_allocator_reminder` (schedule: 19:00 IST daily, PATCH_135) —
+ *    for every active employee with employees.shift_allocation_mode='daily'
+ *    (today: VFL1560, VFL1566 — never hardcoded here, the DB flag is the
+ *    source of truth), checks whether EVERY active/uses_app team member
+ *    already has an employee_shifts row for TOMORROW; if any don't, nudges
+ *    that allocator. Owner decision 12 Nov 2026.
+ *
+ * 5. `daily_allocator_hr_escalation` (schedule: 21:00 IST daily, PATCH_135) —
+ *    same tomorrow-date check, 2 hours later; for any daily-mode allocator
+ *    STILL incomplete, notifies every active hr_admin naming the allocator
+ *    and the still-unallocated people. Owner decision 12 Nov 2026.
+ *
  * POST body: { "mode": "weekly_shift_notify" | "daily_checkin_reminder"
- *                    | "forms_due_reminder" }
+ *                    | "forms_due_reminder" | "daily_allocator_reminder"
+ *                    | "daily_allocator_hr_escalation" }
  * If omitted, mode is inferred from the current IST day of week — which never
- * infers forms_due_reminder, so that one needs its own cron entry passing
- * {"mode":"forms_due_reminder"} explicitly.
+ * infers forms_due_reminder/daily_allocator_reminder/
+ * daily_allocator_hr_escalation, so each of those needs its own cron entry
+ * passing its mode explicitly (same reason forms_due_reminder already does).
  */
 
 import { handleOptions, jsonResponse } from '../_shared/cors.ts';
@@ -397,6 +411,149 @@ async function formsDueReminder(db: ReturnType<typeof supabaseAdmin>) {
   return { dueShifts: dueShifts.map((s) => s.shift), departments: byDepartment.size, notified, skipped };
 }
 
+/** Tomorrow's IST calendar date, as YYYY-MM-DD, from an IST-shifted `now`. */
+function tomorrowIstDateStr(now: Date): string {
+  const t = new Date(now);
+  t.setUTCDate(t.getUTCDate() + 1);
+  return t.toISOString().slice(0, 10);
+}
+
+interface DailyAllocatorPerson {
+  id: string;
+  name: string;
+  emp_code: string;
+  shift_allocator_id: string;
+}
+
+/**
+ * Builds { allocatorId -> [unassigned team members] } for tomorrow, scoped
+ * to employees.shift_allocation_mode='daily' allocators and their active,
+ * uses_app team. Shared by both daily_allocator_* modes so the two checks
+ * (19:00 reminder, 21:00 escalation) can never disagree on who's missing.
+ */
+async function findIncompleteDailyAllocations(
+  db: ReturnType<typeof supabaseAdmin>,
+  tomorrow: string
+): Promise<{ allocators: Map<string, { id: string; name: string; emp_code: string }>; incomplete: Map<string, DailyAllocatorPerson[]> }> {
+  const { data: allocatorRows } = await db
+    .from('employees')
+    .select('id, name, emp_code')
+    .eq('shift_allocation_mode', 'daily')
+    .eq('is_active', true);
+
+  const allocators = new Map<string, { id: string; name: string; emp_code: string }>(
+    (allocatorRows ?? []).map((a: { id: string; name: string; emp_code: string }) => [a.id, a])
+  );
+  const incomplete = new Map<string, DailyAllocatorPerson[]>();
+  if (allocators.size === 0) return { allocators, incomplete };
+
+  const allocatorIds = Array.from(allocators.keys());
+  const { data: team } = await db
+    .from('employees')
+    .select('id, name, emp_code, shift_allocator_id')
+    .in('shift_allocator_id', allocatorIds)
+    .eq('is_active', true)
+    .eq('uses_app', true);
+
+  if (!team || team.length === 0) return { allocators, incomplete };
+
+  const { data: assigned } = await db
+    .from('employee_shifts')
+    .select('employee_id')
+    .eq('date', tomorrow)
+    .in('employee_id', team.map((t: { id: string }) => t.id));
+  const assignedSet = new Set<string>((assigned ?? []).map((a: { employee_id: string }) => a.employee_id));
+
+  for (const member of team as DailyAllocatorPerson[]) {
+    if (assignedSet.has(member.id)) continue;
+    const list = incomplete.get(member.shift_allocator_id) ?? [];
+    list.push(member);
+    incomplete.set(member.shift_allocator_id, list);
+  }
+
+  return { allocators, incomplete };
+}
+
+async function dailyAllocatorReminder(db: ReturnType<typeof supabaseAdmin>) {
+  const tomorrow = tomorrowIstDateStr(istNow());
+  const { incomplete } = await findIncompleteDailyAllocations(db, tomorrow);
+
+  if (incomplete.size === 0) {
+    return { tomorrow, notified: 0, allocatorsIncomplete: 0 };
+  }
+
+  // Once per allocator per tomorrow-date is enough — same dedupe shape as
+  // weeklyShiftNotify's gapKey, just keyed on the single date, not a week.
+  const dedupeKey = `daily-alloc:${tomorrow}`;
+  const { data: already } = await db
+    .from('notifications')
+    .select('user_id')
+    .eq('type', 'daily_allocation_incomplete')
+    .eq('related_entity_id', dedupeKey)
+    .limit(10000);
+  const alreadySet = new Set<string>((already ?? []).map((n: { user_id: string }) => n.user_id));
+
+  const toNotify = Array.from(incomplete.keys()).filter((id) => !alreadySet.has(id));
+  if (toNotify.length > 0) {
+    await notifyEmployees(db, {
+      employeeIds: toNotify,
+      type: 'daily_allocation_incomplete',
+      title: 'Shift plan incomplete for tomorrow',
+      body: `Some of your team still has no shift assigned for ${tomorrow}. Open Shift Allocation to complete it.`,
+      relatedEntityType: 'shift_day',
+      relatedEntityId: dedupeKey,
+    });
+  }
+
+  return { tomorrow, notified: toNotify.length, allocatorsIncomplete: incomplete.size };
+}
+
+async function dailyAllocatorHrEscalation(db: ReturnType<typeof supabaseAdmin>) {
+  const tomorrow = tomorrowIstDateStr(istNow());
+  const { allocators, incomplete } = await findIncompleteDailyAllocations(db, tomorrow);
+
+  if (incomplete.size === 0) {
+    return { tomorrow, notified: 0, allocatorsIncomplete: 0 };
+  }
+
+  const { data: hrAdmins } = await db.from('employees').select('id').eq('role', 'hr_admin').eq('is_active', true);
+  if (!hrAdmins || hrAdmins.length === 0) {
+    return { tomorrow, notified: 0, allocatorsIncomplete: incomplete.size, hrAdmins: 0 };
+  }
+
+  const dedupeKey = `daily-alloc-escalation:${tomorrow}`;
+  const { data: already } = await db
+    .from('notifications')
+    .select('user_id')
+    .eq('type', 'daily_allocation_hr_escalation')
+    .eq('related_entity_id', dedupeKey)
+    .limit(10000);
+  const alreadySet = new Set<string>((already ?? []).map((n: { user_id: string }) => n.user_id));
+
+  const toNotify = (hrAdmins as { id: string }[]).map((e) => e.id).filter((id) => !alreadySet.has(id));
+  if (toNotify.length === 0) {
+    return { tomorrow, notified: 0, allocatorsIncomplete: incomplete.size };
+  }
+
+  const lines = Array.from(incomplete.entries()).map(([allocatorId, people]) => {
+    const allocator = allocators.get(allocatorId);
+    const who = allocator ? `${allocator.name} (${allocator.emp_code})` : allocatorId;
+    const names = people.map((p) => `${p.name} (${p.emp_code})`).join(', ');
+    return `${who}: ${names}`;
+  });
+
+  await notifyEmployees(db, {
+    employeeIds: toNotify,
+    type: 'daily_allocation_hr_escalation',
+    title: 'Daily shift allocation still incomplete',
+    body: `For ${tomorrow}, these allocators still have unassigned team members — ${lines.join(' | ')}`,
+    relatedEntityType: 'shift_day',
+    relatedEntityId: dedupeKey,
+  });
+
+  return { tomorrow, notified: toNotify.length, allocatorsIncomplete: incomplete.size };
+}
+
 Deno.serve(async (req: Request) => {
   const preflight = handleOptions(req);
   if (preflight) return preflight;
@@ -426,6 +583,12 @@ Deno.serve(async (req: Request) => {
     }
     if (mode === 'forms_due_reminder') {
       return jsonResponse({ mode, ...(await formsDueReminder(db)) });
+    }
+    if (mode === 'daily_allocator_reminder') {
+      return jsonResponse({ mode, ...(await dailyAllocatorReminder(db)) });
+    }
+    if (mode === 'daily_allocator_hr_escalation') {
+      return jsonResponse({ mode, ...(await dailyAllocatorHrEscalation(db)) });
     }
     return jsonResponse({ error: 'Unknown mode' }, 400);
   } catch (err) {
