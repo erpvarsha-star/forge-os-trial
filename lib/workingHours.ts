@@ -165,3 +165,27 @@ export function canUndoCheckout(checkInTime?: string | null, checkOutTime?: stri
 // it was just safer to leave a small gap than to match the boundary
 // exactly.
 export const OPEN_RECORD_FALLBACK_HOURS = 23
+
+// ---------------------------------------------------------------------------
+// Accidental tap-in/tap-out guard — this session's own diagnosis (12 Nov
+// 2026), NOT a number Yash specified. Real production bug: a check-in
+// immediately followed by an accidental check-out (a double-tap, or a
+// mis-tap right after checking in) ran the normal HALF_DAY_MAX_HOURS logic
+// in checkOut() and recorded a fake half-day. Confirmed real case: VFL4071,
+// 6-7 Nov 2026 — check-in and check-out about a minute apart, hours_worked
+// 0.01/0.02, wrongly saved as status 'HL'.
+//
+// Below this many minutes between check-in and check-out, checkOut() in
+// hooks/useAttendance.ts still records the real check_out_time/hours_worked
+// (so the row and the timestamps aren't silently lost) and still sets
+// overtime_hours to 0 (a session this short can never be a genuine 12h+ OT
+// day, so the Shift-1/3 -> Shift-4/5 reclassification is skipped too), but
+// does NOT set status to 'HL' and does NOT touch status at all — whatever
+// checkIn() already set ('P' or 'L') stands. This is a deliberate, narrow
+// choice: it means the day is left recorded as present (per the check-in),
+// not specially re-opened or flagged for a manual review queue — the goal
+// is only to stop a false half-day, not to add a new confirmation workflow
+// or a new DB column (out of scope for this fix). If a genuinely short real
+// shift (not an accidental tap) is ever reported under 5 minutes, revisit
+// this constant rather than the logic.
+export const ACCIDENTAL_TAP_MINUTES = 5
