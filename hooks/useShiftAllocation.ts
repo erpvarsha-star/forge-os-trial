@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Shift } from '@/types'
+import { istDateStr } from '@/lib/istDate'
 
 // Same Sat-Thu work-week math as app/(hr-admin)/shifts.tsx's getWeekStartIST/
 // getWeekDays — kept in sync by hand since this is a small, self-contained
@@ -24,6 +25,14 @@ const getWeekDays = (weekStart: string): string[] => {
   return days
 }
 
+// IST calendar date `days` after today, as YYYY-MM-DD — same convention as
+// components/AssignTaskModal.tsx's istPlusDays(), kept as its own small copy
+// here rather than a shared util for two call sites.
+const istPlusDays = (days: number): string => {
+  const [y, m, d] = istDateStr().split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
+}
+
 export interface ShiftAllocationTeamMember {
   id: string
   emp_code: string
@@ -39,8 +48,19 @@ export interface ShiftAllocationTeamMember {
 // coexisting with Shift 1/3, not replacing them.
 const ALLOCATABLE_SHIFT_NAMES = ['General', 'Shift 1', 'Shift 2', 'Shift 3', 'Shift 4', 'Shift 5']
 
-export function useShiftAllocation(allocatorId: string | undefined) {
+export type ShiftAllocationMode = 'weekly' | 'daily'
+
+// PATCH_135, 12 Nov 2026 — VFL1560/VFL1566 want to allocate daily instead of
+// weekly; every other allocator keeps the existing week-grid flow untouched.
+// `mode` comes from the caller's own employees.shift_allocation_mode (the
+// Employee row useAuth() already loads with select('*')), not re-queried
+// here — this hook just branches its data-loading/saving on it.
+export function useShiftAllocation(allocatorId: string | undefined, mode: ShiftAllocationMode = 'weekly') {
   const [weekOffset, setWeekOffset] = useState(0)
+  // Daily mode only: how many IST days from today the picked date is.
+  // Defaults to tomorrow (1), per Yash's "they chose the date and day of
+  // the week they are alloting" — a free +/- stepper, no date-picker lib.
+  const [dayOffset, setDayOffset] = useState(1)
   const [shifts, setShifts] = useState<Shift[]>([])
   const [team, setTeam] = useState<ShiftAllocationTeamMember[]>([])
   const [selections, setSelections] = useState<Record<string, string>>({})
@@ -49,6 +69,10 @@ export function useShiftAllocation(allocatorId: string | undefined) {
 
   const weekStart = getWeekStartIST(weekOffset)
   const weekDays = getWeekDays(weekStart)
+  const date = istPlusDays(dayOffset)
+  // The one date whose employee_shifts rows this load/save cycle targets —
+  // the week's Saturday in weekly mode, the picked single day in daily mode.
+  const activeDate = mode === 'daily' ? date : weekStart
 
   const loadData = useCallback(async () => {
     if (!allocatorId) return
@@ -65,7 +89,7 @@ export function useShiftAllocation(allocatorId: string | undefined) {
       supabase
         .from('employee_shifts')
         .select('employee_id, shift_id')
-        .eq('date', weekStart),
+        .eq('date', activeDate),
     ])
 
     if (sData) setShifts((sData as Shift[]).filter(s => ALLOCATABLE_SHIFT_NAMES.includes(s.name)))
@@ -81,7 +105,7 @@ export function useShiftAllocation(allocatorId: string | undefined) {
     }
 
     setIsLoading(false)
-  }, [allocatorId, weekStart])
+  }, [allocatorId, activeDate])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -118,16 +142,40 @@ export function useShiftAllocation(allocatorId: string | undefined) {
     return results.every(r => !r.error)
   }
 
+  // Daily-mode equivalent of saveWeek() — same per-employee RPC pattern,
+  // one date instead of six, via allocate_team_shift_day() (PATCH_135).
+  const saveDay = async (): Promise<boolean> => {
+    const entries = Object.entries(selections).filter(([, shiftId]) => shiftId)
+    if (entries.length === 0) return false
+
+    setIsSaving(true)
+    const results = await Promise.all(
+      entries.map(([employeeId, shiftId]) =>
+        supabase.rpc('allocate_team_shift_day', {
+          p_employee_id: employeeId,
+          p_shift_id: shiftId,
+          p_date: date,
+        })
+      )
+    )
+    setIsSaving(false)
+    return results.every(r => !r.error)
+  }
+
   return {
     weekOffset,
     setWeekOffset,
     weekStart,
     weekDays,
+    dayOffset,
+    setDayOffset,
+    date,
     shifts,
     team,
     selections,
     select,
     saveWeek,
+    saveDay,
     isLoading,
     isSaving,
   }

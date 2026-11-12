@@ -29,6 +29,11 @@ export interface Employee {
   uses_app?: boolean
   /** Set (e.g. 'Pune') for the clerk who enters attendance for that location's home workers. */
   attendance_clerk_location?: string | null
+  /** PATCH_135, 12 Nov 2026. 'weekly' (default) or 'daily' — only VFL1560/
+   *  VFL1566 are 'daily' as of this patch. Only meaningful for a
+   *  shift_allocator_id target (a team member looks this up on themselves
+   *  as allocator, not on the people they allocate for). */
+  shift_allocation_mode?: 'weekly' | 'daily'
   created_at: string
   updated_at: string
 }

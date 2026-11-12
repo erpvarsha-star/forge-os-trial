@@ -18,6 +18,17 @@ const fmtWeekLabel = (weekStart: string): string => {
   return `${fmt(base)} – ${fmt(end)}`
 }
 
+// Daily mode (PATCH_135, VFL1560/VFL1566 only) — same "parse the YYYY-MM-DD
+// as UTC midnight" trick fmtWeekLabel uses, since the string already IS the
+// IST calendar date and must never be re-shifted by the device's own tz.
+const fmtDayLabel = (date: string): string =>
+  new Date(date + 'T00:00:00Z').toLocaleDateString('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  })
+
 // Reuses app/(hr-admin)/shifts.tsx's week-nav + chip-grid pattern, scoped to
 // employees.shift_allocator_id instead of the whole company, and writing
 // through allocate_team_shift_week() (the actual security boundary) instead
@@ -27,25 +38,35 @@ const fmtWeekLabel = (weekStart: string): string => {
 export function ShiftAllocationGrid() {
   const { t } = useTranslation()
   const { employee } = useAuth()
+  // PATCH_135, 12 Nov 2026: VFL1560/VFL1566 allocate daily instead of
+  // weekly — driven by employees.shift_allocation_mode, not a hardcoded
+  // emp_code check, so a third allocator can be switched later with one
+  // UPDATE and no code change. Every other allocator stays on 'weekly'
+  // (the column default) and sees byte-identical behavior to before.
+  const mode = employee?.shift_allocation_mode === 'daily' ? 'daily' : 'weekly'
   const {
     weekOffset,
     setWeekOffset,
     weekStart,
+    dayOffset,
+    setDayOffset,
+    date,
     shifts,
     team,
     selections,
     select,
     saveWeek,
+    saveDay,
     isLoading,
     isSaving,
-  } = useShiftAllocation(employee?.id)
+  } = useShiftAllocation(employee?.id, mode)
 
   if (!employee) return <LoadingScreen />
 
   const handleSave = async () => {
-    const ok = await saveWeek()
+    const ok = mode === 'daily' ? await saveDay() : await saveWeek()
     if (ok) {
-      Alert.alert(t('common.success'), t('hrAdmin.weekSaved'))
+      Alert.alert(t('common.success'), mode === 'daily' ? t('shiftAllocator.daySaved') : t('hrAdmin.weekSaved'))
     } else {
       Alert.alert(t('common.error'), t('common.somethingWentWrong'))
     }
@@ -59,24 +80,49 @@ export function ShiftAllocationGrid() {
           {t('shiftAllocator.tab')}
         </Text>
 
-        <View className="flex-row items-center justify-between bg-white rounded-xl border border-ink-100 px-4 py-3 mb-5">
-          <TouchableOpacity
-            onPress={() => setWeekOffset(w => w - 1)}
-            className="w-9 h-9 items-center justify-center rounded-full bg-ink-50"
-          >
-            <ChevronLeft size={20} color={INK[600]} />
-          </TouchableOpacity>
-          <View className="items-center">
-            <Text className="text-xs text-ink-400 uppercase tracking-wide mb-0.5">{t('hrAdmin.weekOf')}</Text>
-            <Text className="text-sm font-bold text-ink-900">{fmtWeekLabel(weekStart)}</Text>
+        {mode === 'daily' ? (
+          // Single-date stepper (PATCH_135) — defaults to tomorrow, free
+          // +/- day stepper, weekday name printed next to the date so the
+          // allocator can see "they chose the date and day of the week" at
+          // a glance, per Yash's own wording.
+          <View className="flex-row items-center justify-between bg-white rounded-xl border border-ink-100 px-4 py-3 mb-5">
+            <TouchableOpacity
+              onPress={() => setDayOffset(d => d - 1)}
+              className="w-9 h-9 items-center justify-center rounded-full bg-ink-50"
+            >
+              <ChevronLeft size={20} color={INK[600]} />
+            </TouchableOpacity>
+            <View className="items-center">
+              <Text className="text-xs text-ink-400 uppercase tracking-wide mb-0.5">{t('shiftAllocator.dateFor')}</Text>
+              <Text className="text-sm font-bold text-ink-900">{fmtDayLabel(date)}</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setDayOffset(d => d + 1)}
+              className="w-9 h-9 items-center justify-center rounded-full bg-ink-50"
+            >
+              <ChevronRight size={20} color={INK[600]} />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            onPress={() => setWeekOffset(w => w + 1)}
-            className="w-9 h-9 items-center justify-center rounded-full bg-ink-50"
-          >
-            <ChevronRight size={20} color={INK[600]} />
-          </TouchableOpacity>
-        </View>
+        ) : (
+          <View className="flex-row items-center justify-between bg-white rounded-xl border border-ink-100 px-4 py-3 mb-5">
+            <TouchableOpacity
+              onPress={() => setWeekOffset(w => w - 1)}
+              className="w-9 h-9 items-center justify-center rounded-full bg-ink-50"
+            >
+              <ChevronLeft size={20} color={INK[600]} />
+            </TouchableOpacity>
+            <View className="items-center">
+              <Text className="text-xs text-ink-400 uppercase tracking-wide mb-0.5">{t('hrAdmin.weekOf')}</Text>
+              <Text className="text-sm font-bold text-ink-900">{fmtWeekLabel(weekStart)}</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setWeekOffset(w => w + 1)}
+              className="w-9 h-9 items-center justify-center rounded-full bg-ink-50"
+            >
+              <ChevronRight size={20} color={INK[600]} />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {isLoading ? (
           <View className="py-12 items-center">
@@ -127,7 +173,7 @@ export function ShiftAllocationGrid() {
             </Card>
 
             <Button
-              title="hrAdmin.saveWeek"
+              title={mode === 'daily' ? 'shiftAllocator.saveDay' : 'hrAdmin.saveWeek'}
               onPress={handleSave}
               loading={isSaving}
               className="mt-2"
