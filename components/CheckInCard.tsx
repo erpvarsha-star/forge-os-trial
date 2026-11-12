@@ -288,15 +288,23 @@ export function CheckInCard() {
 
       if (shiftData) setShift(shiftData as EmployeeShift)
 
+      // Owner late-reason skip — 12 Nov 2026, Yash: "i do not get allot a
+      // shift and i am never late so remove asking me for reasons for
+      // late as i am out for work and dont check in." Scoped to the role,
+      // not his specific emp_code, so it keeps working if the role is
+      // ever reassigned. He is never shown the late-reason modal and
+      // never marked late; every other role's behavior is unchanged.
+      const isOwner = employee.role === 'owner'
+
       const grace = (shiftData as EmployeeShift | null)?.shift?.late_grace_minutes ?? 15
       let rawLateMinutes = 0
-      if ((shiftData as EmployeeShift | null)?.shift?.start_time) {
+      if (!isOwner && (shiftData as EmployeeShift | null)?.shift?.start_time) {
         rawLateMinutes = serverLateMinutesAgainst((shiftData as EmployeeShift).shift.start_time as string)
       }
 
       const effectiveLateMinutes = rawLateMinutes > grace ? rawLateMinutes : 0
 
-      if (rawLateMinutes > grace && !lateReason) {
+      if (!isOwner && rawLateMinutes > grace && !lateReason) {
         setShowLateModal(true)
         return
       }
