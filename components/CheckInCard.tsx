@@ -249,6 +249,7 @@ export function CheckInCard() {
       }
 
       // Check-in time decides the shift, even over HR's allocation (Yash, 28 Sep 2026).
+      let resolvedShiftForCheckIn: Shift | null = null
       {
         const current = shiftData as EmployeeShift | null
         let allShifts: Shift[] = []
@@ -269,6 +270,7 @@ export function CheckInCard() {
         const assignedShift =
           current?.shift ?? allShifts.find(s => s.id === employee.default_shift_id) ?? null
         const resolved = resolveShiftForCheckIn(assignedShift, nowMinutesOfDay, employee.role, allShifts)
+        resolvedShiftForCheckIn = resolved
         if (resolved && resolved.id !== current?.shift_id) {
           try {
             const { error: shiftError } = await withTimeout(
@@ -306,7 +308,8 @@ export function CheckInCard() {
         lateReason || undefined,
         mockDetected,
         deviceId,
-        accuracy
+        accuracy,
+        resolvedShiftForCheckIn?.is_night_shift === true
       )
       if (checkInError) alertError(t, checkInError)
       await refresh()

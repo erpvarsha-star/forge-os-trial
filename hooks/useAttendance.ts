@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { AttendanceRecord } from '@/types'
 import { istMonthYear, getMonthEndDay } from '@/lib/istDate'
-import { serverNowMs, serverAttendanceDateStr } from '@/lib/serverClock'
+import { serverNowMs, serverAttendanceDateStr, serverIstDateStr } from '@/lib/serverClock'
 import { withTimeout } from '@/lib/withTimeout'
-import { finalizeShiftAndOvertime, HALF_DAY_MAX_HOURS, OPEN_RECORD_FALLBACK_HOURS, UNDO_CHECKOUT_WINDOW_MINUTES } from '@/lib/workingHours'
+import { finalizeShiftAndOvertime, HALF_DAY_MAX_HOURS, OPEN_RECORD_FALLBACK_HOURS, UNDO_CHECKOUT_WINDOW_MINUTES, ACCIDENTAL_TAP_MINUTES } from '@/lib/workingHours'
 
 // Stored to one decimal; null when the phone reported no accuracy.
 const roundAccuracy = (m?: number | null) =>
@@ -43,43 +43,62 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
         setRecords(data as AttendanceRecord[])
       }
 
-      const { data: todayData, error: todayError } = await withTimeout(
+      // Genuinely open record FIRST — before whatever happens to be dated
+      // "today" (bug fix, 12 Nov 2026). Night shifts (Shift 3/5, Security
+      // Night) check out after the 06:45 rollover, so their real open
+      // session is often still dated yesterday; checking "today"'s dated
+      // row first used to be safe ONLY because a day with no row at all
+      // meant "not checked in" — but a WEEKLY-OFF placeholder row
+      // (status='WO', no check_in_time, written by the mark_weekly_offs
+      // cron at 00:01 IST) also counts as "a row exists for today" to a
+      // naive date-first lookup. A night-shift worker whose real open shift
+      // was still running from the previous day, checking out after that
+      // WO row had already been written, would see the WO row, be offered
+      // "Check In" instead of "Check Out", tap it, and get a spurious
+      // few-minutes-later check-in/check-out on the WO row — a false 'HL'
+      // half-day, while their real open night shift later gets silently
+      // auto-closed at default hours by the hourly cron. Confirmed real
+      // case: VFL4071, 6-7 Nov 2026.
+      //
+      // So: look for a genuinely open record (check_in_time set,
+      // check_out_time still null) within OPEN_RECORD_FALLBACK_HOURS
+      // (lib/workingHours.ts) FIRST, regardless of its date — kept just
+      // under the 24h auto-checkout server cutoff so the UI never loses
+      // track of a row the server itself still considers open. Only when
+      // NO open record exists do we fall back to whatever is dated "today"
+      // (WO placeholder included) to decide what the UI should offer.
+      const { data: open, error: openError } = await withTimeout(
         supabase
           .from('attendance_records')
           .select('*')
           .eq('employee_id', employeeId)
-          .eq('date', serverAttendanceDateStr())
+          .is('check_out_time', null)
+          .not('check_in_time', 'is', null)
+          .gte('check_in_time', new Date(serverNowMs() - OPEN_RECORD_FALLBACK_HOURS * 60 * 60 * 1000).toISOString())
+          .order('check_in_time', { ascending: false })
+          .limit(1)
           .maybeSingle(),
         15000,
         'Attendance load'
       )
-      if (error || todayError) throw new Error((error || todayError)!.message)
 
-      // Night shifts (Shift 3/5, Security Night) check out after the 06:45
-      // rollover, so fall back to a still-open record within
-      // OPEN_RECORD_FALLBACK_HOURS (lib/workingHours.ts) — kept just under
-      // the 24h auto-checkout server cutoff so the UI never loses track of
-      // a row the server itself still considers open (real bug: a
-      // legitimate overtime check-in past the old, shorter window was
-      // "forgotten," leading to a duplicate same-day row and a subsequent
-      // lockout for the real next shift).
-      let current = todayData as AttendanceRecord | null
+      let current = open as AttendanceRecord | null
+      let todayError: any = null
       if (!current) {
-        const { data: open } = await withTimeout(
+        const res = await withTimeout(
           supabase
             .from('attendance_records')
             .select('*')
             .eq('employee_id', employeeId)
-            .is('check_out_time', null)
-            .gte('check_in_time', new Date(serverNowMs() - OPEN_RECORD_FALLBACK_HOURS * 60 * 60 * 1000).toISOString())
-            .order('check_in_time', { ascending: false })
-            .limit(1)
+            .eq('date', serverAttendanceDateStr())
             .maybeSingle(),
           15000,
           'Attendance load'
         )
-        current = open as AttendanceRecord | null
+        todayError = res.error
+        current = res.data as AttendanceRecord | null
       }
+      if (error || openError || todayError) throw new Error((error || openError || todayError)!.message)
       // Still nothing open? A night-shift checkout just past the 06:45 rollover closes
       // check_out_time right before this same function re-runs (checkOut()'s own
       // fetchRecords() call) — the open-record fallback above then misses it too, wrongly
@@ -116,6 +135,29 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
   // lateMinutes: the EFFECTIVE late minutes (0 if within grace period) — callers
   // compute raw lateness, apply the shift's grace, pass 0 if within grace.
   // status is derived here so it's always consistent with what's in the DB.
+  //
+  // isNightShift (bug fix, 12 Nov 2026): whether the shift actually resolved
+  // for THIS punch (lib/shiftInference.ts's resolveShiftForCheckIn/
+  // findClosestShift, already run by both callers before calling checkIn())
+  // is a night shift (Shift 3/5, Security Night — shifts.is_night_shift).
+  // serverAttendanceDateStr() rolls the attendance day over at 06:45 IST for
+  // EVERYONE, which is only correct for a night shift still running past
+  // midnight (per the "Shift 3 belongs to the previous working day" rule,
+  // CLAUDE.md, 28 Sep 2026) — a day-shift worker punching in before 06:45
+  // for genuine pre-shift work (e.g. starting furnaces) was getting filed
+  // under YESTERDAY's date, and then late-minutes math run against
+  // whichever shift that wrong date implied. Decision, in order:
+  //   1. If there's a genuinely open (checked-in, not checked-out) record
+  //      from a PREVIOUS date, this punch is part of an already-running
+  //      night session regardless of what shift it would otherwise resolve
+  //      to (e.g. a mid-shift QR re-scan) — file under the rolled-back date,
+  //      unchanged from before.
+  //   2. Else if the shift resolved for this punch is itself a night shift,
+  //      file under the rolled-back date — unchanged from before, and the
+  //      existing Shift-3/5/Security-Night boundary cases are untouched.
+  //   3. Otherwise, file under the REAL current IST date.
+  // Outside the 00:00-06:45 IST window the two dates are identical, so this
+  // only ever changes behavior in the window the bug actually lives in.
   const checkIn = async (
     lat: number,
     lng: number,
@@ -123,11 +165,44 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     lateReason?: string,
     mockDetected?: boolean,
     deviceId?: string,
-    accuracyM?: number | null
+    accuracyM?: number | null,
+    isNightShift?: boolean
   ) => {
     // Server-corrected time: a wrong phone clock must not become the recorded check-in.
     const now = new Date(serverNowMs())
-    const date = serverAttendanceDateStr()
+    const trueDate = serverIstDateStr()
+    const rolledBackDate = serverAttendanceDateStr()
+
+    let date = trueDate
+    if (rolledBackDate !== trueDate) {
+      let continuingNightShift = isNightShift === true
+      if (!continuingNightShift) {
+        // Safety net, best-effort: an open unfinished record from a
+        // genuinely earlier date means a real night session is still
+        // running even if this specific punch's own shift resolution
+        // didn't come back as a night shift (e.g. shift lookup failed).
+        try {
+          const { data: openPrev } = await withTimeout(
+            supabase
+              .from('attendance_records')
+              .select('id')
+              .eq('employee_id', employeeId)
+              .is('check_out_time', null)
+              .not('check_in_time', 'is', null)
+              .lt('date', trueDate)
+              .limit(1)
+              .maybeSingle(),
+            8000,
+            'Open record check'
+          )
+          if (openPrev) continuingNightShift = true
+        } catch {
+          // Can't tell — fall through using isNightShift alone, never block check-in on this.
+        }
+      }
+      date = continuingNightShift ? rolledBackDate : trueDate
+    }
+
     const time = now.toISOString()
     const status = lateMinutes > 0 ? 'L' : 'P'
 
@@ -191,6 +266,21 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
       hours_worked = Math.round((elapsed / 3600000) * 100) / 100
     }
 
+    // Accidental tap-in/tap-out guard (this session's own diagnosis, 12 Nov
+    // 2026 — see ACCIDENTAL_TAP_MINUTES in lib/workingHours.ts for the full
+    // reasoning). An elapsed time this short between check-in and check-out
+    // can only be a mis-tap, never a real half-day, so the half-day logic
+    // and the overtime/shift-reclassification logic below are both skipped
+    // for it — status is left exactly as check-in already set it ('P'/'L'),
+    // never downgraded to 'HL'.
+    const elapsedMinutesSinceCheckIn = todayRecord?.check_in_time
+      ? (now.getTime() - new Date(todayRecord.check_in_time).getTime()) / 60000
+      : null
+    const isAccidentalTap =
+      typeof elapsedMinutesSinceCheckIn === 'number' &&
+      elapsedMinutesSinceCheckIn >= 0 &&
+      elapsedMinutesSinceCheckIn < ACCIDENTAL_TAP_MINUTES
+
     // Half-day — Yash, 6 Oct 2026: "being late is being marked absent is not
     // a rule or logic we have decided, the decision should be based on
     // working hours. if hours worked is 4 or less then half day." This
@@ -198,8 +288,9 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     // checked out at/before shift end) — lateness no longer has any role in
     // deciding present vs half-day vs absent. Someone who has checked in is
     // never downgraded further than half-day here, regardless of how late
-    // they arrived — see HALF_DAY_MAX_HOURS below.
-    const halfDay = typeof hours_worked === 'number' && hours_worked <= HALF_DAY_MAX_HOURS
+    // they arrived — see HALF_DAY_MAX_HOURS below. Never applies to an
+    // accidental tap (see above) — that is not a valid half-day.
+    const halfDay = !isAccidentalTap && typeof hours_worked === 'number' && hours_worked <= HALF_DAY_MAX_HOURS
 
     const updatePayload: Record<string, unknown> = {
       check_out_time: time,
@@ -219,7 +310,11 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     // 3->5 at 12h+) goes through set_my_shift_for_date, the same
     // SECURITY DEFINER RPC the check-in flow already uses — a direct
     // employee_shifts write is management-only under RLS (PATCH_59).
-    if (typeof hours_worked === 'number') {
+    // Skipped entirely for an accidental tap: overtime is simply 0 and the
+    // day can never have crossed 12h, so there is nothing to reclassify.
+    if (isAccidentalTap) {
+      if (typeof hours_worked === 'number') updatePayload.overtime_hours = 0
+    } else if (typeof hours_worked === 'number') {
       const { reclassifyToShiftName, overtimeHours } = finalizeShiftAndOvertime(shiftName, hours_worked)
       updatePayload.overtime_hours = overtimeHours
       if (reclassifyToShiftName) {

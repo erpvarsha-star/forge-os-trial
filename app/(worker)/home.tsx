@@ -233,7 +233,8 @@ export default function WorkerHome() {
         lateReason || undefined,
         mockDetected,
         deviceId,
-        accuracy
+        accuracy,
+        resolved?.is_night_shift === true
       )
       if (checkInError) alertError(t, checkInError)
       await refresh()

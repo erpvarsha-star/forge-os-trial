@@ -36,9 +36,22 @@ export const serverNowMs = (): number => Date.now() + offsetMs
 export const serverIstNow = (): Date => new Date(serverNowMs() + IST_OFFSET_MS)
 
 // Same 06:45-IST rollover as attendanceDateStr() in lib/istDate.ts (Shift 3
-// belongs to the previous working day), but on server time.
+// belongs to the previous working day), but on server time. Only correct
+// for a genuine night-shift (Shift 3/5/Security Night) continuation — see
+// serverIstDateStr() below and hooks/useAttendance.ts's checkIn() for why a
+// blanket rollover is wrong for everyone else.
 export const serverAttendanceDateStr = (): string =>
   new Date(serverNowMs() + (5.5 - 6.75) * 60 * 60 * 1000).toISOString().slice(0, 10)
+
+// The REAL current IST calendar date — no 06:45 rollover. Added 12 Nov 2026
+// (Bug 1 fix): a day-shift worker who punches in before 06:45 IST for
+// genuine pre-shift work (e.g. starting furnaces) must be filed under
+// TODAY's real date, not rolled back to yesterday the way
+// serverAttendanceDateStr() does for night-shift continuations. Use this
+// whenever the punch is confirmed NOT to be a night-shift continuation;
+// use serverAttendanceDateStr() when it is.
+export const serverIstDateStr = (): string =>
+  serverIstNow().toISOString().slice(0, 10)
 
 // Mirrors lateMinutesAgainst() in lib/istDate.ts on server time.
 export const serverLateMinutesAgainst = (startTime: string): number => {
