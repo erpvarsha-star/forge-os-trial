@@ -3108,6 +3108,20 @@ While making "leave application + leave balances... go live" real (item 2 above)
 
 **Real, unfabricated data gap, flagged not guessed:** 4 active staff with `uses_app=true` have **no `leave_balances` row at all** — VFL5463, VFL5464, VFL5465, VFL5466. Their leave applications will submit and route correctly now, but any EL/CL/SL balance check against them has nothing to check against until HR enters real opening balances for FY2026-27. Needs HR's real numbers, never invented.
 
+## Owner decisions of 12 Nov 2026 — AI review deployed; early-arrival/Diwali/10-Nov-swap rules
+
+**`payroll-warning-review`'s `temperature:0` bug — fixed, deployed as the function's own v4, live.** Root cause of all 110 October warnings staying "awaiting AI review": Anthropic's Messages API now rejects `temperature` for this model with HTTP 400. Fixed by dropping that parameter (`supabase/functions/payroll-warning-review/index.ts`); owner said "go", deployed and verified byte-for-byte against the repo. HR can now tap "Retry review" and it will actually clear.
+
+**🔒 Early arrival before a day shift, filed under the previous IST date — Yash, 12 Nov 2026.** `attendanceDateStr()`'s flat 06:45 rollover (meant only for night shifts) also catches a day-shift worker who punches in before 06:45 for genuine pre-shift work (starting furnaces/machines). Yash: "you are right to mark them as present on 11th as they entered in 3rd shift of 11th November... people who came early are first shift of 12th but needed to come early for starting furnaces and machines before shift start. you can treat it as 11th part shift or OT for 12th first shift, both decisions are ok... yes they need to be marked present for 12th first shift also." **Decision: both days get a presence record** — the mis-dated punch stays on the earlier date (status corrected to `P`, no late penalty), AND a same-employee row is added for the real shift's date (`P`, no punch time — same manually-entered-presence shape the Pune/security screens already use), so the day isn't lost. This is a real, recurring bug (29 occurrences since 1 Oct, 7 in Nov) — **not fixed in code yet**, only hand-corrected for the specific people HR flagged (VFL4008, VFL4026). The proper fix (treat the 06:45 cutoff per-employee based on their actual shift, not a blanket rule) is queued — see PENDING.md.
+
+**🔒 8–11 Nov 2026 Diwali — paid holiday, staff and worker.** Yash confirmed the plant was shut 8–11 Nov (4 days) and it is paid. Per the 1 Nov 2026 "two-report principle" (payroll core pays only days worked; extras — including holiday pay — go through the HR-approved Extras report, never hard-coded attendance `H` rows, to avoid the double-count bug found 4 Nov), this is **not yet written to `attendance_records`** — it is queued for whoever builds November's Extras report (November's run itself is not until December's first week, so there is no urgency).
+
+**10/6 Nov weekly-off swap — written live, 12 Nov 2026.** 65 employees who actually worked 6 Nov (real check-in, excluding security guards and Kajal/VFL1567 whose weekly off is Sunday) now have a `WO` row for 10 Nov instead. No change was needed on the 6-Nov side — `mark_weekly_offs()`'s own "a real check-in always wins" design already left those rows correctly as `P`/`L`/`HL`.
+
+**VFL4071's 6/7 Nov half-day rows and 2/3 Nov missing nights — NOT corrected.** A different, unrelated bug (night-shift checkout offered "Check In" instead of finding the open record, producing a 1-minute `HL`) produced these; Yash's "confirmed" answer approves the diagnosis, not specific replacement punch times, which only HR/Kajal can supply. Still open — see PENDING.md.
+
+---
+
 ## Owner instruction of 2 Nov 2026 — final shape of the October package
 
 **"I would like to see the tables as per HR for Ready - first pay, get them to answer for the balance day and no app use and give accounts second lot for payment. And consultant will be as per your calculation and the missing days as per attendance sheet will come in second batch."**
