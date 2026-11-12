@@ -693,7 +693,10 @@
     "tab": "Shift Allocation",
     "sub": "Set weekly shifts for your team",
     "myTeam": "My Team",
-    "noTeam": "You are not set as the shift allocator for any employees yet"
+    "noTeam": "You are not set as the shift allocator for any employees yet",
+    "dateFor": "Allocating for",
+    "saveDay": "Save Day",
+    "daySaved": "Day's assignments saved"
   },
   "shiftCheckinSummary": {
     "tab": "Shift Check-in Summary",
