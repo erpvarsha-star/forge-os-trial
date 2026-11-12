@@ -1,4 +1,19 @@
-# >>> RESUME STATE 6 Nov 2026 (session close) — READ THIS FIRST <<<
+# >>> RESUME STATE 12 Nov 2026 — READ THIS FIRST (supersedes the 6 Nov block below) <<<
+**Branch reality (verified by git 12 Nov):** `claude/forge-os-backend-setup-7woj4t` = `0d5d5cf` (PR #77 merged) is authoritative. Work branch `claude/peaceful-feynman-hisowr` = base + the one fix below, in a draft PR.
+
+**All findings below verified live by Claude on 12 Nov (SQL + function logs + code read), nothing changed in the DB.**
+
+1. **October run AI review — ROOT CAUSE FOUND, fix in repo, NOT DEPLOYED.** Run `d5c1e25a` still draft, feeds confirmed, 110 warnings / 0 undecided / 110 unreviewed. HR did retry on 12 Nov 09:35 UTC; every call returned 502. Function log: Anthropic HTTP 400 "`temperature` is deprecated for this model". Fix = remove `temperature: 0` from `supabase/functions/payroll-warning-review/index.ts` line 90 (done on the work branch). **Deploy was blocked by the session's permission classifier — needs Yash's explicit "go"**, then: deploy via Supabase MCP (`verify_jwt: true`, files `index.ts` + `lib/*` verbatim), fetch back and diff, then HR taps "Retry review" once, then Calculate.
+2. **Attendance bug A — early morning check-in filed on the PREVIOUS day.** `attendanceDateStr()` (`lib/istDate.ts`) rolls the day at 06:45 IST for everyone, but shift inference accepts Shift 1/4 arrivals from 06:00. A day-shift check-in before 06:45 lands on yesterday's date. 12 Nov: VFL4008 (06:39), VFL4026 (05:01, also given 301 late minutes), VFL4066 — all filed under 11 Nov, no 12 Nov row. 29 such rows since 1 Oct (7 in Nov). Not fixed; rule needed from Yash (see questions). The three open rows of 12 Nov need their date moved to 12 Nov — needs Yash's go.
+3. **Attendance bug B — night-shift checkout creates a fake one-minute day.** `hooks/useAttendance.ts` only falls back to the open (previous-date) record when NO row exists for today. When a row already exists (the 00:01 `WO` pre-write on a Friday, or any earlier row) the app offers Check In, the worker taps in then out: a ~1-minute row marked `HL`, the real night shift is later auto-closed at default hours, and that night's check-in is blocked. VFL4071: 6 Nov (07:02–07:03) and 7 Nov (07:12–07:13) are this; nights of 2 and 3 Nov have no row at all. 14 in/out-within-5-min rows in Nov, 81 since 1 Oct (some are test taps). Not fixed.
+4. **Calendar UX:** Late and Half Day colours are nearly identical, so a fake `HL` reads as "late" while the Late tile says 0.
+5. **6 Nov / 10 Nov weekly-off swap — still NOT applied.** 6 Nov: 72 worked, 25 `WO` untouched. 10 Nov: 8 rows only (7 P, 1 L), no `WO` rows. Can still be written (not time-critical for pay) — needs Yash's go.
+6. **8–11 Nov almost empty** (about 10 rows a day, no `H` rows). If the plant was shut for Diwali, November pay will treat those days as absent unless holiday/extras are decided.
+7. **A November `PERMANENT_WORKER` draft run exists** (`d49f2ff3`, 22 warnings, 0 items, feeds not confirmed) — not created by Claude; untouched. Ask who created it.
+
+---
+
+# >>> RESUME STATE 6 Nov 2026 (session close) <<<
 **Branch:** `claude/forge-os-backend-setup-7woj4t`, HEAD = `d120d62`. Local checkout `ccr-e6455619-qd283w` tracks it. `git status` clean.
 
 **⚠ BRANCH REALITY, appended 10 Nov 2026 (nothing above this line altered):** the branch/HEAD line above is stale. Three refs now diverge from `4e885d8`: (a) `ccr-9feb6882-let9qi` — carries commit `49e651d`, the CLAUDE.md/ARCHIVE.md split, plus PR/issue templates, CodeQL, Dependabot, `PATCH_134` and payroll engine edge-case tests; (b) `ccr-81ac007d-k0dr8v` — this checkout, which has now MERGED (a) and is therefore a strict superset of both, and carries the 10 Nov control-file audit; (c) `claude/forge-os-backend-setup-7woj4t` — the branch this block names, which has none of the above. **Owner decision needed: pick (b) as authoritative and merge it into the long-lived branch, or say otherwise.** Until that happens, treat the docs in (b) as current and do NOT edit CLAUDE.md/PENDING.md/ARCHIVE.md on another branch — they will conflict.

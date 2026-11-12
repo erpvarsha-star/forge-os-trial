@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
         method: 'POST',
         headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
         body: JSON.stringify({
-          model: MODEL, max_tokens: 400, temperature: 0, system: SYSTEM_PROMPT,
+          model: MODEL, max_tokens: 400, system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content: prompt }],
         }),
       });
