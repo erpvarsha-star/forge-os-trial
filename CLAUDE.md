@@ -217,6 +217,17 @@ timezone — wrong the moment a phone isn't set to IST, and wrong for anyone
 near the UTC/IST day boundary (IST is 5.5h ahead, so 18:30 UTC is already the
 next day in IST) regardless of device settings.
 
+**🔒 Every time Claude QUOTES to Yash is in IST too — restated by Yash, 12 Nov
+2026, after correcting it twice before** ("you keep referring to time by utc
+when that has been fixed twice to refer to everything in ist"). This covers
+chat replies, briefs, PENDING.md / CLAUDE.md entries, PR descriptions and
+commit messages: log timestamps, cron times, release/publish times, "HR
+retried at…" — convert to IST (UTC + 5:30) before writing, and label it
+"IST". Tools (Supabase logs, GitHub, cron expressions) return UTC; that is
+the raw input, never what gets reported. A cron expression may be quoted as
+stored only if the IST time is given next to it. **Common gotcha — this has
+now been corrected three times; do not make it a fourth.**
+
 **The fix that made this a rule, not a suggestion**: a full-codebase audit
 found and fixed 16 files with exactly this bug (see PENDING.md, 27 Sep 2026)
 — it wasn't hypothetical, it was the live cause of HR's "calendar shows the
