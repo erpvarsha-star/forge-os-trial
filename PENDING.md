@@ -1,3 +1,20 @@
+## AI-agent roadmap — not started, needs its own scoping session (added 12 Nov 2026)
+
+Owner's own words: "the problem is coz we have not built the ai into the system, i am also having notifications for people who have not been alloted shifts but have checked in at general time or close to the shifts we have defined but as its not defined i am suppose to look right, this could be done by an ai agent if we build one so put this in pending as will need to work on all things the agent/agents should do."
+
+This is a roadmap entry, not an active build. Candidate list of things an agent (or agents) could take over — review and prioritize with the owner before scoping any of it as a real build:
+
+1. **Shift-assignment judgment calls** — today's "Needs Your Call" screen (owner-only) surfaces every `system_inferred`/`system_reclassified` shift for manual review. An agent could pre-screen these: an unassigned check-in landing close to (but not exactly on) a defined shift start, with a consistent pattern for that person, could be auto-confirmed instead of sitting in the owner's queue — this is exactly the case the owner flagged ("as its not defined i am suppose to look right").
+2. **Attendance-anomaly triage** — the three bugs fixed today (wrong-date filing, WO-shadowed checkout, accidental taps) were all found by a human reading screenshots. An agent could scan `attendance_records` daily for the same shapes (a punch within the 00:00–06:45 window with no open previous-day session; an in/out pair under 5 minutes; two consecutive days with zero rows for someone who otherwise punches daily) and flag them before HR notices from a phone photo.
+3. **Payroll warning review** — already exists (`payroll-warning-review`, Haiku-class model) but is narrowly scoped to late-decision audits; could be widened to the other warning types (`no_punch`, `punched_absent`, `missing_efficiency`) once the late-type review has a track record.
+4. **Fraud alert triage** — `fraud_alerts`/`fraud_flags` resolution is still a manual owner decision (Confirmed/False Positive/Investigate); an agent could pre-classify based on device/location history before the owner looks at it.
+5. **Shift-allocator compliance** — the new 19:00/21:00 reminder+escalation (built today, see CLAUDE.md) is a hard-coded rule; an agent could instead learn each allocator's actual pattern and adjust reminder timing/escalation thresholds per person.
+6. **Leave/advance approval anomalies** — flag an approval chain that's been stuck unusually long, or a request shape that doesn't match the requester's history, before it becomes a "where did this go" complaint (like PATCH_126's stuck-chain bug, found by a human noticing 7 stuck requests).
+
+Needs from the owner before any of this is built: which of these (if any) to prioritize first, a budget/model tier for it (this project's existing convention is Haiku-class for narrow classification, Sonnet-class for anything that edits/writes), and whether it should run as a scheduled job, an on-demand screen, or both.
+
+---
+
 # >>> RESUME STATE 12 Nov 2026 — READ THIS FIRST (supersedes the 6 Nov block below) <<<
 **Branch reality (verified by git 12 Nov):** `claude/forge-os-backend-setup-7woj4t` = `0d5d5cf` (PR #77 merged) is authoritative. Work branch `claude/peaceful-feynman-hisowr` = base + the one fix below, in a draft PR.
 
