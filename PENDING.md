@@ -11,6 +11,11 @@
 6. **8–11 Nov almost empty** (about 10 rows a day, no `H` rows). If the plant was shut for Diwali, November pay will treat those days as absent unless holiday/extras are decided.
 7. **A November `PERMANENT_WORKER` draft run exists** (`d49f2ff3`, 22 warnings, 0 items, feeds not confirmed) — not created by Claude; untouched. Owner doesn't know who created it either; November's own run isn't due until December's first week, so this is low priority — just don't let it get calculated by accident.
 
+## 12 Nov 2026 — owner's second round of answers, actions taken this same turn
+
+1. **PR #79 merged** into `claude/forge-os-backend-setup-7woj4t` as `087dfcf`. Owner's call on the Bug-A residual gap: **leave it** (no fuller fix attempted). **APK build triggered automatically** (workflow run #131, `Build Android APK`, off `087dfcf`) — check it finished (`success`, a new release published) before telling anyone to reinstall.
+2. **"Calculate hrs worked for 11th 3rd shift" (VFL4008/VFL4026):** checked live — **both rows are still open** (checked in 06:39/05:01, no checkout yet; current time ~17:20 IST, their Shift 4 (07:00–19:00) hasn't ended). Nothing was written to `hours_worked` — this project's own locked rule is that the raw column stays null and the no-checkout default (8.5h for a Shift 3 day) is applied at READ time only, never backfilled, so writing a number into an still-open row would conflict with the real checkout once it happens. **If/when they check out normally through the app, real hours will be computed as usual.** If what's wanted is the number right now for a manual report: per the existing Shift-3 no-checkout convention, each would show as **8.5h** if nothing else happens before auto-checkout. Flagged back to the owner rather than guessed into the database — see open questions below.
+
 ## 12 Nov 2026 — owner's answers, actions taken this same turn
 
 1. **AI review: DEPLOYED.** `payroll-warning-review` v4 live, `temperature` removed, verified byte-for-byte against the repo. [PR #78](https://github.com/erpvarsha-star/forge-os-trial/pull/78) merged into `claude/forge-os-backend-setup-7woj4t` as `409cfc9`. **HR still needs to tap "Retry review" once** — not done by Claude (HR has the screen open live, same caution as every other `pay_run_warnings` touch).
