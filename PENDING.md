@@ -42,8 +42,18 @@ by `google/gemma-4-31b-it:free` once that pool recovered.
 
 ## Still open from the previous block (unchanged by this stage)
 
-- **October AI review: HR still has not tapped "Retry review"** — `pay_run_warnings` was 110 total /
-  0 undecided / 101 unreviewed. That tap is still the one step left. **Do not touch those rows.**
+- **October AI review — owner chose option "c" (13 Nov): batch review built, deployed, NOT YET RUN.**
+  Verified live 13 Nov: run `d5c1e25a` = 110 warnings, **101 blocking** (`waived`/`deduct` with
+  `agent_reviewed_at IS NULL`), `pay_run_ready_to_calculate` **false** → Calculate 422s, October
+  payroll fully blocked. `payroll-warning-review-batch` (v1, `verify_jwt: false`, CI-deployed, source
+  verified) clears them server-side with no HR involvement and no APK. **Next step: invoke it via
+  `pg_net` with NO Authorization header** (start `limit: 3` to prove the LLM call works — it has never
+  once succeeded — then ramp; 101 × ~3 s would exceed the function's wall clock in one call):
+  `select net.http_post(url := '.../functions/v1/payroll-warning-review-batch', headers := '{"Content-Type":"application/json"}'::jsonb, body := '{"runId":"d5c1e25a-bd3e-425a-8db0-540ef2734a2e","limit":3}'::jsonb, timeout_milliseconds := 55000);`
+  then read `net._http_response` for that id. **Blocked at the moment of writing** by the Supabase MCP
+  connector returning `Service Unavailable` on every call (even `select 1`) — transient infra, not the
+  function. Retry the invoke when it recovers. **Do not touch `pay_run_warnings` / `pay_runs` rows by
+  hand** — HR drives that screen live (6 Nov incident).
 - ~~`nightly-scoring` second Gemini caller~~ — **CLOSED 13 Nov 2026, owner chose "leave it" ("b").**
   Stays on `gemini-1.5-flash`; nothing changed. **`GEMINI_API_KEY` is therefore still live — do NOT
   delete that secret.** It fails soft (scores compute, only the AI suggestion is silently empty), which
