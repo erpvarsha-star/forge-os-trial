@@ -24,6 +24,56 @@ plus old drafts **#8** (production sync `qty` null) and **#12** (EOTM one-award)
 - November `PERMANENT_WORKER` draft `d49f2ff3` still exists, untouched — don't let it be calculated.
 - `payroll-run` v17, `shift-reminder` v23 — both as documented.
 
+## 🔴 URGENT-PRODUCTION FRIDAY CANNOT BE ALLOCATED — real bug, root-caused 13 Nov 2026 from VFL1560's report
+
+**Reported by VFL1560 Shaikh Majeed (daily allocator, Maintenance), 13 Nov 10:36 IST, via screenshot:**
+"Production is ongoing today, but today date is not being displayed in the app for shift assign."
+
+**Confirmed: the work-week grid structurally excludes Friday, so an urgent-production Friday cannot be
+allocated by ANYONE — not an allocator, not HR.** `getWeekDays()` loops `for (let i = 0; i < 6; i++)`
+from the week's Saturday, producing **Sat–Thu only**. The identical six-day loop exists in BOTH
+`hooks/useShiftAllocation.ts:29` (the 8 department allocators' screen) and
+`app/(hr-admin)/shifts.tsx:29` (HR's own unscoped screen) — so **there is no HR workaround.** Today
+(13 Nov) is a Friday: `getWeekStartIST(0)` returns 7 Nov, the grid shows 7–12 Nov, and `weekOffset+1`
+jumps to 14–19 Nov. **Friday appears in no week, ever.**
+
+**This directly contradicts the documented design.** CLAUDE.md's "Work week" section says a working
+Friday "is just a Friday HR assigns shifts for, same as any other day" — the UI makes that impossible.
+The owner's own rule allows it: "friday is weekly off **unless we have urgent production** friday is
+working. 90% of times friday is off." Today is one of the 10%.
+
+**Second, smaller contributor (daily mode only, VFL1560/VFL1566 on apk-132):** the single-date stepper
+in `components/ShiftAllocationGrid.tsx` **defaults to tomorrow** (`useState(1)` in
+`useShiftAllocation.ts`). There is **no clamp** — `setDayOffset(d => d - 1)` is unbounded, so today IS
+reachable by tapping `‹` once; it is simply not what the screen shows on open. So if VFL1560 is on
+apk-132 he has a workaround today; if he is on apk-131 or earlier he sees the weekly grid and has none.
+
+**Live state today, 13 Nov ~10:40 IST (re-queried; an earlier 05:48 IST reading of "zero rows for
+13 Nov" is STALE — the day had not started):** 43 `employee_shifts` rows now exist for 13 Nov;
+**40 present / 55 WO** in `attendance_records`. `mark_weekly_offs()` correctly wrote WO at 00:01 IST
+(Friday default); the ~40 who actually came in have overwritten their own WO by checking in, exactly as
+designed. VFL1560's team: **10 of 12 assigned.** VFL1560 himself checked in **08:53 IST, status `P`,
+shift `General` but `assignment_source='system_inferred'`** — i.e. nobody could allocate him, so the
+app inferred it from his punch. That is why his own home screen read "No shift assigned today" (the
+screenshot he sent is his personal check-in screen, not the allocation screen). VFL1566 is `WO` today
+and did not come in, which is why only VFL1560 raised it.
+
+**Net effect: nobody is being lost** — check-in inference is covering the gap and attendance is being
+recorded correctly. The damage is that shifts cannot be *planned* for a working Friday, lateness is
+judged against an inferred shift rather than the one the allocator intended, and the allocator sees a
+screen that looks broken.
+
+**NOT FIXED — needs the owner's go (a code change touching every allocator's screen and HR's).**
+Options, in the order Claude would recommend them:
+1. Extend both grids from 6 to 7 days so Friday is visible and allocatable, leaving it blank/unassigned
+   on a normal week (the weekly-off marking is independent of whether a shift row exists). Smallest
+   change, fixes it for everyone including HR, matches the documented intent.
+2. Default the daily stepper to **today** rather than tomorrow (a one-line change) — helps only the two
+   daily allocators, does nothing for HR or the other six.
+3. Both.
+Whichever is chosen, `getWeekDays()` is duplicated by hand in two files and **both must change together**
+— the same hand-sync duplication already flagged for the IST helpers and `AttendanceReport.gs`.
+
 ## Daily shift allocation (VFL1560/VFL1566) — BUILT and live; reminders NOT yet proven to deliver (verified 13 Nov 06:00 IST)
 
 **Built and confirmed live, first-hand (owner asked 13 Nov whether it exists for his two people — it does):**
