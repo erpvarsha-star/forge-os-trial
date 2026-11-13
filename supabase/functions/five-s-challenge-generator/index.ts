@@ -1,7 +1,7 @@
 /**
  * five-s-challenge-generator
  *
- * Generates one 5S housekeeping challenge for today by calling DeepSeek,
+ * Generates one 5S housekeeping challenge for today by calling OpenRouter (google/gemma-4-31b-it:free),
  * and writes it to the "5s_challenges" table (quoted — table name starts
  * with a digit) in the shape app/(worker)/5s.tsx actually reads: one row
  * per day (unique on `date`), no per-department rows — the app's own
@@ -28,18 +28,20 @@ const PROMPT =
   'Generate today\'s 5S challenge. Return only valid JSON: {"challenge_en": "max 20 words", "challenge_hi": "max 20 words in Hindi", ' +
   '"category": "Sort|Set|Shine|Standardise|Sustain", "verification_hint_en": "what photo should show", "verification_hint_hi": "same in Hindi"}';
 
-async function generateChallengeFromDeepSeek(): Promise<ChallengeJson> {
-  const apiKey = Deno.env.get('DEEPSEEK_API_KEY');
-  if (!apiKey) throw new Error('DEEPSEEK_API_KEY is not set');
+async function generateChallengeFromOpenRouter(): Promise<ChallengeJson> {
+  const apiKey = Deno.env.get('OPENROUTER_API_KEY');
+  if (!apiKey) throw new Error('OPENROUTER_API_KEY is not set');
 
-  const res = await fetch('https://api.deepseek.com/chat/completions', {
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://github.com/erpvarsha-star/forge-os-trial',
+      'X-Title': 'Forge OS',
     },
     body: JSON.stringify({
-      model: 'deepseek-chat',
+      model: 'google/gemma-4-31b-it:free',
       messages: [{ role: 'user', content: PROMPT }],
       max_tokens: 200,
       response_format: { type: 'json_object' },
@@ -47,14 +49,14 @@ async function generateChallengeFromDeepSeek(): Promise<ChallengeJson> {
   });
 
   if (!res.ok) {
-    throw new Error(`DeepSeek API error ${res.status}: ${await res.text()}`);
+    throw new Error(`OpenRouter API error ${res.status}: ${await res.text()}`);
   }
 
   const data = await res.json();
   const text: string | undefined = data?.choices?.[0]?.message?.content;
-  if (!text) throw new Error('DeepSeek returned no content');
+  if (!text) throw new Error('OpenRouter returned no content');
 
-  // DeepSeek sometimes wraps JSON in a ```json ... ``` fence — strip it before parsing.
+  // Some models wrap JSON in a ```json ... ``` fence — strip it before parsing.
   const cleaned = text.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
   return JSON.parse(cleaned) as ChallengeJson;
 }
@@ -67,7 +69,7 @@ Deno.serve(async (req: Request) => {
   const today = istDateStr();
 
   try {
-    const challenge = await generateChallengeFromDeepSeek();
+    const challenge = await generateChallengeFromOpenRouter();
 
     const { error: insertError } = await db.from('5s_challenges').upsert(
       {
