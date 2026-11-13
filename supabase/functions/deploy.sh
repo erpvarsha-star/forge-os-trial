@@ -22,6 +22,7 @@ FUNCTIONS=(
   "payroll-feeds-approval-reminder"
   "plant-head-efficiency-reminder"
   "accounts-advance-recovery-reminder"
+  "payroll-warning-review-batch"
 )
 
 # Deliberately NOT `set -e` around the loop: with it, the first bad function
