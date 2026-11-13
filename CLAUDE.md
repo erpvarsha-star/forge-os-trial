@@ -3284,3 +3284,31 @@ unallocatable — is a genuine miss**: the 6-day loop has existed since 28 Sep 2
 verified each new feature's data/RPC/cron behaviour but never tested the calendar case "what happens on
 a Friday." It took a real user report. **Lesson: when a feature is date-driven, test the real calendar
 edges (weekly off, month end, the day the team actually works) before calling it verified.**
+
+## Owner decision of 13 Nov 2026 — 5S challenge generator moves from Gemini to DeepSeek
+
+**Owner: "Change the model to deepseek that u holding of Gemini."** The daily 5S challenge generator is
+switched from Google Gemini to **DeepSeek**.
+
+**Why it was broken:** `five-s-challenge-generator` has been returning **HTTP 500 every morning** —
+Google retired the model (`"This model models/gemini-2.0-flash is no longer available"`), so no daily
+5S challenge has been generated at all. Found 13 Nov by reading `net._http_response` directly, not from
+a report. The failure is upstream and sudden, not caused by any change in this repo.
+
+**The change** (`supabase/functions/five-s-challenge-generator/index.ts`): DeepSeek is OpenAI-compatible,
+so three things differ from Gemini — the endpoint becomes `https://api.deepseek.com/chat/completions`,
+auth moves from a `?key=` query parameter to an `Authorization: Bearer` header, and the response is read
+from `choices[0].message.content` instead of `candidates[0].content.parts[0].text`. Model `deepseek-chat`,
+`response_format: {type:'json_object'}`. The PROMPT text and the ```json fence-stripping are unchanged
+(DeepSeek also fences sometimes). Built by a Sonnet agent, reviewed by Claude.
+
+**🔒 NEW SECRET REQUIRED — `DEEPSEEK_API_KEY`, Supabase → Edge Functions → Secrets.** The function reads
+`Deno.env.get('DEEPSEEK_API_KEY')` and throws without it. **The owner pastes the key into that settings
+page himself — it must never be typed into chat** (the standing rule, same as `FCM_SERVICE_ACCOUNT_JSON`
+and `ANTHROPIC_API_KEY` were handled). Until that secret exists the function keeps failing daily, just
+with a different message. `GEMINI_API_KEY` becomes unused and can be removed afterwards.
+
+**Scope limit, stated so it is not over-read:** this covers the **5S challenge generator only**. The
+payroll AI review (`payroll-warning-review`) still runs on Anthropic `claude-haiku-5-5` and is NOT part
+of this decision — the owner asked about DeepSeek for that one on 12 Nov but gave no instruction to
+switch it, so it stays as it is until he says otherwise.
