@@ -3238,3 +3238,30 @@ by checking in, and the rest keep `WO`. That self-corrects for attendance, but a
 was rostered for a Friday and did not turn up reads as a legitimate weekly off rather than an absence.
 Whether Maintenance should instead carry a different `weekly_off_day` is the owner's call — do not guess
 a day.
+
+## 🔒 Owner process rule, 13 Nov 2026 — ONE issue at a time, ONE question, with time estimates
+
+**Owner: "You have listed out issues which I really want to sort out one by one... if the real issues
+and real bugs ask me one question and time to get the answers and to fix it."**
+
+**Binding change to how findings are reported.** Do NOT end a message with a numbered list of 3–5 open
+questions (the previous habit, and what prompted this rule). Instead:
+1. **Surface ONE issue at a time**, highest-impact first — a real, verified bug, not a hypothesis.
+2. **Ask exactly ONE question about it**, with concrete options.
+3. **Give a time estimate with every option**: how long to get the answer (if research is needed) AND
+   how long to build, verify and ship it (including the ~20–30 min APK build when app code changes).
+4. Only move to the next issue once that one is decided or explicitly parked.
+Keep a running, prioritised list of the remaining issues in PENDING.md so nothing is lost — but do not
+read that list out to the owner unless he asks for it.
+
+This does NOT override the locked "full brief at the end of every job" rule: the brief still states what
+was done and verified. It changes the *questions* section — one question, not a menu.
+
+**Owner's related observation, answered honestly and worth keeping:** "I don't see these have been pop
+up earlier." Of the three issues raised 13 Nov, two could not have surfaced before (the daily stepper
+and its reminder shipped the previous evening in apk-132; the `five-s-challenge-generator` failure began
+when Google retired `gemini-2.0-flash` upstream). **The third — the Sat–Thu grid making Friday
+unallocatable — is a genuine miss**: the 6-day loop has existed since 28 Sep 2026, and prior sessions
+verified each new feature's data/RPC/cron behaviour but never tested the calendar case "what happens on
+a Friday." It took a real user report. **Lesson: when a feature is date-driven, test the real calendar
+edges (weekly off, month end, the day the team actually works) before calling it verified.**
