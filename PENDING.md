@@ -123,6 +123,15 @@ Whichever is chosen, `getWeekDays()` is duplicated by hand in two files and **bo
 (21:00 IST).** See CLAUDE.md "Owner decision of 13 Nov 2026" for the full record, including that both
 daily allocators are `role='manager'`, not supervisor.
 
+**Owner, 13 Nov: "there will be no test tonight as it's a Friday but still we should expect them to
+allocate the shifts for tomorrow."** Two separate things, and only one is affected by it being a Friday:
+the reminder has **no weekly-off/Friday awareness** and looks only at *tomorrow's* date, so it **will
+fire tonight** — tomorrow is Sat 14 Nov, a normal working day. So tonight still tests the **delivery
+mechanism** (the genuinely unproven part). What it does NOT fairly test is whether Majeed **responds**,
+since he is likely off on a Friday evening. The owner's expectation that tomorrow's shifts get allocated
+stands. **The single outstanding person is `CON24` Shriram Pawar (Maintenance)** — named here so
+tomorrow's check is unambiguous.
+
 **Concrete, falsifiable prediction for tonight — check this tomorrow morning.** Verified live 13 Nov
 10:43 IST, tomorrow = **Sat 14 Nov**: **VFL1560 has 11 of 12 assigned (1 missing); VFL1566 has 12 of 12
 (0 missing).** Therefore:
