@@ -37,6 +37,13 @@ from the week's Saturday, producing **Sat–Thu only**. The identical six-day lo
 (13 Nov) is a Friday: `getWeekStartIST(0)` returns 7 Nov, the grid shows 7–12 Nov, and `weekOffset+1`
 jumps to 14–19 Nov. **Friday appears in no week, ever.**
 
+**⚠ SEVERITY RAISED 13 Nov by the owner: Maintenance works EVERY Friday** (see CLAUDE.md, "Maintenance
+WORKS Fridays"). This is not a rare urgent-production case — it is a standing weekly roster, and it is
+why daily allocation exists. Proven: every Friday shift row for Majeed's team from 9 Oct to 6 Nov was
+`system_inferred`, **zero `hr_allocated` in five weeks**; 13 Nov is the first Friday ever to carry
+`hr_allocated` rows (4), via the apk-132 daily stepper. **Claude's earlier suggestion to add a
+weekly-off exclusion to the reminder is WITHDRAWN — it would have broken exactly this case.**
+
 **This directly contradicts the documented design.** CLAUDE.md's "Work week" section says a working
 Friday "is just a Friday HR assigns shifts for, same as any other day" — the UI makes that impossible.
 The owner's own rule allows it: "friday is weekly off **unless we have urgent production** friday is
