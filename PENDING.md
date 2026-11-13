@@ -44,10 +44,10 @@ by `google/gemma-4-31b-it:free` once that pool recovered.
 
 - **October AI review: HR still has not tapped "Retry review"** — `pay_run_warnings` was 110 total /
   0 undecided / 101 unreviewed. That tap is still the one step left. **Do not touch those rows.**
-- `nightly-scoring/index.ts` `generateAiSuggestion` (~line 328) is a **second Gemini caller** on
-  `gemini-1.5-flash`. It **fails soft**, so scoring is fine and only the AI suggestion is empty. The
-  owner's DeepSeek/OpenRouter instruction covered the 5S generator only — **no instruction given for
-  this one**, so it is untouched. One `OPENROUTER_API_KEY` would now cover it if he wants it switched.
+- ~~`nightly-scoring` second Gemini caller~~ — **CLOSED 13 Nov 2026, owner chose "leave it" ("b").**
+  Stays on `gemini-1.5-flash`; nothing changed. **`GEMINI_API_KEY` is therefore still live — do NOT
+  delete that secret.** It fails soft (scores compute, only the AI suggestion is silently empty), which
+  is why leaving it is legitimate. Do not re-raise. See CLAUDE.md's 5S section for the full record.
 - Dependabot **#64 `supabase/setup-cli` must NOT be merged** without a verified green APK build.
 - November `PERMANENT_WORKER` draft `d49f2ff3` — leave it; don't let it be calculated.
 - Calendar Late vs Half-Day colour clash; 8–11 Nov Diwali holiday pay (November Extras report, December).
