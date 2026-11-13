@@ -3308,6 +3308,21 @@ page himself — it must never be typed into chat** (the standing rule, same as 
 and `ANTHROPIC_API_KEY` were handled). Until that secret exists the function keeps failing daily, just
 with a different message. `GEMINI_API_KEY` becomes unused and can be removed afterwards.
 
+**⚠ Found while verifying, 13 Nov — the 5S feature has NEVER produced anything.** `"5s_challenges"`
+is **completely empty — zero rows, ever** (queried live). So this is not "broken since Google retired the
+model" as first written; `app/(worker)/5s.tsx` has had no challenge to show for its entire life. Fixing
+the model call is necessary but may not be sufficient — once `DEEPSEEK_API_KEY` is set and the function
+is deployed, **confirm a real row actually lands in `"5s_challenges"` for that day** before calling the
+feature working. Do not assume a green deploy means workers now see a challenge.
+
+**⚠ There is a SECOND Gemini caller: `nightly-scoring/index.ts` (`generateAiSuggestion`, ~line 328),
+on `gemini-1.5-flash`** — older than the model Google just retired. **It fails SOFT**, unlike the 5S one:
+`if (!res.ok) { console.error(...); return null; }`, wrapped in try/catch. So nightly scoring itself is
+NOT broken — scores still compute; only the AI suggestion silently comes back empty. **Not changed**, no
+instruction given for it. If the owner's DeepSeek switch is meant to cover both, this is the second file;
+if Gemini is kept anywhere, this one needs a current model id too. `monthly_scores` has no
+`*suggest*` column, so where that text is consumed was not traced — check before touching it.
+
 **Scope limit, stated so it is not over-read:** this covers the **5S challenge generator only**. The
 payroll AI review (`payroll-warning-review`) still runs on Anthropic `claude-haiku-5-5` and is NOT part
 of this decision — the owner asked about DeepSeek for that one on 12 Nov but gave no instruction to
