@@ -82,12 +82,13 @@ Deno.serve(async (req) => {
       return json({ error: 'ANTHROPIC_API_KEY not configured' }, 502);
     }
     let text = '';
+    let stopReason: string | null = null;
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
         body: JSON.stringify({
-          model: MODEL, max_tokens: 400, system: SYSTEM_PROMPT,
+          model: MODEL, max_tokens: 4096, output_config: { effort: 'low' }, system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content: prompt }],
         }),
       });
@@ -98,6 +99,7 @@ Deno.serve(async (req) => {
         return json({ error: `llm http ${res.status}` }, 502);
       }
       const out = await res.json();
+      stopReason = out?.stop_reason ?? null;
       text = (out?.content ?? []).filter((b: any) => b?.type === 'text').map((b: any) => b.text).join('\n');
     } catch (e) {
       console.error('payroll-warning-review: llm request failed: ' + String(e));
@@ -106,7 +108,7 @@ Deno.serve(async (req) => {
 
     const review = extractReview(text);
     if (!review) {
-      console.error('payroll-warning-review: could not parse llm response', text);
+      console.error('payroll-warning-review: could not parse llm response', 'stop_reason=' + stopReason, text);
       return json({ error: 'could not parse llm response' }, 502);
     }
 
