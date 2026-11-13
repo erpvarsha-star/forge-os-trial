@@ -3184,3 +3184,22 @@ While making "leave application + leave balances... go live" real (item 2 above)
 **The off-by-one found as a side effect — real, and deliberately NOT applied.** `lib/istDate.ts:26` (`lateMinutesAgainst`) and `lib/serverClock.ts:61` (`serverLateMinutesAgainst`) both end `return diff > 720 ? 0 : diff`, while the function's own comment states "More than 12h 'late' means the check-in is actually early for that start." Intent and code therefore disagree at exactly `diff === 720`: a punch exactly 12h 00m after shift start is recorded as **720 minutes late** instead of being capped to 0. Confirmed by reading both files on 13 Nov; **ARCHIVE.md contains no rationale for the 720 value**, so fixing it would not be overriding a hidden, hard-won reason (the usual danger — see the ARCHIVE.md read triggers). It is narrow: one minute-value out of 1440.
 
 **Why it stays unapplied:** Yash ruled out the historical half and **has not asked for the forward-looking code change either**. Do not proactively deploy it. Revisit only if this shape shows up in a month that has not yet been paid. **If it is ever changed, both files must be changed together** — `serverClock.ts`'s copy exists specifically to mirror `istDate.ts` on server time, the same hand-sync duplication already flagged for the IST helpers and `AttendanceReport.gs`.
+
+## Owner decision of 13 Nov 2026 — daily-allocation reminder: stop chasing last night, clock starts today; allocator then HR
+
+**Owner: "Forget last night reminder. Start today. Supervisor thtn hr."**
+
+1. **The 12 Nov 21:00 IST escalation mystery is CLOSED — do not investigate it further.** It had run
+   after the v23 deploy, returned 200 and created no notification despite 24 unassigned team members,
+   and could not be explained (pg_net had pruned the response body; `employees` carries no audit
+   trigger). The owner's instruction is to drop it and judge the feature from **today's** runs onward.
+   Do not re-raise it; if the same silence repeats tonight, that is a NEW finding worth chasing.
+2. **Escalation order confirmed as built: the ALLOCATOR first (19:00 IST), then HR (21:00 IST).** No
+   change required — `dailyAllocatorReminder` notifies the allocator, `dailyAllocatorHrEscalation`
+   notifies every active `hr_admin` (today only VFL5440 Pallavi) naming the allocator and the
+   still-unassigned people.
+   ⚠ **Wording note, flagged not assumed:** the owner said "supervisor", but both daily allocators are
+   **`role='manager'`** (VFL1560 Shaikh Majeed, VFL1566 Abhimanyu Kakde) — verified live 13 Nov. The
+   chain notifies *the allocator themselves*, whatever their role, which is what matters operationally.
+   Read as confirming the order, not as adding a separate supervisor stage. If a real third-party
+   supervisor stage is ever wanted before HR, that is a new build.

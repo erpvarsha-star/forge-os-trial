@@ -95,7 +95,7 @@ Whichever is chosen, `getWeekDays()` is duplicated by hand in two files and **bo
    shows a **400** at 13:30 UTC (= 19:00 IST) next to the 200 from the every-15-min `forms_due_reminder`.
    That is exactly the "unknown mode until the merge deploys" behaviour the build notes predicted. It also
    proves v23 really does carry the new modes, since the same call returned **200** after the deploy.
-2. **21:00 IST on 12 Nov — UNEXPLAINED, genuinely open.** The escalation ran *after* the deploy and
+2. **21:00 IST on 12 Nov — CLOSED 13 Nov by the owner's instruction ("forget last night reminder, start today"); do NOT investigate further.** Left on record only because a repeat tonight would be a new finding. What was seen: The escalation ran *after* the deploy and
    returned **200** with no `console.error` (the handler returns 500 and logs on any throw, and
    `notifyEmployees` throws on a failed insert — so nothing threw). Yet it created no notification, even
    though **all 24** team members had no `employee_shifts` row for 13 Nov. The code path has no
@@ -105,6 +105,21 @@ Whichever is chosen, `getWeekDays()` is duplicated by hand in two files and **bo
    most plausible benign explanation is that the mode flag was set *after* 21:00 IST, which would make
    `allocators.size === 0` an early return — but that is a hypothesis, **not verified**. Do not record
    this as working until a run is observed delivering.
+
+**🔒 Owner, 13 Nov 2026: the clock starts TODAY. Order confirmed — allocator (19:00 IST) then HR
+(21:00 IST).** See CLAUDE.md "Owner decision of 13 Nov 2026" for the full record, including that both
+daily allocators are `role='manager'`, not supervisor.
+
+**Concrete, falsifiable prediction for tonight — check this tomorrow morning.** Verified live 13 Nov
+10:43 IST, tomorrow = **Sat 14 Nov**: **VFL1560 has 11 of 12 assigned (1 missing); VFL1566 has 12 of 12
+(0 missing).** Therefore:
+- **19:00 IST** → a `daily_allocation_incomplete` notification to **VFL1560 only**. VFL1566 must get
+  nothing (he is complete) — a notification to him would itself be a bug.
+- **21:00 IST** → if VFL1560 has not filled that one person in, a `daily_allocation_hr_escalation`
+  notification to **VFL5440 (Pallavi)** naming him and the missing person. If he fills it, silence.
+Check with:
+`select type, user_id, created_at at time zone 'Asia/Kolkata' from notifications where type in ('daily_allocation_incomplete','daily_allocation_hr_escalation') order by created_at desc;`
+Zero rows after 19:00 with a gap still open = the delivery bug is real and now reproducible.
 
 **Tonight (13 Nov) is a clean natural test, no code needed.** Tomorrow is **Saturday 14 Nov**, and
 coverage is already uneven: **VFL1560 has 4 of 12 unassigned, VFL1566 has all 12 assigned.** So the
