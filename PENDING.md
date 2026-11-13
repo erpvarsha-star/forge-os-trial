@@ -24,7 +24,13 @@ plus old drafts **#8** (production sync `qty` null) and **#12** (EOTM one-award)
 - November `PERMANENT_WORKER` draft `d49f2ff3` still exists, untouched — don't let it be calculated.
 - `payroll-run` v17, `shift-reminder` v23 — both as documented.
 
-## 🔴 URGENT-PRODUCTION FRIDAY CANNOT BE ALLOCATED — real bug, root-caused 13 Nov 2026 from VFL1560's report
+## ✅ PARKED BY THE OWNER, 13 Nov 2026 — Friday allocation: build nothing (kept for the record only)
+
+**🔒 OWNER DECISION 13 Nov 2026: do not build anything for this.** The supervisor picks who comes in on
+a given Friday; whoever comes in checks in, and that check-in is the record; the compensating day off is
+adjusted by HR in leave. No grid change, no stepper default change, no `weekly_off_day` change. Claude's
+earlier "Maintenance works every Friday" framing was an over-read and is corrected in CLAUDE.md. Nothing
+below is a to-do — kept only so the behaviour is explained if someone asks why Friday has no grid column.
 
 **Reported by VFL1560 Shaikh Majeed (daily allocator, Maintenance), 13 Nov 10:36 IST, via screenshot:**
 "Production is ongoing today, but today date is not being displayed in the app for shift assign."

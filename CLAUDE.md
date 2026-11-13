@@ -3204,40 +3204,59 @@ While making "leave application + leave balances... go live" real (item 2 above)
    Read as confirming the order, not as adding a separate supervisor stage. If a real third-party
    supervisor stage is ever wanted before HR, that is a new build.
 
-## 🔒 Owner, 13 Nov 2026 — Maintenance WORKS Fridays; that is why they are on day-wise allocation
+## 🔒 Owner, 13 Nov 2026 — Friday working is PER-PERSON, decided by the supervisor; build NOTHING around it
 
-**Owner: "Maintanence as discussed before comes to work done Friday so they have day wise allocation."**
-Maintenance does its work on the plant's weekly off, when machines are idle. **Friday is a routine
-working day for them, not an urgent-production exception.** This is the reason VFL1560 (Shaikh Majeed,
-Maintenance) and VFL1566 (VMC Shop) were put on `shift_allocation_mode='daily'` in the first place.
+**⚠ CORRECTION, same day — an earlier version of this section said "the entire Maintenance department
+works every Friday." That was Claude over-reading the owner's shorter first message; it is WRONG and is
+corrected here.** Owner's own words: *"The entire maintenance department does not work on every Friday,
+the supervisor decides who needs to come in on a Friday... just leave it to the checking and not try and
+build anything else around it... if I come Friday and I take off any other day my leave is adjusted."*
 
-**Confirmed live 13 Nov 2026, six consecutive Fridays (9 Oct → 13 Nov), zero exceptions** — Maintenance
-present each Friday: **7, 6, 8, 5, 8, 6 of 12** (a rotating roughly-half team; company-wide present on
-the same days was 25/56/61/24/72/41). Not occasional: every week.
+**How it actually works:** the **supervisor picks individuals** for a given Friday. Whoever comes in
+simply **checks in**, and that check-in is the record — the app's existing shift inference gives them a
+shift from their punch, which is correct and sufficient. The person then takes a different day off, and
+**HR adjusts the leave**. That is a people/leave process, not a software one.
 
-**Consequence — this makes the Friday-grid bug far more serious than first written up.** The weekly grid
-is Sat–Thu (`i < 6`), so a Friday could never be allocated. Proven empirically, not just from the code:
-every Friday shift row for Majeed's team from **9 Oct to 6 Nov was `system_inferred`** (one
-`system_reclassified`) — **not one `hr_allocated` row in five weeks.** Every Friday, the 5–8 Maintenance
-people who actually worked got a shift guessed from their punch instead of the one their allocator
-intended, and were judged for lateness against that guess.
+**🔒 DECISION: build nothing for Friday allocation.** No 7-day grid, no stepper-default change, no
+weekly-off carve-out, no `weekly_off_day` data change for Maintenance. The owner's explicit reasoning is
+that this is being over-engineered: *"you are getting confused and making too many complications in the
+coding because [it is] a very simple task."* **Do not re-propose a Friday-allocation feature** unless
+the owner raises it himself.
+
+**Live data, 13 Nov 2026, six consecutive Fridays (9 Oct → 13 Nov)** — Maintenance present each Friday:
+**7, 6, 8, 5, 8, 6 of 12** (company-wide on the same days: 25/56/61/24/72/41). **This fits the owner's
+description exactly** — a different subset each week, chosen by the supervisor — and is NOT evidence
+that the department works Fridays as a block. Claude originally read it as the latter; that reading was
+wrong.
+
+**The Sat–Thu grid (`i < 6`) means a Friday cannot be allocated in the app at all** — confirmed in code
+and empirically: every Friday shift row for Majeed's team from 9 Oct to 6 Nov was `system_inferred`
+(one `system_reclassified`), **zero `hr_allocated` in five weeks**. **Per the owner's 13 Nov decision
+this is ACCEPTED, not a defect to fix**: the check-in is the record, and inference from the punch is
+exactly the intended behaviour for a Friday. Leave it alone.
 
 **13 Nov is the first Friday in the dataset with `hr_allocated` rows (4 of them)** — apk-132 shipped the
-daily stepper on the evening of 12 Nov, so Majeed stepped back a day and allocated for the first time.
-His same-morning complaint ("today date is not being displayed") is therefore about the stepper
-**defaulting to tomorrow**: he had to discover the `‹` arrow. The feature works; the default is wrong.
+daily stepper the evening of 12 Nov, so Majeed stepped back a day and allocated for the first time. His
+complaint ("today date is not being displayed") is about the stepper **opening on tomorrow**; today is
+one tap back on `‹`. **Left as is by the owner's decision** — if he asks again, the answer is the back
+arrow, not a code change.
 
 **🔒 Therefore: do NOT add a weekly-off exclusion to the daily-allocation reminder.** Claude proposed
 that on 13 Nov to stop it "nagging about Fridays" — **that was wrong for exactly this population** and
 is withdrawn. Friday is when these teams most need the 19:00/21:00 reminder. It was never built; do not
 build it.
 
-**Open, not changed without the owner's word:** every member of both teams has `weekly_off_day = NULL`,
-so `mark_weekly_offs()` writes `WO` for all 24 every Friday at 00:01 IST; the ones who work overwrite it
-by checking in, and the rest keep `WO`. That self-corrects for attendance, but a Maintenance person who
-was rostered for a Friday and did not turn up reads as a legitimate weekly off rather than an absence.
-Whether Maintenance should instead carry a different `weekly_off_day` is the owner's call — do not guess
-a day.
+**`weekly_off_day` stays NULL for these teams — CLOSED, do not change it.** `mark_weekly_offs()` writes
+`WO` for all 24 every Friday at 00:01 IST; whoever the supervisor called in overwrites their own `WO` by
+checking in, and the rest keep it. **That is the correct and intended outcome** under the owner's rule:
+Friday presence comes from the check-in, and the compensating day off is adjusted by HR in leave. Do not
+propose a per-department `weekly_off_day`.
+
+**Known consequence, flagged once and NOT acted on:** the 19:00/21:00 daily-allocation reminder has no
+weekly-off exclusion, so on a Thursday night it will report Friday as "unallocated" to Majeed/Kakde and
+escalate to HR — which under this decision is noise, since Friday is not meant to be allocated. First
+occurrence would be Thu 19 Nov for Fri 20 Nov. Raise it to the owner as its own separate issue when he
+is ready for the next one; do not bundle it.
 
 ## 🔒 Owner process rule, 13 Nov 2026 — ONE issue at a time, ONE question, with time estimates
 
