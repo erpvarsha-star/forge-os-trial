@@ -554,13 +554,19 @@ Everything else below this ticket is DONE/verified or explicitly deferred from t
 - **October comparison workbook, all 4 populations**, built fresh from the live engine + live data, sent to owner. Then **updated a second time (`0bc32bd` for the CLAUDE.md record)** per the owner's night answers: CON05/09/12/13 now use `salary/26 × HR-CSV-present-days` (not app punches); the 3 security guards' present-days corrected from the same HR CSV (`VFL_HR_OS_2026_27_ATTENDANCE_DAILY.csv`); all 7 BUNG/Pune rows filled from the owner's own October Pune sheet instead of ₹0. Every figure independently re-verified by Claude against the source CSVs/DB before sending. File lives only in the agent's scratchpad, never committed (real names/figures).
 - Confirmed live: Kajal's Pune Attendance screen is reachable (`attendance_clerk_location='Pune'` gates her More-menu row) — she just hasn't used it yet for October.
 
-## OPEN OWNER DECISIONS, unanswered as of session end
+## OPEN OWNER DECISIONS as of 4 Nov — ⚠ 3 of these 5 are now RESOLVED (reconciled 13 Nov 2026)
 
-1. Real daily-rate figures for CON05/CON09/CON12/CON13 (needed to actually convert them to `rate_type='daily'` in the DB — the salary/26 formula is applied only inside the comparison workbook so far, not the live DB).
-2. Security guards still have no self check-in screen in the app (owner flagged this 4 Nov; use the HR CSV as the data source meanwhile — not built).
-3. 26-30 Sep arrears sourcing — HR's own tab, not yet in hand.
-4. HR has not yet entered real leave-balance opening figures for VFL5463/64/65/66 — owner said "leave this in pending."
-5. Instructions for >12h-same-day-return logging were given to the owner inline in chat this session (not a file) — re-send on request.
+1. ~~Daily-rate figures for CON05/09/12/13~~ — **RESOLVED 5 Nov 2026**, owner gave the rates and
+   `PATCH_130` applied them live (`rate_type='daily'`, effective 2026-10-01). Do not re-ask.
+2. ~~Security guards have no self check-in screen~~ — **BUILT 4 Nov 2026** (`PATCH_123`, commit
+   `06bf0cc`): `CheckInCard` wired into `app/(security)/dashboard.tsx`, `mark_weekly_offs()` excludes
+   them. Confirmed live. Do not re-ask.
+3. ~~26-30 Sep arrears sourcing~~ — **CLOSED 5 Nov 2026**: paid directly outside the app, owner said
+   "remove it from pending". `attach_arrears_sep26_30()` is NOT used. Do not re-ask.
+4. **STILL OPEN but PARKED BY THE OWNER** — real leave-balance opening figures for VFL5463/64/65/66.
+   Owner: "leave this in pending." Not a question to put to him again; HR supplies the numbers.
+5. Not a decision — the >12h-same-day-return logging instructions were given inline in chat; re-send
+   on request.
 
 # >>> RESUME STATE 1 Nov 2026 (superseded by the 4 Nov block above where they conflict) <<<
 - DONE: payroll core = days worked + salary only (commit c5d8825): OT never fed to engine, 'H' rows neutral, approved POSITIVE payroll_adjustments paid after the engine as APPROVED_EXTRAS (outside statutory wages). Claude re-ran suites: engine 61/0, feedsync 64/0, extras 53/0, export 15/0, category-runs 13/0, statutory 66/0, payslip 12/0, i18n clean. **NOT DEPLOYED: payroll-run live is still v11** - redeploy (all 12 files, verify_jwt true, sha check) only on owner OK.
