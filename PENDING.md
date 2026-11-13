@@ -1,21 +1,110 @@
-## AI-agent roadmap — not started, needs its own scoping session (added 12 Nov 2026)
+# >>> RESUME STATE 13 Nov 2026 (reconciliation pass) — READ THIS FIRST <<<
 
-Owner's own words: "the problem is coz we have not built the ai into the system, i am also having notifications for people who have not been alloted shifts but have checked in at general time or close to the shifts we have defined but as its not defined i am suppose to look right, this could be done by an ai agent if we build one so put this in pending as will need to work on all things the agent/agents should do."
+**What this pass was:** the owner asked for a review of CLAUDE.md / PENDING.md (/ ARCHIVE.md if needed)
+against the previous session's handoff notes. **Doc-only. No code edited, no DB row changed, nothing
+deployed.** Four real discrepancies were found and fixed — see "Reconciliation findings" below.
 
-This is a roadmap entry, not an active build. Candidate list of things an agent (or agents) could take over — review and prioritize with the owner before scoping any of it as a real build:
+**Branch reality (verified by git + GitHub myself, 13 Nov 05:48 IST):**
+`claude/forge-os-backend-setup-7woj4t` HEAD = `d351a56` (PR #81 merged) **is authoritative and is the
+branch to work on** (owner confirmed this directly, 13 Nov). The throwaway checkout
+`claude/amazing-mendel-wtni36` was at the *identical* commit, so nothing diverged or was lost.
+`apk-132` (off `07aa425`, published 12 Nov 20:50 IST) is the current published APK — verified via
+`get_latest_release`, not assumed. Nothing is mid-flight: PRs #78/#79/#80/#81 all merged.
+**10 PRs open**, all pre-existing: 8 Dependabot (#62, #63, #64, #65, #66, #67, #70, #71 — leave them;
+**#64 `supabase/setup-cli` must NOT be merged until a green APK build**, it caused the 6 Nov CI outage)
+plus old drafts **#8** (production sync `qty` null) and **#12** (EOTM one-award) — both still real bugs.
 
-1. **Shift-assignment judgment calls** — today's "Needs Your Call" screen (owner-only) surfaces every `system_inferred`/`system_reclassified` shift for manual review. An agent could pre-screen these: an unassigned check-in landing close to (but not exactly on) a defined shift start, with a consistent pattern for that person, could be auto-confirmed instead of sitting in the owner's queue — this is exactly the case the owner flagged ("as its not defined i am suppose to look right").
-2. **Attendance-anomaly triage** — the three bugs fixed today (wrong-date filing, WO-shadowed checkout, accidental taps) were all found by a human reading screenshots. An agent could scan `attendance_records` daily for the same shapes (a punch within the 00:00–06:45 window with no open previous-day session; an in/out pair under 5 minutes; two consecutive days with zero rows for someone who otherwise punches daily) and flag them before HR notices from a phone photo.
-3. **Payroll warning review** — already exists (`payroll-warning-review`, Haiku-class model) but is narrowly scoped to late-decision audits; could be widened to the other warning types (`no_punch`, `punched_absent`, `missing_efficiency`) once the late-type review has a track record.
-4. **Fraud alert triage** — `fraud_alerts`/`fraud_flags` resolution is still a manual owner decision (Confirmed/False Positive/Investigate); an agent could pre-classify based on device/location history before the owner looks at it.
-5. **Shift-allocator compliance** — the new 19:00/21:00 reminder+escalation (built today, see CLAUDE.md) is a hard-coded rule; an agent could instead learn each allocator's actual pattern and adjust reminder timing/escalation thresholds per person.
-6. **Leave/advance approval anomalies** — flag an approval chain that's been stuck unusually long, or a request shape that doesn't match the requester's history, before it becomes a "where did this go" complaint (like PATCH_126's stuck-chain bug, found by a human noticing 7 stuck requests).
+**LIVE state, queried 13 Nov 05:48 IST (not recited from notes):**
+- Headcount **106 active / 154 total**. (Any older number in these files is stale by rule.)
+- October run `d5c1e25a` — `draft`, `population=NULL` (whole company), feeds confirmed, **0 pay_run_items**.
+- `pay_run_warnings`: **110 total, 0 undecided, 101 unreviewed, 3 `concern`.**
+- **Last AI review = 12 Nov 17:16 IST — BEFORE `payroll-warning-review` v5 was deployed (~22:25 IST).**
+  So **HR has not tapped "Retry review" since v5 went live**, and the 101-unreviewed count has not moved.
+  v5 confirmed live and correct: `version: 5`, `verify_jwt: true`. **The one step left is still HR's tap.**
+- November `PERMANENT_WORKER` draft `d49f2ff3` still exists, untouched — don't let it be calculated.
+- `payroll-run` v17, `shift-reminder` v23 — both as documented.
 
-Needs from the owner before any of this is built: which of these (if any) to prioritize first, a budget/model tier for it (this project's existing convention is Haiku-class for narrow classification, Sonnet-class for anything that edits/writes), and whether it should run as a scheduled job, an on-demand screen, or both.
+## Reconciliation findings (13 Nov) — what was actually wrong
+
+1. **🔴 The 13 Nov session's own record was orphaned.** Its RESUME STATE block and the 12 Nov
+   session-close block (dependabot hygiene, the 7-item status list, PR #80 merged) were committed to
+   `claude/peaceful-feynman-hisowr` and **never merged — no PR was ever opened**. Base still showed the
+   12 Nov blocks as newest, so a fresh session would have read superseded state. **Rescued into this
+   file on the authoritative branch** (content preserved verbatim; conservation checked).
+2. **🔴 The owner's 13 Nov standing decision was in no control file at all** — only in that orphaned
+   branch. It is now recorded in **CLAUDE.md** ("Owner decision of 13 Nov 2026 — do not correct paid
+   historical attendance") and in the **NEVER-do list**, per the locked "a decision exists only once it
+   is in CLAUDE.md" rule. This mattered: the 12 Nov (late) block still invites a reader to treat
+   VFL4024's 720 / VFL5458's 1134 `late_minutes` as "data to look at", which is exactly the
+   already-paid historical data the owner ruled out touching.
+3. **🟡 UTC regression avoided.** The orphaned branch re-introduced "13:30 UTC / 19:00 IST" cron
+   wording, against the owner's 12 Nov IST-only rule (already corrected three times). Restored to
+   IST-only while rescuing the rest.
+4. **🟡 Structure fixed.** The AI-agent roadmap was sitting *above* the RESUME STATE block, though
+   CLAUDE.md's session-start protocol says the top RESUME STATE block is read first. Roadmap moved
+   below. **CLAUDE.md's `Branch:` header** also still said that branch was "⚠ stale" — it is now the
+   authoritative one; corrected.
+
+## Known gap, deliberately NOT fixed (owner has not asked)
+
+**Off-by-one in the 12-hour late cap.** `lib/istDate.ts:26` (`lateMinutesAgainst`) and
+`lib/serverClock.ts:61` (`serverLateMinutesAgainst`) both `return diff > 720 ? 0 : diff`. The function's
+own comment says "More than 12h late means the check-in is actually early", so intent and code disagree
+at exactly `diff === 720`: a punch exactly 12h 00m after shift start is recorded as **720 minutes late**
+instead of 0. Verified by reading both files this pass; **ARCHIVE.md has no rationale for the 720
+value**, so there is no hidden reason being overridden. Real but narrow (one minute-value in 1440).
+**Not applied** — the owner ruled out the historical correction and has not asked for the forward fix.
+Revisit only if this shape appears in an *unpaid* month. Keep the two files in sync if it is ever changed.
+
+## Still genuinely open (nobody has asked for these)
+
+- **October AI review** — waiting on HR's "Retry review" tap (see live state above). The 3 `concern`
+  rows (VFL1463, VFL4011, VFL4026) do **not** block Calculate. Do NOT touch `pay_runs` /
+  `pay_run_warnings` rows directly — HR drives that screen live (see the 6 Nov incident).
+- **Calendar UX** — Late (yellow) vs Half-Day (orange) are nearly identical. Claude's own finding; the
+  owner has not asked for a fix.
+- **8–11 Nov Diwali** (confirmed paid holiday) — queued for November's Extras report, due December.
+  Must NOT be written as `H` attendance rows (that was the 4 Nov double-count bug).
+- **AI-agent roadmap** — scoping only, below.
+- **Dependabot #64** — only after a verified green APK build.
 
 ---
 
-# >>> RESUME STATE 12 Nov 2026 (late) — READ THIS FIRST <<<
+# >>> RESUME STATE 13 Nov 2026 (earlier — rescued from the unmerged work branch; superseded by the reconciliation block at the top) <<<
+
+**Branch reality (verified by git + GitHub 13 Nov):** `claude/forge-os-backend-setup-7woj4t` HEAD = `d351a56` (PR #81 merged). Work branch `claude/peaceful-feynman-hisowr` merged up to this point, clean. **PRs #78, #79, #80, #81 are ALL merged — nothing app/backend is in a draft PR.** `apk-132` (off `07aa425`) is still the current published APK — PR #81 was backend-only (edge function + docs), no app code touched, no new APK triggered or needed.
+
+**Shift 3/5 "implausible late_minutes" investigation — CLOSED, no fix applied, per owner's explicit instruction.** A Sonnet agent root-caused the two flagged rows (VFL4024 `late_minutes=720`, VFL5458 `late_minutes=1134`, both dated 3 Oct): **not a current-code bug** — both employees' phones were still on the pre-28-Sep APK build, whose lateness math had no midnight wraparound and no cap, and simply read an on-time ~19:00 night-shift arrival as hours "late" against whatever day-shift time was on file. Current code (28 Sep onward) would correctly compute 0 for both. 16 rows total share this signature, all dated 28 Sep–8 Oct — the window between the real fix shipping and these phones reinstalling. One small residual bug was found as a side effect (an `>720` vs `>=720` off-by-one in `lib/istDate.ts`/`lib/serverClock.ts`'s `lateMinutesAgainst`/`serverLateMinutesAgainst`, letting an exact-12h-boundary case slip through uncapped) — a proposed (unapplied) diff exists in the agent's report.
+
+**Owner's decision, 13 Nov 2026: do not touch any of this.** September and October payroll are already paid — correcting historical attendance rows now serves no purpose, and the owner explicitly said not to go back and fix anything from the past. **No code was edited, no data was changed, nothing was deployed.** The off-by-one fix (item above) is NOT applied — if a similar case shows up in a future (unpaid) month, revisit then; do not proactively deploy this fix without the owner asking for it again, since he has not asked for the forward-looking code change either, only ruled out the historical-data part.
+
+**Everything from the 12 Nov session is resolved or explicitly deferred — nothing is mid-flight.** Real work still open: items 4, 6, 7 in the status list just below, and the "NEXT PRIORITY" block further down (October payroll AI review — now on v5, see the 12 Nov (late) block for detail).
+
+---
+
+# >>> RESUME STATE 12 Nov 2026 (session close) <<<
+**Branch reality (verified by git + CI 12 Nov, end of session):** `claude/forge-os-backend-setup-7woj4t` HEAD = `07aa425` (PR #80 merged). Work branch `claude/peaceful-feynman-hisowr` is clean, no uncommitted changes, sitting on top of the same history. **PRs #78, #79, #80 are ALL merged — nothing of this session's app/backend work is still in a draft PR.** `apk-132` is the current published APK (off `07aa425`); CI, Deploy Edge Functions, and Build Android APK all show `success` on that commit — nothing broken by the session's close-out activity (closing dependabot PRs does not touch the base branch or trigger any workflow).
+
+**GitHub hygiene done at session close:** closed 7 dependabot PRs that contradict CLAUDE.md's pinned-dependency policy — #68 (typescript 5→7), #69 (expo-constants 16→58), #72 (tailwindcss 3→4), #73 (async-storage 1→3), #74 (react bump), #75 (react-native-chart-kit 6→7), #76 (eslint 8→10) — each confirmed closed via a fresh fetch (`state:"closed"`, real `closed_at`), not just a success response. Left open on purpose: #62, #63, #65, #66, #67, #70, #71 (lower-risk CI/dev-tool bumps) and **#64 supabase/setup-cli (open but do NOT merge** until a green APK build verifies it — this exact action caused the documented 6 Nov CI outage before). Left open as real, unfixed bugs, not stale: **#8** (production sync — Forge/Press/Machine `qty` still null) and **#12** (EOTM one-award-per-category still broken in base `eotm.tsx`). Issues #1, #2, #3, #7, #28 and GitHub Issues #10/#11 were already closed by the owner directly — verified, no action needed.
+
+**All findings below verified live by Claude on 12 Nov (SQL + function logs + code read), nothing changed in the DB.**
+
+**STATUS OF THE 7 ITEMS BELOW, as of session close (12 Nov) — this list is the original find; read the "owner's answers" sections right after it for what actually happened to each:**
+
+1. **October run AI review — ✅ RESOLVED (v4; superseded by v5, see 12 Nov (late) block).**
+2. **Attendance bug A (VFL4008/4026/4066 mis-dated punches) — ✅ HANDLED per owner instruction.** VFL4026 corrected, both given 12-Nov presence rows, no `hours_worked` backfilled (owner's explicit "no, let it be as per their check in time"). VFL4066 deliberately NOT touched (different bug shape). The underlying 06:45-rollover root cause is **NOT fixed in code** — only this specific instance was hand-corrected; the general bug (item below) is partially fixed by PR #79.
+3. **Attendance bug B (VFL4071-style WO-shadowed checkout) — ✅ FIXED, merged, deployed** (PR #79, `apk-131`). Bug C (<5min accidental tap) also fixed in the same PR. Bug A's residual case (unassigned early arrival >60min before a day shift) deliberately left as-is per owner's 12 Nov decision.
+4. **Calendar UX (Late vs Half Day colour clash) — still open, not addressed this session.**
+5. **6 Nov / 10 Nov weekly-off swap — ✅ WRITTEN LIVE.** 65 employees who worked 6 Nov now have a 10-Nov `WO` row.
+6. **8–11 Nov Diwali — still open, deliberately deferred.** Confirmed paid holiday by the owner, but not written to attendance — queued for whoever builds November's Extras report (two-report principle; November's run isn't due until December).
+7. **November `PERMANENT_WORKER` draft run (`d49f2ff3`) — still open, low priority, untouched.** Nobody has calculated it; just don't let it happen by accident before November's real run is due.
+
+## 12 Nov 2026 — owner's second round of answers, actions taken this same turn
+
+1. **PR #79 merged** into `claude/forge-os-backend-setup-7woj4t` as `087dfcf`. Owner's call on the Bug-A residual gap: **leave it** (no fuller fix attempted). **APK build triggered automatically** (workflow run #131, `Build Android APK`, off `087dfcf`) — check it finished (`success`, a new release published) before telling anyone to reinstall.
+2. **"Calculate hrs worked for 11th 3rd shift" (VFL4008/VFL4026):** checked live — **both rows are still open** (checked in 06:39/05:01, no checkout yet; current time ~17:20 IST, their Shift 4 (07:00–19:00) hasn't ended). Nothing was written to `hours_worked` — this project's own locked rule is that the raw column stays null and the no-checkout default (8.5h for a Shift 3 day) is applied at READ time only, never backfilled, so writing a number into an still-open row would conflict with the real checkout once it happens. **If/when they check out normally through the app, real hours will be computed as usual.** If what's wanted is the number right now for a manual report: per the existing Shift-3 no-checkout convention, each would show as **8.5h** if nothing else happens before auto-checkout. Flagged back to the owner rather than guessed into the database — see open questions below.
+
+# >>> RESUME STATE 12 Nov 2026 (late; superseded by the 13 Nov blocks above) <<<
 **Branch reality (verified by git + GitHub 12 Nov, late):** `claude/forge-os-backend-setup-7woj4t` = `07aa425` is authoritative (PRs #78, #79, #80 merged; `apk-132` published off it). Work branch `claude/magical-galileo-sn6n0l` = base + the one fix below, in a draft PR. Open PRs otherwise: Dependabot #62–#67, #70, #71 (leave; #64 only after a green APK build) and old drafts #8, #12.
 
 **October run AI review — SECOND root cause found and FIXED LIVE: `payroll-warning-review` v5 deployed 12 Nov ~22:25 IST on Yash's "yes deploy"** (Sonnet agent; Claude fetched the deployed source back himself: v5, `verify_jwt` true, `max_tokens: 4096`, effort low, no `temperature`). Not yet proven on a live call — that happens when HR retries. **Only step left: HR taps "Retry review" once, then Calculate.** If any call still fails, the function log now prints `stop_reason=`. The 3 `concern` rows (VFL1463, VFL4011, VFL4026) do not block Calculate. Two reviews also flagged implausible `late_minutes` (VFL4024 720, VFL5458 1134) — data to look at, nothing changed. Detail of the diagnosis: Verified live: HR DID retry after v4 (12 Nov, 17:14–17:20 IST). Run `d5c1e25a` is still draft, 0 items: **110 warnings / 0 undecided / 101 unreviewed / 9 reviewed, of which 3 are `concern`** (owner was notified of those). About 30 calls, 3 returned 200, the rest 502 with the function log "could not parse llm response" and an EMPTY or cut-off reply. Cause: `max_tokens: 400` — `claude-haiku-5-5` thinks by default and thinking counts against the cap, so the answer is cut before or during the JSON. Fix (Sonnet agent, verified by Claude: diff read, `payroll-warning-review.test.ts` 24/0): `max_tokens: 4096`, `output_config: { effort: 'low' }`, and `stop_reason` added to the failure log. Already-reviewed rows are skipped on retry. Do NOT touch `pay_runs` / `pay_run_warnings` rows.
@@ -58,11 +147,11 @@ Needs from the owner before any of this is built: which of these (if any) to pri
    - Bug C: a tap-in/tap-out under 5 minutes should not record a half day.
    - **Built, independently re-verified, draft PR open: [PR #79](https://github.com/erpvarsha-star/forge-os-trial/pull/79) — MERGED, apk-131 published.** Claude re-ran `tsc --noEmit` (still exactly 7 baseline, 0 new) and `check-i18n.mjs` (clean) itself rather than trusting the agent's numbers, and read the full diff. Bugs B (VFL4071's WO-shadowing) and C (<5min tap) are fully fixed. Bug A is **partially** fixed, left as-is per owner's 12 Nov decision: an UNASSIGNED early arrival more than ~60 min before a day shift's start still resolves to Shift 3 and files under the previous date — deliberately left alone to avoid the documented Shift-3/4 tie-break/widened-buffer risk.
 
-## Daily shift allocation (VFL1560/VFL1566) + owner late-skip + 19:00/21:00 reminder — built 12 Nov 2026, draft [PR #80](https://github.com/erpvarsha-star/forge-os-trial/pull/80)
+## Daily shift allocation (VFL1560/VFL1566) + owner late-skip + 19:00/21:00 reminder — built 12 Nov 2026, [PR #80](https://github.com/erpvarsha-star/forge-os-trial/pull/80) MERGED
 
 Owner-approved build (see CLAUDE.md "Owner decisions of 12 Nov 2026 (second batch)"). Built by a Sonnet agent, independently re-verified by Claude (not taken on the agent's word): `tsc --noEmit` re-run (exactly 7 baseline, 0 new), `check-i18n.mjs` re-run (clean), every diff read line-by-line, and the live DB re-checked directly: `employees.shift_allocation_mode='daily'` for exactly VFL1560/VFL1566 (154 employees total, 152 stay `'weekly'`); `allocate_team_shift_day()`'s grants (`authenticated`/`postgres`/`service_role`, no `anon`) match `allocate_team_shift_week()`'s exactly; both new cron jobs (`daily-allocator-reminder` 19:00 IST, `daily-allocator-hr-escalation` 21:00 IST) confirmed live and `active=true`.
 
-**Not merged, no APK yet, `shift-reminder` not yet redeployed** (merging will trigger CI's `Deploy Edge Functions`, currently green, to redeploy it automatically — the two new cron jobs will 400 harmlessly with `{"error":"Unknown mode"}` each night until that merge happens; no bad data is written either way). Needs Yash's review/go before merge.
+**MERGED into `claude/forge-os-backend-setup-7woj4t` as `07aa425`. `Deploy Edge Functions` (run #54) and `Build Android APK` (run #132, `apk-132`) both confirmed `success` off that commit.** `shift-reminder`'s two new modes are now live in the deployed function — the 19:00/21:00 IST reminder+escalation will actually fire starting tonight (13 Nov) for VFL1560/VFL1566. Nothing further needed here unless Yash reports an issue with the reminders or the new daily-allocation screen.
 
 ---
 
@@ -301,7 +390,7 @@ Everything else below this ticket is DONE/verified or explicitly deferred from t
 **OWNER DECISIONS STILL OPEN:** OD/COFF bucket mapping; historical audit_log rows masking (not done, needs approval); owner opinion on Hindi hint wording ('पिछले अनुमोदक ने N दिन प्रस्तावित किए').
 **Standing waiting-on-others:** HR bank-details task (due 3 Nov); Kajal device test (optional); first-week-Nov decisions on closed data-gap items; October run 1-5 Nov (owner/HR trigger; Claude prepares + verifies only).
 
-# >>> STATE AT 29 Oct 2026 (late) — READ THIS FIRST (supersedes the older 27-28 Oct banners below where they conflict) <<<
+# >>> HISTORICAL STATE 29 Oct 2026 (late) — NOT CURRENT (this used to say "READ THIS FIRST"; it is superseded by every block above. Relabelled 13 Nov 2026 — supersedes the older 27-28 Oct banners below where they conflict) <<<
 - [x] PATCH_111 APPLIED (1 newer row filled; staging dropped). [x] PATCH_112 + payroll-run v9 live. [x] PATCH_113 APPLIED (ledger-aware comp-off; shortfall BLOCKED; half-day C-off -> HR decision, owner notified; granted-days override kept across stages; old 3-arg overload dropped). [x] PATCH_114 (decide_halfday_coff, list_pending_halfday_coff, list_missing_bank_details, hr_set_bank_details, auth_role fix). [x] PATCH_115 (HR red count for pending half-day C-off).
 - [x] **apk-111 PUBLISHED 29 Oct 04:22 IST** (commit 91c1e75): HR Bank Details + Half-day Comp-off screens, HR count, pre-filled reduced days. [ ] Install; HR/Kajal real-use. Owner: no device test required for leave.
 - [ ] HR task (assigned to VFL5440, due 3 Nov): fill missing bank/UAN details via More -> Bank Details. Blank bank cells never hold payroll (VFL5465/5466 etc.).
@@ -1450,4 +1539,23 @@ Owner + Plant Head), which today never fire.
   - Oct2026_Worker_Final_Package.xlsx - Batch1 6,84,377 + Batch2 top-up 60,065 (payable; 15 people) + holiday extras 18,752 (17 workers) + advance disbursements 2,76,000 (17 Diwali + VFL4063) = recovery from Nov Rs 27,600/mo. VFL4072 flagged: 0 app punches but HR+physical CSV both show 25 present days - Rs 24,316 top-up + holiday-extra withheld pending owner/HR review, not in totals.
 - OPEN OWNER QUESTIONS (next brief will restate numbered): (1) VFL4072 worker - pay the ~Rs 24,316+holiday top-up or investigate first? (2) physical-CSV 30 Oct gap (zero rows for everyone, all populations) - data problem, not a holiday; (3) 3 staff reclassify READY<->DISPUTE if physical CSV is used (VFL1543, VFL5433 -> READY; VFL5413 -> DISPUTE) - use it or not? (4) BUNG02 remark mismatch, BUNG30 unexplained deduction; (5) CON16/18/21/22/23 inactive but have Oct attendance rows - check with HR; (6) statutory treatment of Batch-2/holiday-extra lines still open (same as 1 Nov Extras question); (7) whether '1-31 Oct' tab double-counts any of 26-30 Sep - not yet resolved; (8) consultant sheet still has no October figures - HR to fill.
 - NEXT: await owner answers above; HR/accounts review of the three final-package workbooks; no payroll-run call until owner/HR trigger the real run.
+
+
+
+---
+
+## AI-agent roadmap — not started, needs its own scoping session (added 12 Nov 2026)
+
+Owner's own words: "the problem is coz we have not built the ai into the system, i am also having notifications for people who have not been alloted shifts but have checked in at general time or close to the shifts we have defined but as its not defined i am suppose to look right, this could be done by an ai agent if we build one so put this in pending as will need to work on all things the agent/agents should do."
+
+This is a roadmap entry, not an active build. Candidate list of things an agent (or agents) could take over — review and prioritize with the owner before scoping any of it as a real build:
+
+1. **Shift-assignment judgment calls** — today's "Needs Your Call" screen (owner-only) surfaces every `system_inferred`/`system_reclassified` shift for manual review. An agent could pre-screen these: an unassigned check-in landing close to (but not exactly on) a defined shift start, with a consistent pattern for that person, could be auto-confirmed instead of sitting in the owner's queue — this is exactly the case the owner flagged ("as its not defined i am suppose to look right").
+2. **Attendance-anomaly triage** — the three bugs fixed today (wrong-date filing, WO-shadowed checkout, accidental taps) were all found by a human reading screenshots. An agent could scan `attendance_records` daily for the same shapes (a punch within the 00:00–06:45 window with no open previous-day session; an in/out pair under 5 minutes; two consecutive days with zero rows for someone who otherwise punches daily) and flag them before HR notices from a phone photo.
+3. **Payroll warning review** — already exists (`payroll-warning-review`, Haiku-class model) but is narrowly scoped to late-decision audits; could be widened to the other warning types (`no_punch`, `punched_absent`, `missing_efficiency`) once the late-type review has a track record.
+4. **Fraud alert triage** — `fraud_alerts`/`fraud_flags` resolution is still a manual owner decision (Confirmed/False Positive/Investigate); an agent could pre-classify based on device/location history before the owner looks at it.
+5. **Shift-allocator compliance** — the new 19:00/21:00 reminder+escalation (built today, see CLAUDE.md) is a hard-coded rule; an agent could instead learn each allocator's actual pattern and adjust reminder timing/escalation thresholds per person.
+6. **Leave/advance approval anomalies** — flag an approval chain that's been stuck unusually long, or a request shape that doesn't match the requester's history, before it becomes a "where did this go" complaint (like PATCH_126's stuck-chain bug, found by a human noticing 7 stuck requests).
+
+Needs from the owner before any of this is built: which of these (if any) to prioritize first, a budget/model tier for it (this project's existing convention is Haiku-class for narrow classification, Sonnet-class for anything that edits/writes), and whether it should run as a scheduled job, an on-demand screen, or both.
 
