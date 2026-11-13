@@ -3285,7 +3285,7 @@ verified each new feature's data/RPC/cron behaviour but never tested the calenda
 a Friday." It took a real user report. **Lesson: when a feature is date-driven, test the real calendar
 edges (weekly off, month end, the day the team actually works) before calling it verified.**
 
-## Owner decision of 13 Nov 2026 — 5S challenge generator moves from Gemini to DeepSeek
+## Owner decisions of 13 Nov 2026 — 5S generator: Gemini → DeepSeek → **OpenRouter (LIVE AND WORKING)**
 
 **Owner: "Change the model to deepseek that u holding of Gemini."** The daily 5S challenge generator is
 switched from Google Gemini to **DeepSeek**.
@@ -3302,18 +3302,18 @@ from `choices[0].message.content` instead of `candidates[0].content.parts[0].tex
 `response_format: {type:'json_object'}`. The PROMPT text and the ```json fence-stripping are unchanged
 (DeepSeek also fences sometimes). Built by a Sonnet agent, reviewed by Claude.
 
-**🔒 NEW SECRET REQUIRED — `DEEPSEEK_API_KEY`, Supabase → Edge Functions → Secrets.** The function reads
-`Deno.env.get('DEEPSEEK_API_KEY')` and throws without it. **The owner pastes the key into that settings
-page himself — it must never be typed into chat** (the standing rule, same as `FCM_SERVICE_ACCOUNT_JSON`
-and `ANTHROPIC_API_KEY` were handled). Until that secret exists the function keeps failing daily, just
-with a different message. `GEMINI_API_KEY` becomes unused and can be removed afterwards.
+**⚠ SUPERSEDED SAME DAY — `DEEPSEEK_API_KEY` was never created; the owner chose OpenRouter instead.**
+See the OpenRouter block at the end of this section for the final, live state. (The DeepSeek version
+*was* deployed — CI run #56, 13 Nov 11:09 IST — so an earlier note here saying "not yet deployed" was
+wrong; it simply had no key and failed on the guard. `GEMINI_API_KEY` and any DeepSeek key are both
+unused now and can be removed.)
 
-**⚠ Found while verifying, 13 Nov — the 5S feature has NEVER produced anything.** `"5s_challenges"`
-is **completely empty — zero rows, ever** (queried live). So this is not "broken since Google retired the
-model" as first written; `app/(worker)/5s.tsx` has had no challenge to show for its entire life. Fixing
-the model call is necessary but may not be sufficient — once `DEEPSEEK_API_KEY` is set and the function
-is deployed, **confirm a real row actually lands in `"5s_challenges"` for that day** before calling the
-feature working. Do not assume a green deploy means workers now see a challenge.
+**⚠ Found while verifying, 13 Nov — the 5S feature had NEVER produced anything.** `"5s_challenges"`
+was **completely empty — zero rows, ever** (queried live). So this was not "broken since Google retired
+the model" as first written; `app/(worker)/5s.tsx` had no challenge to show for its entire life. That
+made the real acceptance gate "a row actually lands in `"5s_challenges"`", not "the deploy is green".
+**✅ That gate was met 13 Nov 2026 at 16:34 IST — the first row this table has ever held.** The rule it
+taught stands: for this feature a green deploy proves nothing; always confirm the row.
 
 **⚠ There is a SECOND Gemini caller: `nightly-scoring/index.ts` (`generateAiSuggestion`, ~line 328),
 on `gemini-1.5-flash`** — older than the model Google just retired. **It fails SOFT**, unlike the 5S one:
@@ -3327,3 +3327,52 @@ if Gemini is kept anywhere, this one needs a current model id too. `monthly_scor
 payroll AI review (`payroll-warning-review`) still runs on Anthropic `claude-haiku-5-5` and is NOT part
 of this decision — the owner asked about DeepSeek for that one on 12 Nov but gave no instruction to
 switch it, so it stays as it is until he says otherwise.
+
+### 🔒 FINAL: OpenRouter, not DeepSeek — owner's decision 13 Nov 2026, built, deployed and VERIFIED WORKING
+
+**Owner chose OpenRouter's free tier over a paid DeepSeek key** and put the key in Supabase → Edge
+Functions → Secrets himself as **`OPENROUTER_API_KEY`** (never typed into chat, per the standing rule).
+OpenRouter is OpenAI-compatible, so only the endpoint, model id, secret name and attribution headers
+changed; **the PROMPT, the JSON contract and the upsert are byte-identical** (verified by sha256 of the
+PROMPT block across every commit in this chain, not just by eye).
+
+**Live result, 13 Nov 2026 16:34 IST — the 5S feature works for the first time ever.** One row in
+`"5s_challenges"` for `2026-11-13`, `department = null` (plant-wide, matching `app/(worker)/5s.tsx`'s
+query), both `challenge_text_en` and `challenge_text_hi` correct and natural. Served by the primary
+model `google/gemma-4-31b-it:free`. Function **v21**, CI-deployed, deployed source confirmed matching
+the repo. Cron `five-s-challenge-generator` (jobid 21) is `30 0 * * *` = **06:00 IST daily**, active —
+the schedule was never the problem, only the model call.
+
+**Model choice — `google/gemma-4-31b-it:free` primary.** Picked off OpenRouter's live free list (checked
+13 Nov, not from training data) because it is the only strong free model with explicit 140+ language
+support: this prompt must return correct Hindi, which is the binding constraint. It also has native
+structured output, so `response_format: {type:'json_object'}` works.
+
+**🔒 Three real failures were found ONLY by invoking it for real — a green deploy proved nothing each
+time. Do not undo any of these three fixes.**
+1. **429, `"limit_source":"upstream_provider_shared_pool"` (Google AI Studio).** Free pools are *shared*
+   and saturate unpredictably, so a cron firing once at a fixed time would silently skip that day.
+   Fix: OpenRouter's **`models` fallback array** — docs verbatim: *"If the first model returns an error,
+   OpenRouter will automatically try the next model in the list"*, and *"any error can trigger … 
+   Rate-limiting … Downtime"*.
+2. **400 `'models' array must have 3 items or fewer`.** **An undocumented hard cap** — absent from
+   OpenRouter's Model Fallbacks page, it surfaced only on a live call. The chain is therefore exactly
+   three entries, deliberately **one per upstream provider** (Google / NVIDIA / Baidu), because one
+   provider's pool saturating is the whole failure mode this chain exists to survive. **Never add a
+   fourth** — it returns 400 and the feature stops entirely.
+3. **200 with EMPTY content.** Reasoning tokens count against `max_tokens` (docs: *"On most providers
+   they also count against the request's `max_output_tokens`"*), and both Gemma 4 and Nemotron 3 Ultra
+   think by default — so the `max_tokens: 200` budget, sized for Gemini which did not think, was spent
+   before any answer was emitted. **This is the exact same failure class as `payroll-warning-review` on
+   12 Nov 2026 (PR #81).** Fix: `reasoning: { effort: 'none' }` plus `max_tokens: 800` as
+   belt-and-braces, and the empty-content error now names `model` and `finish_reason` so the next
+   failure diagnoses itself.
+
+**The fallback chain is proven, not assumed.** Edge logs show the 16:31 IST attempt was answered by
+`nvidia/nemotron-3-ultra-550b-a55b:free` while Gemma was still 429 — i.e. it really did fall through to
+a different provider — and the 16:34 IST success came back from `google/gemma-4-31b-it:free` once that
+pool recovered. `console.log('5S challenge generated by', data?.model)` is what makes this visible; keep it.
+
+**Known limit, accepted:** if all three free pools are saturated at 06:00 IST, no challenge is generated
+that day and the app shows nothing (its existing behaviour). No retry/alerting was built — not asked for,
+and a missed motivational banner is not worth a pager.

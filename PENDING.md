@@ -1,4 +1,58 @@
-# >>> RESUME STATE 13 Nov 2026 (reconciliation pass) — READ THIS FIRST <<<
+# >>> RESUME STATE 13 Nov 2026, 16:40 IST — READ THIS FIRST <<<
+
+**What this stage was:** the owner asked for OpenRouter sign-up steps and a free-model pick for the 5S
+challenge generator, then confirmed he had put the key in Supabase Secrets. Built, deployed and
+**verified working end to end**. Code + docs only; no payroll/attendance data touched.
+
+## ✅ DONE THIS STAGE — the 5S feature now works for the first time ever
+
+`"5s_challenges"` held **zero rows, ever**, for the feature's whole life. It now holds **1 row for
+2026-11-13**, written 16:34 IST. That was the real acceptance gate, not a green deploy.
+
+- **Owner's key** is in Supabase → Edge Functions → Secrets as **`OPENROUTER_API_KEY`** (never in chat).
+  DeepSeek was dropped — no key was ever created for it.
+- **Live row** (verified by SQL): `date=2026-11-13`, `department=null` (plant-wide, matches
+  `app/(worker)/5s.tsx`'s query), `challenge_text_en` + `challenge_text_hi` both correct, Hindi natural.
+- **Function v21**, CI-deployed, **deployed source confirmed matching the repo** (fetched back and
+  grep-verified — the standing practice after any deploy here).
+- **Cron** `five-s-challenge-generator` jobid 21, `30 0 * * *` = **06:00 IST daily**, active. The
+  schedule was never broken; only the model call was.
+- **4 commits**, all on `claude/forge-os-backend-setup-7woj4t`, each CI-green:
+  `99e3987` (→OpenRouter) → `dbe0465` (fallback chain) → `faaec8d` (trim to 3) → `3fd33ae` (reasoning off).
+- **Gate on every commit:** tsc exactly **7** (documented baseline), i18n clean, and the `PROMPT`
+  constant verified **byte-identical by sha256** at every step — never once edited.
+
+**Three failures found only by invoking it for real** (each one is why a fix exists — don't undo them):
+429 shared-pool saturation → `models` fallback array; **400 undocumented cap, `models` max 3 items** →
+never add a fourth; 200-with-empty-content → reasoning tokens eat `max_tokens`, same failure class as
+`payroll-warning-review` on 12 Nov. Full detail + verbatim doc quotes in CLAUDE.md's 5S section.
+
+**Fallback chain proven, not assumed:** edge logs show 16:31 IST answered by
+`nvidia/nemotron-3-ultra-550b-a55b:free` (Gemma still 429 → it really fell through), 16:34 IST answered
+by `google/gemma-4-31b-it:free` once that pool recovered.
+
+## Next on this feature (nothing is blocking)
+
+1. **Confirm tomorrow's 06:00 IST cron fire produced a row** — the only thing not yet observed is an
+   unattended run. `select date from "5s_challenges" order by date desc limit 3;`
+2. **Workers see it only after reopening the app** — no new APK needed (`apk-132` already reads the
+   table); the row is server-side data.
+3. **Accepted limit:** if all three free pools are saturated at 06:00 IST, no challenge that day and the
+   app shows nothing. No retry/alerting built — not asked for.
+
+## Still open from the previous block (unchanged by this stage)
+
+- **October AI review: HR still has not tapped "Retry review"** — `pay_run_warnings` was 110 total /
+  0 undecided / 101 unreviewed. That tap is still the one step left. **Do not touch those rows.**
+- `nightly-scoring/index.ts` `generateAiSuggestion` (~line 328) is a **second Gemini caller** on
+  `gemini-1.5-flash`. It **fails soft**, so scoring is fine and only the AI suggestion is empty. The
+  owner's DeepSeek/OpenRouter instruction covered the 5S generator only — **no instruction given for
+  this one**, so it is untouched. One `OPENROUTER_API_KEY` would now cover it if he wants it switched.
+- Dependabot **#64 `supabase/setup-cli` must NOT be merged** without a verified green APK build.
+- November `PERMANENT_WORKER` draft `d49f2ff3` — leave it; don't let it be calculated.
+- Calendar Late vs Half-Day colour clash; 8–11 Nov Diwali holiday pay (November Extras report, December).
+
+# >>> RESUME STATE 13 Nov 2026, 05:48 IST (reconciliation pass) — superseded by the block above <<<
 
 **What this pass was:** the owner asked for a review of CLAUDE.md / PENDING.md (/ ARCHIVE.md if needed)
 against the previous session's handoff notes. **Doc-only. No code edited, no DB row changed, nothing
