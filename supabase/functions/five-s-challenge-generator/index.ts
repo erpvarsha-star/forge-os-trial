@@ -32,11 +32,14 @@ const PROMPT =
 // OpenRouter's `models` fallback retries the next model on any error, rate-limiting included,
 // which keeps the daily cron from silently skipping a day. Order is Hindi quality first, and the
 // list deliberately spans different upstream providers.
+// HARD LIMIT: OpenRouter caps `models` at 3 items (undocumented; returns HTTP 400
+// "'models' array must have 3 items or fewer"), so never add a fourth entry. The three are
+// deliberately on three different upstream providers because one provider's shared free pool
+// saturating is the actual failure mode this chain exists to survive.
 const MODELS = [
-  'google/gemma-4-31b-it:free',      // best free Hindi (140+ languages); Google AI Studio pool
-  'google/gemma-4-26b-a4b-it:free',  // same family, may route to a different pool slot
-  'nvidia/nemotron-3-ultra-550b-a55b:free', // NVIDIA pool, different upstream entirely
-  'baidu/ernie-5.5-flash-preview:free',     // Baidu pool, last resort
+  'google/gemma-4-31b-it:free',             // best free Hindi (140+ languages); Google AI Studio pool
+  'nvidia/nemotron-3-ultra-550b-a55b:free', // NVIDIA pool — different upstream, 550B
+  'baidu/ernie-5.5-flash-preview:free',     // Baidu pool — third distinct upstream, last resort
 ];
 
 async function generateChallengeFromOpenRouter(): Promise<ChallengeJson> {
