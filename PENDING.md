@@ -24,6 +24,59 @@ plus old drafts **#8** (production sync `qty` null) and **#12** (EOTM one-award)
 - November `PERMANENT_WORKER` draft `d49f2ff3` still exists, untouched — don't let it be calculated.
 - `payroll-run` v17, `shift-reminder` v23 — both as documented.
 
+## Daily shift allocation (VFL1560/VFL1566) — BUILT and live; reminders NOT yet proven to deliver (verified 13 Nov 06:00 IST)
+
+**Built and confirmed live, first-hand (owner asked 13 Nov whether it exists for his two people — it does):**
+- `shift_allocation_mode='daily'` on **exactly** VFL1560 Shaikh Majeed (Maintenance) and VFL1566
+  Abhimanyu Kakde (VMC Shop), both `is_active`; the other **152** employees stay `'weekly'`.
+- `allocate_team_shift_day(p_employee_id uuid, p_shift_id uuid, p_date date)` exists, `SECURITY DEFINER`,
+  grants `postgres`/`authenticated`/`service_role`, **no `anon`** — matches `allocate_team_shift_week()`.
+- Both pg_cron jobs exist and `active=true`: `daily-allocator-reminder` 19:00 IST,
+  `daily-allocator-hr-escalation` 21:00 IST. Both carry the correct `mode` in their body and a real key.
+- Merged (PR #80 → `07aa425`), shipped in **apk-132**, and `shift-reminder` is deployed at **v23**
+  containing both new modes — proven by behaviour, not by the deploy call's own say-so (see below).
+- Each allocator has a **12-person** team, all `uses_app=true`.
+
+**⚠ NOT proven end-to-end: no allocator reminder has ever been delivered.**
+`notifications` contains **zero** rows of `daily_allocation_incomplete` or `daily_allocation_hr_escalation`
+— none, ever. There is no CHECK constraint blocking the types. Two separate reasons, one explained, one not:
+1. **19:00 IST on 12 Nov — explained, one-off, no action needed.** The job fired on time but
+   `shift-reminder` v23 only deployed at **20:41 IST**, so it hit the old function: `function_edge_logs`
+   shows a **400** at 13:30 UTC (= 19:00 IST) next to the 200 from the every-15-min `forms_due_reminder`.
+   That is exactly the "unknown mode until the merge deploys" behaviour the build notes predicted. It also
+   proves v23 really does carry the new modes, since the same call returned **200** after the deploy.
+2. **21:00 IST on 12 Nov — UNEXPLAINED, genuinely open.** The escalation ran *after* the deploy and
+   returned **200** with no `console.error` (the handler returns 500 and logs on any throw, and
+   `notifyEmployees` throws on a failed insert — so nothing threw). Yet it created no notification, even
+   though **all 24** team members had no `employee_shifts` row for 13 Nov. The code path has no
+   weekly-off exclusion, so on the data it *should* have notified HR. **Could not be resolved:**
+   `net._http_response` had already pruned that run's body, and `employees` carries no audit trigger, so
+   neither the response nor the exact time the two rows were switched to `'daily'` can be recovered. The
+   most plausible benign explanation is that the mode flag was set *after* 21:00 IST, which would make
+   `allocators.size === 0` an early return — but that is a hypothesis, **not verified**. Do not record
+   this as working until a run is observed delivering.
+
+**Tonight (13 Nov) is a clean natural test, no code needed.** Tomorrow is **Saturday 14 Nov**, and
+coverage is already uneven: **VFL1560 has 4 of 12 unassigned, VFL1566 has all 12 assigned.** So the
+19:00 IST reminder should notify **VFL1560 only**, and the 21:00 escalation should stay silent if he
+fills it in. Check `notifications` for the two types after 19:00/21:00 IST tonight — that settles item 2
+either way.
+
+**Design point worth a decision (Claude's finding, owner has not been asked):** **13 Nov is a Friday —
+the company-wide weekly off.** `employee_shifts` has **zero** rows for 13 Nov company-wide (7–12 Nov each
+have ~111; 14–16 Nov have 86) and `mark_weekly_offs()` has already written **93 `WO`** attendance rows for
+it. `findIncompleteDailyAllocations()` has **no weekly-off exclusion**, so as written the 19:00/21:00 pair
+will nag both allocators — and escalate to HR — every Thursday night about a Friday that is *correctly*
+unallocated. Not changed (nobody asked); needs the owner's call before touching it.
+
+## Separate live failure found 13 Nov 06:00 IST — `five-s-challenge-generator` is broken
+
+Its 06:00 IST run returned **500**: `Gemini API error 404: "This model models/gemini-2.0-flash is no
+longer available. Please update your code to use models/gemini-3.8-flash"`. The model was retired
+upstream, so the daily 5S challenge is not being generated at all. Unrelated to the payroll/shift work;
+found while reading `net._http_response`. **Not fixed — nobody has asked.** The fix is a model-id change
+in `supabase/functions/five-s-challenge-generator/index.ts` plus a redeploy.
+
 ## Reconciliation findings (13 Nov) — what was actually wrong
 
 1. **🔴 The 13 Nov session's own record was orphaned.** Its RESUME STATE block and the 12 Nov
