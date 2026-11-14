@@ -4,7 +4,7 @@
 // Writes ONLY agent_verdict / agent_notes / agent_reviewed_at. Never touches decision or adjustments.
 // On LLM/network/parse failure NOTHING is written, so the caller can retry.
 // Secret: ANTHROPIC_API_KEY (Supabase -> Edge Functions -> Secrets).
-import { buildUserPrompt, cutoffDateIst, extractReview, MODEL, ownerAlertRow, SYSTEM_PROMPT } from '../payroll-warning-review/lib/review.ts';
+import { autoAgreeForIneligibleWaiver, buildUserPrompt, cutoffDateIst, extractReview, MODEL, ownerAlertRow, SYSTEM_PROMPT } from '../payroll-warning-review/lib/review.ts';
 
 export type ReviewResult =
   | { ok: true; status: 200; body: Record<string, unknown>; skipped?: boolean; verdict?: string; notes?: string }
@@ -30,6 +30,21 @@ export async function reviewWarning(
     if (w.agent_reviewed_at) {
       return { ok: true, status: 200, skipped: true, verdict: w.agent_verdict, notes: w.agent_notes,
         body: { ok: true, skipped: 'already reviewed', verdict: w.agent_verdict, notes: w.agent_notes } };
+    }
+
+    // ---- deterministic short-circuit: waiving a non-deduct-eligible late is what the rule requires (no LLM)
+    const auto = autoAgreeForIneligibleWaiver(w.warning_type, w.decision, w.detail);
+    if (auto) {
+      const { error: aErr } = await supabase.from('pay_run_warnings')
+        .update({ agent_verdict: auto.verdict, agent_notes: auto.notes, agent_reviewed_at: new Date().toISOString() })
+        .eq('id', w.id).is('agent_reviewed_at', null);
+      if (aErr) {
+        console.error('payroll-warning-review: save failed: ' + aErr.message);
+        return fail(500, 'save failed: ' + aErr.message);
+      }
+      console.log(`payroll-warning-review: ${w.id} auto-agreed (deduct_eligible=false waiver), no LLM call`);
+      return { ok: true, status: 200, verdict: auto.verdict, notes: auto.notes,
+        body: { ok: true, verdict: auto.verdict, notes: auto.notes, notified: false } };
     }
 
     // ---- context (all keyed by employee_code)

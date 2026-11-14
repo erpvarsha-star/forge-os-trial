@@ -1,5 +1,5 @@
 /** payroll-warning-review pure logic test. Run: npx tsx scripts/payroll-warning-review.test.ts */
-import { buildUserPrompt, cutoffDateIst, extractReview, ownerAlertRow, SYSTEM_PROMPT, MODEL } from '../supabase/functions/payroll-warning-review/lib/review'
+import { buildUserPrompt, cutoffDateIst, extractReview, ownerAlertRow, SYSTEM_PROMPT, MODEL, autoAgreeForIneligibleWaiver } from '../supabase/functions/payroll-warning-review/lib/review'
 let pass = 0, fail = 0
 const check = (n: string, c: boolean, d = '') => { c ? (pass++, console.log(`  ok  ${n}`)) : (fail++, console.log(`FAIL  ${n} ${d}`)) }
 
@@ -39,5 +39,23 @@ const row = ownerAlertRow('VFL1001', { warningId: 'w1', employeeCode: 'VFL9', de
 check('alert row shape', row.type === 'clean_chit_alert' && row.title_en === 'Clean-chit concern' && row.title_hi === 'क्लीन चिट पर चिंता' &&
   row.body_en.includes('VFL9') && row.body_en.includes('waived') && row.body_en.includes('habitual') && row.payload.warning_id === 'w1')
 check('alert deduct wording', ownerAlertRow('O', { warningId: 'w', employeeCode: 'E', decision: 'deduct', notes: 'n' }).body_en.includes('deducted'))
+const A = autoAgreeForIneligibleWaiver
+const r1 = A('late_excess', 'waived', { nth_over_30: 2, deduct_eligible: false })
+check('auto-agree: ineligible waived', r1?.verdict === 'agree' && r1.notes.includes('nth_over_30=2') && r1.notes.length < 400)
+check('auto-agree: decision "waive" too', A('late_excess', 'waive', { deduct_eligible: false })?.verdict === 'agree')
+check('eligible waived -> LLM', A('late_excess', 'waived', { nth_over_30: 4, deduct_eligible: true }) === null)
+check('deduct decision -> LLM', A('late_excess', 'deduct', { deduct_eligible: false }) === null)
+check('other warning type -> LLM', A('no_punch', 'waived', { deduct_eligible: false }) === null)
+check('missing deduct_eligible -> LLM', A('late_excess', 'waived', { nth_over_30: 1 }) === null)
+check('null deduct_eligible -> LLM', A('late_excess', 'waived', { deduct_eligible: null }) === null)
+check('string "false" -> LLM', A('late_excess', 'waived', { deduct_eligible: 'false' }) === null)
+check('null/undefined detail -> LLM', A('late_excess', 'waived', null) === null && A('late_excess', 'waived', undefined) === null)
+check('JSON-string detail handled', A('late_excess', 'waived', '{"deduct_eligible":false,"nth_over_30":3}')?.notes.includes('nth_over_30=3') === true)
+let threw = false, bad: unknown = 1
+try { bad = A('late_excess', 'waived', '{not json') } catch { threw = true }
+check('unparseable string -> null, no throw', !threw && bad === null)
+check('missing nth -> no "undefined"', !A('late_excess', 'waived', { deduct_eligible: false })!.notes.includes('undefined'))
+check('non-numeric nth -> no "undefined"', !A('late_excess', 'waived', { deduct_eligible: false, nth_over_30: 'x' })!.notes.includes('undefined'))
+check('prompt states deduct_eligible rule', SYSTEM_PROMPT.includes('detail.deduct_eligible is false') && SYSTEM_PROMPT.includes('only be a "concern" when detail.deduct_eligible is true'))
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)
