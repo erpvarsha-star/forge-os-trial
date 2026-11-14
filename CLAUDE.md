@@ -3721,7 +3721,23 @@ exit statuses are stored `effective_from = p_date + 1`; writes `employee_status_
 are picked up by the `apply_due_exits()` pg_cron job at 00:10 IST daily. So the answer to "does HR have
 a function to inform the app about left employees" is **yes, and it works.**
 
-**But it does NOT rotate the PIN or kill sessions** — the same gap found with VFL1557. `PATCH_135`
-(`scripts/PATCH_135_exit_revokes_credentials_15Nov2026.sql`) is written and **deliberately NOT applied**:
-it makes a deactivation destroy that person's PIN, which changes what a mis-click costs (HR would then
-also have to `reset_employee_pin()`), so it is the owner's call, not a silent technical fix.
+**It did NOT rotate the PIN or kill sessions — FIXED 15 Nov 2026 by `PATCH_135`, applied live on the
+owner's approval** ("apply patch 135 .. if they make a mistake then they should take the extra effort to
+reactivate"). `public._revoke_employee_credentials(uuid)` (service_role only) rotates the password to
+three in-database `gen_random_uuid()`s bcrypt-hashed, revokes refresh tokens and expires sessions; it is
+called by **both** `record_employee_status()` and the nightly `apply_due_exits()` cron, at the exact
+point each already sets `is_active = false`. A non-exit transition ('active'/'rehired'/'on_leave')
+revokes nothing.
+
+**🔒 Consequence the owner explicitly accepted — do NOT soften it to a warning:** a deactivation now
+DESTROYS that person's PIN. Reactivating a mis-deactivated employee is **not enough** — HR must also
+reset their PIN via More → Missing Data → reset PIN (`reset_employee_pin()`, which already handles both
+the VFL and CON formulas). His words: *"if they make a mistake then they should take the extra effort to
+reactivate."*
+
+Verified by rolled-back tests on already-inactive employees (positive: PIN hash changed, exit recorded,
+deactivated; negative: `on_leave` changed no credential; cron returned the correct count; the
+owner/hr_admin gate still refuses an unauthenticated caller), with zero residue confirmed afterwards.
+Full test record is in the patch file. **The old deactivations (PATCH_60, PATCH_61, VFL5337 and the
+rest) are still NOT remediated** — this only fixes exits from now on; that backlog remains the separate
+owner item in PENDING.md.

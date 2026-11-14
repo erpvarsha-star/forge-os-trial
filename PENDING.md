@@ -223,16 +223,35 @@ already feed `monthly_scores.task_completion_score` via `nightly-scoring`'s `com
 responsibility expressed as a task is already scored and lateness already costs score. A dedicated
 record-keeping scorecard is a separate build that needs scoping first — do not infer its design.
 
-## 🔴 PATCH_135 WRITTEN, NOT APPLIED — needs the owner's go-ahead (policy, not just code)
+## ✅ PATCH_135 APPLIED LIVE — every exit now revokes credentials (15 Nov 2026, owner approved)
 
-`scripts/PATCH_135_exit_revokes_credentials_15Nov2026.sql`. Makes HR's own exit action
-(`record_employee_status`) and the nightly `apply_due_exits()` cron ALSO rotate the PIN and kill
-sessions, closing the hole proven by VFL1557. **Why it is not simply applied:** after it, a
-deactivation DESTROYS that person's PIN — so a mis-click by HR needs a `reset_employee_pin()` as well
-as a reactivation. That is a change to what a mistake costs, which is the owner's call. Without it,
-each of the 8 exits above will leave another live credential behind. A Sonnet agent was briefed to
-apply it and the spawn was **refused by the safety classifier** (writes to `auth.*` read as
-destructive) — on reflection correct, since this is a policy change.
+Owner: *"apply patch 135 .. if they make a mistake then they should take the extra effort to reactivate."*
+Applied by Claude directly (the Sonnet agent spawn was refused by the safety classifier — writes to
+`auth.*` read as destructive — and on reflection that refusal was right, since this was a policy change,
+not a pure code fix).
+
+`public._revoke_employee_credentials(uuid)` — **service_role only** (verified: anon false, authenticated
+false) — rotates the password to three in-database `gen_random_uuid()`s bcrypt-hashed, revokes refresh
+tokens, expires sessions. Called by **both** `record_employee_status()` (HR's Employee Exit screen) and
+the nightly `apply_due_exits()` cron, at the exact point each already sets `is_active = false`.
+Non-exit transitions revoke nothing. Both functions were rebuilt from their live bodies via
+`pg_get_functiondef`, never retyped — the 4 Nov "v15" lesson.
+
+**Tested in rolled-back transactions on already-INACTIVE employees** (nobody live touched): positive
+CON16 → PIN hash changed, exit row written, deactivated; negative CON18 `on_leave` → PIN untouched;
+`apply_due_exits()` → correct count 0; role gate still refuses a caller with no JWT. **Residue check
+after rollback: CON16/CON18/CON21 all still 0 history rows, is_active unchanged.** Full record in
+`scripts/PATCH_135_exit_revokes_credentials_15Nov2026.sql`.
+
+**🔒 Accepted consequence — tell HR:** a deactivation now destroys that person's PIN. Reactivating a
+mis-deactivated employee is NOT enough; HR must also reset the PIN (More → Missing Data → reset PIN).
+
+**🔴 STILL OPEN — the OLD deactivations are not remediated.** PATCH_135 only fixes exits from now on.
+PATCH_60 (VFL1319), PATCH_61 (CON22, CON23, VFL5354, VFL4048), VFL5337 and every other historical
+deactivation had step 1-2 only, so **their credentials may still authenticate directly.** Remediating
+is one `_revoke_employee_credentials()` call per person and is safe, but it destroys those PINs, so it
+needs the owner's word first — same decision he just made for the forward case. Raise it as its own
+single question when the October run is closed.
 
 ## Next steps
 
