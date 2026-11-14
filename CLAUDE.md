@@ -3517,3 +3517,32 @@ gates or alters October pay. **Do not revisit the 83 `concern` verdicts** — 69
 following the owner's own rule (see the 14 Nov batch-review section above), and the owner has now ruled
 on the remaining 14 as a group. The advisory prompt gap in `_shared/warningReview.ts` stays unfixed and
 unasked-for; it changes no money.
+
+## AI review false-concern fix — both functions live, 14 Nov 2026
+
+**Owner asked for the review prompt to be fixed** after the October run returned 83 `concern` verdicts
+of which 69 were noise (the LLM flagged HR for waiving the 1st/2nd/3rd flagged late, where the plant
+rule permits no deduction at all). Commit `6bfc96e`.
+
+**Two-part fix.** (1) A **deterministic short-circuit** — `autoAgreeForIneligibleWaiver()` in
+`payroll-warning-review/lib/review.ts`, called from `_shared/warningReview.ts` **before any context
+query or LLM call**: a `late_excess` warning **waived** with `detail.deduct_eligible` **strictly
+`false`** is written `agree` with an explanatory note and never reaches the model. **Strict `=== false`
+on purpose** — missing / `null` / the string `"false"` still goes to the LLM, because a row whose
+eligibility is unknown must still be reviewed. Scoped to `late_excess` waives only; `deduct` decisions
+and all other warning types are untouched. Same idempotency guard as the LLM path; the owner
+`clean_chit_alert` is unreachable on this path. (2) A **prompt sentence** so any row that does reach the
+model reasons correctly. Effect: 83 concerns → 14, and ~69 of 110 rows need no API call.
+
+**Live state, each verified by Claude fetching the deployed source back (never from the deploy
+response or an agent's say-so):** `payroll-warning-review-batch` **v2** (CI, `verify_jwt` false);
+`payroll-warning-review` **v7** (manual MCP, `verify_jwt` true, sha `a651686b…`), whose `index.ts` is
+now a thin wrapper importing `reviewWarning`. **The 13 Nov repo-vs-live divergence for the single
+function is CLOSED.** The deploy trap stands: it is not in `deploy.sh`, so a future manual deploy must
+include `_shared/warningReview.ts` and `payroll-warning-review/lib/review.ts` or it ships a broken
+import.
+
+**🔒 Verification lesson — an agent reported stale live state as current.** The deploy agent asserted
+the batch function was "v1, missing the fix". Claude had already read it at v2 *with* the fix and
+re-read it to be sure: the agent had looked before CI's deploy landed and reported that as fact.
+**Re-verify every agent claim about live state, especially one that contradicts a check already done.**

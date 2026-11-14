@@ -20,8 +20,27 @@ October produced 83 `concern` verdicts of which **69 were noise**: the LLM flagg
 **Side effect:** on a run like October's, ~69 of 110 rows now need **no API call at all**.
 **Gates (re-run by Claude, not taken from the agent):** tsc exactly **7** (baseline), warning-review
 **38/0** (was 24/0), warnings **35/0**, decide-warning **26/0**, i18n clean. CI #105 + Deploy #62 green.
-**`payroll-warning-review-batch` verified live at v2** — deployed source fetched back, all 3 files
-present, anchors confirmed, no `temperature`.
+
+**BOTH functions are live with the fix — each verified by Claude fetching the deployed source back:**
+- **`payroll-warning-review-batch` v2** (CI-deployed via `deploy.sh`, `verify_jwt: false`).
+- **`payroll-warning-review` v7** (manual MCP deploy, `verify_jwt: true`, sha `a651686b…`). Its
+  `index.ts` is now the thin version that imports `reviewWarning` from `../_shared/warningReview.ts`,
+  and all 3 bundled files carry `autoAgreeForIneligibleWaiver` + the new SYSTEM_PROMPT sentences.
+  `MODEL='claude-haiku-5-5'`, `max_tokens: 4096`, `output_config: { effort: 'low' }`, **no
+  `temperature`** (confirmed absent — it was removed 12 Nov because Anthropic now 400s on it).
+- **✅ The repo-vs-live divergence recorded on 13 Nov for `payroll-warning-review` is CLOSED** — the
+  live copy now matches the repo. The deploy trap itself still stands: it is **not** in `deploy.sh`
+  (`verify_jwt: true`, which that script cannot produce), so CI will never redeploy it and any future
+  manual deploy must again include `_shared/warningReview.ts` **and**
+  `payroll-warning-review/lib/review.ts`.
+
+**⚠ Verification lesson, worth keeping.** The deploy agent's own report claimed the **batch** function
+was "v1 and out of date, missing `autoAgreeForIneligibleWaiver`". **That was wrong** — Claude had
+already fetched it at v2 *with* the fix, and re-fetched it afterwards to be certain. The agent had read
+the batch function *before* CI's Deploy #62 landed (18:11 IST) and then reported that stale observation
+as current fact. **Always re-verify an agent's claim about live state against the live state itself**,
+especially when it contradicts something already checked — this is exactly why this project's rule is
+"Claude verifies, agents edit".
 
 ## 🆕 NEW LIVE FAILURE — the 5S generator failed its first unattended run
 
