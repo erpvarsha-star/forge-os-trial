@@ -3613,3 +3613,62 @@ necessity for this system to work, if you understand."**
 
 **Generalise it:** before putting any item in front of the owner as blocking, check whether anything in
 payroll, attendance or leave actually reads it. If nothing does, it is an add-on — record it and move on.
+
+## 🔒 VFL1557 Milind Ambadas Barhate — TERMINATED for breach of information, access revoked 15 Nov 2026
+
+**Owner: "milind has been removed as he created breach of information."** Recorded and acted on the same
+turn. He must never again be described as active, and his name must not be re-added to any reminder,
+headcount or "missing data" list.
+
+**What was true before the action (verified live, not assumed):**
+- `role = 'member'` — the LOWEST app role, despite sitting in the Human Resource *department*. This
+  matters for assessing the breach: under PATCH_99/100/101/102 a `member` cannot read
+  `employee_salary_structure` (owner + hr_admin only), cannot read `pay_runs`/`pay_run_items` beyond
+  their own via `my_payslips()`, and cannot read colleagues' `employees` rows at all. **The app was
+  almost certainly not the leak vector.**
+- **0 rows in `audit_log` as actor** — he never performed a single audited write in the app.
+- **Exactly one real check-in ever: 26 Sep 2026, 10:44 IST.** Every `attendance_records` row after that
+  is a `WO` written by the `mark_weekly_offs()` cron, not him attending. (He was one of the five
+  "weekly-off-only people — do nothing" from 1 Nov.) 0 present days in both Oct and Nov 2026.
+- Nothing financial or structural hanging on him: 0 pending leave, 0 approved advances, ₹0 outstanding,
+  0 assigned tasks either direction, 0 push tokens, 0 direct reports, not a supervisor / manager /
+  shift allocator / plant head for anyone. **So no approval chain broke** (contrast PATCH_126).
+
+**What was done — all four steps, because deactivation alone is NOT revocation:**
+1. `employee_status_history` row: `status='terminated'`, `effective_from='2026-11-15'`, note recording
+   the reason and that the exact dismissal date is the owner's to confirm. `terminated` (for cause), not
+   `left`.
+2. `employees.is_active = false`. Active headcount 106 → **105**.
+3. **`auth.users.encrypted_password` rotated** to three concatenated `gen_random_uuid()`s hashed with
+   `extensions.crypt(..., extensions.gen_salt('bf'))` — generated inside Postgres, so **nobody, Claude
+   included, has ever seen the value** (same pattern as PATCH_16's QR salt). Verified `$2a$`, 60 chars.
+4. **`auth.refresh_tokens.revoked = true` and `auth.sessions.not_after = now()`** — and this caught a
+   real exposure: **he had 1 live refresh token and 1 live session at that moment.**
+
+**🔒 THE LESSON, and it generalises to every future dismissal — `is_active = false` ALONE DOES NOT LOCK
+ANYONE OUT.** It blocks only the *app's* login path, because `resolve_login_identifier()` filters on
+`e.is_active = true`. But the synthetic email is derivable by anyone (`<empcode>@forgeos.local`), the PIN
+is unchanged, and **no RLS policy checks `is_active`** — every policy keys on `auth_user_id = auth.uid()`.
+So a direct call to the Supabase Auth API would still mint a working session for a "deactivated"
+employee. **For any departure, and especially a dismissal for cause, all four steps above are required.**
+Earlier deactivations in this project (PATCH_60, PATCH_61, VFL5337, VFL1319 and the rest) did steps 1-2
+only — **those people's credentials may still authenticate directly. Not audited or remediated; raise it
+with the owner as its own item, do not bulk-act on it.**
+
+**Payroll impact: none.** He was already HELD in the October run (no `pay_run_item`), so the run's 102
+items are untouched and it stays at `in_review`. If the run is ever reopened to `draft` and recalculated,
+he is correctly excluded as inactive and his new `employee_status_history` row makes feedSync handle him
+properly. His 6 historical payslips (Apr-Sep) are deliberately left intact for the record.
+
+## 🔒 Owner, 14 Nov 2026 — NO production questions at all until HRMS + payroll is fully built
+
+**Owner: "again i do not want to get into production related questions till we have hrms and payroll as a
+fully built system. so will not answer now for 1st side and second side."**
+
+Stronger than the add-on scope rule above, and it supersedes how Claude has been behaving: **do not ask
+the owner ANY production question** — not the Machine Shop First/Second Side double-count, not which
+Drive form is the live one, not the empty `RAW_FINAL`/`RAW_OIL`/`RAW_VMC` tabs, not the Apps Script
+paste. **This is the second time he has had to say it.** Production work may be investigated and
+recorded in PENDING.md, but nothing about it reaches a brief, a question list, or a "what I need from
+you" section until Goal 1 (HRMS + payroll as the system of record) is complete and he himself opens
+Goal 2.

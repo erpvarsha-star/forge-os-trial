@@ -154,6 +154,36 @@ that Fazal's dashboard tile and the manager report show stale or empty productio
 below about it (the 24-of-29 unresolved forms, the Drive file-id remapping, Machine Shop First/Second
 Side, PR #8's Apps Script paste) is **add-on work with no deadline and no payroll risk.**
 
+## 🔒 VFL1557 TERMINATED + ACCESS REVOKED (15 Nov 2026) — and a security gap it exposed
+
+Owner: *"milind has been removed as he created breach of information."* Done live the same turn, all
+four steps, verified after each. Full record in CLAUDE.md. Headline facts:
+- His app `role` was **`member`** (lowest), despite the Human Resource *department* — so he could not
+  read salary structures, pay runs or colleagues' rows. **0 `audit_log` rows as actor. One real check-in
+  ever (26 Sep 2026).** The app was almost certainly not the leak vector.
+- Nothing hanging: 0 pending leave, ₹0 advance, 0 tasks, 0 direct reports, no approval chain broken.
+- **Payroll untouched** — he was already held in the October run, which stays `in_review` with 102 items.
+
+**🔴 OPEN SECURITY ITEM for the owner — do NOT bulk-act, raise it as its own question when Goal 1 is
+clear.** Revoking access needs FOUR steps, and `is_active = false` is only one of them:
+`resolve_login_identifier()` filters on `is_active`, so deactivation blocks the **app** login — but the
+synthetic email is derivable (`<empcode>@forgeos.local`), the PIN is unchanged, and **no RLS policy
+anywhere checks `is_active`** (they all key on `auth_user_id = auth.uid()`). A direct Supabase Auth API
+call therefore still mints a working session for a "deactivated" employee. Proof it is not theoretical:
+VFL1557 **had 1 live refresh token and 1 live session** at the moment of revocation.
+**Every earlier deactivation in this project did steps 1-2 only** — PATCH_60 (VFL1319), PATCH_61 (CON22,
+CON23, VFL5354, VFL4048), VFL5337, and the rest. **Their credentials may still authenticate directly.**
+Not audited, not remediated. The fix per person is the password rotation + token revocation pattern
+recorded in CLAUDE.md; a durable fix would be an `is_active` check in the auth path or a nightly sweep.
+
+## 🔒 NO production questions until Goal 1 is complete (owner, 14 Nov 2026 — said TWICE)
+
+*"again i do not want to get into production related questions till we have hrms and payroll as a fully
+built system. so will not answer now for 1st side and second side."* **Machine Shop First/Second Side is
+withdrawn, unanswered, and must not be re-asked.** Nor may any other production question reach a brief
+or question list: not which Drive form is live, not the empty `RAW_FINAL`/`RAW_OIL`/`RAW_VMC` tabs, not
+the Apps Script paste. Investigate and record here if useful; put none of it to the owner.
+
 ## Next steps
 
 1. ~~HR presses Calculate~~ — **DONE by HR, 14 Nov 19:52 IST.** The October run is at `in_review` with
@@ -163,10 +193,11 @@ Side, PR #8's Apps Script paste) is **add-on work with no deadline and no payrol
 3. **Confirm the 06:00 IST 5S run** — `select date from "5s_challenges" order by date desc limit 3;`
    If it fails again the log now names the real cause.
 
-**Moved OFF the critical path by the scope rule above** (add-on, Goal 2, no deadline): pasting
-`scripts/PASTE_syncProductionToSupabase_17Oct2026.gs` into the live Apps Script + `testSupabaseSync` +
-PATCH_89's cleanup, and the Machine Shop First/Second Side question. Do not put these back in a payroll
-brief or chase the owner for them.
+**Moved OFF the critical path** (add-on, Goal 2, no deadline, and now under a hard no-questions
+rule — see the block above): pasting `scripts/PASTE_syncProductionToSupabase_17Oct2026.gs` into the live
+Apps Script + `testSupabaseSync` + PATCH_89's cleanup, the Machine Shop First/Second Side question
+(**withdrawn unanswered**), the 24 unresolved form titles and the Drive file-id remapping. Never put
+these in a brief or chase the owner for them.
 
 ## Open owner decisions (nothing is being built on these)
 
