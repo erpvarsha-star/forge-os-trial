@@ -1,4 +1,130 @@
-# >>> RESUME STATE 14 Nov 2026, 12:10 IST — READ THIS FIRST <<<
+# >>> RESUME STATE 14 Nov 2026, 18:30 IST — READ THIS FIRST <<<
+
+**This stage:** fixed the AI-review false-concern bug (owner asked), audited all 10 open GitHub PRs,
+and built the ordered close-out plan below. Also found one NEW live failure and closed four stale items
+with evidence. No payroll/attendance data touched; October's run is untouched and still `draft`.
+
+## ✅ DONE — AI review false-concern fix, deployed and verified live
+
+October produced 83 `concern` verdicts of which **69 were noise**: the LLM flagged HR for waiving the
+1st/2nd/3rd flagged late, where the plant rule permits no deduction at all. Two-part fix, commit `6bfc96e`:
+1. **Deterministic short-circuit** — new pure helper `autoAgreeForIneligibleWaiver()` in
+   `payroll-warning-review/lib/review.ts`, called from `_shared/warningReview.ts` **before any context
+   query or LLM call**. A `late_excess` warning **waived** with `detail.deduct_eligible` **strictly
+   `false`** is written `agree` with an explanatory note and never reaches the model.
+   **Strict `=== false` on purpose** — missing / `null` / the string `"false"` still goes to the LLM.
+   Scoped to `late_excess` waives only; `deduct` decisions and all other warning types untouched.
+   Same idempotency guard as the LLM path; the owner alert is unreachable on this path.
+2. **Prompt clarification** in `SYSTEM_PROMPT` so any row that does reach the model reasons correctly.
+
+**Side effect:** on a run like October's, ~69 of 110 rows now need **no API call at all**.
+**Gates (re-run by Claude, not taken from the agent):** tsc exactly **7** (baseline), warning-review
+**38/0** (was 24/0), warnings **35/0**, decide-warning **26/0**, i18n clean. CI #105 + Deploy #62 green.
+**`payroll-warning-review-batch` verified live at v2** — deployed source fetched back, all 3 files
+present, anchors confirmed, no `temperature`.
+
+## 🆕 NEW LIVE FAILURE — the 5S generator failed its first unattended run
+
+`"5s_challenges"` has **only the 13 Nov row** (that one was Claude's manual invoke). The **06:00 IST
+14 Nov** cron fire returned **HTTP 500**, function log:
+`OpenRouter returned no content (model=unknown, finish_reason=unknown)`.
+**`model=unknown` means OpenRouter returned a body with no `model` field and no content** — so this is
+**NOT** any of the three failures fixed on 13 Nov (429 pool saturation, the 3-item `models` cap, or
+reasoning tokens eating `max_tokens`, all of which would report a real model/finish_reason). The current
+error path **discards the response body**, so the actual cause is unknown. **Fix = log the raw body
+(truncated) on empty content, then read tomorrow's 06:00 IST run.** ~20 min, no APK. Not built yet.
+
+## ✅ PROVEN END-TO-END FIRST TIME — the daily-allocator reminder chain
+
+PENDING previously said "no allocator reminder has ever been delivered". **It delivered on 13 Nov:**
+- **19:00:03 IST** → VFL1560 (Shaikh Majeed), "Shift plan incomplete for tomorrow" — correct, he had
+  4 of 12 unassigned for 14 Nov.
+- **21:00:04 IST** → VFL5440 (Pallavi, hr_admin), naming the allocator **and** the one person still
+  missing (Shriram Pawar CON24) — he had filled 3 of the 4 by then.
+- VFL1566 correctly got nothing (all 12 already assigned).
+Both `notifications` rows carry `related_entity_type='shift_day'`. **This item is CLOSED.**
+
+## ✅ FOUR STALE ITEMS CLOSED WITH LIVE EVIDENCE (they were listed as open but are not)
+
+| Was listed as open | Live reality (queried 14 Nov) |
+|---|---|
+| "`shifts` table has no seed data and no creation flow" | **9 shifts exist**: General, General (Pune), Security Day, Security Night, Shift 1–5. Stale since Sep/Oct. |
+| "Nightly scoring never executed against live data" | **320 `monthly_scores` rows**, latest month = 11 (November). It runs. |
+| "GPS check-in inside the geofence — untested" | **1,187 attendance rows carry `check_in_accuracy_m`.** Real GPS check-ins daily. |
+| "Push registration" (implied open) | **93 `push_tokens`** registered. |
+
+**Still genuinely untested:** `5s_submissions` = **0 rows** — and now explained: there was never a
+challenge to submit against until 13 Nov, so this was blocked by the 5S bug, not by neglect. Worth a
+real device test once the generator is reliable. `maintenance_observations` = 2 rows (partly exercised).
+
+## 📋 All 10 open GitHub PRs — audited 14 Nov 2026
+
+**⚠ The local clone is SHALLOW (depth 50).** `git merge-tree` reported "refusing to merge unrelated
+histories / no merge base" for both real PRs until `git fetch --unshallow` was run (106 → 526 commits).
+**A future session must unshallow before judging any older branch as unmergeable** — the conflict was an
+artifact of the clone, not of the branches.
+
+**2 real PRs, both still drafts, both based on `fbea4357` (Oct):**
+| PR | What | Merge state vs HEAD `6bfc96e` | APK? |
+|---|---|---|---|
+| **#12** `fix(eotm)`: one person, one award | Fetches top-10 per category, assigns in descending winning-margin order, excludes repeat winners. Fixes a real observed bug (CON20 won 3 awards in one month). 1 file, +50/−11, `app/(owner)/eotm.tsx`. | **MERGES CLEAN.** That file has **zero** changes on HEAD since the PR's base — no drift at all. | **YES** (`app/`) |
+| **#8** Production sync: Forge/Press/Machine qty always null | `scripts/ALERT.gs` read RAW_* tabs by column *position*; RAW_FORGE/PRESS/MACHINE have an extra Prod_Type column, so `qty` got the VF number → NaN → null for ~7,000 rows since April. Now maps by header name; repeated rows get `|#2` suffixes instead of being silently dropped. 5 files, +232/−14. | **CONFLICTS — but ONLY in `CLAUDE.md` + `PENDING.md`** (doc text). `scripts/ALERT.gs` has **zero** changes on HEAD since the base, so the real code does not conflict. Trivial resolve: keep HEAD's docs, re-add the PR's notes. | **NO** (`scripts/` is outside the APK paths filter) |
+
+**8 Dependabot PRs open: #62, #63, #64, #65, #66, #67, #70, #71.** PENDING.md's "16 Dependabot PRs"
+table is **out of date** — the 7 genuinely dangerous ones (#68 typescript 5→7, #69 expo-constants 16→58,
+#72 tailwind 3→4, #73 async-storage 1→3, #74 react major, #75, #76) are **already closed**. What remains:
+- **5 GitHub-Actions bumps** — #63 setup-java 4→6, #65 setup-node 4→7, #66 gradle/actions 4→6,
+  #62 upload-artifact 4→7, **#64 supabase/setup-cli 1→3**. #64 is the highest risk of the five: the
+  6 Nov CI outage was caused by exactly a Supabase CLI version change.
+- **3 low-risk npm bumps** — #70/#71 typescript-eslint 7→8 (lint only, not in the APK bundle),
+  #67 minor-and-patch group (6 updates — needs its contents read before any merge).
+
+## 🗺️ THE CLOSE-OUT PLAN — ordered so everything in this file can be cleared in one run
+
+**Design principle: ONE APK at the end, not one per fix.** Every CI run builds a fresh APK off the whole
+branch (not an incremental diff), so all app-code work is batched into Wave 2 and a single build covers
+the lot. Waves 1 and 3 touch no app code and need no build.
+
+### WAVE 1 — Claude alone, no app code, NO APK (~1 hour)
+| # | Item | Notes |
+|---|---|---|
+| 1.1 | **5S empty-body logging fix** | The new finding above. Log the raw OpenRouter body on empty content; redeploy (CI); read the 06:00 IST run next morning. The only *currently broken daily feature*. |
+| 1.2 | **PR #8 — resolve the docs-only conflict and merge** | Code side is clean. After merge the Apps Script paste is **owner's step** (Wave 3). No APK. |
+| 1.3 | **Close the 4 stale items + the proven allocator chain** | Already evidenced above; just needs the old sections struck through so a future session stops re-reading them as open. |
+| 1.4 | **Dependabot decision executed** | Per the owner's call in Wave 4 — close or hold. Pure GitHub housekeeping. |
+
+### WAVE 2 — Claude alone, app code, then ONE APK (~2 hours + ~25 min build)
+| # | Item | Notes |
+|---|---|---|
+| 2.1 | **PR #12 EOTM one-person-one-award — merge** | Merges clean, zero drift, fixes a real observed bug. Open question in its own body: tie-break when two categories have equal margins is currently category list order — owner may want a different priority. |
+| 2.2 | **Calendar colour fix** (Late yellow vs Half-Day orange, near-identical) | Claude's own finding. Cosmetic, ~20 min. |
+| 2.3 | **5S photo submission** — real-device test | Unblocked for the first time now that a challenge row exists. Needs a phone, so it is really a Wave-3 hand-off once the APK is out. |
+| 2.4 | **ONE APK build** | Covers 2.1 + 2.2 together. Verify the RELEASE exists (`get_release_by_tag`), not just that the run was green. |
+
+### WAVE 3 — needs the owner / HR / Kajal (Claude cannot do these)
+| # | Item | Who |
+|---|---|---|
+| 3.1 | **Press Calculate on the October run** — nothing gates it any more | HR |
+| 3.2 | **Paste PR #8's function into the live Apps Script + run `testSupabaseSync` once; then PATCH_89's cleanup (count first)** | Owner |
+| 3.3 | **`listAllFormsInDrive()`** → give the 22 real form titles so `resolveFormSheets` can match | Owner |
+| 3.4 | **Which forms should NOT be chased per shift** → Claude sets both mute switches (data, no redeploy) | Owner |
+| 3.5 | **Supervisors message @Form_mgr_bot** to register Telegram chat IDs (only DME VFL5434 done) | HR to circulate |
+| 3.6 | **Shakeel Sayyad's emp_code**; **VFL1527's phone**; **`leave_balances` for VFL5463/64/65/66** | Owner/HR — never fabricated |
+| 3.7 | **November Extras report** incl. 8–11 Nov Diwali paid holiday — due December, must NOT be written as `H` rows | Claude builds, HR approves |
+
+### WAVE 4 — decisions only, nothing built until answered
+| # | Item |
+|---|---|
+| 4.1 | **Dependabot**: close the 5 Actions bumps + 3 npm bumps, or hold them pending a green APK? (Recommendation: close #64 outright — it caused the 6 Nov outage class; hold the rest.) |
+| 4.2 | **EOTM tie-break rule** (PR #12's own open question). |
+| 4.3 | **AI-agent roadmap** — 6 candidates listed at the bottom of this file; needs prioritisation + model tier before any build. |
+| 4.4 | **Fraud escalation tiers** (2nd flag → HR, 3rd+ → owner/plant head) — wired nowhere, never fires. Not urgent. |
+| 4.5 | **720 off-by-one** in `lib/istDate.ts:26` + `lib/serverClock.ts:61` — owner has NOT asked for the forward fix. Leave unless it appears in an unpaid month. Change both files together if ever touched. |
+| 4.6 | **Rotating `supervisor_id`** — still manual weekly SQL, closed as out of scope 10 Aug but keeps recurring. |
+
+---
+
+# >>> RESUME STATE 14 Nov 2026, 12:10 IST (October warnings closed) — SUPERSEDED by the block above; history, NOT a to-do <<<
 
 **What this stage was:** execute the batch AI review the owner approved as option "c" on 13 Nov, to
 unblock the October payroll run. **DONE — October is no longer blocked.** No app code, no new APK, no
@@ -255,7 +381,11 @@ Whichever is chosen, `getWeekDays()` is duplicated by hand in two files and **bo
   containing both new modes — proven by behaviour, not by the deploy call's own say-so (see below).
 - Each allocator has a **12-person** team, all `uses_app=true`.
 
-**⚠ NOT proven end-to-end: no allocator reminder has ever been delivered.**
+**✅ PROVEN END-TO-END 13 Nov 2026 — this warning is now OUT OF DATE, see the top block.** The 19:00 IST
+reminder reached VFL1560 and the 21:00 IST escalation reached HR (VFL5440) naming him and CON24. Both
+rows are in `notifications` with `related_entity_type='shift_day'`. The original text follows as history:
+
+**(historical) ⚠ NOT proven end-to-end: no allocator reminder has ever been delivered.**
 `notifications` contains **zero** rows of `daily_allocation_incomplete` or `daily_allocation_hr_escalation`
 — none, ever. There is no CHECK constraint blocking the types. Two separate reasons, one explained, one not:
 1. **19:00 IST on 12 Nov — explained, one-off, no action needed.** The job fired on time but
@@ -1702,13 +1832,13 @@ queued as the next build task.
 - [ ] **Role-by-role walkthrough** — now much cheaper: sign in as VFL1001 and
       use **More → View as** to step through all seven roles and every
       department. No second login, no PIN resets, nothing to undo afterwards.
-- [ ] **5S photo submission end-to-end** — capture → upload → supervisor sees it.
-      The one path in build 22/23 I could not test: no device, and Supabase is
-      unreachable from the build sandbox.
+- [ ] **5S photo submission end-to-end** — capture → upload → supervisor sees it. `5s_submissions` is
+      still **0 rows** (checked 14 Nov 2026) — but this was **blocked, not neglected**: there was no
+      challenge row to submit against until 13 Nov 2026, when the 5S generator produced its first row
+      ever. Genuinely testable for the first time now; needs a real device.
 - [ ] **Maintenance observation photo** — same flow, second screen.
-- [ ] **GPS check-in inside the geofence** (100 m around 19.836079, 75.236261).
-- [ ] **Nightly scoring** — rewritten but never executed against live data.
-      Runs 22:00 IST; check `monthly_scores` the next morning.
+- [x] ~~**GPS check-in inside the geofence**~~ — **CLOSED 14 Nov 2026 with live evidence:** 1,187 attendance rows carry `check_in_accuracy_m`; real GPS check-ins happen daily. Radius is 45 m now, not 100 m.
+- [x] ~~**Nightly scoring** — never executed against live data~~ — **CLOSED 14 Nov 2026 with live evidence:** 320 `monthly_scores` rows exist, latest month = 11 (November). It runs.
 
 ---
 
@@ -1817,16 +1947,10 @@ Owner + Plant Head), which today never fire.
 - [ ] **Shakeel Sayyad** — confirmed a real employee, still has no `emp_code`,
       so cannot be provisioned a login.
 - [ ] **VFL1527 phone** — deliberately NULL, correct number still unknown.
-- [ ] **`shifts` table has no seed data and no creation flow** — found 13 Aug
-      while fixing `shift-reminder`'s `daily_checkin_reminder` mode (see
-      above). No `scripts/*.sql` file seeds `shifts`, and
-      `app/(hr-admin)/shifts.tsx` only lets HR assign an *existing* shift to
-      an employee — there's no screen or script that creates one. Until a
-      `shifts` row exists with `start_time` matching
-      `plant_config.form_shift_schedule` (`08:30`/`15:30`/`23:30`),
-      `employee_shifts` can't be populated (FK constraint) and shift-based
-      reminders have nothing real to match against. Needs a decision: seed
-      the three known shifts directly, or build a "create shift" screen.
+- [x] ~~**`shifts` table has no seed data and no creation flow**~~ — **CLOSED 14 Nov 2026 with live
+      evidence:** 9 rows exist — General, General (Pune), Security Day, Security Night, Shift 1, 2, 3,
+      4, 5 (seeded by PATCH_63/64/71 and earlier). `employee_shifts` is populated daily and every
+      shift-based reminder matches against real rows. This entry was stale from ~Sep 2026.
 
 ---
 
