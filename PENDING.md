@@ -58,6 +58,80 @@ CI step, so it never runs** — lowest priority in this file). Confirmed by a fr
 **Genuinely still the owner's:** AI-agent roadmap priorities; fraud escalation tiers; everything in
 "Next steps" below.
 
+## ✅ OCTOBER RUN — HR ALREADY CALCULATED IT (verified live 15 Nov 2026, 00:3x IST)
+
+Run `d5c1e25a-bd3e-425a-8db0-540ef2734a2e` (1–31 Oct, whole company, `population=null`) is **no longer
+`draft`** — it is **`in_review` with 102 `pay_run_items`**. From `audit_log`, actor **VFL5440 (Pallavi)**
+both times:
+- **14 Nov 19:52:30 IST — `calculate` ran.** Payload: `items 102, held 4, warnings 110`
+  (`late_excess 108`, `no_punch 2`), `vdaRatePerDay 103`, `extrasTotalInr 26042` across
+  `extrasEmployees 4`, `workerOtVdaBasis MASTER_SNAPSHOT`. **So the batch AI review did unblock it** —
+  ~7 minutes after the apk-133 brief went out.
+- **14 Nov 19:55:16 IST — transition `calculated` → `in_review`.**
+- `warn_undecided 0`, `warn_unreviewed 0`, `pay_run_ready_to_calculate` still true.
+
+**The 4 held employees** (active, no `pay_run_item` in this run) — 3 already known, 1 new:
+| Code | Name | Why held | Status |
+|---|---|---|---|
+| VFL1001 | Yash Munot | all-zero salary structure (documented) | expected |
+| VFL1557 | Milind Ambadas Barhate | **0 present days**, 5 `WO` rows, 5 rows total | the 1 Nov "weekly-off-only, do nothing" case |
+| VFL4072 | Gundappa Mahadeo Nadde | 0 app punches | owner already ruled: **Batch 2**, pending explanation of app non-use |
+| **VFL4043** | **Uttam Kacharu Bhadgal** (worker, Cutting Shop) | **only 3 present days**, 5 `WO`, 9 rows of 31 — net goes negative, engine holds (`engine.ts:168`) | **NEW — needs the owner's call** |
+
+**🔒 Claude CANNOT press any payroll-run action — decided, not a question.** `payroll-run/index.ts:172-184`
+takes the caller's JWT, maps it to an `employees` row via `auth_user_id`, and requires role `owner` or
+`hr_admin`; a service-role key has no employee row behind it → 403. **Claude has decided NOT to build a
+service-role/`verify_jwt:false` variant for this**, unlike `payroll-warning-review-batch`: that function's
+worst case was an AI verdict written twice, whereas a publicly-callable `calculate`/`transition` endpoint
+writes real pay figures and moves money states. Not worth the exposure. **The owner can do it himself in
+~2 min without waiting for HR: view-as → hr_admin → Payroll Run.** `view-as` is presentation-only, his JWT
+stays `owner`, and the function allows `owner` for every action.
+
+**Remaining transitions** (`payRunStateMachine.ts`): `in_review → approved` (**reversible** — `approved`
+can still go back to `draft`; no money moves, no notifications) then `approved → finalized`
+(**IRREVERSIBLE** — `finalized` only goes forward to `payment_file_generated`; it applies advance
+recoveries, decrementing real outstanding balances, and sends `payslip_ready` to all 102 employees).
+
+## 🔎 PRODUCTION SYSTEM — the real blocker found 15 Nov 2026: 24 of 29 forms do not resolve
+
+Owner, 14 Nov: *"keep production sync separate. you need to first ask for all google forms and google
+sheets where form data comes in to build the production system and improve it."* Claude went and
+inventoried it instead of asking (locked connectors-over-manual-steps rule).
+
+**The whole pipeline funnels through ONE workbook:** ` VFPL Operations Dashboard 2026 -27`,
+`1GHdhrRtOhQFshsAOCK4n3GiJp-6a03k8bn0V_M04wSY` (`DASH_ID` in `ALERT.gs:27`) — **81 tabs**. 11 `RAW_*`
+tabs feed `production_records` via `DEPT_TO_RAW_TAB` (`ALERT.gs:46`).
+
+**That workbook already contains the inventory — a `FORM_SHEET_MAP` tab — and it shows the problem:
+of its 29 rows, only 5 resolve to a real Drive form; 24 are `NO MATCH`.** The 5 that work: Forge /
+Press / HT / Final **Shop Planning** (all four pointing at one responses workbook,
+`1YfAfYH9pJcoNcLvCJuf52lzcHveIStFRqy7Msl9lHJc`) and `VMC Shop Daily Check sheet`.
+
+**Root cause: `form_links.form_name` holds short internal names that are not the real Drive titles.**
+Drive has **100+ Google Forms** (first page alone, `nextPageToken` still set) with heavy duplication —
+"Copy of …" everywhere, **3 files named `VFL PMS Forgings 2026-2027`**, **4 named
+`VFPL Operations Dashboard 2026 -27`**, plus 2024-2025 leftovers. Strong candidate real titles do exist
+for ~12 of the 24 (e.g. `Cutting Daily check sheet` → `VFL Cutting Shop Daily Check Sheet`;
+`Cutting Planning` → `1. Cutting Shop Planning`; `57F4 Inward Form` → `Inward 57F4`;
+`VFL Oil Consumable` → `VFL Oil Consumable 2026`; `Dispatch Plan-Machine Shop` →
+`VFL Dispatch Plan-Machine Shop`).
+
+**Structural finding, worse than the name drift:** at least one form is **recreated monthly with the
+month in its title** — `VFPL Electricity Consumable Form Sep 26` vs the registered
+`VFPL Electricity Consumable Form`. **Any title-based matching therefore breaks every month by design.**
+**Claude's architectural call: key the mapping on the form's Drive FILE ID, not its title** — an id
+survives renames and copies. Needs the owner only to confirm which file is the live one where duplicates
+exist, which is a review, not a compilation.
+
+**Also flagged, not yet confirmed:** `RAW_FINAL`, `RAW_OIL` and `RAW_VMC` all sit at the default 1000-row
+grid size while every other populated `RAW_*` tab is well above it (`RAW_MACHINE` 5455, `RAW_MANPOWER_CONTRACT`
+6632, `RAW_ELECTRICITY` 4082, `RAW_CUTTING` 2091). **So 3 of the 11 mapped departments — Final, Oil,
+VMC Shop — may be feeding nothing at all.** Row-count is grid size, not data, so confirm by reading the
+tabs before acting on this.
+
+**Deliberately NOT bundled with payroll**, per the owner's instruction. The Machine Shop
+First/Second Side double-counting question stays part of this track, not the payroll one.
+
 ## Next steps
 
 1. **HR presses Calculate on the October run** — still the only thing standing between here and
