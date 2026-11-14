@@ -11,6 +11,45 @@ import { Award, Medal, Star, Trophy } from 'lucide-react-native'
 import { BRAND, STATUS } from '@/components/theme'
 import { istMonthYear } from '@/lib/istDate'
 
+const CATEGORIES = [
+  { key: 'attendance', col: 'attendance_score' },
+  { key: 'production', col: 'production_score' },
+  { key: 'safety', col: 'safety_score' },
+  { key: '5s', col: 'five_s_score' },
+] as const
+
+/**
+ * Winner selection rule (per HR spec): ONE PERSON, ONE AWARD.
+ * The same employee must not win multiple categories in the same month.
+ *
+ * Allocation: for each category compute the winner's margin over the runner-up.
+ * Assign categories in descending margin order — the strongest claim keeps its
+ * winner; in every other category the award goes to the next-best employee who
+ * has not already won something. (Previously each category independently picked
+ * its top scorer with LIMIT 1, so one person could sweep all four.)
+ */
+function allocateWinners(candidates: Record<string, any[]>): Record<string, any> {
+  const order = CATEGORIES
+    .map(cat => {
+      const rows = candidates[cat.key] ?? []
+      const top = rows[0]?.[cat.col] ?? 0
+      const runnerUp = rows[1]?.[cat.col] ?? 0
+      return { key: cat.key, margin: top - runnerUp }
+    })
+    .sort((a, b) => b.margin - a.margin)
+
+  const taken = new Set<string>()
+  const results: Record<string, any> = {}
+  for (const { key } of order) {
+    const winner = (candidates[key] ?? []).find(r => !taken.has(r.employee_id))
+    if (winner) {
+      results[key] = winner
+      taken.add(winner.employee_id)
+    }
+  }
+  return results
+}
+
 export default function EOTMScreen() {
   const { t } = useTranslation()
   const { employee } = useAuth()
@@ -21,18 +60,18 @@ export default function EOTMScreen() {
     const fetch = async () => {
       if (!employee) return
       const { month, year } = istMonthYear()
-      const categories = [
-        { key: 'attendance', col: 'attendance_score' },
-        { key: 'production', col: 'production_score' },
-        { key: 'safety', col: 'safety_score' },
-        { key: '5s', col: 'five_s_score' },
-      ]
-      const results: any = {}
-      for (const cat of categories) {
-        const { data } = await supabase.from('monthly_scores').select('*, employee:employees(name, emp_code, department)').eq('month', month).eq('year', year).order(cat.col, { ascending: false }).limit(1).single()
-        if (data) results[cat.key] = data
+      // Top 10 per category so there is always an eligible runner-up to promote.
+      const candidates: Record<string, any[]> = {}
+      for (const cat of CATEGORIES) {
+        const { data } = await supabase
+          .from('monthly_scores')
+          .select('*, employee:employees(name, emp_code, department)')
+          .eq('month', month).eq('year', year)
+          .order(cat.col, { ascending: false })
+          .limit(10)
+        candidates[cat.key] = data ?? []
       }
-      setWinners(results)
+      setWinners(allocateWinners(candidates))
       setIsLoading(false)
     }
     fetch()
