@@ -77,7 +77,7 @@ export const STATUS = {
   late: tone('#A6650A', '#FBEDD0', 'late'),
   weekoff: tone('#5B6373', '#EBEDF1', 'weekoff'),
   holiday: tone('#5B48B0', '#EBE4F8', 'holiday'),
-  halfday: tone('#A6540A', '#FBE7D0', 'halfday'),
+  halfday: tone('#1D5FB4', '#DCE9FA', 'halfday'),
   pending: tone('#A6650A', '#FBEDD0', 'pending'),
   approved: tone('#0E7A44', '#E1F5EA', 'approved'),
   rejected: tone('#C22030', '#FBE3E5', 'rejected'),

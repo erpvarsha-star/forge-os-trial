@@ -64,8 +64,8 @@ module.exports = {
           'weekoff-bg': '#EBEDF1',
           holiday: '#5B48B0',
           'holiday-bg': '#EBE4F8',
-          halfday: '#A6540A',
-          'halfday-bg': '#FBE7D0',
+          halfday: '#1D5FB4',
+          'halfday-bg': '#DCE9FA',
           // Approval / request states (leave_requests, advance_requests, ...)
           pending: '#A6650A',
           'pending-bg': '#FBEDD0',

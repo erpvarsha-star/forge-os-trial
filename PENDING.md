@@ -599,7 +599,18 @@ Revisit only if this shape appears in an *unpaid* month. Keep the two files in s
 
 1. **October run AI review — ROOT CAUSE FOUND, fix in repo, NOT DEPLOYED.** Run `d5c1e25a` still draft, feeds confirmed, 110 warnings / 0 undecided / 110 unreviewed. HR did retry on 12 Nov 15:05 IST; every call returned 502. Function log: Anthropic HTTP 400 "`temperature` is deprecated for this model". Fix = remove `temperature: 0` from `supabase/functions/payroll-warning-review/index.ts` line 90 (done on the work branch). **Deploy was blocked by the session's permission classifier — needs Yash's explicit "go"**, then: deploy via Supabase MCP (`verify_jwt: true`, files `index.ts` + `lib/*` verbatim), fetch back and diff, then HR taps "Retry review" once, then Calculate.
 2. **Attendance bug A — early morning check-in filed on the PREVIOUS day.** `attendanceDateStr()` (`lib/istDate.ts`) rolls the day at 06:45 IST for everyone, but shift inference accepts Shift 1/4 arrivals from 06:00. A day-shift check-in before 06:45 lands on yesterday's date. 12 Nov: VFL4008 (06:39), VFL4026 (05:01, also given 301 late minutes), VFL4066 — all filed under 11 Nov, no 12 Nov row. 29 such rows since 1 Oct (7 in Nov). Not fixed; rule needed from Yash (see questions). The three open rows of 12 Nov need their date moved to 12 Nov — needs Yash's go.
-3. **Attendance bug B — night-shift checkout creates a fake one-minute day.** `hooks/useAttendance.ts` only falls back to the open (previous-date) record when NO row exists for today. When a row already exists (the 00:01 `WO` pre-write on a Friday, or any earlier row) the app offers Check In, the worker taps in then out: a ~1-minute row marked `HL`, the real night shift is later auto-closed at default hours, and that night's check-in is blocked. VFL4071: 6 Nov (07:02–07:03) and 7 Nov (07:12–07:13) are this; nights of 2 and 3 Nov have no row at all. 14 in/out-within-5-min rows in Nov, 81 since 1 Oct (some are test taps). Not fixed.
+3. ~~**Attendance bug B — night-shift checkout creates a fake one-minute day.**~~ **STALE — this was
+   already FIXED on 12 Nov 2026 in commit `087dfcf`** ("Fix 3 attendance bugs: wrong-date filing,
+   WO-blocked night checkout, fake tap half-days"); this line was never updated. **Verified in code
+   14 Nov 2026:** `hooks/useAttendance.ts` `fetchRecords()` now looks for a genuinely **open** record
+   (`check_in_time` set, `check_out_time` null, within `OPEN_RECORD_FALLBACK_HOURS` = 23 h, kept just
+   under the 24 h `auto-checkout` cutoff) **FIRST, regardless of its date**, and only falls back to
+   whatever is dated "today" when no open record exists — so a `WO`/`H`/`A` placeholder can no longer
+   shadow a running night shift, and a `WO` row can never match the open-record query because it has
+   no `check_in_time`. `checkOut()` also carries `ACCIDENTAL_TAP_MINUTES` and `undoCheckout`.
+   **The VFL4071 rows of 6-7 Nov predate that fix**; the DATA was never corrected (see CLAUDE.md's
+   12 Nov entry — that is a separate, still-open item needing real punch times from HR/Kajal), but the
+   CODE is fixed. Anyone still hitting it is on a pre-`087dfcf` APK.
 4. **Calendar UX:** Late and Half Day colours are nearly identical, so a fake `HL` reads as "late" while the Late tile says 0.
 5. **6 Nov / 10 Nov weekly-off swap — still NOT applied.** 6 Nov: 72 worked, 25 `WO` untouched. 10 Nov: 8 rows only (7 P, 1 L), no `WO` rows. Can still be written (not time-critical for pay) — needs Yash's go.
 6. **8–11 Nov almost empty** (about 10 rows a day, no `H` rows). If the plant was shut for Diwali, November pay will treat those days as absent unless holiday/extras are decided.

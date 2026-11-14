@@ -39,8 +39,8 @@ export const ATTENDANCE_STATUS_COLORS: Record<string, string> = {
   A: 'bg-red-500',
   L: 'bg-yellow-500',
   WO: 'bg-gray-400',
-  H: 'bg-blue-400',
-  HL: 'bg-orange-400',
+  H: 'bg-purple-600',
+  HL: 'bg-blue-700',
 }
 
 // Statuses meaning the person was physically at work — 'L' is Late, not Leave.
