@@ -3547,3 +3547,39 @@ import.
 the batch function was "v1, missing the fix". Claude had already read it at v2 *with* the fix and
 re-read it to be sure: the agent had looked before CI's deploy landed and reported that as fact.
 **Re-verify every agent claim about live state, especially one that contradicts a check already done.**
+
+## 🔒 Owner process rule, 14 Nov 2026 — Claude DECIDES technical questions; only business questions go to the owner
+
+**Owner: "You have built the entire system and remain the architect for it. Technical questions for my
+decision to keep open or close is difficult for me to answer."**
+
+**This refines the 13 Nov "one issue, one question" rule rather than replacing it.** That rule set the
+*format* of a question (one at a time, with options and time estimates). This one sets **which questions
+are allowed to be asked at all.**
+
+**The line:**
+- **Claude decides, and simply reports the decision in one line:** anything whose answer depends on
+  knowledge of this codebase, its pinned dependency chain, its deploy paths, RLS, schema, CI, library
+  versions, code structure, or which of two technical options is safer. The owner has no basis to judge
+  these and asking him is handing him Claude's own job. **Decide it, do it, say what was decided and
+  why in one sentence.** If it later proves wrong, say so and fix it — that is the architect's risk to
+  carry, not his.
+- **The owner decides:** money, people, policy, and anything about how the plant actually runs — what
+  gets paid and to whom, whose attendance counts, what a rule *should* be, who approves what, what is
+  a holiday, whether a figure is correct, priorities and sequencing, and anything that spends real money
+  or touches a real person's pay. Also: anything irreversible or outward-facing where he carries the
+  consequence.
+- **Grey area → decide it, then state the decision and that it is reversible**, instead of asking.
+  Do not park work waiting for an answer to a question he cannot answer.
+
+**What triggered it (recorded so the lesson survives):** Claude ended a brief asking him to choose
+whether to close or hold 8 Dependabot pull requests — a judgement requiring knowledge of why
+`react-native`, `nativewind` and `expo-constants` are pinned for Expo SDK 51. That is a pure
+architecture call. **Executed the same turn as the architect's decision:** #67 and #64 closed (each
+with a comment on the PR stating the reason, so the label alone cannot mislead a future session into
+reopening them); #62/#63/#65/#66 and #70/#71 left open deliberately. See PENDING.md.
+
+**Still binding, unchanged:** the locked "full brief at the end of every job" rule. The brief still
+states what was done, what was verified, and what is live vs merged vs untested — it just no longer
+contains technical questions for the owner. Where a decision was Claude's, the brief names it as
+Claude's call, so he can override it.

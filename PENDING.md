@@ -1,4 +1,4 @@
-# >>> RESUME STATE 14 Nov 2026, 19:45 IST — READ THIS FIRST <<<
+# >>> RESUME STATE 15 Nov 2026, 00:26 IST — READ THIS FIRST <<<
 
 **Owner said "option a" — Wave 1 + Wave 2 of the close-out plan are DONE, in one APK.** Commit
 `0e713d1`. **`apk-133` published** (88.4 MB, built from `0e713d1`, asset uploaded — release confirmed
@@ -30,6 +30,34 @@ latepolicy **7/0**.
 2. **Already shipped, not pending:** the Pune bulk-upload screen (`pune-bulk-attendance.tsx`) and the
    "Confirm feeds are final" gate (in `payroll-run.tsx` + both i18n files).
 
+## 🔒 New standing rule — Claude decides technical questions (14 Nov 2026)
+
+**Owner: "You have built the entire system and remain the architect for it. Technical questions for my
+decision to keep open or close is difficult for me to answer."** Full text in CLAUDE.md. In short:
+anything whose answer needs knowledge of this codebase (pinned dependencies, deploy paths, RLS, schema,
+CI, which option is safer) is **Claude's to decide and report in one line**, never a question for the
+owner. Only money / people / policy / plant-operations questions, and irreversible outward-facing
+actions, go to him. **It refines the 13 Nov "one issue, one question" rule — that governs the format of
+a question; this governs whether it may be asked at all.**
+
+**Executed the same turn:** Dependabot **#67 and #64 CLOSED** (each with a comment on the PR giving the
+reason, so the misleading "minor-and-patch" label cannot trick a future session into reopening #67).
+**6 left open on purpose:** #62/#63/#65/#66 (Actions bumps — they change the build machine, not the
+app's own libraries, so they fail loudly and can never silently ship a broken APK; take one at a time,
+each with a green APK) and #70/#71 (lint-only; **verified 14 Nov that eslint has no config file and no
+CI step, so it never runs** — lowest priority in this file). Confirmed by a fresh listing: exactly those
+6 open. No build triggered, no branch touched.
+
+**Reclassified by this rule — these are no longer owner decisions:**
+- **EOTM tie-break** when two categories have identical winning margins → Claude's call.
+- **The `lateMinutesAgainst` 720 off-by-one** (`lib/istDate.ts:26` + `lib/serverClock.ts:61`, which must
+  always change together) → Claude's call for the forward fix. **Still deliberately unapplied**: the
+  owner ruled out touching already-paid months, and the forward change touches `lib/`, so it rides the
+  next APK rather than one of its own.
+
+**Genuinely still the owner's:** AI-agent roadmap priorities; fraud escalation tiers; everything in
+"Next steps" below.
+
 ## Next steps
 
 1. **HR presses Calculate on the October run** — still the only thing standing between here and
@@ -44,15 +72,25 @@ latepolicy **7/0**.
 
 ## Open owner decisions (nothing is being built on these)
 
-- **Dependabot (8 open).** **Deliberately NOT actioned** — closing PRs is outward-facing and this was a
-  Wave-4 decision, not part of "option a". Recommendation stands: **close #67** (mislabelled
-  "minor-and-patch" but carries `react-native` 0.74→0.88 and `nativewind` 4.1→4.2, both forbidden pins)
-  and **#64** (`supabase/setup-cli` 1→3 — that version class caused the 6 Nov CI outage); **hold**
-  #62/#63/#65/#66 until an APK verifies green on each; #70/#71 are lint-only.
-- **EOTM tie-break** when two categories have identical margins (currently category list order).
+- ~~**Dependabot (8 open).**~~ **CLOSED OUT 14 Nov 2026 — decided by Claude as architect, on the
+  owner's standing instruction that he should not be asked to adjudicate technical choices he has no
+  basis to judge.** #67 and #64 are **closed** (each with a comment stating why, so a future session
+  or a re-read of the label does not reopen them). **6 remain open on purpose:** #62/#63/#65/#66
+  (GitHub Actions bumps — they change the build machine, not the app's libraries, so they fail loudly
+  and cannot silently ship a broken APK; take one at a time, each with a green APK) and #70/#71
+  (lint-only, and verified 14 Nov that eslint has **no config file and no CI step**, so it never runs
+  — lowest priority of anything in this file).
+- ~~**EOTM tie-break**~~ → **no longer an owner decision (14 Nov rule): Claude's call.** Currently
+  category list order when two categories have identical winning margins. Not changed yet; no money or
+  person is affected by the ordering, so it rides whichever build next touches `app/(owner)/eotm.tsx`.
 - **AI-agent roadmap** — 6 candidates listed at the bottom of this file; needs prioritisation.
+  **Genuinely the owner's** (priorities and spend).
 - **Fraud escalation tiers** (2nd flag → HR, 3rd+ → owner/plant head) — wired nowhere, never fires.
-- **720 off-by-one** in `lib/istDate.ts` + `lib/serverClock.ts` — parked; change both together if ever.
+  **Genuinely the owner's** (who gets told about a suspected fraud, and when).
+- ~~**720 off-by-one**~~ → **no longer an owner decision (14 Nov rule): Claude's call.**
+  `lib/istDate.ts:26` + `lib/serverClock.ts:61`, **which must always change together.** Still
+  deliberately unapplied: the owner ruled out touching already-paid months, and the forward fix touches
+  `lib/`, so it rides the next APK instead of a build of its own.
 - **VFL4071's 6/7 Nov rows + 2/3 Nov missing nights** — needs real punch times, not invented ones.
 - **Bug A** (early check-in filed on the previous day) — owner said "leave it" on 12 Nov; untouched.
 
@@ -227,7 +265,7 @@ the lot. Waves 1 and 3 touch no app code and need no build.
 ### WAVE 4 — decisions only, nothing built until answered
 | # | Item |
 |---|---|
-| 4.1 | **Dependabot** (8 open). Recommendation: **close #67 outright** (mislabelled; carries react-native 0.74→0.88 and nativewind 4.1→4.2, both forbidden pins) and **close #64** (supabase/setup-cli 1→3 — a Supabase CLI version change caused the 6 Nov CI outage). **Hold** #62/#63/#65/#66 (Actions bumps) until an APK build is verified green on each, and #70/#71 (lint-only) whenever convenient. |
+| ~~4.1~~ | ~~**Dependabot**~~ — **DONE 14 Nov 2026, no longer an owner decision.** #67 and #64 closed by Claude as architect; #62/#63/#65/#66 and #70/#71 left open deliberately. See the "Open owner decisions" block at the top of this file. |
 | 4.2 | **EOTM tie-break rule** (PR #12's own open question). |
 | 4.3 | **AI-agent roadmap** — 6 candidates listed at the bottom of this file; needs prioritisation + model tier before any build. |
 | 4.4 | **Fraud escalation tiers** (2nd flag → HR, 3rd+ → owner/plant head) — wired nowhere, never fires. Not urgent. |
