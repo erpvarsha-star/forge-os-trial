@@ -1,4 +1,4 @@
-# >>> RESUME STATE 14 Nov 2026, 11:35 IST — READ THIS FIRST <<<
+# >>> RESUME STATE 14 Nov 2026, 12:10 IST — READ THIS FIRST <<<
 
 **What this stage was:** execute the batch AI review the owner approved as option "c" on 13 Nov, to
 unblock the October payroll run. **DONE — October is no longer blocked.** No app code, no new APK, no
@@ -58,14 +58,23 @@ not lateness:
 **Nothing here was changed.** No decision was touched — the batch only ever writes
 `agent_verdict`/`agent_notes`/`agent_reviewed_at`.
 
+## ✅ WARNINGS STAGE CLOSED — owner ruled 14 Nov 2026: "wavier stands for everyone for october"
+
+**No late deduction for anyone in October**, VFL1482 included. Verified live the same turn: the 2
+remaining `deduct` rows (CON12, 8 + 10 Oct) are on the 1st/2nd flagged late with
+`deduct_eligible = false`, which under the locked 25 Oct rule inserts **no adjustment** — zero pay
+effect, so they were left as HR set them, not flipped. `payroll_adjustments` has **0** rows with
+`source_reference like 'warning:%'`. Nothing about lateness alters October pay.
+
 ## Next steps, in order
 
-1. **HR presses Calculate on the October run** — now permitted. Nothing else gates it.
-2. **Owner's call on VFL1482** (the single real habitual-lateness case) — the only concern worth a
-   decision. Everything else is either policy-compliant or a shift-assignment artifact.
-3. **Optional, not asked for:** tighten the review prompt so a waiver on lates 1–3 is never a
-   `concern` (it would have cut 83 concerns to 14). One-file change in
-   `supabase/functions/_shared/warningReview.ts` + a manual redeploy of the batch function.
+1. **HR presses Calculate on the October run** — the only remaining action, and nothing gates it.
+2. **Do NOT revisit the 83 `concern` verdicts.** 69 flagged HR for following the owner's own rule; the
+   owner has ruled on the remaining 14 as a group. Closed.
+3. **Parked, not asked for:** the review prompt still raises a `concern` on a waiver where
+   `deduct_eligible = false` (it would have cut 83 → 14). One-file change in
+   `supabase/functions/_shared/warningReview.ts` + a manual redeploy of the batch function. It is
+   advisory only and changes no money — leave it unless the owner raises it.
 
 ## Still open from the previous block (unchanged by this stage)
 

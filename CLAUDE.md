@@ -3494,3 +3494,26 @@ delays (38 "Net problem", 56 "Let", 43 "Bike padam", 41 "Dashrath ji Puja to Sam
 this file's standing note that he arrives ~07:20–08:30 against Shift 1. CON05 has one real one too
 (39 mins, "Bike petrol end"). **Nothing was corrected** — October attendance is not to be edited, and
 the owner's decision on VFL1482 is the only open item from this review.
+
+## 🔒 Owner decision of 14 Nov 2026 — the October late waiver STANDS FOR EVERYONE; no late deduction in October
+
+**Owner: "wavier stands for everyone for october."** Answering the one question from the batch AI
+review: HR waived 108 of 110 October warnings, and that blanket waiver is confirmed. **No late
+deduction is applied to anyone for October 2026**, VFL1482's 7 flagged lates included (he was the only
+genuine habitual-lateness case the review surfaced). No decision was changed, no adjustment inserted,
+no attendance row touched.
+
+**Verified live the same turn, so this is settled rather than assumed:**
+- The 2 remaining `deduct` decisions (both CON12, 8 Oct and 10 Oct) are on the **1st and 2nd** flagged
+  late with `deduct_eligible = false`. Under the locked 25 Oct 2026 rule a `deduct` on lates 1–3
+  records the decision but **inserts no adjustment**, so they carry **zero pay effect** — they did not
+  need flipping to `waived` and were left exactly as HR set them.
+- `payroll_adjustments` holds **0** rows with `source_reference like 'warning:%'` — nothing was ever
+  inserted from a warning decision for any run. Confirmed by query, not inferred.
+- `pay_run_ready_to_calculate('d5c1e25a-…')` is TRUE and all 110 warnings are AI-reviewed.
+
+**Consequence: the October warnings stage is CLOSED.** HR presses Calculate; nothing about lateness
+gates or alters October pay. **Do not revisit the 83 `concern` verdicts** — 69 of them flagged HR for
+following the owner's own rule (see the 14 Nov batch-review section above), and the owner has now ruled
+on the remaining 14 as a group. The advisory prompt gap in `_shared/warningReview.ts` stays unfixed and
+unasked-for; it changes no money.
