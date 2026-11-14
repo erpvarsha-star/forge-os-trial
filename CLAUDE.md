@@ -3672,3 +3672,56 @@ paste. **This is the second time he has had to say it.** Production work may be 
 recorded in PENDING.md, but nothing about it reaches a brief, a question list, or a "what I need from
 you" section until Goal 1 (HRMS + payroll as the system of record) is complete and he himself opens
 Goal 2.
+
+## 🔒 Owner, 14 Nov 2026 — record-keeping is a SCORED responsibility; this is why he wanted the forms data
+
+**Owner's own words:** *"this is exactly what should carry minus points for HR for not keeping data
+updated… exactly the same reason we wanted to pull the production forms here was they are responsible of
+keeping the data updated. if they don't, when they come for increment review i need data to show them
+their consistency in maintaining records and source of truth information. he should be deactivated
+regardless but HR should do the information update time to time."*
+
+**This reframes an earlier misreading.** The production-forms work was never about production *numbers*.
+Its purpose is **evidence of each responsible person's consistency in maintaining their own
+source-of-truth records**, to put in front of them at **increment review**. Claude had been treating it
+as a reporting/KPI feature; it is an accountability feature. (That does not reopen the production track —
+the no-production-questions rule above still stands. It explains the motive, which changes how the
+feature should eventually be designed when Goal 2 opens.)
+
+**The standing requirement, stated generally:** every role that owns a source of truth is measured on
+whether they keep it current, and that measurement must be producible as a per-person history at
+increment time. Concretely today:
+- **HR (hr_admin)** — recording every exit as it happens (not in batches), completing master data
+  (bank / UAN / PAN), clearing pending leave and advance approvals, entering the monthly payroll feeds.
+  **Not recording a leaver is a minus**, by the owner's explicit instruction.
+- **Shift allocators** — allocating their team's week by Thursday (and, for VFL1560 / VFL1566, daily).
+- **Supervisors / department owners** — submitting their department's daily forms on time.
+
+**What already exists to build this on (verified, not assumed):** `assigned_tasks` + `assigned_task_events`
+(PATCH_83) record who was asked, when it was due, whether it was submitted late, and `returned_count`
+for send-backs; `nightly-scoring`'s `computeTaskRatio` already feeds completed-on-time assigned tasks
+into `monthly_scores.task_completion_score`. So **a recurring responsibility expressed as an assigned
+task is already scored, and lateness already costs the person score.** `LATE_SUBMISSIONS`,
+`DATA_SUBMISSION_LOG` and `DATA_GAPS` tabs also exist in the Operations Dashboard workbook for the forms
+side.
+
+**What does NOT exist yet and is NOT being built unasked:** a per-person *record-keeping* scorecard
+distinct from `task_completion_score` — i.e. a screen or report the owner can open at increment time
+showing, per responsible person per month, what they were responsible for maintaining and how reliably
+they did it. Needs its own scoping with the owner (which responsibilities count, what weight, what
+window) before any build. Do not infer the design.
+
+## Employee exit — HR DOES have the tool (verified 15 Nov 2026), but it does not revoke credentials
+
+**HR's screen: More → Employee Exit** (`app/(hr-admin)/employee-exit.tsx`) → `record_employee_status()`.
+Verified live by reading the function definition: owner/hr_admin only; validates the status transition
+(`active → on_leave/left/terminated/retired`, `terminated` is terminal, `left/retired → rehired`);
+exit statuses are stored `effective_from = p_date + 1`; writes `employee_status_history` with
+`recorded_by`; and **sets `is_active = false`** once the effective date has arrived. Future-dated exits
+are picked up by the `apply_due_exits()` pg_cron job at 00:10 IST daily. So the answer to "does HR have
+a function to inform the app about left employees" is **yes, and it works.**
+
+**But it does NOT rotate the PIN or kill sessions** — the same gap found with VFL1557. `PATCH_135`
+(`scripts/PATCH_135_exit_revokes_credentials_15Nov2026.sql`) is written and **deliberately NOT applied**:
+it makes a deactivation destroy that person's PIN, which changes what a mis-click costs (HR would then
+also have to `reset_employee_pin()`), so it is the owner's call, not a silent technical fix.

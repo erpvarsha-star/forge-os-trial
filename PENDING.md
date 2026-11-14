@@ -184,6 +184,56 @@ withdrawn, unanswered, and must not be re-asked.** Nor may any other production 
 or question list: not which Drive form is live, not the empty `RAW_FINAL`/`RAW_OIL`/`RAW_VMC` tabs, not
 the Apps Script paste. Investigate and record here if useful; put none of it to the owner.
 
+## 🔒 HR data-hygiene task CREATED from the owner (15 Nov 2026) + scoring requirement
+
+Owner: *"set a task for HR from me to do so for every left employee since 25th of September. and a
+notification. and this is exactly what should carry minus points for HR for not keeping data updated."*
+
+**Done, live:** `assigned_tasks` row `fdc04aa8-5c18-498e-b40c-eb3b831b0e1c` — **from VFL1001 (owner) to
+VFL5440 (Pallavi)**, priority `high`, **due 20 Nov 2026**, status `open`. Notification fired via
+`notify_task_event()` and **verified landed unread** in `notifications` with
+`related_entity_type='assigned_task'` pointing at the task. (A direct table insert does NOT notify —
+`assigned_tasks` has no triggers; the notify call is inside the `create_assigned_task` RPC, so it had to
+be fired separately. Remember this if a task is ever inserted by SQL again.)
+
+**The 8 people in the task — active, app users, Aurangabad, non-security, ZERO attendance 1-14 Nov 2026,
+and no approved leave explains any of them** (checked `leave_requests`; the only hit was VFL5433's CL of
+1-3 Oct, still `pending` — itself an HR backlog item):
+| Code | Name | Dept | Present Oct | Present 1-14 Nov |
+|---|---|---|---|---|
+| VFL5397 | Amol Rakhmaji Ambhore | VMC Shop | 22 | 0 |
+| VFL5413 | Sachin Somnath Parmeshwar | Die Shop | 19 | 0 |
+| VFL1066 | Ramnath Babasaheb Gadekar | Heat Treatment | 16 | 0 |
+| VFL5433 | Aniket Kailas Taru | Quality | 12 | 0 |
+| VFL4011 | Banwari Harihar Yadav | Forge Shop | 8 | 0 |
+| **VFL4043** | **Uttam Kacharu Bhadgal** | Cutting Shop | **3** | 0 | ← also the employee HELD in the October pay run |
+| CON24 | Shriram Pawar | Maintenance | 0 | 0 (never logged in) |
+| VFL5457 | Sandip Tryambak Landage | Maintenance | 0 | 0 (never logged in) |
+
+**Stated in the task itself, so HR does not over-act:** zero attendance is evidence, not proof — 8-11 Nov
+was the Diwali shutdown. Each case must be confirmed before an exit is recorded.
+
+**VFL4043 bears directly on the one open payroll question:** he worked 3 days in October and has not
+appeared since. If HR confirms he left, "leave him held and settle separately" becomes the obvious
+answer to the owner's pending decision.
+
+**Scoring requirement recorded in CLAUDE.md, NOT built:** record-keeping is now a scored
+responsibility, and the owner wants a per-person history to show at increment review. Assigned tasks
+already feed `monthly_scores.task_completion_score` via `nightly-scoring`'s `computeTaskRatio`, so a
+responsibility expressed as a task is already scored and lateness already costs score. A dedicated
+record-keeping scorecard is a separate build that needs scoping first — do not infer its design.
+
+## 🔴 PATCH_135 WRITTEN, NOT APPLIED — needs the owner's go-ahead (policy, not just code)
+
+`scripts/PATCH_135_exit_revokes_credentials_15Nov2026.sql`. Makes HR's own exit action
+(`record_employee_status`) and the nightly `apply_due_exits()` cron ALSO rotate the PIN and kill
+sessions, closing the hole proven by VFL1557. **Why it is not simply applied:** after it, a
+deactivation DESTROYS that person's PIN — so a mis-click by HR needs a `reset_employee_pin()` as well
+as a reactivation. That is a change to what a mistake costs, which is the owner's call. Without it,
+each of the 8 exits above will leave another live credential behind. A Sonnet agent was briefed to
+apply it and the spawn was **refused by the safety classifier** (writes to `auth.*` read as
+destructive) — on reflection correct, since this is a policy change.
+
 ## Next steps
 
 1. ~~HR presses Calculate~~ — **DONE by HR, 14 Nov 19:52 IST.** The October run is at `in_review` with
