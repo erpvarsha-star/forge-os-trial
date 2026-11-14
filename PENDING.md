@@ -76,8 +76,17 @@ table is **out of date** — the 7 genuinely dangerous ones (#68 typescript 5→
 - **5 GitHub-Actions bumps** — #63 setup-java 4→6, #65 setup-node 4→7, #66 gradle/actions 4→6,
   #62 upload-artifact 4→7, **#64 supabase/setup-cli 1→3**. #64 is the highest risk of the five: the
   6 Nov CI outage was caused by exactly a Supabase CLI version change.
-- **3 low-risk npm bumps** — #70/#71 typescript-eslint 7→8 (lint only, not in the APK bundle),
-  #67 minor-and-patch group (6 updates — needs its contents read before any merge).
+- **#67 is MISLABELLED AND DANGEROUS — close it, do not hold it.** Dependabot groups it as
+  "minor-and-patch", but its `package.json` diff (read 14 Nov) carries **`react-native` 0.74.0 →
+  0.88.1** (a major jump; the project is pinned to 0.74.0 for Expo SDK 51) and **`nativewind`
+  ~4.1.23 → ~4.2.7** — which is *precisely* the pin CLAUDE.md documents as deliberate, because 4.2.x
+  pulls `react-native-css-interop@0.2.x`, which requires `react-native-worklets/plugin` (Reanimated 4)
+  against this project's pinned `reanimated ~3.10.0`. It also un-pins `react-native-web`
+  0.19.10 → 0.21.4, another deliberate exact pin. Only 3 of its 6 updates are genuinely minor
+  (`@supabase/supabase-js`, `react-native-qrcode-svg`, `react-native-svg`). **The group label is not
+  trustworthy — always read a grouped Dependabot PR's own `package.json` diff before judging it.**
+- **2 genuinely low-risk npm bumps** — #70/#71 typescript-eslint 7→8 (lint only, never bundled into
+  the APK). Still untested against the APK build.
 
 ## 🗺️ THE CLOSE-OUT PLAN — ordered so everything in this file can be cleared in one run
 
@@ -115,7 +124,7 @@ the lot. Waves 1 and 3 touch no app code and need no build.
 ### WAVE 4 — decisions only, nothing built until answered
 | # | Item |
 |---|---|
-| 4.1 | **Dependabot**: close the 5 Actions bumps + 3 npm bumps, or hold them pending a green APK? (Recommendation: close #64 outright — it caused the 6 Nov outage class; hold the rest.) |
+| 4.1 | **Dependabot** (8 open). Recommendation: **close #67 outright** (mislabelled; carries react-native 0.74→0.88 and nativewind 4.1→4.2, both forbidden pins) and **close #64** (supabase/setup-cli 1→3 — a Supabase CLI version change caused the 6 Nov CI outage). **Hold** #62/#63/#65/#66 (Actions bumps) until an APK build is verified green on each, and #70/#71 (lint-only) whenever convenient. |
 | 4.2 | **EOTM tie-break rule** (PR #12's own open question). |
 | 4.3 | **AI-agent roadmap** — 6 candidates listed at the bottom of this file; needs prioritisation + model tier before any build. |
 | 4.4 | **Fraud escalation tiers** (2nd flag → HR, 3rd+ → owner/plant head) — wired nowhere, never fires. Not urgent. |
