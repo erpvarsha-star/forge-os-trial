@@ -1,4 +1,86 @@
-# >>> RESUME STATE 13 Nov 2026, 16:40 IST — READ THIS FIRST <<<
+# >>> RESUME STATE 14 Nov 2026, 11:35 IST — READ THIS FIRST <<<
+
+**What this stage was:** execute the batch AI review the owner approved as option "c" on 13 Nov, to
+unblock the October payroll run. **DONE — October is no longer blocked.** No app code, no new APK, no
+`pay_runs`/`pay_run_warnings` row edited by hand.
+
+## ✅ THE OCTOBER RUN IS UNBLOCKED — `pay_run_ready_to_calculate` is now TRUE
+
+Run `d5c1e25a-bd3e-425a-8db0-540ef2734a2e` (1–31 Oct, whole company):
+
+| | before | after |
+|---|---|---|
+| total warnings | 110 | 110 |
+| undecided (`pending`) | 0 | 0 |
+| **blocking** (`waived`/`deduct`, `agent_reviewed_at IS NULL`) | **101** | **0** |
+| AI-reviewed | 9 | **110** |
+| `pay_run_ready_to_calculate` | **false** | **TRUE** |
+
+Verdicts: **27 `agree`, 83 `concern`**, 0 failed. HR can now press **Calculate** on the October run.
+
+**The AI review has now actually worked for the first time** — it had never once succeeded through two
+earlier fixes (`temperature` on 12 Nov, the `max_tokens` cap in PR #81). The `temperature:0` removal
+was the real cause; this run proves it.
+
+### How it was run (for the next person who needs this)
+
+`payroll-warning-review-batch` invoked via `pg_net` with **no Authorization header**
+(`verify_jwt: false`), **9 sequential batches** of 12 (last two 8 and 6). Measured **~12 s per row**.
+- **Batches must be ≤12 rows** — at ~12 s/row a larger batch risks the edge-function wall clock.
+- **pg_net stops waiting at 55 s but the function runs on to completion**, so on any batch >4 rows the
+  response body is lost while the work still lands. That is fine: the DB counts and the
+  `agent_verdict='concern'` rows are the real record. Set `timeout_milliseconds := 2000` and read the
+  counts from `pay_run_warnings` instead of waiting for a body.
+- It is **idempotent** (`.is('agent_reviewed_at', null)` guard) and skips already-reviewed rows, so a
+  re-fire is safe and cheap.
+
+## ⚠ The 83 `concern` verdicts are mostly NOISE — read this before acting on them
+
+**69 of the 83 are on the 1st/2nd/3rd flagged late (`deduct_eligible = false`), where waiving is
+exactly what the owner's own rule requires** (deduction applies only from the 4th flagged late in the
+month). The AI flagged HR for *following* policy. Distribution: nth=1 → 31, nth=2 → 28, nth=3 → 10,
+nth=4 → 8, nth=5 → 4, nth=6 → 2. **Prompt-design issue in `_shared/warningReview.ts`, not an HR
+problem, and not a blocker** — the review is advisory, it does not gate anything now that every row
+is reviewed.
+
+**Only 14 concerns sit on a 4th-or-later late**, i.e. a waiver that really is an override. Reading
+their own late reasons, most of those are ALSO correct waivers — they are shift misclassification,
+not lateness:
+- **VFL4071** 504 and 496 late mins, reason "2nd shift" — ~8 h "late" = measured against 1st shift's
+  start. Same bug class as the 12 Nov VFL4024/VFL5458 finding. Not lateness.
+- **VFL5400** 193/190 mins ("Nat park"), **VFL4011** 131 mins ("1st shift"), **VFL5079** 113/111 mins
+  ("App problem"), **CON05** 204 mins ("Half day") — all shift/app issues, correctly waived.
+- **VFL1482 is the one genuine habitual-lateness case**: 4 flagged lates all waived, all small real
+  delays — 38 mins ("Net problem"), 56 ("Let"), 43 ("Bike padam"), 41 ("Dashrath ji Puja to Saman").
+  Consistent with CLAUDE.md's standing note that he arrives ~07:20–08:30 against Shift 1.
+- **CON05** also has one real one: 39 mins ("Bike petrol end").
+
+**Nothing here was changed.** No decision was touched — the batch only ever writes
+`agent_verdict`/`agent_notes`/`agent_reviewed_at`.
+
+## Next steps, in order
+
+1. **HR presses Calculate on the October run** — now permitted. Nothing else gates it.
+2. **Owner's call on VFL1482** (the single real habitual-lateness case) — the only concern worth a
+   decision. Everything else is either policy-compliant or a shift-assignment artifact.
+3. **Optional, not asked for:** tighten the review prompt so a waiver on lates 1–3 is never a
+   `concern` (it would have cut 83 concerns to 14). One-file change in
+   `supabase/functions/_shared/warningReview.ts` + a manual redeploy of the batch function.
+
+## Still open from the previous block (unchanged by this stage)
+
+- **Confirm the 5S cron fired unattended** at 06:00 IST: `select date from "5s_challenges" order by date desc limit 3;`
+  (14 Nov is the first unattended fire; 13 Nov's row was written by a manual invoke.)
+- ~~`nightly-scoring` second Gemini caller~~ — **CLOSED 13 Nov 2026, owner chose "leave it" ("b").**
+  Stays on `gemini-1.5-flash`; nothing changed. **`GEMINI_API_KEY` is therefore still live — do NOT
+  delete that secret.** It fails soft (scores compute, only the AI suggestion is silently empty), which
+  is why leaving it is legitimate. Do not re-raise.
+- **Do not touch `pay_run_warnings` / `pay_runs` rows by hand** — HR drives that screen live (6 Nov
+  incident).
+
+---
+
+# >>> RESUME STATE 13 Nov 2026, 16:40 IST (5S generator) — SUPERSEDED by the 14 Nov block above; kept as history, NOT a to-do <<<
 
 **What this stage was:** the owner asked for OpenRouter sign-up steps and a free-model pick for the 5S
 challenge generator, then confirmed he had put the key in Supabase Secrets. Built, deployed and

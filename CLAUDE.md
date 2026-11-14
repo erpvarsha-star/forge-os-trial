@@ -3458,3 +3458,39 @@ session does not "helpfully" undo this:
   column, so **where that text is consumed was never traced** — check that before ever touching it.
 - **Do not re-raise this.** If the owner later wants suggestions working, the fix is the same pattern
   the 5S generator now uses and `OPENROUTER_API_KEY` already covers it — no new key needed.
+
+## Batch AI review EXECUTED, October run unblocked — 14 Nov 2026
+
+**Result: `pay_run_ready_to_calculate('d5c1e25a-bd3e-425a-8db0-540ef2734a2e')` is now TRUE.** Run
+`d5c1e25a` (1–31 Oct, whole company): 110 warnings, blocking **101 → 0**, AI-reviewed **9 → 110**,
+0 failed, verdicts 27 `agree` / 83 `concern`. HR can press Calculate. **The AI review has now actually
+succeeded for the first time** — it had never once worked through two prior fixes; the 12 Nov
+`temperature:0` removal was the real cause, and this run is the proof.
+
+**How, so it is repeatable:** `payroll-warning-review-batch` invoked via `pg_net` with **no
+Authorization header** (it is `verify_jwt: false`, which is exactly why no key ever has to be written
+into SQL or chat — see the 1 Oct 2026 `cron.job` key-exposure incident). **9 sequential batches of
+≤12.** Measured **~12 s per row**, so a bigger batch risks the edge-function wall clock. **pg_net stops
+waiting at 55 s but the function runs on to completion**, so on any batch over ~4 rows the response
+body is lost while the work still lands — set `timeout_milliseconds := 2000` and read the counts from
+`pay_run_warnings` instead of waiting for a body. Idempotent (`.is('agent_reviewed_at', null)`), skips
+already-reviewed rows, so re-firing is safe. Nothing but
+`agent_verdict`/`agent_notes`/`agent_reviewed_at` was ever written — **no HR decision was touched**.
+
+**🔒 The 83 `concern` verdicts are mostly NOISE — do not act on the count.** **69 of 83 are on the
+1st/2nd/3rd flagged late (`deduct_eligible = false`), where waiving is precisely what the owner's own
+rule requires** (deduction only from the 4th flagged late). The AI flagged HR for *following* policy.
+nth=1 → 31, nth=2 → 28, nth=3 → 10, nth=4 → 8, nth=5 → 4, nth=6 → 2. This is a prompt-design gap in
+`supabase/functions/_shared/warningReview.ts`, **not** an HR problem and not a blocker (the review is
+advisory; every row is now reviewed). If it is ever tightened, suppressing a `concern` on a waiver
+where `deduct_eligible = false` would have cut 83 → 14.
+
+**Of the 14 concerns on a 4th-or-later late, most are ALSO correct waivers — shift misclassification,
+not lateness:** VFL4071 504 / 496 mins ("2nd shift") — ~8 h "late" because it was measured against
+1st shift's start, the same bug class as the 12 Nov VFL4024/VFL5458 finding; VFL5400 193/190 ("Nat
+park"); VFL4011 131 ("1st shift"); VFL5079 113/111 ("App problem"); CON05 204 ("Half day").
+**VFL1482 is the one genuine habitual-lateness case** — 4 flagged lates, all waived, all small real
+delays (38 "Net problem", 56 "Let", 43 "Bike padam", 41 "Dashrath ji Puja to Saman"), consistent with
+this file's standing note that he arrives ~07:20–08:30 against Shift 1. CON05 has one real one too
+(39 mins, "Bike petrol end"). **Nothing was corrected** — October attendance is not to be edited, and
+the owner's decision on VFL1482 is the only open item from this review.
