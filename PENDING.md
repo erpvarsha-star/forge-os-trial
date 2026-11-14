@@ -132,17 +132,41 @@ tabs before acting on this.
 **Deliberately NOT bundled with payroll**, per the owner's instruction. The Machine Shop
 First/Second Side double-counting question stays part of this track, not the payroll one.
 
+## 🔒 SCOPE RULE — production sync is an ADD-ON, never a dependency (owner, 14 Nov 2026)
+
+**Owner: "if production sync is lying in pending it is a addon feature to hrms and payroll not a
+necessity for this system to work."** Correct, and **verified in code 15 Nov 2026 rather than taken on
+trust:**
+- `grep -rn "production_records" lib/payroll/ supabase/functions/payroll-run/` → **no match.** Payroll
+  never reads it, in any form.
+- The worker **production allowance does NOT come from production data.** It comes from
+  `payroll_efficiency_entries` (the plant head's typed-in monthly efficiency %) via
+  `payroll_efficiency_slabs` (PATCH_125) — an entirely separate feed. A broken production sync cannot
+  change anyone's pay by one rupee.
+- `production_records` is read by exactly three **display-only** surfaces:
+  `app/(manager)/reports.tsx`, `app/(plant-head)/dashboard.tsx` and `dashboard/index.html`. Nothing
+  writes back from them; nothing in attendance, leave, payroll or statutory depends on them.
+
+**Therefore: production sync belongs to GOAL 2 (KPI / performance), which the owner has already parked
+until Goal 1 is finished — not to the payroll close-out.** It must never again be listed as something
+standing between the plant and a pay run, and **never bundled into a payroll brief.** Its worst case is
+that Fazal's dashboard tile and the manager report show stale or empty production numbers. Everything
+below about it (the 24-of-29 unresolved forms, the Drive file-id remapping, Machine Shop First/Second
+Side, PR #8's Apps Script paste) is **add-on work with no deadline and no payroll risk.**
+
 ## Next steps
 
-1. **HR presses Calculate on the October run** — still the only thing standing between here and
-   October pay. Nothing gates it.
+1. ~~HR presses Calculate~~ — **DONE by HR, 14 Nov 19:52 IST.** The October run is at `in_review` with
+   102 items. See the block above. **Now: owner approves (reversible) then finalizes (NOT reversible),
+   via view-as → hr_admin → Payroll Run**; and decides VFL4043 (3 present days, held).
 2. **Owner: install `apk-133`.**
-3. **Owner: paste `scripts/PASTE_syncProductionToSupabase_17Oct2026.gs` into the live Apps Script**
-   (that one function only, never the whole file — the live copy may hold inline tokens), then run
-   `testSupabaseSync` once. Claude then runs PATCH_89's cleanup (count first). See the production-sync
-   block below for the third open question (Machine Shop First/Second Side double-counting).
-4. **Confirm tomorrow's 06:00 IST 5S run** — `select date from "5s_challenges" order by date desc limit 3;`
-   If it fails again the log will now name the real cause.
+3. **Confirm the 06:00 IST 5S run** — `select date from "5s_challenges" order by date desc limit 3;`
+   If it fails again the log now names the real cause.
+
+**Moved OFF the critical path by the scope rule above** (add-on, Goal 2, no deadline): pasting
+`scripts/PASTE_syncProductionToSupabase_17Oct2026.gs` into the live Apps Script + `testSupabaseSync` +
+PATCH_89's cleanup, and the Machine Shop First/Second Side question. Do not put these back in a payroll
+brief or chase the owner for them.
 
 ## Open owner decisions (nothing is being built on these)
 

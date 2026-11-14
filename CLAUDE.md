@@ -3583,3 +3583,33 @@ reopening them); #62/#63/#65/#66 and #70/#71 left open deliberately. See PENDING
 states what was done, what was verified, and what is live vs merged vs untested — it just no longer
 contains technical questions for the owner. Where a decision was Claude's, the brief names it as
 Claude's call, so he can override it.
+
+## 🔒 Scope rule, 14 Nov 2026 — production sync is an ADD-ON to HRMS/payroll, never a dependency
+
+**Owner: "if production sync is lying in pending it is a addon feature to hrms and payroll not a
+necessity for this system to work, if you understand."**
+
+**Verified in code 15 Nov 2026 before agreeing, not taken on trust:**
+- `grep -rn "production_records" lib/payroll/ supabase/functions/payroll-run/` returns **nothing**.
+  The payroll engine, feedSync and the `payroll-run` function never read production data at all.
+- The **worker production allowance does not come from production records.** It comes from
+  `payroll_efficiency_entries` — the plant head's typed-in monthly efficiency % — resolved through
+  `payroll_efficiency_slabs` (PATCH_125). A completely separate feed. **A broken production sync cannot
+  move anyone's pay by one rupee.**
+- `production_records` is read by exactly three **display-only** surfaces: `app/(manager)/reports.tsx`,
+  `app/(plant-head)/dashboard.tsx`, and `dashboard/index.html`. None of them write back. Nothing in
+  attendance, leave, payroll or statutory reads them.
+
+**Consequences, binding:**
+1. **Production sync belongs to Goal 2 (KPI / performance), which is parked until Goal 1 is complete.**
+   It is never a Goal 1 item and never on the payroll critical path.
+2. **Never list it as something blocking a pay run, and never bundle it into a payroll brief.** The
+   owner has asked twice for the two to be kept apart.
+3. Its worst case is a stale or empty production tile on the plant-head dashboard and the manager
+   report. That is cosmetic, has no deadline, and does not justify chasing the owner.
+4. The same applies to everything downstream of it: the 24-of-29 unresolved form titles, the Drive
+   file-id remapping, the Machine Shop First/Second Side double-count question, and PR #8's Apps Script
+   paste + `testSupabaseSync` + PATCH_89 cleanup. All add-on work.
+
+**Generalise it:** before putting any item in front of the owner as blocking, check whether anything in
+payroll, attendance or leave actually reads it. If nothing does, it is an add-on — record it and move on.
