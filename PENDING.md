@@ -76,6 +76,30 @@ Both `notifications` rows carry `related_entity_type='shift_day'`. **This item i
 challenge to submit against until 13 Nov, so this was blocked by the 5S bug, not by neglect. Worth a
 real device test once the generator is reliable. `maintenance_observations` = 2 rows (partly exercised).
 
+## Production sync fix (PR #8, built 17 Oct 2026) — MERGED 14 Nov 2026, owner action outstanding
+
+Every Forge/Press/Machine Shop `qty` in `production_records` was **null since April** (0 of ~7,000
+rows). Cause: `syncProductionToSupabase()` (`scripts/ALERT.gs`) read the RAW_* tabs by **column
+position**, but RAW_FORGE / RAW_PRESS / RAW_MACHINE carry an extra Prod_Type / Process column — so
+`vf_no` got "Forging Production"/"First Side" and `qty` got the VF number (NaN → null). Its "keep
+last" dedup also silently dropped genuine repeated rows (10 Oct, Hammer 2 Ton, Shift 2, VF1050 was
+entered twice — 378 and 409 — and one was lost). Fixed: columns mapped **by header name**, repeats
+kept with a `|#2` suffix, plus new `process` + `dropout_qty` columns (**PATCH_89, applied live
+17 Oct**). `scripts/ALERT.gs` had zero changes on the base branch since this PR's base, so the code
+merged clean — only CLAUDE.md/PENDING.md conflicted, and both were resolved keeping current content.
+
+- [ ] ⏳ **OWNER: paste the new function into the live Apps Script.**
+      `scripts/PASTE_syncProductionToSupabase_17Oct2026.gs` replaces `syncProductionToSupabase()` in
+      the live ALERT.gs — **that one function only, never the whole file** (the live copy may hold
+      inline tokens). Then run `testSupabaseSync` once.
+- [ ] ⏳ **Claude, only after that run:** run PATCH_89's commented-out cleanup (**count first**) to
+      delete the old mis-mapped rows, then confirm Forge/Press/Machine `qty` is populated April → today.
+- [ ] **Needs an owner answer:** Machine Shop logs First Side and Second Side as separate rows for the
+      same part, so summing `qty` (Production Summary card, plant dashboard) **counts each part twice**.
+      Should a "Machine Shop total" mean sides machined, or finished parts (Second Side only)?
+- Not sync bugs, in the Sheet itself: RAW_FINAL has no rows after April (Final Shop data stopped being
+  entered); no production rows for 1 Oct in any RAW tab (2 Oct was a holiday + Friday).
+
 ## 📋 All 10 open GitHub PRs — audited 14 Nov 2026
 
 **⚠ The local clone is SHALLOW (depth 50).** `git merge-tree` reported "refusing to merge unrelated
