@@ -3761,3 +3761,57 @@ logged out.
 exit was never formally recorded. Inventing a last-working-date for a real person is fabrication — HR
 records the real dates through More → Employee Exit (the 15 Nov task covers it). So **"no exit row" is
 no longer a security gap, only a record-keeping one.**
+
+## 🔒 Owner decision of 15 Nov 2026 — VFL4043 stays HELD; owner approves and finalizes October himself
+
+**Owner: "leave 4043 held, i will approve and finalize."** VFL4043 Uttam Kacharu Bhadgal (worker,
+Cutting Shop) worked 3 days in October and has no November attendance; he is on HR's exit-review task.
+**Decision: leave him held** — the October run is NOT reopened to `draft` and NOT recalculated. He is
+settled separately once HR confirms whether he left, same route as VFL4072 (Batch 2). The run is
+approved and finalized as it stands, with **102 pay_run_items and 4 held** (VFL1001, VFL1557, VFL4072,
+VFL4043). The owner does both transitions himself via More → view-as → HR Admin → Payroll Run.
+
+## 🔒 PATCH_137, 15 Nov 2026 — advance recovery had NEVER worked: wrong JSON key casing
+
+**Found by a pre-finalize check, minutes before the owner finalized October — not by any report.**
+Because `approved → finalized` is irreversible and is the ONLY moment `apply_advance_recoveries()`
+fires, the recovery path was inspected before he pressed it.
+
+**The bug:** the engine writes the deduction key as **`ADVANCE`** (uppercase) — `lib/payroll/engine.ts`
+lines 93/143/201, the vendored copy, and `scripts/build-history-seed.ts:90` all agree. PATCH_103's
+`apply_advance_recoveries()` read **`snapshot->'deductions'->>'advance'`** (lowercase). **Postgres JSON
+keys are case-sensitive**, so it read NULL for every employee, treated the deduction as 0, and skipped
+everyone.
+
+**Proof it had never once worked, queried live before touching anything:** `advance_recoveries` held
+**0 rows, ever**; 0 of the October run's 102 snapshots contain a lowercase `advance` key; no
+`advance_requests.outstanding_balance` had ever been decremented by the app. **This is the exact bug
+PATCH_103 was written to close** (gap item 6, 21 Oct 2026 — "nothing ever reduces `outstanding_balance`,
+so deductions repeat forever"); it shipped against a key the engine does not produce, so the
+repeat-forever bug was never actually fixed.
+
+**Scale:** October's exposure was only ₹7,000 — BUNG09 ₹2,000 and VFL1528 ₹5,000 — because PATCH_127
+defers 29 of 31 advances to November (`first_recovery_month='2026-11'`). **November is the month this
+would have bitten hard:** 31 advances begin recovering then, and every one would have been deducted
+from pay while the balance stayed untouched, forever.
+
+**The fix (Claude's call under the 14 Nov rule — a pure key-casing bug):** read both casings, uppercase
+first, `coalesce(…->>'ADVANCE', …->>'advance')`, so the engine's real output works and any legacy
+hand-seeded snapshot still does. Everything else is byte-identical to the live PATCH_103 body (fetched
+with `pg_get_functiondef`, never retyped — the 4 Nov "v15" lesson): same signature, SECURITY DEFINER,
+search_path, already-recovered guard, oldest-advance-first `FOR UPDATE` ordering, the
+`least(remaining, monthly_deduction, outstanding)` cap, `ON CONFLICT (pay_run_id, advance_id)`
+idempotency, shortfall reporting and returned jsonb.
+
+**Verified live in rolled-back transactions against the real October run:** first call →
+`recovered_total 7000, employees 2, unmatched []`; second call → no further recovery (idempotent);
+balances BUNG09 6,000→4,000 and VFL1528 12,000→7,000 with exactly 1 recovery row each; then **rolled
+back and re-checked outside the transaction — 0 recovery rows, both balances restored.** Nothing was
+pre-applied: the real recovery happens when the owner finalizes, which is the correct moment.
+
+**🔒 LESSON — snapshot JSON keys are UPPERCASE (`ADVANCE`, `CANTEEN`, `SOCIETY`, `OTHER`, `PF`, `PT`,
+`ESI`, `MLWF`).** Any SQL reading `pay_run_items.snapshot->'deductions'` or `->'earnings'` must match
+that casing exactly; a lowercase read fails silently, returning NULL rather than erroring. **Before
+trusting any such query, confirm against `lib/payroll/engine.ts`** — and note Claude's own first
+pre-flight query made this same mistake and briefly read as "zero advance deductions in the run",
+which was the query's fault, not the data's.

@@ -17,10 +17,31 @@ real pay figures). **The owner can do it himself in ~2 min: More → view-as →
   recoveries against real balances and sends `payslip_ready` to all 102 employees.
 
 **The 4 held employees** (active, no `pay_run_item`): VFL1001 (owner, all-zero structure — expected),
-VFL1557 (0 present days; now terminated), VFL4072 (owner already ruled: Batch 2, pending his app-use
-explanation), and **VFL4043 Uttam Bhadgal — 3 present days in October, nothing in November.** He is on
-the HR exit-review task, so if HR confirms he left, leaving him held is right and the run can be
-approved as it stands. Paying his 3 days instead means reopening to `draft` and recalculating.
+VFL1557 (0 present days; now terminated), VFL4072 (owner already ruled: Batch 2), and **VFL4043 Uttam
+Bhadgal — 🔒 owner's decision 15 Nov: STAYS HELD.** The run is NOT reopened or recalculated; he is
+settled separately once HR confirms whether he left. Approve and finalize as it stands.
+
+## 🔴 CAUGHT MINUTES BEFORE FINALIZE — PATCH_137: advance recovery had NEVER worked
+
+Owner said "leave 4043 held, i will approve and finalize." Because finalize is irreversible and is the
+only moment `apply_advance_recoveries()` fires, that path was checked first. **The engine writes the
+deduction key as `ADVANCE` (uppercase); the function read lowercase `'advance'`. Postgres JSON keys are
+case-sensitive, so it read NULL for everyone and recovered nothing — `advance_recoveries` had 0 rows,
+ever.** That is the exact repeat-forever bug PATCH_103 was written to close, shipped against a key the
+engine does not produce.
+
+**Fixed live (`PATCH_137`), reading both casings.** Tested rolled-back against the real October run:
+₹7,000 / 2 employees (BUNG09 ₹2,000, VFL1528 ₹5,000), idempotent on a second call, balances 6,000→4,000
+and 12,000→7,000, then rolled back and re-verified zero residue outside the transaction. **Nothing
+pre-applied — finalize now does it correctly.**
+
+**October's exposure was only ₹7,000 because PATCH_127 defers 29 of 31 advances to November. NOVEMBER is
+the month this would have bitten hard** — 31 advances start recovering then. Re-check
+`select count(*) from advance_recoveries` after the owner finalizes October: it must be **2**.
+
+**🔒 Standing lesson: snapshot JSON keys are UPPERCASE** (`ADVANCE`, `CANTEEN`, `SOCIETY`, `OTHER`, `PF`,
+`PT`, `ESI`, `MLWF`). A lowercase read of `snapshot->'deductions'` fails silently with NULL. Claude's own
+first pre-flight query made this mistake and briefly read as "no advance deductions at all".
 
 ## ✅ Done in the 14–15 Nov session (all verified live, nothing left half-applied)
 

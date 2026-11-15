@@ -1,0 +1,48 @@
+-- Forge OS — PATCH_137: apply_advance_recoveries() read the WRONG JSON KEY CASING and so had never
+-- recovered a single rupee. Applied live 15 Nov 2026, minutes before the owner finalized October.
+--
+-- THE BUG (found by a pre-finalize check, not by a report):
+--   * The engine writes the deduction key as 'ADVANCE' — UPPERCASE. lib/payroll/engine.ts lines 93,
+--     143, 201 (`ADVANCE: input.deductions.advance`), the vendored copy in
+--     supabase/functions/payroll-run/lib/engine.ts, and scripts/build-history-seed.ts:90 all agree.
+--   * PATCH_103's apply_advance_recoveries() read `snapshot->'deductions'->>'advance'` — lowercase.
+--   * Postgres JSON key access is CASE-SENSITIVE. So the read returned NULL for every employee,
+--     v_deduct became 0, and the loop `continue`d past everyone.
+--
+-- PROOF IT HAD NEVER WORKED (queried live before fixing):
+--   * `select count(*) from advance_recoveries` = **0 rows, ever**.
+--   * 0 of the October run's 102 snapshots contain a lowercase 'advance' key.
+--   * No advance_requests.outstanding_balance has ever been decremented by the app.
+--
+-- WHY IT MATTERS: this is the exact bug PATCH_103 was written to fix (gap item 6, 21 Oct 2026 —
+-- "feedSync deducts min(monthly_deduction, outstanding_balance) every month but nothing ever reduces
+-- outstanding_balance, so deductions repeat forever"). The fix shipped against a key the engine does
+-- not produce, so the repeat-forever bug was never actually closed. October's exposure was small
+-- because 29 of 31 advances are deferred to November (first_recovery_month='2026-11', PATCH_127):
+-- only BUNG09 (Rs 2,000) and VFL1528 (Rs 5,000) carried an October advance line, Rs 7,000 total.
+-- **November is the month this would have bitten hard** — 31 advances begin recovering then, and every
+-- one would have been deducted from pay while the balance stayed untouched, indefinitely.
+--
+-- THE FIX: read BOTH casings, uppercase first —
+--   coalesce((snapshot->'deductions'->>'ADVANCE')::numeric,
+--            (snapshot->'deductions'->>'advance')::numeric)
+-- so the engine's real output works and any legacy/hand-seeded snapshot using lowercase still does.
+-- Everything else in the function is byte-identical to the live PATCH_103 version (fetched with
+-- pg_get_functiondef and copied verbatim — never retyped, per the 4 Nov "v15" lesson): same
+-- signature, SECURITY DEFINER, search_path, the per-employee already-recovered guard, the
+-- oldest-advance-first ordering with FOR UPDATE, the least(remaining, monthly_deduction, outstanding)
+-- cap, the ON CONFLICT (pay_run_id, advance_id) idempotency, the shortfall/unmatched reporting and
+-- the returned jsonb shape.
+--
+-- VERIFIED LIVE, all inside `begin; … rollback;` against the REAL October run d5c1e25a:
+--   1. First call  -> {"recovered_total": 7000, "employees": 2, "unmatched": [], "already_applied_employees": 0}
+--   2. Second call -> no further recovery (idempotent; the guard holds)
+--   3. Balances after: BUNG09 6,000 -> 4,000 (took 2,000); VFL1528 12,000 -> 7,000 (took 5,000);
+--      exactly 1 advance_recoveries row each.
+--   4. ROLLED BACK, then re-checked OUTSIDE the transaction: advance_recoveries = 0 rows, BUNG09 back
+--      at 6,000, VFL1528 back at 12,000. **Nothing was pre-applied** — the real recovery happens when
+--      the owner finalizes, which is the only correct moment for it.
+--
+-- NOT CHANGED: PATCH_103's own file is left as the historical record of what was originally applied;
+-- this patch is the correction. No app code, no deploy, no APK — payroll-run calls this function by
+-- name, so the live function body is the whole fix.
