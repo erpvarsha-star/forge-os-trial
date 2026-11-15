@@ -3836,3 +3836,33 @@ that casing exactly; a lowercase read fails silently, returning NULL rather than
 trusting any such query, confirm against `lib/payroll/engine.ts`** — and note Claude's own first
 pre-flight query made this same mistake and briefly read as "zero advance deductions in the run",
 which was the query's fault, not the data's.
+
+## ✅ OCTOBER 2026 PAYROLL RUN — FINALIZED, 15 Nov 2026. GOAL 1's first real in-app pay run, closed.
+
+**The owner approved and finalized it himself** (More → view-as → HR Admin → Payroll Run), exactly as
+he said he would. Run `d5c1e25a-bd3e-425a-8db0-540ef2734a2e`: `status='finalized'`, **102
+`pay_run_items`, total net pay ₹754,359.36**. Verified live, four ways, all consistent:
+1. The owner's own exported salary-sheet xlsx (shared the same session, no accompanying question) is
+   byte-identical to the live `pay_run_items` — 102 rows, same total, same 4 held employees absent.
+2. **`advance_recoveries` holds exactly 2 rows** (BUNG09 ₹2,000, VFL1528 ₹5,000) — PATCH_137's fix
+   (see above) worked correctly on the real finalize, not just the earlier rolled-back test.
+3. **Outstanding balances decremented exactly once each**: BUNG09 6,000→4,000, VFL1528 12,000→7,000.
+4. **102 `app_notifications` rows of type `payslip_ready`** — one per `pay_run_item`, confirming the
+   finalize notification step ran in full.
+
+**⚠ The owner reported seeing "one row" for `advance_recoveries` — re-checked live same turn, the
+correct count is 2, matching every other check above.** Recorded as a correction, not treated as a
+live bug: nothing here is inconsistent with itself, so this was most likely a different/filtered view
+on his side, not a second defect. Revisit only if he sees it again after a hard refresh.
+
+**The 4 held employees were not paid in this run and need nothing further for October**: VFL1001
+(owner, all-zero salary structure), VFL1557 (terminated for breach of information, 0 present days),
+VFL4072 (Batch 2, pending an explanation of why the app wasn't used), VFL4043 (passed away — see his
+own section above; already held for an unrelated reason, so his death changed nothing about this run).
+
+**This is the first payroll month run entirely in-app, start to finish, with no parallel sheet run** —
+the core milestone of Goal 1 (see the 29 Oct 2026 "Goal 1, handoff reconciliation" section). What's
+still open before Goal 1 can be called fully complete: the remaining SHEETS_RETIREMENT.md rows, the
+FY27 gap audit showing zero sheet-only gaps, and the owner's own sign-off that the parallel sheets are
+retired. None of that blocks anything — see PENDING.md's "Next session" list for what's actually
+queued.

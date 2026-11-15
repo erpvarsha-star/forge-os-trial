@@ -1,60 +1,71 @@
-# >>> RESUME STATE 15 Nov 2026, ~10:00 IST — READ THIS FIRST <<<
+# >>> RESUME STATE 15 Nov 2026, ~14:15 IST — READ THIS FIRST <<<
 
-## ✅ Owner's answers this session (recorded + acted on live, same turn)
+## ✅ OCTOBER PAYROLL RUN IS FINALIZED — CLOSED, verified live
 
-1. **VFL4043 Uttam Bhadgal has passed away** (owner, 15 Nov). Recorded: `employee_status_history`
-   `status='left'` (effective_from = today, no death date given, note says so), `is_active=false`,
-   credentials revoked (`_revoke_employee_credentials` — PIN destroyed, 1 live token + 1 live session
-   both killed, verified 0/0). **Active headcount 105 → 104.** October run untouched — he was already
-   held for an unrelated reason (negative net). See CLAUDE.md's new section on him.
-2. **HR exit task (`fdc04aa8…`, due 20 Nov) — still open.** Owner: the 8 named employees' November
-   questions get answered when November salaries are done, **first week of December**. Nothing to chase
-   before then; the task itself still stands (due 20 Nov) for whatever HR can action sooner.
-3. **October approve/finalize: owner is doing it himself** ("i will have it done") — no further Claude
-   action. Once he finalizes, re-check `select count(*) from advance_recoveries` — must read **2**.
+Run **`d5c1e25a-bd3e-425a-8db0-540ef2734a2e`** (1–31 Oct, whole company) is **`status='finalized'`**.
+The owner pressed approve → finalize himself (More → view-as → HR Admin → Payroll Run), as planned.
+Verified live, all four checks pass:
+- **102 `pay_run_items`, total net pay ₹754,359.36** — cross-checked against the owner's own exported
+  salary-sheet xlsx the same session: byte-identical (102 rows, same total, same 4 held employees
+  absent). Nothing to reconcile.
+- **`advance_recoveries` holds exactly 2 rows** (BUNG09 ₹2,000, VFL1528 ₹5,000) — PATCH_137's fix
+  worked correctly on the real finalize, not just in the earlier rolled-back test.
+- **Outstanding balances correctly decremented once each**: BUNG09 6,000→4,000, VFL1528 12,000→7,000.
+- **102 `payslip_ready` rows** written to `app_notifications` (one per pay_run_item) — the finalize
+  notification step ran fully.
 
-## 🔴 THE ONE THING BLOCKING OCTOBER PAY — it is the owner's/HR's move, not Claude's
+**⚠ Owner reported "one row" for `advance_recoveries` — re-checked live and the correct count is 2,
+both with the right amounts and balances.** No bug found on re-verification; likely a different/filtered
+view on his end. Flagging the correction for the record, not disputing in isolation — the four checks
+above all agree with each other and with the pre-finalize rolled-back test.
 
-The October run **`d5c1e25a-bd3e-425a-8db0-540ef2734a2e`** (1–31 Oct, whole company, `population=null`)
-sits at **`in_review` with 102 `pay_run_items`**. HR already pressed Calculate (14 Nov 19:52 IST) and
-moved it to `in_review` (19:55 IST), both as VFL5440. All 110 warnings are decided AND AI-reviewed;
-`pay_run_ready_to_calculate` is TRUE; the blanket late waiver is confirmed for everyone (owner, 14 Nov).
+**The 4 held employees stayed held, as decided**: VFL1001 (owner, all-zero structure), VFL1557
+(terminated, 0 present days), VFL4072 (Batch 2, pending explanation of app non-use), VFL4043 (passed
+away — see below). None were paid in this run; none need to be.
 
-**Remaining steps, and only a human with an owner/HR login can do them** — `payroll-run/index.ts:172-184`
-maps the caller's JWT to an `employees` row and requires role `owner`/`hr_admin`, so a service-role key
-gets 403. Claude decided NOT to build a side-door (a publicly-callable `calculate`/`transition` writes
-real pay figures). **The owner can do it himself in ~2 min: More → view-as → HR Admin → Payroll Run.**
-- `in_review → approved` — **reversible** (`approved` can still go back to `draft`); no money moves,
-  nobody notified.
-- `approved → finalized` — **IRREVERSIBLE** (only forward to `payment_file_generated`); applies advance
-  recoveries against real balances and sends `payslip_ready` to all 102 employees.
+## ✅ VFL4043 Uttam Kacharu Bhadgal — CLOSED (owner: "mark complete")
 
-**The 4 held employees** (active, no `pay_run_item`): VFL1001 (owner, all-zero structure — expected),
-VFL1557 (0 present days; terminated), VFL4072 (owner already ruled: Batch 2), and **VFL4043 Uttam
-Bhadgal — HELD, and now confirmed deceased (owner, 15 Nov — see above).** The run is NOT reopened or
-recalculated for any of the 4. Approve and finalize as it stands.
+Passed away, confirmed by the owner 15 Nov. `employee_status_history` (`status='left'`), deactivated,
+credentials revoked — all done and verified earlier this session (see CLAUDE.md). October payroll
+needed no further action for him (already held for an unrelated reason, stays held). **Nothing further
+to do for him** — if he is one of the 8 names on HR's exit-review task (`fdc04aa8…`), that line item is
+now moot; the task itself stays open for the other 7 until HR actions it in the app (due 20 Nov).
 
-## 🔴 CAUGHT MINUTES BEFORE FINALIZE — PATCH_137: advance recovery had NEVER worked
+## Standing lesson from this session, kept for the record
 
-Owner said "leave 4043 held, i will approve and finalize." Because finalize is irreversible and is the
-only moment `apply_advance_recoveries()` fires, that path was checked first. **The engine writes the
-deduction key as `ADVANCE` (uppercase); the function read lowercase `'advance'`. Postgres JSON keys are
-case-sensitive, so it read NULL for everyone and recovered nothing — `advance_recoveries` had 0 rows,
-ever.** That is the exact repeat-forever bug PATCH_103 was written to close, shipped against a key the
-engine does not produce.
+**Snapshot JSON keys are UPPERCASE** (`ADVANCE`, `CANTEEN`, `SOCIETY`, `OTHER`, `PF`, `PT`, `ESI`,
+`MLWF`). A lowercase read of `snapshot->'deductions'`/`->'earnings'` fails silently with NULL — this is
+exactly how PATCH_103's `apply_advance_recoveries()` went unnoticed-broken since 21 Oct (see CLAUDE.md's
+PATCH_137 section for the full story). Confirm against `lib/payroll/engine.ts` before trusting any such
+query.
 
-**Fixed live (`PATCH_137`), reading both casings.** Tested rolled-back against the real October run:
-₹7,000 / 2 employees (BUNG09 ₹2,000, VFL1528 ₹5,000), idempotent on a second call, balances 6,000→4,000
-and 12,000→7,000, then rolled back and re-verified zero residue outside the transaction. **Nothing
-pre-applied — finalize now does it correctly.**
+## 🟡 Next session — nothing urgent, nothing blocking; pick up when convenient
 
-**October's exposure was only ₹7,000 because PATCH_127 defers 29 of 31 advances to November. NOVEMBER is
-the month this would have bitten hard** — 31 advances start recovering then. Re-check
-`select count(*) from advance_recoveries` after the owner finalizes October: it must be **2**.
+1. **HR exit task** (`fdc04aa8…`, due 20 Nov) — 7 remaining named employees (VFL4043 now moot). Owner
+   said their November questions get answered when November salaries run, first week of December —
+   do not chase before then.
+2. **VFL4071's 6/7 Nov half-day rows + 2/3 Nov missing nights** — still uncorrected; needs real
+   replacement punch times from HR/Kajal, not guessed.
+3. **8–11 Nov Diwali paid holiday** (4 days, staff + worker) — queued for whoever builds November's
+   Extras report, per the 1 Nov two-report principle. No urgency; November's run isn't until December's
+   first week.
+4. **Early-arrival/06:45 rollover bug** (mis-dates a pre-shift arrival to the previous day) — root
+   cause understood, forward fix not yet written; low priority, only 29 occurrences since 1 Oct.
+5. **Historical credential-revocation gap**: the ~31 pre-PATCH_135 exits that got `is_active=false`
+   only (PATCH_60/61, VFL5337, etc.) were revoked in bulk by PATCH_136 — but their `employee_status_history`
+   was never back-dated (deliberately, per the no-fabrication rule). Flagged to the owner as a
+   record-keeping gap, not yet raised as its own item — raise it when there's a natural moment, don't
+   force it.
+6. **Dependabot**: #62/#63/#65/#66 (Actions bumps) and #70/#71 (lint-only, no CI step reads them) —
+   left open deliberately, take one at a time with a green APK each.
+7. **AI-agent roadmap** — owner wants a dedicated scoping session before any build; not started.
+8. **Leave balances gap**: VFL5463/64/65/66 have no `leave_balances` row — owner said he'll confirm
+   numbers when he has them; not blocking.
+9. **Production sync / Goal 2** — stays fully parked. No production questions, no production items in
+   any brief, until the owner opens Goal 2 himself.
 
-**🔒 Standing lesson: snapshot JSON keys are UPPERCASE** (`ADVANCE`, `CANTEEN`, `SOCIETY`, `OTHER`, `PF`,
-`PT`, `ESI`, `MLWF`). A lowercase read of `snapshot->'deductions'` fails silently with NULL. Claude's own
-first pre-flight query made this mistake and briefly read as "no advance deductions at all".
+Branch `claude/forge-os-backend-setup-7woj4t`, latest APK `apk-133` — no new APK needed since (this
+session's changes, PATCH_135/136/137, are database-only).
 
 ## ✅ Done in the 14–15 Nov session (all verified live, nothing left half-applied)
 
