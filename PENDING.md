@@ -1,4 +1,47 @@
-# >>> RESUME STATE 15 Nov 2026, 00:26 IST — READ THIS FIRST <<<
+# >>> RESUME STATE 15 Nov 2026, 09:30 IST — READ THIS FIRST <<<
+
+## 🔴 THE ONE THING BLOCKING OCTOBER PAY — it is the owner's/HR's move, not Claude's
+
+The October run **`d5c1e25a-bd3e-425a-8db0-540ef2734a2e`** (1–31 Oct, whole company, `population=null`)
+sits at **`in_review` with 102 `pay_run_items`**. HR already pressed Calculate (14 Nov 19:52 IST) and
+moved it to `in_review` (19:55 IST), both as VFL5440. All 110 warnings are decided AND AI-reviewed;
+`pay_run_ready_to_calculate` is TRUE; the blanket late waiver is confirmed for everyone (owner, 14 Nov).
+
+**Remaining steps, and only a human with an owner/HR login can do them** — `payroll-run/index.ts:172-184`
+maps the caller's JWT to an `employees` row and requires role `owner`/`hr_admin`, so a service-role key
+gets 403. Claude decided NOT to build a side-door (a publicly-callable `calculate`/`transition` writes
+real pay figures). **The owner can do it himself in ~2 min: More → view-as → HR Admin → Payroll Run.**
+- `in_review → approved` — **reversible** (`approved` can still go back to `draft`); no money moves,
+  nobody notified.
+- `approved → finalized` — **IRREVERSIBLE** (only forward to `payment_file_generated`); applies advance
+  recoveries against real balances and sends `payslip_ready` to all 102 employees.
+
+**The 4 held employees** (active, no `pay_run_item`): VFL1001 (owner, all-zero structure — expected),
+VFL1557 (0 present days; now terminated), VFL4072 (owner already ruled: Batch 2, pending his app-use
+explanation), and **VFL4043 Uttam Bhadgal — 3 present days in October, nothing in November.** He is on
+the HR exit-review task, so if HR confirms he left, leaving him held is right and the run can be
+approved as it stands. Paying his 3 days instead means reopening to `draft` and recalculating.
+
+## ✅ Done in the 14–15 Nov session (all verified live, nothing left half-applied)
+
+| Item | State |
+|---|---|
+| **October run unblocked** | Batch AI review executed: blocking warnings **101 → 0**, AI-reviewed **9 → 110**, 0 failed. The AI review succeeded for the first time ever. |
+| **AI false-concern fix** | `autoAgreeForIneligibleWaiver()` + prompt sentence. `payroll-warning-review-batch` **v2**, `payroll-warning-review` **v7** — both confirmed by fetching the deployed source back. 83 concerns → 14; ~69 of 110 rows now need no API call. |
+| **PATCH_135** | Every FUTURE exit (HR's screen + the nightly `apply_due_exits` cron) now revokes credentials, not just `is_active=false`. Applied + rolled-back-tested. |
+| **PATCH_136** | **All 32 historical deactivations revoked.** Starting-PIN formula dead for all 32; 98 active untouched. |
+| **VFL1557 terminated** | Breach of information. 4-step revocation; he had a LIVE session at that moment. Headcount 106 → **105**. |
+| **HR exit task** | `assigned_tasks` row from the owner to VFL5440, high priority, **due 20 Nov**, notification verified landed unread. Names 8 employees with zero Nov attendance and no approved leave. |
+| **Dependabot** | #67 and #64 closed with reasons on the PRs; #62/#63/#65/#66 + #70/#71 left open deliberately. |
+| **Scope rules recorded** | Production sync = add-on, never a dependency (proven: payroll never reads `production_records`). No production questions until Goal 1 is done. Claude decides technical questions. Record-keeping is a scored responsibility. |
+
+**Branch:** `claude/forge-os-backend-setup-7woj4t`, pushed and clean. Latest APK `apk-133` (off `0e713d1`).
+No app code changed in this session after that build — PATCH_135/136 are database-only, so **no new APK
+is needed.**
+
+---
+
+# >>> (previous) RESUME STATE 15 Nov 2026, 00:26 IST — superseded by the block above <<<
 
 **Owner said "option a" — Wave 1 + Wave 2 of the close-out plan are DONE, in one APK.** Commit
 `0e713d1`. **`apk-133` published** (88.4 MB, built from `0e713d1`, asset uploaded — release confirmed
@@ -246,12 +289,17 @@ after rollback: CON16/CON18/CON21 all still 0 history rows, is_active unchanged.
 **🔒 Accepted consequence — tell HR:** a deactivation now destroys that person's PIN. Reactivating a
 mis-deactivated employee is NOT enough; HR must also reset the PIN (More → Missing Data → reset PIN).
 
-**🔴 STILL OPEN — the OLD deactivations are not remediated.** PATCH_135 only fixes exits from now on.
-PATCH_60 (VFL1319), PATCH_61 (CON22, CON23, VFL5354, VFL4048), VFL5337 and every other historical
-deactivation had step 1-2 only, so **their credentials may still authenticate directly.** Remediating
-is one `_revoke_employee_credentials()` call per person and is safe, but it destroys those PINs, so it
-needs the owner's word first — same decision he just made for the forward case. Raise it as its own
-single question when the October run is closed.
+**✅ CLOSED 15 Nov 2026 — `PATCH_136`, the old deactivations ARE now remediated.** Owner: *"why have
+you left it untouched if decision is made. finish the job in hand."* Correct — his PATCH_135 decision
+extended backwards by its own logic (these people have left; destroying a PIN costs nothing; HR resets
+a PIN on any rehire; a working credential for an ex-employee is the real risk). **All 32 inactive
+employees holding a login revoked.** Verified four ways: the guessable **starting-PIN formula no longer
+authenticates for any of them** (0 of 32), all 32 rotated in the run window, all 32 valid `$2a$`
+bcrypt, 0 live tokens / 0 live sessions. **All 98 active employees untouched** — the 2 whose
+`updated_at` moved were token refreshes (still hold live tokens AND sessions, which the helper would
+have killed); 96 of 98 still have a live session. **Not done on purpose:** no exit row was invented for
+the ~31 with no `employee_status_history` — that is HR's job via More → Employee Exit (the 15 Nov task),
+and it is now a record-keeping gap, not a security one.
 
 ## Next steps
 

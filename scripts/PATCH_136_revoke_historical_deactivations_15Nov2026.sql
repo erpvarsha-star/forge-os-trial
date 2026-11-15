@@ -1,0 +1,48 @@
+-- Forge OS — PATCH_136: one-time backfill — revoke credentials for EVERY already-deactivated employee.
+-- Applied live 15 Nov 2026 on the owner's instruction: "why have you left it untouched if decision is
+-- made. finish the job in hand."
+--
+-- WHY (keep the reason attached to the rule):
+-- PATCH_135 made every FUTURE exit revoke credentials, but only future ones. Every historical
+-- deactivation in this project — PATCH_60 (VFL1319), PATCH_61 (CON22, CON23, VFL5354, VFL4048),
+-- VFL5337's pre-rejoin record, and ~26 more — had set `is_active = false` and nothing else. That does
+-- NOT lock anyone out: `resolve_login_identifier()` filters on is_active so the APP login is blocked,
+-- but the synthetic email is derivable from the emp_code ('<empcode>@forgeos.local'), the PIN is
+-- unchanged, and NO RLS policy anywhere checks is_active (every policy keys on auth_user_id =
+-- auth.uid()). A direct Supabase Auth API call would therefore still mint a working session for an
+-- ex-employee, and that session passes RLS.
+--
+-- The owner's reasoning for extending his PATCH_135 decision backwards: these people have LEFT, so
+-- destroying their PIN costs nothing, and HR already resets a PIN on any rehire. Leaving a working
+-- credential for an ex-employee is the actual risk.
+--
+-- WHAT RAN (no new objects; reuses PATCH_135's helper):
+--   do $$ declare r record; begin
+--     for r in select id, emp_code from employees
+--              where is_active = false and auth_user_id is not null order by emp_code
+--     loop perform public._revoke_employee_credentials(r.id); end loop;
+--   end $$;
+--
+-- For each: auth.users.encrypted_password rotated to three concatenated gen_random_uuid()s bcrypt-
+-- hashed INSIDE Postgres (nobody, Claude included, ever saw a value), auth.refresh_tokens revoked,
+-- auth.sessions expired. No DELETE, no DROP. employees rows untouched — is_active was already false,
+-- and no employee_status_history row was invented for people whose exit was never formally recorded
+-- (that stays HR's job via More -> Employee Exit; see the 15 Nov HR task).
+--
+-- VERIFIED LIVE IMMEDIATELY AFTER (all four checks, not inferred from the call succeeding):
+--   32 inactive employees hold a login; of those:
+--     * starting_pin_still_works = 0   -- the ID-card-derivable formula ('001319', '200016', ...) no
+--                                         longer authenticates for ANY of them. This was the real
+--                                         exposure, since those PINs are guessable by design.
+--     * rotated_just_now        = 32   -- every auth.users row updated within the run window
+--     * valid_bcrypt            = 32   -- all '$2a$', 60 chars (correct Supabase format)
+--     * any_live_token / any_live_session = 0 / 0
+--   SAFETY: 98 ACTIVE employees hold a login and NONE was affected. The 2 active rows whose
+--   auth.users.updated_at moved during the run were ordinary token refreshes — proven because both
+--   still have live refresh tokens AND live sessions (4/4 and 1/1), which this helper would have
+--   revoked had it touched them; their last_sign_in_at is weeks old, the refresh-not-signin pattern.
+--   96 of 98 active employees have a live session, i.e. nobody was logged out.
+--
+-- NOT DONE, deliberately: no exit row was back-dated for the ~31 people with no
+-- employee_status_history record. Inventing a last-working-date for a real person is fabrication; HR
+-- records the real dates through Employee Exit.

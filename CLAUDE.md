@@ -3738,6 +3738,26 @@ reactivate."*
 Verified by rolled-back tests on already-inactive employees (positive: PIN hash changed, exit recorded,
 deactivated; negative: `on_leave` changed no credential; cron returned the correct count; the
 owner/hr_admin gate still refuses an unauthenticated caller), with zero residue confirmed afterwards.
-Full test record is in the patch file. **The old deactivations (PATCH_60, PATCH_61, VFL5337 and the
-rest) are still NOT remediated** — this only fixes exits from now on; that backlog remains the separate
-owner item in PENDING.md.
+Full test record is in the patch file.
+
+**✅ THE HISTORICAL BACKLOG IS NOW CLOSED TOO — `PATCH_136`, applied live 15 Nov 2026.** Owner: *"why
+have you left it untouched if decision is made. finish the job in hand."* He was right, and Claude had
+been inconsistent: his PATCH_135 decision extends backwards by its own logic — these people have LEFT,
+so destroying their PIN costs nothing, HR already resets a PIN on any rehire, and a working credential
+for an ex-employee is the actual risk. **All 32 inactive employees holding a login were revoked** via
+the same `_revoke_employee_credentials()` helper (PATCH_60's VFL1319, PATCH_61's CON22/CON23/VFL5354/
+VFL4048, VFL5337's pre-rejoin record, VFL1557, and 26 more).
+
+**Verified live, four ways, immediately after:** the ID-card-derivable **starting-PIN formula no longer
+authenticates for ANY of the 32** (`starting_pin_still_works = 0` — this was the real exposure, since
+those PINs are guessable by design); all 32 `auth.users` rows rotated in the run window; all 32 valid
+`$2a$` 60-char bcrypt; 0 live tokens and 0 live sessions across all 32. **Safety confirmed: all 98
+ACTIVE employees were untouched** — the 2 whose `updated_at` moved during the run were ordinary token
+refreshes, proven because both still hold live refresh tokens AND live sessions (4/4 and 1/1), which
+this helper would have revoked; 96 of 98 active employees still have a live session, so nobody was
+logged out.
+
+**NOT done, deliberately:** no `employee_status_history` row was back-dated for the ~31 people whose
+exit was never formally recorded. Inventing a last-working-date for a real person is fabrication — HR
+records the real dates through More → Employee Exit (the 15 Nov task covers it). So **"no exit row" is
+no longer a security gap, only a record-keeping one.**
