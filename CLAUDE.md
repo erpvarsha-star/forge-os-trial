@@ -3771,6 +3771,27 @@ settled separately once HR confirms whether he left, same route as VFL4072 (Batc
 approved and finalized as it stands, with **102 pay_run_items and 4 held** (VFL1001, VFL1557, VFL4072,
 VFL4043). The owner does both transitions himself via More → view-as → HR Admin → Payroll Run.
 
+## 🔒 VFL4043 Uttam Kacharu Bhadgal — PASSED AWAY, owner confirmed 15 Nov 2026 (same day as the above)
+
+**Owner: "hes passed away."** Supersedes the "needs the owner's call" framing above — this is now a
+closed fact, not an open question. **Recorded and acted on the same turn, live:**
+`employee_status_history` gained a `status='left'` row (`effective_from` = the date Claude was told,
+2026-11-15 — the owner gave no actual date of death, so none was fabricated; the note says so
+explicitly); `employees.is_active` set `false` (active headcount 105 → **104**); credentials revoked
+via `_revoke_employee_credentials()` (the PATCH_135/136/137 pattern — PIN destroyed, 1 live refresh
+token and 1 live session both killed, verified 0/0 afterwards).
+
+**October payroll: no change.** He was already HELD (no `pay_run_item`) in the October run `d5c1e25a`
+before this, for an unrelated reason (3 present days → engine computes a negative net → `engine.ts:168`
+holds him). That stands. **The run's "4 held" set (VFL1001, VFL1557, VFL4072, VFL4043) and the 102
+pay_run_items are untouched** — the owner approves and finalizes it as-is, per the decision immediately
+above.
+
+**Not done, and not this Claude's call to do:** no final settlement, gratuity, or death-benefit
+processing — that is HR/owner territory once they decide what, if anything, is owed. HR's exit-review
+task (`fdc04aa8…`, due 20 Nov) can now be checked off for him specifically, but the task still covers
+7 other named employees and stays open until HR actions it in the app.
+
 ## 🔒 PATCH_137, 15 Nov 2026 — advance recovery had NEVER worked: wrong JSON key casing
 
 **Found by a pre-finalize check, minutes before the owner finalized October — not by any report.**

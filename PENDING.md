@@ -1,4 +1,17 @@
-# >>> RESUME STATE 15 Nov 2026, 09:30 IST — READ THIS FIRST <<<
+# >>> RESUME STATE 15 Nov 2026, ~10:00 IST — READ THIS FIRST <<<
+
+## ✅ Owner's answers this session (recorded + acted on live, same turn)
+
+1. **VFL4043 Uttam Bhadgal has passed away** (owner, 15 Nov). Recorded: `employee_status_history`
+   `status='left'` (effective_from = today, no death date given, note says so), `is_active=false`,
+   credentials revoked (`_revoke_employee_credentials` — PIN destroyed, 1 live token + 1 live session
+   both killed, verified 0/0). **Active headcount 105 → 104.** October run untouched — he was already
+   held for an unrelated reason (negative net). See CLAUDE.md's new section on him.
+2. **HR exit task (`fdc04aa8…`, due 20 Nov) — still open.** Owner: the 8 named employees' November
+   questions get answered when November salaries are done, **first week of December**. Nothing to chase
+   before then; the task itself still stands (due 20 Nov) for whatever HR can action sooner.
+3. **October approve/finalize: owner is doing it himself** ("i will have it done") — no further Claude
+   action. Once he finalizes, re-check `select count(*) from advance_recoveries` — must read **2**.
 
 ## 🔴 THE ONE THING BLOCKING OCTOBER PAY — it is the owner's/HR's move, not Claude's
 
@@ -17,9 +30,9 @@ real pay figures). **The owner can do it himself in ~2 min: More → view-as →
   recoveries against real balances and sends `payslip_ready` to all 102 employees.
 
 **The 4 held employees** (active, no `pay_run_item`): VFL1001 (owner, all-zero structure — expected),
-VFL1557 (0 present days; now terminated), VFL4072 (owner already ruled: Batch 2), and **VFL4043 Uttam
-Bhadgal — 🔒 owner's decision 15 Nov: STAYS HELD.** The run is NOT reopened or recalculated; he is
-settled separately once HR confirms whether he left. Approve and finalize as it stands.
+VFL1557 (0 present days; terminated), VFL4072 (owner already ruled: Batch 2), and **VFL4043 Uttam
+Bhadgal — HELD, and now confirmed deceased (owner, 15 Nov — see above).** The run is NOT reopened or
+recalculated for any of the 4. Approve and finalize as it stands.
 
 ## 🔴 CAUGHT MINUTES BEFORE FINALIZE — PATCH_137: advance recovery had NEVER worked
 
