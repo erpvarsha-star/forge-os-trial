@@ -24,6 +24,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { fetchAllPages } from './lib/pagedFetch.ts';
 import { resolveDeltaCorrection } from './lib/deltaCorrection.ts';
+import { filterTopupInputs } from './lib/topupFilter.ts';
 import { assemblePayrollInputs } from './lib/feedSync.ts';
 import { filterByPopulation, isPayPopulation } from './lib/populationFilter.ts';
 import { DEFAULT_ENGINE_CONFIG } from './lib/engine.ts';
@@ -162,14 +163,10 @@ async function buildRunInputs(supabase: any, run: any, year: number, month: numb
         }
       }
     }
-    if (!deltaOnly) {
-      inputs = assembled.inputs.filter((i: any) => {
-        const already = paid.has(idByCode.get(i.empCode) as string);
-        if (already) skippedAlreadyPaid++;
-        return !already;
-      });
-    }
-    // deltaOnly: nobody is filtered out of `inputs` here — see the function comment above.
+    const filtered = filterTopupInputs(assembled.inputs, (i: any) => idByCode.get(i.empCode) as string, paid, deltaOnly);
+    inputs = filtered.kept;
+    skippedAlreadyPaid = filtered.skippedAlreadyPaid;
+    // deltaOnly: filterTopupInputs keeps everyone — see the function comment above.
   }
   return { assembled, inputs, idByCode, topup, deltaOnly, skippedAlreadyPaid, alreadyPaidByEmployeeId } as const;
 }
