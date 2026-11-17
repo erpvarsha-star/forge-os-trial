@@ -22,6 +22,9 @@
 // history runs are identified by status='archived' + pay_period month/year.
 // Feed tables (PATCH_91) are keyed by payroll_month TEXT 'YYYY-MM'.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { fetchAllPages } from './lib/pagedFetch.ts';
+import { resolveDeltaCorrection } from './lib/deltaCorrection.ts';
+import { filterTopupInputs } from './lib/topupFilter.ts';
 import { assemblePayrollInputs } from './lib/feedSync.ts';
 import { filterByPopulation, isPayPopulation } from './lib/populationFilter.ts';
 import { DEFAULT_ENGINE_CONFIG } from './lib/engine.ts';
@@ -45,6 +48,33 @@ const json = (body: unknown, status = 200) =>
 // ------------------------------------------------------------------ shared helpers
 const safe = async (q: PromiseLike<any>) => { try { const r = await q; return r.data ?? []; } catch { return []; } };
 
+/**
+ * Page-safe select wrapper around a Supabase/PostgREST query (see lib/payroll/pagedFetch.ts
+ * for the root cause and why a plain `safe(supabase.from(...).select(...))` is not enough once
+ * a table's row count for a query passes PostgREST's configured max-rows cap). `filterFn` applies
+ * any `.gte()`/`.eq()`/etc filters to the query builder before paging; `.range()` itself is applied
+ * here, once per page, so `filterFn` must never call `.range()` or `.limit()` itself.
+ * Fails soft like `safe()`: a mid-page error logs and returns whatever pages were read so far.
+ */
+async function fetchAllRows(
+  supabase: any, table: string, selectCols: string,
+  filterFn: (q: any) => any = (q: any) => q, pageSize = 1000,
+): Promise<any[]> {
+  try {
+    return await fetchAllPages<any>(
+      async (offset, limit) => {
+        const { data, error } = await filterFn(supabase.from(table).select(selectCols)).range(offset, offset + limit - 1);
+        if (error) throw error;
+        return data ?? [];
+      },
+      pageSize,
+    );
+  } catch (e) {
+    console.error(`fetchAllRows(${table}) failed:`, e instanceof Error ? e.message : String(e));
+    return [];
+  }
+}
+
 /** Fetch every feed the engine + warnings need for one pay month (PATCH_91 tables degrade gracefully). */
 async function loadFeeds(supabase: any, year: number, month: number) {
   const mm = String(month).padStart(2, '0');
@@ -52,11 +82,24 @@ async function loadFeeds(supabase: any, year: number, month: number) {
   const periodEnd = `${year}-${mm}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`;
   const [employees, salaries, attendance, leaves, advances, canteen, society, efficiency, efficiencySlabs, adjustments, statusEvents, recurring] =
     await Promise.all([
+      // employees/employee_salary_structure/advance_requests/employee_status_history/
+      // recurring_adjustments: small today (154/125/36/3/1 rows live, 15 Nov 2026 — matches
+      // CLAUDE.md's "~100-150 rows" note) but UNBOUNDED in principle, no date/period filter on
+      // any of them. Leaving these as single-shot `safe()` reads for now; the moment any one
+      // approaches 1000 rows, page it the same way attendance_records/leave_requests are below.
       safe(supabase.from('employees').select('id,emp_code,name,category,work_location,gender,is_active,weekly_off_day,pt_exempt')),
       safe(supabase.from('employee_salary_structure').select('*')),
-      safe(supabase.from('attendance_records').select('employee_id,date,status,overtime_hours,ot_hours,outstation_travel,check_in_time,check_out_time,late_minutes,late_reason')
-        .gte('date', `${year}-${mm}-01`).lte('date', periodEnd)),
-      safe(supabase.from('leave_requests').select('employee_id,type,start_date,end_date,days,status')),
+      // attendance_records: CONFIRMED to exceed PostgREST's row cap for real monthly data —
+      // 4,299 rows live total, 2,731 in October 2026 alone. A plain .select() here silently
+      // truncated the October payroll run's attendance read with no error, which is what
+      // underpaid most October employees. Must stay paginated — do not revert to safe().
+      fetchAllRows(supabase, 'attendance_records',
+        'employee_id,date,status,overtime_hours,ot_hours,outstation_travel,check_in_time,check_out_time,late_minutes,late_reason',
+        (q: any) => q.gte('date', `${year}-${mm}-01`).lte('date', periodEnd)),
+      // leave_requests: fetches ALL leave requests EVER with no date/status filter at all — genuinely
+      // unbounded as the company's leave history grows, not just "small today" (32 rows live, 15 Nov
+      // 2026). Paginated defensively now rather than waiting for it to actually exceed the cap.
+      fetchAllRows(supabase, 'leave_requests', 'employee_id,type,start_date,end_date,days,status'),
       safe(supabase.from('advance_requests').select('employee_id,monthly_deduction,outstanding_balance,status,first_recovery_month')),
       safe(supabase.from('payroll_canteen_entries').select('employee_id,amount_inr,approval_status')
         .eq('payroll_month', payrollMonth)),
@@ -77,7 +120,19 @@ async function loadFeeds(supabase: any, year: number, month: number) {
 
 type Feeds = Awaited<ReturnType<typeof loadFeeds>>;
 
-/** Assemble engine inputs; for a top-up run keep only employees with no item yet in the period. */
+/**
+ * Assemble engine inputs. For a plain top-up run (`adjustment_of` set, `pays_delta_only` false/
+ * unset — unchanged behaviour), employees who already have an item in any non-cancelled run of
+ * the same pay period are skipped entirely (they were already paid in full elsewhere).
+ *
+ * For a DELTA-ONLY correction run (`adjustment_of` set AND `pays_delta_only` true — e.g. created
+ * after the PATCH_138 pagination fix to top up everyone the truncated original run underpaid):
+ * nobody is filtered out of `inputs`. Instead, each already-paid employee's total net_pay across
+ * every prior non-cancelled run of the period is summed into `alreadyPaidByEmployeeId`, so the
+ * 'calculate' action can compute each employee's correct total from (now-complete) feeds and write
+ * only the positive difference. An employee with NO prior item behaves exactly like a normal
+ * top-up — paid in full — because their `alreadyPaidByEmployeeId` entry is simply absent (0).
+ */
 async function buildRunInputs(supabase: any, run: any, year: number, month: number, f: Feeds) {
   const assembled = assemblePayrollInputs(year, month, {
     employees: f.employees, salaries: f.salaries, attendance: f.attendance, punches: [], leaves: f.leaves,
@@ -88,8 +143,10 @@ async function buildRunInputs(supabase: any, run: any, year: number, month: numb
   });
   const idByCode = new Map(f.employees.map((e: any) => [e.emp_code, e.id]));
   const topup = !!run.adjustment_of;
+  const deltaOnly = topup && !!run.pays_delta_only;
   let skippedAlreadyPaid = 0;
   let inputs = assembled.inputs;
+  const alreadyPaidByEmployeeId = new Map<string, number>();
   if (topup) {
     const { data: periodRuns } = await supabase
       .from('pay_runs').select('id').eq('pay_period_id', run.pay_period_id).neq('status', 'cancelled');
@@ -97,17 +154,21 @@ async function buildRunInputs(supabase: any, run: any, year: number, month: numb
     const paid = new Set<string>();
     if (runIds.length) {
       const { data: paidItems, error: pErr } = await supabase
-        .from('pay_run_items').select('employee_id').in('pay_run_id', runIds);
+        .from('pay_run_items').select('employee_id, net_pay').in('pay_run_id', runIds);
       if (pErr) return { error: 'could not read existing items: ' + pErr.message } as const;
-      for (const it of paidItems ?? []) paid.add(it.employee_id);
+      for (const it of paidItems ?? []) {
+        paid.add(it.employee_id);
+        if (deltaOnly) {
+          alreadyPaidByEmployeeId.set(it.employee_id, (alreadyPaidByEmployeeId.get(it.employee_id) ?? 0) + Number(it.net_pay ?? 0));
+        }
+      }
     }
-    inputs = assembled.inputs.filter((i: any) => {
-      const already = paid.has(idByCode.get(i.empCode) as string);
-      if (already) skippedAlreadyPaid++;
-      return !already;
-    });
+    const filtered = filterTopupInputs(assembled.inputs, (i: any) => idByCode.get(i.empCode) as string, paid, deltaOnly);
+    inputs = filtered.kept;
+    skippedAlreadyPaid = filtered.skippedAlreadyPaid;
+    // deltaOnly: filterTopupInputs keeps everyone — see the function comment above.
   }
-  return { assembled, inputs, idByCode, topup, skippedAlreadyPaid } as const;
+  return { assembled, inputs, idByCode, topup, deltaOnly, skippedAlreadyPaid, alreadyPaidByEmployeeId } as const;
 }
 
 /**
@@ -233,6 +294,10 @@ Deno.serve(async (req) => {
     // locked parent run is never touched. 'calculate' only pays people with no item yet.
     if (action === 'create_topup') {
       const { parentRunId } = body;
+      // PATCH_138: pass paysDeltaOnly:true to create a CORRECTION run instead of a plain top-up —
+      // see buildRunInputs()'s own comment for what this changes. Defaults to false (unchanged
+      // "pay someone who was entirely missed" behaviour).
+      const paysDeltaOnly = body.paysDeltaOnly === true;
       const { data: parent } = await supabase
         .from('pay_runs').select('id, name, status, pay_period_id, adjustment_of, population').eq('id', parentRunId).single();
       if (!parent) return json({ error: 'parent pay run not found' }, 404);
@@ -247,11 +312,15 @@ Deno.serve(async (req) => {
       const n = (count ?? 0) + 1;
       const { data: top, error: tErr } = await supabase
         .from('pay_runs')
-        .insert({ pay_period_id: parent.pay_period_id, adjustment_of: parent.id, name: `${parent.name} top-up ${n}`, status: 'draft', population: parent.population })
+        .insert({
+          pay_period_id: parent.pay_period_id, adjustment_of: parent.id,
+          name: `${parent.name} ${paysDeltaOnly ? 'correction' : 'top-up'} ${n}`,
+          status: 'draft', population: parent.population, pays_delta_only: paysDeltaOnly,
+        })
         .select().single();
       if (tErr) return json({ error: tErr.message }, 500);
-      await audit(top.id, { event: 'create_topup', parentRunId: parent.id, n, population: parent.population });
-      return json({ payRunId: top.id, parentRunId: parent.id, status: 'draft' });
+      await audit(top.id, { event: 'create_topup', parentRunId: parent.id, n, population: parent.population, paysDeltaOnly });
+      return json({ payRunId: top.id, parentRunId: parent.id, status: 'draft', paysDeltaOnly });
     }
 
     // ------------------------------------------------------------ transition
@@ -320,7 +389,7 @@ Deno.serve(async (req) => {
       if (!w) return json({ error: 'warning not found' }, 404);
       if (w.decision !== 'pending') return json({ error: `warning already decided (${w.decision})` }, 409);
       const { data: run } = await supabase
-        .from('pay_runs').select('id, status, adjustment_of, pay_period_id, pay_periods(month, year)').eq('id', w.run_id).single();
+        .from('pay_runs').select('id, status, adjustment_of, pays_delta_only, pay_period_id, pay_periods(month, year)').eq('id', w.run_id).single();
       if (!run) return json({ error: 'pay run not found' }, 404);
 
       const skippedReason = deductionSkippedReason(w, decision);
@@ -403,7 +472,7 @@ Deno.serve(async (req) => {
     if (action === 'generate_warnings') {
       const { runId } = body;
       const { data: run } = await supabase
-        .from('pay_runs').select('status, adjustment_of, pay_period_id, population, pay_periods(month, year)').eq('id', runId).single();
+        .from('pay_runs').select('status, adjustment_of, pays_delta_only, pay_period_id, population, pay_periods(month, year)').eq('id', runId).single();
       if (!run) return json({ error: 'pay run not found' }, 404);
       if (run.status !== 'draft') return json({ error: `generate_warnings only from draft (current: ${run.status})` }, 409);
       const month = Number(run.pay_periods.month), year = Number(run.pay_periods.year);
@@ -426,7 +495,7 @@ Deno.serve(async (req) => {
     if (action === 'calculate') {
       const { payRunId, force } = body;
       const { data: run } = await supabase
-        .from('pay_runs').select('status, adjustment_of, pay_period_id, population, feeds_confirmed_at, pay_periods(month, year)').eq('id', payRunId).single();
+        .from('pay_runs').select('status, adjustment_of, pays_delta_only, pay_period_id, population, feeds_confirmed_at, pay_periods(month, year)').eq('id', payRunId).single();
       if (!run) return json({ error: 'pay run not found' }, 404);
       if (run.status !== 'draft') {
         return json({ error: `calculate only from draft (current: ${run.status}). For a recalc, cancel and create a fresh run.` }, 409);
@@ -479,7 +548,7 @@ Deno.serve(async (req) => {
 
       const built = await buildRunInputs(supabase, run, year, month, f);
       if ('error' in built) return json({ error: built.error }, 500);
-      const { assembled, idByCode, topup, skippedAlreadyPaid } = built;
+      const { assembled, idByCode, topup, deltaOnly, skippedAlreadyPaid, alreadyPaidByEmployeeId } = built;
       // PATCH_112: population run calculates only its own category (after feed assembly, before the engine)
       const inputs = filterByPopulation(built.inputs, run.population);
 
@@ -513,15 +582,30 @@ Deno.serve(async (req) => {
       const held: any[] = [];
       const extraWarningsList: string[] = [];
       let extrasEmployees = 0, extrasTotalInr = 0;
+      // PATCH_138: delta-only correction run bookkeeping — see buildRunInputs()'s comment.
+      let deltaCorrected = 0, deltaFullyNew = 0, deltaNoChange = 0;
 
       for (const input of inputs) {
         const calc = calculateWithExtras(input, idByCode.get(input.empCode) as string, extrasCtx, cfg);
         const result = calc.result;
         extraWarningsList.push(...calc.warnings);
         if (result.held) { held.push({ empCode: input.empCode, blockers: result.blockers }); continue; }
+
+        const employeeId = idByCode.get(input.empCode) as string;
+        let netPayToWrite = result.netPay;
+        let correctionOf: { parentRunId: string; alreadyPaid: number; correctTotal: number; delta: number } | null = null;
+        if (deltaOnly) {
+          const alreadyPaid = alreadyPaidByEmployeeId.get(employeeId) ?? 0;
+          const dec = resolveDeltaCorrection(run.adjustment_of, result.netPay ?? 0, alreadyPaid);
+          if (!dec.write) { deltaNoChange++; continue; } // already correctly paid (or overpaid) — write no item
+          netPayToWrite = dec.netPay;
+          correctionOf = dec.correctionOf;
+          if (correctionOf) deltaCorrected++; else deltaFullyNew++;
+        }
+
         items.push({
           pay_run_id: payRunId,
-          employee_id: idByCode.get(input.empCode),
+          employee_id: employeeId,
           snapshot: {
             category: result.category, worked: result.worked,
             workingDays: input.workingDays,
@@ -530,9 +614,10 @@ Deno.serve(async (req) => {
             netPay: result.netPay, otPay: result.otPay,
             employer: result.employer, warnings: result.warnings,
             ...(calc.items.length ? { extraEarnings: calc.items, extraEarningsTotal: calc.extraTotal } : {}),
+            ...(correctionOf ? { correctionOf } : {}),
             historical: false,
           },
-          net_pay: result.netPay,
+          net_pay: netPayToWrite,
         });
         if (calc.items.length) { extrasEmployees++; extrasTotalInr = Math.round((extrasTotalInr + calc.extraTotal) * 100) / 100; }
       }
@@ -553,6 +638,7 @@ Deno.serve(async (req) => {
         extrasEmployees, extrasTotalInr, workerOtVdaBasis: cfg.workerOtVdaBasis,
         warningsCount: wst.warningsCount, warningCounts, population: run.population,
         ...(topup ? { topup: true, skippedAlreadyPaid } : {}),
+        ...(deltaOnly ? { paysDeltaOnly: true, deltaCorrected, deltaFullyNew, deltaNoChange } : {}),
       });
       return json({
         ok: true, calculated: items.length, held,
@@ -563,6 +649,11 @@ Deno.serve(async (req) => {
         ...(topup ? {
           topup: true, skippedAlreadyPaid,
           ...(items.length === 0 ? { message: 'Nothing to pay: every eligible employee already has an item in this pay period (or is still held).' } : {}),
+        } : {}),
+        ...(deltaOnly ? {
+          paysDeltaOnly: true, deltaCorrected, deltaFullyNew, deltaNoChange,
+          message: `Correction run: ${deltaCorrected} employee(s) topped up by the shortfall only, `
+            + `${deltaFullyNew} missed-entirely employee(s) paid in full, ${deltaNoChange} already correctly paid (no item written).`,
         } : {}),
         blockedEmployees: assembled.blockedEmployees,
         reconciliation: assembled.reconciliation,
