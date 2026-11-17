@@ -1,4 +1,60 @@
-# >>> RESUME STATE 15 Nov 2026, 09:30 IST — READ THIS FIRST <<<
+# >>> RESUME STATE 17 Nov 2026, 22:20 IST — READ THIS FIRST <<<
+
+## 🔴 OCTOBER PAYROLL WAS WRONG FOR MOST OF THE COMPANY — FOUND, ROOT-CAUSED, AND CORRECTED
+## (this supersedes the 15 Nov block below — October IS finalized, and then WAS WRONG)
+
+**What happened.** The October run (`d5c1e25a-bd3e-425a-8db0-540ef2734a2e`, finalized 15-17 Nov)
+paid ₹7,54,359.36 total. HR (Pallavi) forwarded the HR-approved "VFPL Employee/Worker Salary
+Sheet" 1-31 Oct tabs on 17 Nov, showing a huge gap. **Root cause (PATCH_138): `payroll-run`'s
+`loadFeeds()` fetched `attendance_records` with NO pagination. PostgREST silently caps an
+unbounded select at ~1000 rows; October has 2,731. The engine computed most people's pay off a
+TRUNCATED attendance set, not off missing data** — verified directly: VFL4065 had real
+`status='P'` check-ins for 23/26 days, yet the run's own snapshot said `worked=6`. This recurs
+every month until the fix is deployed.
+
+**Owner's instruction, 17 Nov: use HR's sheet figure directly, no engine re-verification** ("the
+sheet was approved and we paid as per this"). Reconciled all 72 staff + 19 worker rows in HR's
+two Oct sheets against the live run: **89 of 91 underpaid, total shortfall ₹22,21,900.04**,
+2 exact (owner, who draws no salary; VFL4043, already held).
+
+**✅ CORRECTED LIVE, 17 Nov 2026, on explicit owner approval ("Go ahead and disable").**
+`trg_lock_items_upd` disabled → 87 `pay_run_items` updated (`net_pay` + a `correctionAudit` in
+the snapshot documenting old value/reason/HR source — old breakdown replaced with one clear
+`CORRECTED_PER_HR_SHEET` line rather than risk a mistranscribed 8-column rebuild) → trigger
+re-enabled → verified: `tgenabled='O'` again, a test UPDATE on a corrected row was correctly
+REJECTED ("Pay run is finalized"), run total moved 754,359.36 → 2,930,490.40 (exact match to
+754,359.36 + the 87 corrections' ₹21,76,131.04), VFL1064's payslip-equivalent query now reads
+29,400 matching HR's sheet. **Record: `scripts/PATCH_139_october_payroll_hr_sheet_correction_17Nov2026.sql`** (documentation only, not re-runnable).
+
+**NOT corrected — 2 people, by design, not missed:** VFL1557 (Milind Barhate — terminated for
+breach of information, 15 Nov) and VFL4072 (Gundappa Nadde — owner's own "Batch 2, pending
+explanation of app non-use") have **no `pay_run_item` at all** in this run, so the UPDATE
+correctly skipped them (87 = 89 − these 2, not a miscount). Still open, needs the owner's call
+once HR has an answer on each.
+
+**Also NOT touched today, same two sheets but outside this email's scope:** BUNG*/CON* (not in
+today's two sheets — Pune/consultant sheets weren't sent), and the Sept 26-30 "balance days"
+question (closed 5 Nov per the owner — paid directly outside the app already, not an app-side
+gap).
+
+**PATCH_138 (the actual bug fix — pagination + a `pays_delta_only` correction-run mechanism)
+is built, independently re-verified by Claude (tsc 7, engine 137/0, feedsync 77/0, new
+pagination-correction suite 29/0), committed (`697aac3` + merge `d9874d7` on
+`ccr-9b83abb6-ghw3c3`), and sitting in **draft PR #83** against `claude/forge-os-backend-setup-7woj4t`. NOT deployed, migration NOT applied — needs a deploy decision + the SQL run before
+November (or any future month) can safely be calculated with full attendance.** This is the
+actual next step, not optional cleanup — without it, November repeats today's exact failure.
+
+**Open items to carry forward:**
+1. Deploy PATCH_138's `payroll-run` fix + apply its migration BEFORE calculating November.
+2. VFL1557 / VFL4072 — settle once HR/owner decide what each is owed, if anything.
+3. Whether the BUNG/consultant populations have the same attendance-truncation exposure for
+   October (not checked today — today's correction only covered the two sheets HR sent).
+4. HR's payslip screens for these 87 employees should now show the corrected October figure —
+   not yet confirmed on a real device.
+
+---
+
+# >>> (previous) RESUME STATE 15 Nov 2026, 09:30 IST — superseded by the block above <<<
 
 ## 🔴 THE ONE THING BLOCKING OCTOBER PAY — it is the owner's/HR's move, not Claude's
 
