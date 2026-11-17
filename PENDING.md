@@ -65,8 +65,11 @@ source" rule exists. PR #83 merged into `claude/forge-os-backend-setup-7woj4t`
 proper pagination — the truncation bug cannot recur.
 
 **Open items to carry forward:**
-1. VFL1557 / VFL4072 — settle once HR/owner decide what each is owed, if anything. Neither has
-   a `pay_run_item` in the October run, so PATCH_139's correction correctly left them untouched.
+1. **VFL1557 — CLOSED, owner confirmed 17 Nov 2026: "milind has left so no record for October."**
+   No October payslip is correct and expected; nothing to create for him. (He was terminated
+   15 Nov for breach of information — see CLAUDE.md — and had 0 present days in October
+   regardless.) VFL4072 is still open — settle once HR/owner decide what, if anything, he's
+   owed.
 2. BUNG*/CON* populations — whether they have the same attendance-truncation exposure for
    October is UNCHECKED (today's correction only covered the Staff + Worker sheets HR sent;
    no Pune/consultant sheet was provided). Needs those sheets before any claim either way.
