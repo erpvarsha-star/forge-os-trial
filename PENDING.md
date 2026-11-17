@@ -44,13 +44,27 @@ pagination-correction suite 29/0), committed (`697aac3` + merge `d9874d7` on
 November (or any future month) can safely be calculated with full attendance.** This is the
 actual next step, not optional cleanup — without it, November repeats today's exact failure.
 
+**✅ PATCH_138 DEPLOYED, 17 Nov 2026, owner-approved ("Go ahead and deploy it").**
+`pay_runs.pays_delta_only` column applied live; `payroll-run` deployed as **v20**
+(`verify_jwt: true`); deployed source fetched back and compared **byte-for-byte** against the
+repo for all 15 files — caught and fixed one real transcription error (a Hindi month-name
+character) during this process, confirming why this project's "always verify the deployed
+source" rule exists. PR #83 merged into `claude/forge-os-backend-setup-7woj4t`
+(squash `6888c9d`). November (and every future month) now reads `attendance_records` with
+proper pagination — the truncation bug cannot recur.
+
 **Open items to carry forward:**
-1. Deploy PATCH_138's `payroll-run` fix + apply its migration BEFORE calculating November.
-2. VFL1557 / VFL4072 — settle once HR/owner decide what each is owed, if anything.
-3. Whether the BUNG/consultant populations have the same attendance-truncation exposure for
-   October (not checked today — today's correction only covered the two sheets HR sent).
-4. HR's payslip screens for these 87 employees should now show the corrected October figure —
-   not yet confirmed on a real device.
+1. VFL1557 / VFL4072 — settle once HR/owner decide what each is owed, if anything. Neither has
+   a `pay_run_item` in the October run, so PATCH_139's correction correctly left them untouched.
+2. BUNG*/CON* populations — whether they have the same attendance-truncation exposure for
+   October is UNCHECKED (today's correction only covered the Staff + Worker sheets HR sent;
+   no Pune/consultant sheet was provided). Needs those sheets before any claim either way.
+3. HR's payslip screens for the 87 corrected employees should now show the corrected October
+   figure (confirmed via a direct query matching `my_payslips()`'s own logic) — not yet
+   confirmed on a real device/app session.
+4. The 87-person correction was scoped to exactly the two sheets HR sent today. "Everyone" in
+   the full sense (BUNG/CON, and the 11 other October-paid employees outside today's sheets)
+   has NOT been re-verified against an authoritative source — flag this plainly if asked.
 
 ---
 
