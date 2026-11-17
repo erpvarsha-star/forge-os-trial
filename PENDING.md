@@ -1,6 +1,17 @@
-# >>> RESUME STATE 17 Nov 2026, 22:20 IST — READ THIS FIRST <<<
+# >>> RESUME STATE 17 Nov 2026, 23:05 IST — READ THIS FIRST <<<
 
-## 🔴 OCTOBER PAYROLL WAS WRONG FOR MOST OF THE COMPANY — FOUND, ROOT-CAUSED, AND CORRECTED
+## 🔒 NEW PROCESS RULE — plan the whole task before executing (owner, 17 Nov 2026)
+
+Added to CLAUDE.md's "Working rules" after this session worked the October payroll bug
+step-by-step instead of as one upfront plan ("you don't make up plan and then you come back
+on deciding on steps"). Binding going forward: work out the whole mechanism (what's wrong,
+why, the fix, exactly which rows/files/functions it touches) BEFORE the first live-affecting
+write/deploy/correction — investigation and verification are planning, not execution, but
+once execution starts the plan should already be settled, not discovered live. See CLAUDE.md
+for the full rule.
+
+## ✅ OCTOBER PAYROLL — FOUND, ROOT-CAUSED, CORRECTED, FIX DEPLOYED. CLOSED for the data in hand.
+## (this supersedes the 15 Nov block below — October IS finalized, and then WAS WRONG)
 ## (this supersedes the 15 Nov block below — October IS finalized, and then WAS WRONG)
 
 **What happened.** The October run (`d5c1e25a-bd3e-425a-8db0-540ef2734a2e`, finalized 15-17 Nov)

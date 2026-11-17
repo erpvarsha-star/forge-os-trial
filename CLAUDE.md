@@ -155,6 +155,27 @@ GitHub, Figma, Gamma, Wix, Mem.
 frequently at this site; a failure must never cost more than the step in
 progress.
 
+**🔒 LOCKED RULE — plan the whole task before touching anything, especially anything
+live/financial. Decision from Yash, 17 Nov 2026**, after watching the October payroll
+investigation unfold step by step instead of as one upfront plan: "This is the problem
+between facing when you don't make up plan and then you come back on deciding on steps...
+always make a plan first so you not need to try variables while executing." Concretely:
+- Before the first live-affecting action (a write, a deploy, a correction), work out and
+  state the **whole mechanism** — what's wrong, why, the fix, and exactly which rows/files/
+  functions it touches — not just the next single step. Discovering the real shape of the
+  problem (e.g. "the attendance fetch is unpaginated," "the correction needs a trigger
+  disable, not a new run") belongs in the planning pass, before execution starts, not as a
+  live discovery mid-correction that forces a redesign in front of the owner.
+- This doesn't mean stalling on investigation — reading code, querying data, and verifying
+  root cause are planning, not execution. Execution is the first write/deploy/correction. Get
+  the plan right first; only then start writing.
+- Applies most strongly to anything irreversible or money-affecting (payroll corrections,
+  edge-function deploys, trigger disables) — exactly the class of action in play here.
+- This sits alongside, not instead of, the locked verification rules already in this file
+  (re-run tests yourself, byte-diff a deployed function, never trust a tool's own success
+  response) — plan first, then execute, then verify; don't improvise the plan during the
+  execute/verify steps.
+
 **🔒 LOCKED RULE — delegate research and build/deploy work to subagents,
 verify before reporting done. Decision from Yash, 8 Oct 2026.** "you will
 use sonnet 4.6 and haiku 5.5 for every research or deployment as per
