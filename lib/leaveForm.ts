@@ -64,6 +64,19 @@ export function normalizeDateInput(input: string): string | null {
     return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
   }
 
+  // YYYY/MM/DD — the placeholder reads "YYYY-MM-DD" and the existing slash
+  // format is day-first, so a user can reasonably type this unambiguous,
+  // year-first slash variant too (e.g. VFL1391's "2026/11/18"); accept it
+  // additively, same real-calendar-date check as the ISO form.
+  const isoSlashMatch = value.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/)
+  if (isoSlashMatch) {
+    const y = parseInt(isoSlashMatch[1], 10)
+    const m = parseInt(isoSlashMatch[2], 10)
+    const d = parseInt(isoSlashMatch[3], 10)
+    if (!isRealCalendarDate(y, m, d)) return null
+    return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+  }
+
   return null
 }
 

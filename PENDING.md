@@ -1,4 +1,47 @@
-# >>> RESUME STATE 17 Nov 2026, 22:20 IST — READ THIS FIRST <<<
+# >>> RESUME STATE 19 Nov 2026, 19:05 IST — READ THIS FIRST <<<
+
+## PATCH_138 deployed live; leave-apply date-parser bug fixed — PR #84 (draft), not yet merged
+
+**PATCH_138 is now LIVE** (was the top blocker in the 17 Nov block below). `pay_runs.pays_delta_only`
+column confirmed present (idempotent re-apply — it turned out to already exist live, untracked, from
+an earlier session; harmless). `payroll-run` edge function redeployed **v20 → v21**, `verify_jwt: true`.
+Verified independently by Claude (not just the deploy agent): deployed source byte-spot-checked and
+anchor-grepped (36 anchors across all 15 files, counts matching), `pay_runs`/`pay_run_items` row counts
+(26 / 754) unchanged before/after, no run's status touched. **November can now be calculated without
+repeating October's silent-truncation underpayment.**
+
+**Leave date-parser bug (VFL1391's reported "Enter date as DD/MM/YYYY" error on a valid-looking date)
+fixed**, commit `415cdcd`: `lib/leaveForm.ts`'s `normalizeDateInput()` now also accepts `YYYY/MM/DD`
+(year-first slash) alongside the existing ISO and day-first-slash shapes — additive only, both existing
+shapes' behavior unchanged (full existing test suite re-run unmodified and still passes). Re-verified
+independently: tsc exactly 7 (baseline, none new), i18n clean, `leave-form-dates.test.ts` 23/0 (20
+existing + 3 new), `leave-form-days.test.ts` 21/0 (no regression).
+
+**Both committed and pushed to `ccr-d3217a75-he2zsr`. Draft PR #84 opened against
+`claude/forge-os-backend-setup-7woj4t`** (https://github.com/erpvarsha-star/forge-os-trial/pull/84) —
+**`build-apk.yml` only triggers on push to the base branch, so no new APK exists yet for the
+leave-form fix; it needs this PR merged first.** The payroll-run deploy is infra-only and is already
+live regardless of merge status.
+
+**Other items from the same screenshot review, not yet acted on:**
+- **VFL5449 (Siddiqui) COFF leave stuck at the plant-head stage with a generic "Something went wrong."**
+  Traced: he has ZERO rows in `comp_off_balance` (0 unused, 0 total) — the refusal is CORRECT per the
+  owner's 29 Oct 2026 "comp-off shortfall: BLOCKED" rule, but the error message doesn't say why. Not a
+  bug to silently approve around — flag to HR/Pallavi: why did he apply for a comp-off he hasn't earned?
+  A clearer in-app error message (naming the real reason) would be a small, worthwhile follow-up fix.
+- **VFL4071 (2-3 Nov shown absent despite real check-in/out; 6-7 Nov shown half-day despite full day)**
+  — same night-shift-checkout misclassification bug class as the 12 Nov VFL4024/VFL5458 finding. Still
+  open, not yet root-caused or fixed.
+- **VFL1453 — GPS check-in/out done but 18 Nov not showing present** — reported, not yet investigated.
+- **Friday 20 Nov 2026 is a working day for some employees (per-person, supervisor's call)** — no app
+  action needed or wanted, matches the 13 Nov 2026 locked "Friday working is per-person" decision. Flagged
+  but not acted on: tonight's 19:00/21:00 daily-allocator reminder (VFL1560/VFL1566) will likely report
+  Friday as "unallocated" since the grid can't allocate Fridays — already predicted 13 Nov, deliberately
+  left as noise until the owner raises it as its own issue.
+
+---
+
+# >>> (previous) RESUME STATE 17 Nov 2026, 22:20 IST — superseded by the block above <<<
 
 ## 🔴 OCTOBER PAYROLL WAS WRONG FOR MOST OF THE COMPANY — FOUND, ROOT-CAUSED, AND CORRECTED
 ## (this supersedes the 15 Nov block below — October IS finalized, and then WAS WRONG)
