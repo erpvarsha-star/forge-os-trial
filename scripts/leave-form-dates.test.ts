@@ -39,6 +39,12 @@ check('31/10/2026 -> 2026-10-31 (would crash under MM/DD)', normalizeDateInput('
 // only 4-digit years are accepted; must return null, never silently guess.
 check('26/09/26 (2-digit year) -> null, not guessed', normalizeDateInput('26/09/26') === null);
 
+// YYYY/MM/DD (year-first slash, PATCH-adjacent fix for VFL1391's real report:
+// typed "2026/11/18" against the "YYYY-MM-DD" placeholder) — additive, unambiguous.
+check('2026/11/18 -> 2026-11-18 (VFL1391 report)', normalizeDateInput('2026/11/18') === '2026-11-18');
+check('2026/02/30 (Feb 30) -> null', normalizeDateInput('2026/02/30') === null);
+check('2026/13/01 (month 13) -> null', normalizeDateInput('2026/13/01') === null);
+
 // Actually-invalid dates -> null (not just a shape check — a real calendar check)
 check('30/02/2026 (Feb 30) -> null', normalizeDateInput('30/02/2026') === null);
 check('2026-02-30 (ISO Feb 30) -> null', normalizeDateInput('2026-02-30') === null);
