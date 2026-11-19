@@ -88,7 +88,7 @@ export function LeaveAdvanceApprovalCards({
       return
     }
     const { error } = await onReviewLeave(req.id, true, note, granted)
-    if (error) { Alert.alert(t('common.error'), t('common.somethingWentWrong')); return }
+    if (error) { Alert.alert(t('common.error'), error.message || t('common.somethingWentWrong')); return }
     if (isFinalStage(req) && onConsumeLeave) {
       // Final approval: draw the balance down. A consumption failure must NOT
       // roll back the approval (sheet behavior — the approval already stands);
