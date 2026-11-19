@@ -2777,6 +2777,42 @@ eas build --platform android --profile preview
 2. **PATCH_111**: owner supplied the template file only (no values — it holds no personal data). It still needs the private values file (STEP 2) to run; use the corrected repo copy, never the attached older draft.
 3. **"Fix the new apk to build without failing"**: runs #107/#108 built green; the real risk is apk-108 shipping leave code that calls RPCs (`p_granted_days`, `consume_leave_for_request`) that only exist once PATCH_113 is live. Apply 113 first, then verify, then (if needed) rebuild.
 
+## Session close, 19 Nov 2026 — PATCH_138 deployed live; 2 reported app bugs fixed; 1 new finding
+
+**PATCH_138 live**: `payroll-run` redeployed v20→v21 with the attendance-pagination fix (see PATCH_138/139
+above). `pay_runs.pays_delta_only` column confirmed present. Independently re-verified by Claude (not
+just the deploy agent): deployed source anchor-grepped across all 15 files, row counts unchanged before/
+after, no run's status touched. November can now be calculated without repeating October's
+silent-truncation underpayment.
+
+**Two bugs reported by HR (Pallavi) via screenshots, both fixed, merged, and in a published APK:**
+1. **Leave-apply date parser** (VFL1391) — `lib/leaveForm.ts`'s `normalizeDateInput()` only accepted
+   `YYYY-MM-DD` and day-first `D/M/YYYY`; he typed `2026/11/18` (year-first slash, against the field's
+   `YYYY-MM-DD` placeholder) and was blocked. Added that shape additively; the two existing formats are
+   unchanged. PR #84, squash `62b801c`, in `apk-135`.
+2. **Generic "Something went wrong" on leave approval** (VFL5449's comp-off, approved by VFL1386/Fazal)
+   — the RPC `review_leave_request` already raises a specific, correct exception
+   (`'Comp-off balance insufficient: employee has % unused day(s), % requested'` — his real balance is
+   zero, so the refusal is correct per the 29 Oct 2026 "comp-off shortfall: BLOCKED" rule); the client
+   (`components/LeaveAdvanceApprovalCards.tsx`) was discarding `error.message` and always showing the
+   generic string. Now shows the real message, same pattern already used in `PuneAttendance.tsx`. PR
+   #85, squash `d1924c8`. **RPC and refusal behavior untouched — this only fixes what the approver sees.**
+
+**🔴 New finding, not yet corrected, needs HR's sheets: BUNG/consultant employees in the SAME finalized
+October run (`d5c1e25a…`) were very likely ALSO underpaid by the pagination bug**, same root cause as
+the 87 staff/worker rows PATCH_139 already corrected — that correction only covered the Staff/Worker
+sheets HR had sent, never the Pune/consultant sheets. Live figures look low and inconsistent with a full
+month (e.g. CON12 net ₹18,460 against a ₹1,846/day rate implies ~10 paid days; CON24 net ₹0.00). Do not
+correct this without HR's own approved Pune Home Workers and Consultant sheets for October, reconciled
+the same way PATCH_139 was, with explicit owner approval before any `pay_run_items` row is touched. See
+PENDING.md's top RESUME STATE for the full carry-forward list.
+
+**Still open from HR's screenshots, not yet root-caused**: VFL4071 (2-3 Nov shown absent despite a real
+check-in/out; 6-7 Nov shown half-day despite a full day) and VFL1453 (GPS check-in/out done, 18 Nov not
+showing present).
+
+---
+
 ## PATCH_113 APPLIED LIVE — 29 Oct 2026 (owner approved)
 
 Applied step by step. The MCP tool blocked `drop function`, so the old 3-arg `review_leave_request` was **renamed** to `review_leave_request_v53_old` (execute revoked from public/anon/authenticated; safe to drop later from the SQL Editor) instead of dropped, then the 4-arg `review_leave_request(p_id,p_approve,p_note,p_granted_days)` and the ledger-aware `consume_leave_for_request` were created. Execute revoked from public/anon on both new functions. Live rolled-back test as hr_admin: whole-day C-off marks 1 ledger row and is idempotent; half-day C-off → `half_day_pending_decision`, ledger untouched, owner notified; 3-day request with 2 rows → `approval_shortfall_2`; 0 residual rows. apk-107/108 leave code now works. Older apps still calling the 3-arg form resolve to the 4-arg via defaults.

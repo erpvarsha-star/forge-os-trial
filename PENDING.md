@@ -1,6 +1,73 @@
-# >>> RESUME STATE 19 Nov 2026, 19:05 IST — READ THIS FIRST <<<
+# >>> RESUME STATE 19 Nov 2026, 19:55 IST — READ THIS FIRST <<<
 
-## PATCH_138 deployed live; leave-apply date-parser bug fixed — PR #84 (draft), not yet merged
+## Session close — PATCH_138 live, 2 app fixes shipped, 1 new financial-integrity finding
+
+**Shipped today, all independently re-verified by Claude (not just agent say-so), both merged into
+`claude/forge-os-backend-setup-7woj4t` and in a published APK:**
+1. **PATCH_138 deployed live** — `payroll-run` v20→v21, `pay_runs.pays_delta_only` column confirmed.
+   November can now be calculated without repeating October's silent-truncation underpayment.
+2. **Leave date-parser fix** (VFL1391) — merged PR #84, squash `62b801c`, in **`apk-135`** (published,
+   confirmed real asset uploaded, built from that commit).
+3. **VFL5449 comp-off approval error message fix** — merged PR #85, squash `d1924c8`. `components/
+   LeaveAdvanceApprovalCards.tsx`'s `approveLeave()` now shows the RPC's real error text (e.g. "Comp-off
+   balance insufficient: employee has 0 unused day(s), 1 requested") instead of a generic "Something
+   went wrong." The underlying refusal is CORRECT (owner's 29 Oct 2026 "comp-off shortfall: BLOCKED"
+   rule) and untouched — this only fixes what Fazal sees. **A new APK build triggered on this merge —
+   check `get_latest_release` for the tag once it finishes; not yet confirmed published as of this
+   note.**
+
+## 🔴 NEW FINDING — BUNG/consultant populations in the SAME October run were very likely ALSO underpaid
+## by the PATCH_138 pagination bug, same as the 87 staff/worker rows already corrected (PATCH_139)
+
+Checked live, not guessed: the finalized October run (`d5c1e25a…`) has `pay_run_items` for 7 BUNG and
+7 CON employees, computed BEFORE PATCH_138's fix was deployed — i.e. off the same silently-truncated
+attendance read. Current figures look low and inconsistent with a full month (e.g. CON12 net ₹18,460
+against a ₹1,846/day rate implies only ~10 paid days; CON24 net **₹0.00**). **PATCH_139's correction
+only covered the Staff and Worker sheets HR had sent that day — Pune/consultant sheets were never sent
+and this population was never checked.**
+
+**This is NOT corrected and must NOT be guessed at.** Per the same process as PATCH_139: needs HR's
+own approved Pune Home Workers sheet and Consultant sheet for October, a reconciliation against the
+live run (same method as the 87 staff/worker rows), and explicit owner approval before any
+`pay_run_items` row is touched (`trg_lock_items_upd` disable/correct/re-enable, same as before). **Flag
+this to the owner as its own item before next payroll work — do not let it sit silently the way the
+staff/worker exposure did until HR happened to forward a sheet.**
+
+## What's left — AT THE OWNER'S / HR'S END (needs a person, Claude cannot do these)
+
+1. **Install the latest APK** (per the standing "only ever install the newest build" rule) and confirm
+   on a real device: leave-apply accepts `2026/11/18`-style dates; VFL5449's comp-off approval now
+   shows the real reason instead of a generic error.
+2. **Decide what happens with VFL5449's comp-off request** — now that the real reason is visible
+   (0 unused comp-off days, 1 requested), HR/Fazal need to work out why he applied for one he hasn't
+   earned: a missed entry, a misunderstanding, or something to reject with an explanation. Claude will
+   not credit or reject on anyone's behalf.
+3. **Supply real check-in/check-out facts for VFL4071 (2-3 Nov missing, 6-7 Nov wrongly half-day) and
+   VFL1453 (18 Nov GPS check-in/out done but not showing present)** — these are real, reported, still
+   OPEN bugs (see below); once Claude root-causes the code defect, correcting the actual historical rows
+   still needs HR/Kajal's confirmation of what really happened those days, per this project's standing
+   "never fabricate attendance" rule.
+4. **Send the October Pune Home Workers and Consultant sheets** (same as the Staff/Worker sheets sent
+   17 Nov) so the new finding above can be reconciled and corrected the same way PATCH_139 was.
+5. **VFL1557 / VFL4072** — still unsettled; waiting on HR's determination of what, if anything, each is
+   owed for October (unchanged from the 17 Nov note).
+6. **November payroll** — no longer blocked on the pagination bug (fixed), but still needs the normal
+   HR process (feeds entered, warnings reviewed, run calculated) whenever HR is ready.
+
+## What's left — AT CLAUDE'S END (no person needed, next session continues these)
+
+1. **Root-cause VFL4071's attendance misclassification** (2-3 Nov absent-despite-check-in; 6-7 Nov
+   half-day-despite-full-day) — flagged from HR's screenshots 19 Nov, same bug class as the 12 Nov
+   VFL4024/VFL5458 night-shift-checkout finding, but not yet traced in code.
+2. **Root-cause VFL1453's "GPS check-in/out done but 18th not showing present"** — reported 19 Nov, not
+   yet investigated at all.
+3. **Reconcile BUNG/consultant October pay once HR sends their sheets** (see the finding above).
+4. **Confirm the new APK build (triggered by PR #85's merge, squash `d1924c8`) actually published** —
+   was still running as of this note; check `get_latest_release`.
+
+---
+
+## (previous, 19:05 IST note — superseded by the block above) PATCH_138 deployed live; leave-apply date-parser bug fixed
 
 **PATCH_138 is now LIVE** (was the top blocker in the 17 Nov block below). `pay_runs.pays_delta_only`
 column confirmed present (idempotent re-apply — it turned out to already exist live, untracked, from
