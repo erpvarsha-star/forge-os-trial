@@ -1,4 +1,103 @@
-# >>> RESUME STATE 15 Nov 2026, ~14:15 IST — READ THIS FIRST <<<
+# >>> RESUME STATE 17 Nov 2026, 22:20 IST — READ THIS FIRST <<<
+
+## 🔴 OCTOBER PAYROLL WAS WRONG FOR MOST OF THE COMPANY — FOUND, ROOT-CAUSED, AND CORRECTED
+## (this supersedes the 15 Nov block below — October IS finalized, and then WAS WRONG)
+
+**What happened.** The October run (`d5c1e25a-bd3e-425a-8db0-540ef2734a2e`, finalized 15-17 Nov)
+paid ₹7,54,359.36 total. HR (Pallavi) forwarded the HR-approved "VFPL Employee/Worker Salary
+Sheet" 1-31 Oct tabs on 17 Nov, showing a huge gap. **Root cause (PATCH_138): `payroll-run`'s
+`loadFeeds()` fetched `attendance_records` with NO pagination. PostgREST silently caps an
+unbounded select at ~1000 rows; October has 2,731. The engine computed most people's pay off a
+TRUNCATED attendance set, not off missing data** — verified directly: VFL4065 had real
+`status='P'` check-ins for 23/26 days, yet the run's own snapshot said `worked=6`. This recurs
+every month until the fix is deployed.
+
+**Owner's instruction, 17 Nov: use HR's sheet figure directly, no engine re-verification** ("the
+sheet was approved and we paid as per this"). Reconciled all 72 staff + 19 worker rows in HR's
+two Oct sheets against the live run: **89 of 91 underpaid, total shortfall ₹22,21,900.04**,
+2 exact (owner, who draws no salary; VFL4043, already held).
+
+**✅ CORRECTED LIVE, 17 Nov 2026, on explicit owner approval ("Go ahead and disable").**
+`trg_lock_items_upd` disabled → 87 `pay_run_items` updated (`net_pay` + a `correctionAudit` in
+the snapshot documenting old value/reason/HR source — old breakdown replaced with one clear
+`CORRECTED_PER_HR_SHEET` line rather than risk a mistranscribed 8-column rebuild) → trigger
+re-enabled → verified: `tgenabled='O'` again, a test UPDATE on a corrected row was correctly
+REJECTED ("Pay run is finalized"), run total moved 754,359.36 → 2,930,490.40 (exact match to
+754,359.36 + the 87 corrections' ₹21,76,131.04), VFL1064's payslip-equivalent query now reads
+29,400 matching HR's sheet. **Record: `scripts/PATCH_139_october_payroll_hr_sheet_correction_17Nov2026.sql`** (documentation only, not re-runnable).
+
+**NOT corrected — 2 people, by design, not missed:** VFL1557 (Milind Barhate — terminated for
+breach of information, 15 Nov) and VFL4072 (Gundappa Nadde — owner's own "Batch 2, pending
+explanation of app non-use") have **no `pay_run_item` at all** in this run, so the UPDATE
+correctly skipped them (87 = 89 − these 2, not a miscount). Still open, needs the owner's call
+once HR has an answer on each.
+
+**Also NOT touched today, same two sheets but outside this email's scope:** BUNG*/CON* (not in
+today's two sheets — Pune/consultant sheets weren't sent), and the Sept 26-30 "balance days"
+question (closed 5 Nov per the owner — paid directly outside the app already, not an app-side
+gap).
+
+**PATCH_138 (the actual bug fix — pagination + a `pays_delta_only` correction-run mechanism)
+is built, independently re-verified by Claude (tsc 7, engine 137/0, feedsync 77/0, new
+pagination-correction suite 29/0), committed (`697aac3` + merge `d9874d7` on
+`ccr-9b83abb6-ghw3c3`), and sitting in **draft PR #83** against `claude/forge-os-backend-setup-7woj4t`. NOT deployed, migration NOT applied — needs a deploy decision + the SQL run before
+November (or any future month) can safely be calculated with full attendance.** This is the
+actual next step, not optional cleanup — without it, November repeats today's exact failure.
+
+**Open items to carry forward:**
+1. Deploy PATCH_138's `payroll-run` fix + apply its migration BEFORE calculating November.
+2. VFL1557 / VFL4072 — settle once HR/owner decide what each is owed, if anything.
+3. Whether the BUNG/consultant populations have the same attendance-truncation exposure for
+   October (not checked today — today's correction only covered the two sheets HR sent).
+4. HR's payslip screens for these 87 employees should now show the corrected October figure —
+   not yet confirmed on a real device.
+
+---
+
+# >>> (previous) RESUME STATE 15 Nov 2026, ~14:15 IST — superseded by the block above <<<
+
+## 🔴 THE ONE THING BLOCKING OCTOBER PAY — it is the owner's/HR's move, not Claude's (historical — resolved later this same block, see below)
+
+The October run **`d5c1e25a-bd3e-425a-8db0-540ef2734a2e`** (1–31 Oct, whole company, `population=null`)
+sits at **`in_review` with 102 `pay_run_items`**. HR already pressed Calculate (14 Nov 19:52 IST) and
+moved it to `in_review` (19:55 IST), both as VFL5440. All 110 warnings are decided AND AI-reviewed;
+`pay_run_ready_to_calculate` is TRUE; the blanket late waiver is confirmed for everyone (owner, 14 Nov).
+
+**Remaining steps, and only a human with an owner/HR login can do them** — `payroll-run/index.ts:172-184`
+maps the caller's JWT to an `employees` row and requires role `owner`/`hr_admin`, so a service-role key
+gets 403. Claude decided NOT to build a side-door (a publicly-callable `calculate`/`transition` writes
+real pay figures). **The owner can do it himself in ~2 min: More → view-as → HR Admin → Payroll Run.**
+- `in_review → approved` — **reversible** (`approved` can still go back to `draft`); no money moves,
+  nobody notified.
+- `approved → finalized` — **IRREVERSIBLE** (only forward to `payment_file_generated`); applies advance
+  recoveries against real balances and sends `payslip_ready` to all 102 employees.
+
+**The 4 held employees** (active, no `pay_run_item`): VFL1001 (owner, all-zero structure — expected),
+VFL1557 (0 present days; now terminated), VFL4072 (owner already ruled: Batch 2), and **VFL4043 Uttam
+Bhadgal — 🔒 owner's decision 15 Nov: STAYS HELD.** The run is NOT reopened or recalculated; he is
+settled separately once HR confirms whether he left. Approve and finalize as it stands.
+
+## 🔴 CAUGHT MINUTES BEFORE FINALIZE — PATCH_137: advance recovery had NEVER worked
+
+Owner said "leave 4043 held, i will approve and finalize." Because finalize is irreversible and is the
+only moment `apply_advance_recoveries()` fires, that path was checked first. **The engine writes the
+deduction key as `ADVANCE` (uppercase); the function read lowercase `'advance'`. Postgres JSON keys are
+case-sensitive, so it read NULL for everyone and recovered nothing — `advance_recoveries` had 0 rows,
+ever.** That is the exact repeat-forever bug PATCH_103 was written to close, shipped against a key the
+engine does not produce.
+
+**Fixed live (`PATCH_137`), reading both casings.** Tested rolled-back against the real October run:
+₹7,000 / 2 employees (BUNG09 ₹2,000, VFL1528 ₹5,000), idempotent on a second call, balances 6,000→4,000
+and 12,000→7,000, then rolled back and re-verified zero residue outside the transaction. **Nothing
+pre-applied — finalize now does it correctly.**
+
+**October's exposure was only ₹7,000 because PATCH_127 defers 29 of 31 advances to November. NOVEMBER is
+the month this would have bitten hard** — 31 advances start recovering then. Re-check
+`select count(*) from advance_recoveries` after the owner finalizes October: it must be **2**.
+
+**🔒 Standing lesson: snapshot JSON keys are UPPERCASE** (`ADVANCE`, `CANTEEN`, `SOCIETY`, `OTHER`, `PF`,
+`PT`, `ESI`, `MLWF`). A lowercase read of `snapshot->'deductions'` fails silently with NULL. Claude's own
+first pre-flight query made this mistake and briefly read as "no advance deductions at all".
 
 ## ✅ OCTOBER PAYROLL RUN IS FINALIZED — CLOSED, verified live
 

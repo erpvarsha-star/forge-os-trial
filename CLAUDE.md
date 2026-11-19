@@ -3839,6 +3839,12 @@ which was the query's fault, not the data's.
 
 ## ✅ OCTOBER 2026 PAYROLL RUN — FINALIZED, 15 Nov 2026. GOAL 1's first real in-app pay run, closed.
 
+**⚠ SUPERSEDED 17 Nov 2026 — see "PATCH_138/139" below: this run was then found to have underpaid
+most of the company and was corrected live.** Kept as the record of what was verified true at the
+15 Nov finalize itself (advance recovery, payslip notifications, held employees) — all of that
+remains accurate; only the headline total (₹7,54,359.36) was wrong, for the reason PATCH_138/139
+explains.
+
 **The owner approved and finalized it himself** (More → view-as → HR Admin → Payroll Run), exactly as
 he said he would. Run `d5c1e25a-bd3e-425a-8db0-540ef2734a2e`: `status='finalized'`, **102
 `pay_run_items`, total net pay ₹754,359.36**. Verified live, four ways, all consistent:
@@ -3866,3 +3872,81 @@ still open before Goal 1 can be called fully complete: the remaining SHEETS_RETI
 FY27 gap audit showing zero sheet-only gaps, and the owner's own sign-off that the parallel sheets are
 retired. None of that blocks anything — see PENDING.md's "Next session" list for what's actually
 queued.
+
+## 🔒 PATCH_138/139, 17 Nov 2026 — October payroll underpaid ~89 of 91 staff+worker employees:
+## unpaginated attendance read silently truncated at ~1000 rows; corrected live on HR's sheet
+
+**Found investigating HR's own complaint** (Pallavi forwarded the HR-approved "VFPL
+Employee/Worker Salary Sheet" 1-31 Oct tabs, reporting a huge gap vs the app). **Root cause:**
+`supabase/functions/payroll-run/index.ts`'s `loadFeeds()` fetched `attendance_records` for the
+period with a single, unpaginated `.select()`. PostgREST silently caps an unbounded select at
+its configured max-rows (~1000 observed live); October 2026 has **2,731** matching rows. The
+read was truncated with **no error**, so the engine computed most employees' "worked days" off
+an incomplete attendance set — **not off missing attendance.** Verified directly before
+accepting this: VFL4065 had real `status='P'` check-in/checkout rows for 23 of 26 working days
+in `attendance_records`, yet the run's own snapshot said `worked: 6`. Daily row counts for
+October (70-88 rows/day all month) also ruled out "the app was dark" as an alternative
+explanation. **This recurs every month** — including the November `PERMANENT_WORKER` draft
+run already sitting in the system — until the fix below is deployed.
+
+**🔒 Owner decision, 17 Nov 2026: use HR's sheet figure directly, no engine re-verification**
+("I don't need to verify anything again as the sheet was approved and we paid as per this").
+The correction target per person is HR's sheet "Payable Salary", not a recomputed engine total.
+
+**Reconciliation (all 72 staff + 19 worker rows in HR's two Oct 1-31 sheets, parsed via an
+HTML colspan/rowspan grid walk, not eyeballed — a flattened-markdown read of the same sheet
+had already produced one wrong column mapping, caught before trusting it):** 89 of 91
+underpaid, **total shortfall ₹22,21,900.04** (app had paid ₹6,40,627.96 of the ₹28,62,528 HR
+says was owed), 2 exact (VFL1001 owner, draws no salary; VFL4043, already held per the 15 Nov
+decision).
+
+**✅ CORRECTED LIVE, 17 Nov 2026, on explicit owner approval ("Go ahead and disable").**
+`alter table pay_run_items disable trigger trg_lock_items_upd` → 87 `pay_run_items` updated
+(`net_pay` set to HR's figure; `snapshot.earnings`/`deductions` replaced with one clearly-labelled
+`CORRECTED_PER_HR_SHEET` line — deliberately not a rebuilt 8-column breakdown, since
+mistranscribing a real pay figure across two different sheet layouts for 87 people was a real
+risk not worth taking when a single honest line does the job; `snapshot.correctionAudit` records
+the prior net_pay, the prior full snapshot, the HR figure, the reason and the source) →
+`alter table pay_run_items enable trigger trg_lock_items_upd`. **Verified after, not assumed:**
+`pg_trigger.tgenabled='O'` again; a test `UPDATE` on a corrected row was correctly **rejected**
+("Pay run is finalized — items are immutable"); run total moved **₹7,54,359.36 → ₹29,30,490.40**,
+an exact match to 754,359.36 + the 87 corrections' ₹21,76,131.04; a payslip-equivalent query for
+VFL1064 now reads **29,400**, matching HR's sheet and his own Apr-Sep history (same employee,
+same full-attendance month, same figure every time — a strong independent sanity check).
+Record: `scripts/PATCH_139_october_payroll_hr_sheet_correction_17Nov2026.sql` (documentation of
+what was done; not re-runnable, nothing in it is meant to execute again).
+
+**NOT corrected — 2 people, by design, not missed.** VFL1557 (Milind Barhate — terminated for
+breach of information, 15 Nov) and VFL4072 (Gundappa Nadde — owner's own "Batch 2, pending
+explanation of app non-use") have **no `pay_run_item` at all** in this run, so the UPDATE
+(which required an existing item to correct) correctly skipped both — 87 corrected is not a
+miscount of 89, it's 89 minus these two known-held cases. Still open pending HR/owner's call on
+each.
+
+**Also not touched today:** BUNG*/CON* populations (today's email only carried the Staff and
+Worker sheets — Pune/consultant sheets weren't sent, so whether they have the same
+attendance-truncation exposure for October is unchecked); the Sept 26-30 "balance days"
+question (closed 5 Nov, paid directly outside the app already — unrelated to this bug).
+
+**The actual bug fix (not just today's one-off correction) — PATCH_138.** New
+`lib/payroll/pagedFetch.ts` (`fetchAllPages`, pure/testable: pages `.range()` windows until a
+page comes back short, the only reliable "last page" signal PostgREST gives), vendored and
+wired into `payroll-run/index.ts` via a `fetchAllRows()` wrapper, now used for
+`attendance_records` (confirmed exceeding the cap) and `leave_requests` (genuinely unbounded —
+no date/status filter at all, though small today). `employees`/`employee_salary_structure`/
+`advance_requests`/`employee_status_history`/`recurring_adjustments` are flagged in-code as
+unbounded-in-principle but left as single-shot reads (all well under 1000 rows today) — page
+them the moment any one approaches the cap. Also adds `pay_runs.pays_delta_only boolean default
+false` (additive; every existing run unaffected) so a future `create_topup` run can pay just the
+**shortfall** for someone already paid in the period instead of being skipped entirely (the
+existing `create_topup` behavior for someone genuinely missed is unchanged) — built via
+`lib/payroll/topupFilter.ts` + `lib/payroll/deltaCorrection.ts`, both pure/testable.
+**Independently re-verified by Claude, not taken on the build agent's word:** `npx tsc --noEmit`
+exactly 7 (unchanged baseline), new `scripts/payroll-pagination-correction.test.ts` 29/0, engine
+suite 137/0, feedsync suite 77/0 — all re-run directly, not copied from the agent's report.
+Committed (`697aac3`, merged with a concurrent WIP checkpoint as `d9874d7`, branch
+`ccr-9b83abb6-ghw3c3`), sitting in **draft PR #83** against `claude/forge-os-backend-setup-7woj4t`.
+**🔴 NOT deployed, migration NOT applied.** This is the real next step, not optional cleanup —
+**without deploying this before November is calculated, November repeats today's exact
+failure**, and the exposure there is larger (31 advances begin recovering in November per
+PATCH_127, same pattern as the PATCH_137 incident).

@@ -1,0 +1,59 @@
+-- PATCH_139 — RECORD ONLY. Already applied live, 17 Nov 2026, on explicit owner instruction
+-- ("Go ahead and disable"). Do NOT re-run; this file documents what was done for the audit
+-- trail and to spare a future session from re-discovering the root cause.
+--
+-- BACKGROUND
+-- HR (Pallavi Khade) forwarded the HR-approved "VFPL Employee/Worker Salary Sheet" 1-31 Oct
+-- 2026 tabs on 17 Nov 2026, reporting a huge gap between those figures (already paid in
+-- reality, outside the app) and what the already-FINALIZED October payroll run
+-- (d5c1e25a-bd3e-425a-8db0-540ef2734a2e, population=null, 1-31 Oct 2026) showed.
+--
+-- ROOT CAUSE (see PATCH_138, same date): payroll-run/index.ts's loadFeeds() fetched
+-- attendance_records with a single unpaginated .select(). PostgREST silently caps an
+-- unbounded select at its configured max-rows (~1000 observed). October 2026 has 2,731
+-- matching rows, so the engine computed everyone's "worked days" off a truncated subset —
+-- NOT off missing attendance. Verified directly: VFL4065 had real status='P' check-in/
+-- checkout rows for 23 of 26 working days in attendance_records, yet the run's own snapshot
+-- said worked=6. The daily row-count pattern (70-88 rows/day all month) also ruled out "the
+-- app was dark" as the cause. PATCH_138 fixes the read going forward; it does not change
+-- anything already paid.
+--
+-- OWNER DECISION, 17 Nov 2026: "I don't need to verify anything again as the sheet was
+-- approved and we paid as per this." HR's sheet is the ground truth for what was actually
+-- paid in reality — not the engine's own recomputation. The correction target for each
+-- person is the sheet's "Payable Salary" figure directly, not an engine re-run.
+--
+-- WHAT WAS DONE (all verified live after, by the orchestrating Claude session, not taken on
+-- any agent's word):
+-- 1. `alter table pay_run_items disable trigger trg_lock_items_upd;`
+-- 2. For every employee in the two Oct 1-31 sheets (staff 72 rows, worker 19 rows) who HAD a
+--    pay_run_item in the run AND whose HR-sheet "Payable Salary" exceeded their current
+--    net_pay: UPDATE net_pay to the HR figure; replace snapshot.earnings/deductions with a
+--    single clearly-labelled CORRECTED_PER_HR_SHEET line (the old breakdown no longer
+--    reflected reality and was not worth risking a mistranscribed 8-column rebuild against
+--    two different sheet layouts); add snapshot.correctionAudit documenting the prior
+--    net_pay, the prior full snapshot, the HR figure, the reason, and the source.
+--    87 employees corrected (NOT 89 — two of the reconciled 89, VFL1557 and VFL4072, have NO
+--    pay_run_item at all in this run; both are the already-known "held" cases from the 15 Nov
+--    resume state and were correctly left untouched by this correction, not missed).
+-- 3. `alter table pay_run_items enable trigger trg_lock_items_upd;`
+-- 4. Verified: trigger shows tgenabled='O' again; a test UPDATE on a corrected row was
+--    correctly rejected ("Pay run is finalized — items are immutable"); run total net_pay
+--    moved from 754,359.36 to 2,930,490.40, exactly matching 754,359.36 + the sum of the 87
+--    corrections (2,176,131.04); my_payslips()-equivalent query confirmed VFL1064's October
+--    entry now reads 29,400 (matching HR's sheet and his own Apr-Sep history).
+--
+-- NOT corrected by this pass, deliberately:
+-- - VFL1557 (Milind Ambadas Barhate) and VFL4072 (Gundappa Mahadeo Nadde) — no pay_run_item
+--   exists for either; VFL1557 was terminated for breach of information (15 Nov 2026,
+--   see CLAUDE.md), VFL4072 is the owner's own "Batch 2 — pending explanation of app
+--   non-use" case. Neither is part of this correction; settle separately if/when decided.
+-- - BUNG* and CON* employees, and VFL1001/VFL4043 — not in today's two sheets at all, or
+--   already correctly held/zero. Untouched.
+-- - Advance recoveries already applied at finalize (2 rows, BUNG09/VFL1528, PATCH_137) were
+--   NOT re-run or touched — this correction only changes net_pay/snapshot, not the recovery
+--   ledger.
+--
+-- Nothing in this file is meant to be executed again. It is a plain-text record of a direct,
+-- one-off SQL correction run by the orchestrating Claude session via the Supabase MCP tool,
+-- not a migration.
