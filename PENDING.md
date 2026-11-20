@@ -1,4 +1,45 @@
-# >>> RESUME STATE 19 Nov 2026, 19:55 IST — READ THIS FIRST <<<
+# >>> RESUME STATE 20 Nov 2026, 17:50 IST — READ THIS FIRST <<<
+
+## BUNG + consultant October underpayment CONFIRMED, exact figures in hand — awaiting owner go-ahead to correct
+
+HR (Pallavi) sent the October Waluj Consultant sheet (`1z5fttU2UEyxRoZYaBAnGgEivA62BBj6wFMys9pg19eM`,
+tab "Oct 2026") and the October Pune Home Worker sheet (`1lrkH_-suiNefTYLOYYdB4l-cfdczG2UNlByBo1VjKN4`,
+tab "Month Sheet Template", which actually holds filled Oct 2026 data despite its name). Both read
+directly via the Google Sheets connector (not eyeballed) and each row's "Payable Salary" column
+(confirmed from the sheet's own header row, not guessed) extracted for all 7 BUNG + 7 CON employees
+already in the finalized October run (`d5c1e25a…`, same run PATCH_139 already partly corrected).
+
+**Confirms the 19 Nov suspicion: this population was ALSO hit by the same PATCH_138 attendance-pagination
+bug.** Every one of the 14 is underpaid, same shape as the 87 staff/worker rows. Total shortfall
+**₹2,02,943.60** (BUNG ₹79,370.60 + Consultant ₹1,23,573.00).
+
+| Emp code | App paid (live) | HR sheet Payable Salary | Shortfall |
+|---|---|---|---|
+| BUNG01 | 8,870.97 | 25,000.00 | 16,129.03 |
+| BUNG02 | 2,580.65 | 10,300.00 | 7,719.35 |
+| BUNG06 | 3,725.81 | 9,823.00 | 6,097.19 |
+| BUNG09 | 4,387.10 | 16,000.00 | 11,612.90 |
+| BUNG25 | 5,677.42 | 18,242.00 | 12,564.58 |
+| BUNG30 | 5,288.71 | 22,100.00 | 16,811.29 |
+| BUNG33 | 9,317.74 | 17,754.00 | 8,436.26 |
+| CON01 | 7,000.00 | 27,038.00 | 20,038.00 |
+| CON05 | 6,930.00 | 16,129.00 | 9,199.00 |
+| CON09 | 10,608.00 | 23,000.00 | 12,392.00 |
+| CON12 | 18,460.00 | 48,000.00 | 29,540.00 |
+| CON13 | 23,265.00 | 55,000.00 | 31,735.00 |
+| CON20 | 7,620.00 | 22,289.00 | 14,669.00 |
+| CON24 | 0.00 | 6,000.00 | 6,000.00 |
+
+**NOT corrected yet — needs the owner's explicit go-ahead, same as PATCH_139's "Go ahead and disable"
+approval**, before touching any `pay_run_items` row in a finalized run. Mechanism would be identical:
+disable `trg_lock_items_upd`, update these 14 rows' `net_pay` + snapshot (`CORRECTED_PER_HR_SHEET` line
++ `correctionAudit`), re-enable, verify blocking again, confirm run total moves by exactly
+₹2,02,943.60. **Next session's first move: ask for this approval if not already given; do not act
+without it.**
+
+---
+
+# >>> (previous) RESUME STATE 19 Nov 2026, 19:55 IST — superseded by the block above <<<
 
 ## Session close — PATCH_138 live, 2 app fixes shipped, 1 new financial-integrity finding
 
