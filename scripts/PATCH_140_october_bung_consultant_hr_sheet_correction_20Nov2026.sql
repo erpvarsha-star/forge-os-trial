@@ -1,0 +1,73 @@
+-- PATCH_140 — RECORD ONLY. Already applied live, 20 Nov 2026, on explicit owner instruction
+-- ("go ahead and apply the correction"). Do NOT re-run; this file documents what was done for
+-- the audit trail, extending PATCH_139's staff/worker correction to the BUNG + consultant
+-- population of the same finalized October run.
+--
+-- BACKGROUND
+-- PATCH_139 (17 Nov 2026) corrected 87 staff/worker pay_run_items in the finalized October run
+-- (d5c1e25a-bd3e-425a-8db0-540ef2734a2e) against HR's approved Staff/Worker sheets, root-caused
+-- to the PATCH_138 attendance-pagination truncation bug. That pass flagged, but did not check,
+-- whether the BUNG (Pune home worker) and CON (Waluj consultant) populations in the SAME run
+-- had the same exposure — their sheets hadn't been sent yet.
+--
+-- HR (Pallavi Khade) sent both sheets 20 Nov 2026:
+--   - Waluj Consultant: spreadsheet 1z5fttU2UEyxRoZYaBAnGgEivA62BBj6wFMys9pg19eM, tab "Oct 2026"
+--   - Pune Home Worker: spreadsheet 1lrkH_-suiNefTYLOYYdB4l-cfdczG2UNlByBo1VjKN4, tab
+--     "Month Sheet Template" (despite its name, this tab holds filled October 2026 data —
+--     confirmed from its own header row: Month=Oct, Year=2026)
+-- Both read directly via the Google Sheets connector (not eyeballed/flattened-markdown, the
+-- exact mistake this project's history warns against) and each row's own "Payable Salary"
+-- column (confirmed from the sheet's own header, not assumed) extracted.
+--
+-- CONFIRMED: all 14 employees (7 BUNG + 7 CON) in the finalized October run were ALSO
+-- underpaid by the same bug. Total shortfall Rs 2,02,943.60 (BUNG Rs 79,370.60 + Consultant
+-- Rs 1,23,573.00).
+--
+-- Per-person (app paid before -> HR sheet Payable Salary):
+--   BUNG01  8,870.97  -> 25,000.00   (+16,129.03)
+--   BUNG02  2,580.65  -> 10,300.00   (+7,719.35)
+--   BUNG06  3,725.81  -> 9,823.00    (+6,097.19)
+--   BUNG09  4,387.10  -> 16,000.00   (+11,612.90)
+--   BUNG25  5,677.42  -> 18,242.00   (+12,564.58)
+--   BUNG30  5,288.71  -> 22,100.00   (+16,811.29)
+--   BUNG33  9,317.74  -> 17,754.00   (+8,436.26)
+--   CON01   7,000.00  -> 27,038.00   (+20,038.00)
+--   CON05   6,930.00  -> 16,129.00   (+9,199.00)
+--   CON09  10,608.00  -> 23,000.00   (+12,392.00)
+--   CON12  18,460.00  -> 48,000.00   (+29,540.00)
+--   CON13  23,265.00  -> 55,000.00   (+31,735.00)
+--   CON20   7,620.00  -> 22,289.00   (+14,669.00)
+--   CON24       0.00  -> 6,000.00    (+6,000.00)
+--
+-- OWNER DECISION, 20 Nov 2026: "go ahead and apply the correction" (answering Claude's question
+-- on whether to use the same PATCH_139 method). Same ground-truth principle as PATCH_139 —
+-- HR's sheet figure is what was actually paid in reality; no engine re-verification.
+--
+-- WHAT WAS DONE (all verified live after, by the orchestrating Claude session):
+-- 1. `alter table pay_run_items disable trigger trg_lock_items_upd;`
+-- 2. For all 14 rows above: UPDATE net_pay to the HR figure; snapshot merged (not replaced
+--    wholesale, so otPay/worked/category/employer/warnings/historical/workingDays are kept
+--    from the original computation) with netPay/totalEarnings updated, totalDeductions=0,
+--    earnings replaced with a single CORRECTED_PER_HR_SHEET line, deductions cleared, and a
+--    correctionAudit object recording the prior net_pay, the prior full snapshot, the HR
+--    figure, the reason, the source sheet, and when/by-whose-instruction it was corrected —
+--    same shape as PATCH_139's correctionAudit, confirmed by reading an already-corrected
+--    row (VFL1064) before writing this one.
+-- 3. `alter table pay_run_items enable trigger trg_lock_items_upd;`
+-- 4. Verified: trigger shows tgenabled='O' again; a test UPDATE on a corrected row (BUNG01)
+--    was correctly rejected ("Pay run is finalized — items are immutable"); run total net_pay
+--    moved from 2,930,490.40 to 3,133,434.00, exactly matching 2,930,490.40 + 2,02,943.60;
+--    item count unchanged at 102.
+--
+-- NOT touched by this pass:
+-- - VFL1001 (owner, draws no salary), VFL1557 (terminated), VFL4072 (Batch 2, pending
+--   explanation), VFL4043 (held, 15 Nov 2026 owner decision) — none are BUNG/CON, all already
+--   correctly held/zero from before, untouched again here.
+-- - Advance recoveries already applied at finalize (2 rows, BUNG09/VFL1528, PATCH_137) — NOT
+--   re-run or touched. BUNG09's HR sheet "Payable Salary" (16,000) already nets out its own
+--   Rs 2,000 "Other Deductions" line inside the sheet itself; the app's separate
+--   advance_recoveries ledger entry is unrelated and untouched.
+--
+-- Nothing in this file is meant to be executed again. It is a plain-text record of a direct,
+-- one-off SQL correction run by the orchestrating Claude session via the Supabase MCP tool,
+-- not a migration.

@@ -1,6 +1,19 @@
-# >>> RESUME STATE 20 Nov 2026, 17:50 IST — READ THIS FIRST <<<
+# >>> RESUME STATE 20 Nov 2026, 18:05 IST — READ THIS FIRST <<<
 
-## BUNG + consultant October underpayment CONFIRMED, exact figures in hand — awaiting owner go-ahead to correct
+## ✅ BUNG + consultant October underpayment — CORRECTED LIVE, owner-approved ("go ahead and apply the correction")
+
+**Applied via PATCH_140** (`scripts/PATCH_140_october_bung_consultant_hr_sheet_correction_20Nov2026.sql`,
+record-only, not re-runnable). Same method as PATCH_139: `trg_lock_items_upd` disabled → 14
+`pay_run_items` rows (7 BUNG + 7 CON) updated to HR's sheet "Payable Salary" figures, snapshot
+merged with a `correctionAudit` trail → trigger re-enabled. **Verified after, not assumed:**
+`tgenabled='O'` again; a test UPDATE on BUNG01 was correctly REJECTED ("Pay run is finalized");
+run total moved **₹29,30,490.40 → ₹31,33,434.00**, an exact match to 29,30,490.40 + the
+correction's ₹2,02,943.60; item count unchanged at 102. **The October run (`d5c1e25a…`) is now
+fully corrected against HR's approved sheets for every population that has sent one** — staff,
+worker (PATCH_139), BUNG and consultant (PATCH_140). Still held, untouched, by design: VFL1001
+(owner), VFL1557 (terminated), VFL4072 (Batch 2), VFL4043 (15 Nov held decision).
+
+## (context for the above) How the underpayment was found and quantified
 
 HR (Pallavi) sent the October Waluj Consultant sheet (`1z5fttU2UEyxRoZYaBAnGgEivA62BBj6wFMys9pg19eM`,
 tab "Oct 2026") and the October Pune Home Worker sheet (`1lrkH_-suiNefTYLOYYdB4l-cfdczG2UNlByBo1VjKN4`,
@@ -30,12 +43,7 @@ bug.** Every one of the 14 is underpaid, same shape as the 87 staff/worker rows.
 | CON20 | 7,620.00 | 22,289.00 | 14,669.00 |
 | CON24 | 0.00 | 6,000.00 | 6,000.00 |
 
-**NOT corrected yet — needs the owner's explicit go-ahead, same as PATCH_139's "Go ahead and disable"
-approval**, before touching any `pay_run_items` row in a finalized run. Mechanism would be identical:
-disable `trg_lock_items_upd`, update these 14 rows' `net_pay` + snapshot (`CORRECTED_PER_HR_SHEET` line
-+ `correctionAudit`), re-enable, verify blocking again, confirm run total moves by exactly
-₹2,02,943.60. **Next session's first move: ask for this approval if not already given; do not act
-without it.**
+**Corrected the same session, owner approved — see the ✅ block at the top of this file.**
 
 ---
 

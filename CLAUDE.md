@@ -3925,7 +3925,40 @@ exactly 7 (unchanged baseline), new `scripts/payroll-pagination-correction.test.
 suite 137/0, feedsync suite 77/0 — all re-run directly, not copied from the agent's report.
 Committed (`697aac3`, merged with a concurrent WIP checkpoint as `d9874d7`, branch
 `ccr-9b83abb6-ghw3c3`), sitting in **draft PR #83** against `claude/forge-os-backend-setup-7woj4t`.
-**🔴 NOT deployed, migration NOT applied.** This is the real next step, not optional cleanup —
-**without deploying this before November is calculated, November repeats today's exact
-failure**, and the exposure there is larger (31 advances begin recovering in November per
-PATCH_127, same pattern as the PATCH_137 incident).
+**✅ SUPERSEDED 19 Nov 2026 — this WAS deployed the next session; see "Session close, 19 Nov 2026"
+earlier in this file (`payroll-run` v20→v21, verified live).** (The paragraph above was accurate
+when written on 17 Nov; left in place rather than silently edited, so the trail of "found, not
+yet fixed, then fixed" stays intact — do not read it as still-open.)
+
+## ✅ PATCH_140, 20 Nov 2026 — BUNG + consultant October underpayment, same bug, now also corrected
+
+**Confirmed the 19 Nov suspicion.** HR (Pallavi) sent the October Waluj Consultant sheet
+(`1z5fttU2UEyxRoZYaBAnGgEivA62BBj6wFMys9pg19eM`, tab "Oct 2026") and the October Pune Home Worker
+sheet (`1lrkH_-suiNefTYLOYYdB4l-cfdczG2UNlByBo1VjKN4`, tab "Month Sheet Template" — despite the
+name, it holds filled Oct 2026 data). Read directly via the Google Sheets connector, each row's
+own "Payable Salary" column extracted (not eyeballed/flattened-markdown — the exact mistake
+PATCH_138/139's own history warns against). **All 14 BUNG + consultant employees in the same
+finalized October run were also underpaid by the PATCH_138 pagination bug** — total shortfall
+**₹2,02,943.60** (BUNG ₹79,370.60 + Consultant ₹1,23,573.00; per-person table in
+`scripts/PATCH_140_october_bung_consultant_hr_sheet_correction_20Nov2026.sql`).
+
+**Owner: "go ahead and apply the correction."** Applied the identical PATCH_139 method: disabled
+`trg_lock_items_upd`, updated the 14 rows' `net_pay` + snapshot (merged, not wholesale-replaced —
+kept `otPay`/`worked`/`category`/`employer`/`warnings`/`historical`/`workingDays` from the
+original computation; `earnings` replaced with one `CORRECTED_PER_HR_SHEET` line, `deductions`
+cleared, `correctionAudit` added matching PATCH_139's exact shape — confirmed by reading an
+already-corrected row, VFL1064, before writing this one), re-enabled the trigger. **Verified
+after, not assumed:** `tgenabled='O'` again; a test UPDATE on BUNG01 was correctly REJECTED
+("Pay run is finalized — items are immutable"); run total moved **₹29,30,490.40 → ₹31,33,434.00**,
+an exact match to the correction amount; item count unchanged at 102.
+
+**The October run (`d5c1e25a…`) is now corrected against HR's approved sheets for every
+population that has sent one.** Still held, untouched, by design: VFL1001 (owner), VFL1557
+(terminated), VFL4072 (Batch 2), VFL4043 (15 Nov held decision). Advance recoveries already
+applied at finalize (BUNG09/VFL1528, PATCH_137) were NOT re-run — BUNG09's HR sheet payable
+already nets out its own deduction line internally; the app's recovery ledger is separate and
+untouched.
+
+**PATCH_138 itself (the actual code fix) was already deployed live 19 Nov 2026** (`payroll-run`
+v20→v21, see "Session close, 19 Nov 2026" earlier in this file) — November's own calculation is
+no longer at risk of this bug.
