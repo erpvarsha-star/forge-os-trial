@@ -222,6 +222,13 @@ export default function WorkerHome() {
       const effectiveLateMinutes = rawLateMinutes > grace ? rawLateMinutes : 0
 
       if (rawLateMinutes > grace && !lateReason) {
+        // Diagnostic only — nothing is written to the DB here (no attendance
+        // row exists yet at this point). If the employee abandons the modal
+        // (backgrounds the app, etc.) this console line is the only trace
+        // an attempt was made; see the VFL4071 2-3 Nov 2026 investigation,
+        // where an abandoned modal left zero server-side trace. Never write
+        // this to attendance_records or any RLS/pay-affecting table.
+        console.warn('Late-reason modal shown', { employeeId: employee.id, at: new Date().toISOString(), rawLateMinutes, grace })
         setShowLateModal(true)
         return
       }
