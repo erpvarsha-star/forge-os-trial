@@ -1,6 +1,29 @@
-# >>> RESUME STATE 21 Nov 2026, ~16:10 IST — READ THIS FIRST <<<
+# >>> RESUME STATE 21 Nov 2026, ~17:05 IST — READ THIS FIRST <<<
 
-## Owner's "one issue at a time" plan, items 1-3 of 9 DONE. Resume at item 4.
+## Owner's "one issue at a time" plan, items 1-4 of 9 DONE (owner said "Do not skip anything"). Resume at item 5.
+
+**Item 4 of 9 — DONE, verified, pushed (`7534553` on both branches).** `app/(supervisor)/team.tsx`'s
+client-side bulk-confirmation fraud check (in-memory, resets on remount, no dedup, no escalation)
+removed; `confirmAttendance()` now fire-and-forgets a call to the already-deployed `fraud-detector`
+edge function's `bulk_confirmation_check` action, which has real monthly escalation tiers (2nd
+`bulk_confirm` flag this month → notify `hr_admin`; 3rd+ → notify `owner`+`plant_head`) that were
+built and live-deployed but never fired because nothing called this action before. `fraud-detector`
+itself untouched (already correct, already in `deploy.sh`'s CI-deployed list — no redeploy needed).
+Built by a Sonnet agent, diff independently re-read line-by-line and re-verified by Claude: tsc
+exactly 7 (baseline, none in team.tsx), i18n clean. Committed, merged into the authoritative branch.
+
+**Dependabot #62 (`actions/upload-artifact` 4→7) also merged same turn**, as Claude's own technical
+call under the 14 Nov "Claude decides technical questions" rule — it's the lowest-risk of the 4
+remaining Actions bumps (the release step reads the APK straight off the filesystem, not from this
+upload, so even a total failure of this one step can't silently ship a stale APK — though it CAN
+halt the job before the release step runs if the step itself errors, which is exactly what the
+triggered build below is checking). This is the "take one at a time, each behind a verified green
+build" plan from item 8. **Build triggered automatically** (the PR touches
+`.github/workflows/build-apk.yml`, which is in the push-trigger `paths:` filter) — check its result
+on resume with `gh api repos/erpvarsha-star/forge-os-trial/actions/runs?branch=claude/forge-os-backend-setup-7woj4t\&per_page=5 --jq '.workflow_runs[] | {name,status,conclusion,run_number,head_sha}'`
+— if it's green, #63/#65/#66 can go one at a time the same way; if it fails, read the job log before
+assuming it's the dependency bump (this workflow has a documented transient dl.google.com NDK
+failure unrelated to any dependency change — see the comment at the top of build-apk.yml).
 
 **Item 3 of 9 — DONE, DB-only, additive, pushed.** The VFL1453-class bug (item 3 below) is fixed:
 new `attendance_report_for_date(p_date date)` / `attendance_report_for_range(p_start,p_end)` SQL
@@ -52,19 +75,31 @@ had an APK built off them.** Nothing is blocking a build — just hasn't been tr
 in the 9-item plan were still coming. Trigger one once the owner is done with the plan for this session,
 or sooner if he asks.
 
-**NEXT: resume the numbered plan at item 4 of 9** (the full original list, for reference):
+**NEXT: resume the numbered plan at item 5 of 9** (the full original list, for reference):
 1. ✅ DONE — VFL4071 abandoned-modal data-loss design fix
 2. ✅ DONE — VFL4071 historical 2–3 Nov correction
 3. ✅ DONE — VFL1453-class bug: `attendance_report_for_date`/`_range` (PATCH_141, additive, DB-only)
-4. ⏳ NEXT — Fraud escalation tiers (2nd flag→HR, 3rd+→owner/plant head) — not built, not urgent.
-5. November Extras report (OT, 8–11 Nov Diwali paid holiday) — due first week of December, no rush.
-6. Data gaps needing the owner/HR (never fabricate): Shakeel Sayyad's emp_code, VFL1527's phone, leave
-   balances for VFL5463/64/65/66.
-7. Telegram supervisor onboarding circular — HR's task to circulate, not a build.
-8. Remaining Dependabot PRs (#62/63/65/66 Actions bumps, #86/93/94 low-risk) — hold behind a green APK
-   each, not urgent.
-9. AI-agent roadmap — needs the owner's prioritization before any build; 6 candidates listed near the
-   bottom of this file.
+4. ✅ DONE — Fraud escalation tiers now wired (team.tsx → fraud-detector's bulk_confirmation_check)
+5. ⏳ NEXT — November Extras report (OT, 8–11 Nov Diwali paid holiday) — **genuinely blocked on
+   timing, not skippable work**: due first week of December (November's own run isn't due until
+   then, same two-report principle as October's), so there is nothing to build yet — the mechanism
+   is the same one already used for October's Extras workbook. Revisit when November's pay period
+   opens, or sooner if the owner asks.
+6. Data gaps needing the owner/HR directly, never to be fabricated — **nothing Claude can build**:
+   Shakeel Sayyad's emp_code (and dept/designation/salary), VFL1527's phone, leave balances for
+   VFL5463/64/65/66. Waiting on the owner/HR, not on Claude.
+7. Telegram supervisor onboarding circular (@Form_mgr_bot) — **HR's task to circulate, not a Claude
+   build.** Nothing to do here.
+8. Remaining Dependabot PRs: #62 done (see above, build result pending); #63/#65/#66 (Actions bumps)
+   — take one at a time, each behind its own verified green build, once #62's result is in. #86/93/94
+   (low-risk, no CI step reads them) stay open, no action needed.
+9. AI-agent roadmap — **needs the owner's own prioritization and budget/model-tier decision before
+   any build** (this is explicitly a money/priorities call under the 14 Nov rule, not a technical
+   one Claude can decide). 6 candidate agent ideas are listed near the bottom of this file, unchanged.
+
+**So of items 5-9: only #8 (the next Dependabot bump) is actually actionable by Claude right now**
+— 5, 6, 7 and 9 are correctly blocked on time/owner/HR, not being skipped. Report this plainly rather
+than inventing work for them.
 
 **A woken/restarted session: read this block, confirm the branch state with `git log --oneline -3`
 yourself (per the standing rule — don't just trust this note), then ask the owner whether to continue
