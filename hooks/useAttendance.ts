@@ -421,6 +421,35 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     return { data, error }
   }
 
+  // Updates late_reason on the row checkIn() already saved — the reason is
+  // collected as a non-blocking follow-up, not a condition of the save
+  // itself (21 Nov 2026 fix: abandoning the old reason modal used to lose
+  // the whole check-in, see the VFL4071 2-3 Nov 2026 investigation). Never
+  // touches status, late_minutes, or anything else.
+  const updateLateReason = async (reason: string) => {
+    if (!todayRecord) return { data: null, error: new Error('No open attendance record') }
+    let data: any = null
+    let error: any = null
+    try {
+      const res = await withTimeout(
+        supabase.from('attendance_records').update({ late_reason: reason }).eq('id', todayRecord.id).select().single(),
+        15000,
+        'Late reason save'
+      )
+      data = res.data
+      error = res.error
+    } catch (e) {
+      error = e
+    }
+
+    if (!error && data) {
+      setTodayRecord(data as AttendanceRecord)
+      await fetchRecords()
+    }
+
+    return { data, error }
+  }
+
   const confirmQr = async () => {
     if (!todayRecord) return { data: null, error: new Error('No open attendance record') }
     let data: any = null
@@ -469,5 +498,5 @@ export function useAttendance(employeeId: string, month?: string, year?: number)
     return { data, error }
   }
 
-  return { records, todayRecord, isLoading, loadError, checkIn, checkOut, undoCheckout, confirmQr, confirmQrOut, refresh: fetchRecords }
+  return { records, todayRecord, isLoading, loadError, checkIn, checkOut, undoCheckout, updateLateReason, confirmQr, confirmQrOut, refresh: fetchRecords }
 }

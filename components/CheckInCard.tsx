@@ -43,7 +43,7 @@ import { canUndoCheckout } from '@/lib/workingHours'
 export function CheckInCard() {
   const { t } = useTranslation()
   const { employee } = useAuth()
-  const { records, todayRecord, checkIn, checkOut, undoCheckout, confirmQr, confirmQrOut, refresh, isLoading: attendanceLoading, loadError } = useAttendance(
+  const { records, todayRecord, checkIn, checkOut, undoCheckout, updateLateReason, confirmQr, confirmQrOut, refresh, isLoading: attendanceLoading, loadError } = useAttendance(
     employee?.id || ''
   )
   const presentDaysThisMonth = records.filter(r => isPresentStatus(r.status)).length
@@ -303,32 +303,29 @@ export function CheckInCard() {
       }
 
       const effectiveLateMinutes = rawLateMinutes > grace ? rawLateMinutes : 0
+      const isLate = !isOwner && rawLateMinutes > grace
 
-      if (!isOwner && rawLateMinutes > grace && !lateReason) {
-        // Diagnostic only — nothing is written to the DB here (no attendance
-        // row exists yet at this point). If the employee abandons the modal
-        // (backgrounds the app, etc.) this console line is the only trace
-        // an attempt was made; see the VFL4071 2-3 Nov 2026 investigation,
-        // where an abandoned modal left zero server-side trace. Never write
-        // this to attendance_records or any RLS/pay-affecting table.
-        console.warn('Late-reason modal shown', { employeeId: employee.id, at: new Date().toISOString(), rawLateMinutes, grace })
-        setShowLateModal(true)
-        return
-      }
-
+      // The row is saved immediately, late or not — the reason, if any, is
+      // collected as a non-blocking follow-up below via updateLateReason().
+      // Previously the save itself waited on the reason, so abandoning the
+      // modal (backgrounding the app, etc.) lost the whole check-in; see
+      // the VFL4071 2-3 Nov 2026 investigation.
       const { error: checkInError } = await checkIn(
         location.coords.latitude,
         location.coords.longitude,
         effectiveLateMinutes,
-        lateReason || undefined,
+        undefined,
         mockDetected,
         deviceId,
         accuracy,
         resolvedShiftForCheckIn?.is_night_shift === true
       )
-      if (checkInError) alertError(t, checkInError)
-      await refresh()
-      if (!checkInError) setLateReason('')
+      if (checkInError) {
+        alertError(t, checkInError)
+      } else {
+        await refresh()
+        if (isLate) setShowLateModal(true)
+      }
     } catch (e) {
       alertError(t, e)
     } finally {
@@ -420,8 +417,15 @@ export function CheckInCard() {
 
   const submitLateReason = async () => {
     if (!lateReason.trim()) return
+    setIsLoading(true)
+    try {
+      const { error } = await updateLateReason(lateReason.trim())
+      if (error) alertError(t, error)
+    } finally {
+      setIsLoading(false)
+    }
     setShowLateModal(false)
-    await handleCheckIn()
+    setLateReason('')
   }
 
   const handleUndoCheckout = () => {

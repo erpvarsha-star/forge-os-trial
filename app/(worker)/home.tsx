@@ -30,7 +30,7 @@ import { canUndoCheckout } from '@/lib/workingHours'
 export default function WorkerHome() {
   const { t } = useTranslation()
   const { employee } = useAuth()
-  const { todayRecord, checkIn, checkOut, undoCheckout, confirmQrOut, refresh, isLoading: attendanceLoading, loadError } = useAttendance(employee?.id || '')
+  const { todayRecord, checkIn, checkOut, undoCheckout, updateLateReason, confirmQrOut, refresh, isLoading: attendanceLoading, loadError } = useAttendance(employee?.id || '')
   const [shift, setShift] = useState<EmployeeShift | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [showLateModal, setShowLateModal] = useState(false)
@@ -220,31 +220,29 @@ export default function WorkerHome() {
       if (shiftStart) rawLateMinutes = serverLateMinutesAgainst(shiftStart)
       // effectiveLateMinutes is 0 if within grace — this is what gets stored in DB
       const effectiveLateMinutes = rawLateMinutes > grace ? rawLateMinutes : 0
+      const isLate = rawLateMinutes > grace
 
-      if (rawLateMinutes > grace && !lateReason) {
-        // Diagnostic only — nothing is written to the DB here (no attendance
-        // row exists yet at this point). If the employee abandons the modal
-        // (backgrounds the app, etc.) this console line is the only trace
-        // an attempt was made; see the VFL4071 2-3 Nov 2026 investigation,
-        // where an abandoned modal left zero server-side trace. Never write
-        // this to attendance_records or any RLS/pay-affecting table.
-        console.warn('Late-reason modal shown', { employeeId: employee.id, at: new Date().toISOString(), rawLateMinutes, grace })
-        setShowLateModal(true)
-        return
-      }
-
+      // The row is saved immediately, late or not — the reason, if any, is
+      // collected as a non-blocking follow-up below via updateLateReason().
+      // Previously the save itself waited on the reason, so abandoning the
+      // modal (backgrounding the app, etc.) lost the whole check-in; see
+      // the VFL4071 2-3 Nov 2026 investigation.
       const { error: checkInError } = await checkIn(
         location.coords.latitude,
         location.coords.longitude,
         effectiveLateMinutes,
-        lateReason || undefined,
+        undefined,
         mockDetected,
         deviceId,
         accuracy,
         resolved?.is_night_shift === true
       )
-      if (checkInError) alertError(t, checkInError)
-      await refresh()
+      if (checkInError) {
+        alertError(t, checkInError)
+      } else {
+        await refresh()
+        if (isLate) setShowLateModal(true)
+      }
     } catch (e) {
       alertError(t, e)
     } finally {
@@ -369,8 +367,15 @@ export default function WorkerHome() {
 
   const submitLateReason = async () => {
     if (!lateReason.trim()) return
+    setIsLoading(true)
+    try {
+      const { error } = await updateLateReason(lateReason.trim())
+      if (error) alertError(t, error)
+    } finally {
+      setIsLoading(false)
+    }
     setShowLateModal(false)
-    await handleCheckIn()
+    setLateReason('')
   }
 
   const handleUndoCheckout = () => {
