@@ -733,6 +733,28 @@ own RLS-gated client queries):**
    of November, bring the October late data + `checkin_checkout_pattern`
    to Yash for that review.
 
+4. **`attendance_report_for_date(p_date date)` / `attendance_report_for_range(p_start date, p_end date)`**
+   (`PATCH_141`, 21 Nov 2026) — `daily_attendance_report` (#1 above) only
+   ever shows TODAY and YESTERDAY (IST), hardcoded. An investigation into
+   VFL1453 (18 Nov 2026) found this is a systemic gap: looking up ANY
+   employee's attendance more than 1 day in the past always read as "not
+   present" in that view, even when the real `attendance_records` row
+   existed and was correct. These two new functions replicate the EXACT
+   same business rules (check-in/out HH:MM in IST, the no-checkout
+   working-hours default, late_minutes, overtime_hours) for an arbitrary
+   date/date-range instead of a fixed window — so HR/the owner can
+   self-serve check ANY past date without a Claude round-trip, same
+   philosophy as the 2-day view. `daily_attendance_report` itself is
+   untouched (re-verified byte-identical after this patch). Same access
+   pattern: SELECT/EXECUTE granted only to `service_role`/`postgres`
+   (dashboard/SQL-Editor access), explicitly revoked from `anon`/
+   `authenticated`. Verified live against VFL1453's real 18 Nov row
+   (exact match on check-in 18:48, check-out 07:00, 12.20 hrs, 0.2 OT) plus
+   a spot-check on 3 more employees on 10 Nov. Query:
+   `select * from attendance_report_for_date('2026-11-18');`
+   or for a range:
+   `select * from attendance_report_for_range('2026-11-10','2026-11-18') where emp_code='VFL1453';`
+
 **Exporting a result**: both SQL Editor and Table Editor have a built-in
 Export-to-CSV button on any result set — free, no setup, no connector.
 Emailing a result to himself instead of downloading: Gmail is already
@@ -1428,6 +1450,7 @@ Two separate fixes, both same day:
 | `PATCH_110_pune_ot_recurring_adjustments_27Oct2026.sql` (+ `PATCH_109_pune_clerk_columns_26Oct2026.sql`) | `attendance_records.ot_hours`/`outstation_travel`, `employee_salary_structure.ot_rate`, `recurring_adjustments` table, FINAL `pune_set_attendance` (5-arg) + `pune_attendance_roster` (returns OT/travel), Sep-2026 salary increments + BUNG09 advance data fixes. 109 = clerk/`uses_app` columns + unique index | ✅ Applied live 26-27 Oct 2026 by the owner's tool. Repo copies are RECORD-ONLY with pay figures/names redacted (public repo) - never re-run |
 | `PATCH_89_production_records_process_dropout_17Oct2026.sql` | Adds `production_records.process` + `dropout_qty` for the fixed `syncProductionToSupabase()` (header-based column mapping — Forge/Press/Machine qty had been null since April). See PENDING.md's production-sync block | ✅ Applied 17 Oct 2026 — **live Apps Script paste still ⏳ (owner)** |
 | `HR_reset_pin.sql` | HR utility: reset one employee to their starting PIN and re-arm the forced change. Needed after testing a role by logging in as that employee. **Fixed 30 Sep 2026** — see "Employee data" below for the CON-prefix bug this had | ♾️ On demand |
+| `PATCH_141_attendance_report_for_date_21Nov2026.sql` | `attendance_report_for_date(p_date)` / `attendance_report_for_range(p_start,p_end)` — date-parameterized self-serve attendance lookup replicating `daily_attendance_report`'s exact business rules for ANY past date, not just today/yesterday. See "Self-serve data review" above | ✅ Applied 21 Nov 2026 — verified live against VFL1453's real 18 Nov row (exact match) + a 3-employee spot-check on 10 Nov; `daily_attendance_report` confirmed byte-identical/untouched |
 
 **Total employees confirmed live: 129 as of 23 Aug 2026 — STALE, do not quote this number.** Headcount moves constantly (departures, rejoins, new hires, pending approvals) and this file is not re-synced automatically. **Always run `SELECT count(*) FILTER (WHERE is_active) AS active, count(*) AS total FROM employees;` before stating a headcount** — never state 129, or any other number written here, from memory. As of 27 Sep 2026 the real figures were 98 active / 142 total rows ever created; by the time anyone reads this they will be different again — that is the point of this note.
 

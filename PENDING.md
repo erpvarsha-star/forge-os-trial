@@ -1,10 +1,28 @@
-# >>> RESUME STATE 21 Nov 2026, ~15:30 IST (session pausing, resume ~19:30 IST) — READ THIS FIRST <<<
+# >>> RESUME STATE 21 Nov 2026, ~16:10 IST — READ THIS FIRST <<<
 
-## Owner's "one issue at a time" plan, items 1-2 of 9 DONE. Resume at item 3.
+## Owner's "one issue at a time" plan, items 1-3 of 9 DONE. Resume at item 4.
 
-**Branch:** `claude/forge-os-backend-setup-7woj4t` (authoritative) — HEAD `46b609b`, confirmed via
-`git log`. `ccr-1892615a-szlynv` (this session's dev branch) is fast-forwarded to the same commit and
-pushed — the two are identical right now, no divergence to reconcile on restart.
+**Item 3 of 9 — DONE, DB-only, additive, pushed.** The VFL1453-class bug (item 3 below) is fixed:
+new `attendance_report_for_date(p_date date)` / `attendance_report_for_range(p_start,p_end)` SQL
+functions (`scripts/PATCH_141_attendance_report_for_date_21Nov2026.sql`, applied live via the
+Supabase MCP tool) replicate `daily_attendance_report`'s EXACT business rules (IST check-in/out,
+no-checkout working-hours default, late_minutes, overtime_hours) for any date/date-range instead of
+the hardcoded today/yesterday window. `daily_attendance_report` itself is untouched — re-read and
+confirmed byte-identical after the patch. Grants match the view's own pattern exactly:
+`service_role`/`postgres` only (EXECUTE explicitly revoked from `anon`/`authenticated`, since
+Postgres grants EXECUTE on a new function to PUBLIC by default). **Verified live against VFL1453's
+real 18 Nov row** — `select * from attendance_report_for_date('2026-11-18') where emp_code='VFL1453'`
+returned check_in 18:48, check_out 07:00, working_hrs 12.20, overtime_hrs 0.2 — exact match to the
+real `attendance_records` row (13:18:52 UTC in / 01:30:36 UTC+1day out). Also spot-checked 3 more
+employees (VFL5324/VFL1450/VFL5318) on 2026-11-10, all exact matches, and confirmed the range
+function returns exactly 9 rows for `'2026-11-10'..'2026-11-18'`. Documented in CLAUDE.md's
+"Self-serve data review" section. **Not yet done, deliberately out of scope for this item:** the app
+code (`daily_attendance_report`-reading dashboard tiles / `useShiftCheckinSummary`) still only shows
+today/yesterday — this patch is the self-serve SQL-side fix only, matching what the owner approved;
+whether the app UI itself should also gain a date picker is a separate question, not asked.
+
+**Branch:** `claude/forge-os-backend-setup-7woj4t` (authoritative) — HEAD was `46b609b` before this
+update; this commit (PATCH_141 docs) is pushed on top of it. Confirm with `git log` on resume.
 
 **What's DONE and verified (not just agent-claimed), this session:**
 1. Doc reconciliation: merged orphaned PR #82 (VFL4043), closed it; triaged 9 new Dependabot PRs
@@ -34,12 +52,11 @@ had an APK built off them.** Nothing is blocking a build — just hasn't been tr
 in the 9-item plan were still coming. Trigger one once the owner is done with the plan for this session,
 or sooner if he asks.
 
-**NEXT: resume the numbered plan at item 3 of 9** (the full original list, for reference):
+**NEXT: resume the numbered plan at item 4 of 9** (the full original list, for reference):
 1. ✅ DONE — VFL4071 abandoned-modal data-loss design fix
 2. ✅ DONE — VFL4071 historical 2–3 Nov correction
-3. ⏳ NEXT — VFL1453-class bug: the today/yesterday-only attendance lookup (affects everyone, not just
-   him). Already diagnosed above; the question to ask the owner is whether/how to widen it.
-4. Fraud escalation tiers (2nd flag→HR, 3rd+→owner/plant head) — not built, not urgent.
+3. ✅ DONE — VFL1453-class bug: `attendance_report_for_date`/`_range` (PATCH_141, additive, DB-only)
+4. ⏳ NEXT — Fraud escalation tiers (2nd flag→HR, 3rd+→owner/plant head) — not built, not urgent.
 5. November Extras report (OT, 8–11 Nov Diwali paid holiday) — due first week of December, no rush.
 6. Data gaps needing the owner/HR (never fabricate): Shakeel Sayyad's emp_code, VFL1527's phone, leave
    balances for VFL5463/64/65/66.
