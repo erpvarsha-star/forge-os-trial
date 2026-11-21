@@ -3923,6 +3923,47 @@ explanation of app non-use") have **no `pay_run_item` at all** in this run, so t
 miscount of 89, it's 89 minus these two known-held cases. Still open pending HR/owner's call on
 each.
 
+## PATCH_140 (retroactive record), 20 Nov 2026 — BUNG/Consultant October underpayment corrected,
+## never documented until a 21 Nov investigation found it
+
+**Found 21 Nov 2026 by a read-only investigation agent, not reported by anyone at the time.**
+PATCH_138/139 (17 Nov) only reconciled Staff and Worker against the two HR sheets emailed that day;
+whether BUNG (Pune) and Consultant were exposed to the same `loadFeeds()` pagination-truncation bug
+was explicitly left open in PENDING.md. It turns out **someone (owner, via a different session/tool,
+per the correction's own audit note) already answered and fixed this on 20 Nov 2026 — 15+ hours before
+this file was updated to say so.**
+
+**Why they were exposed:** `payroll-run`'s `loadFeeds()` fetches `attendance_records` **once,
+company-wide, unsplit by population**, for the whole pay period — there is no separate feed path for
+BUNG/Consultant that could have exempted them from the pre-PATCH_138 truncation. BUNG attendance
+enters via `pune_set_attendance` rather than GPS check-in, but it lands in the same table and the same
+unfiltered query.
+
+**What was corrected, live, 2026-11-20 12:33:12 UTC (≈18:03 IST) — same mechanism as PATCH_139**
+(`trg_lock_items_upd` disabled → `net_pay` + a `correctionAudit` snapshot block written → trigger
+re-enabled): all **14** live BUNG\*/Consultant `pay_run_items` on run
+`d5c1e25a-bd3e-425a-8db0-540ef2734a2e` (7 BUNG, 7 active consultants — CON16/18/21/22/23 correctly have
+no item, inactive per the 28 Oct decision), citing "owner instruction 20 Nov 2026 via Claude" and HR's
+Pune/Consultant sheets. Examples: BUNG01 ₹8,870.97→₹25,000.00; BUNG02 ₹2,580.65→₹10,300.00; CON01
+₹7,000.00→₹27,038.00; CON13 ₹23,265.00→₹55,000.00; CON24 ₹0.00→₹6,000.00.
+
+**Independently re-verified by Claude, 21 Nov 2026, not taken on the correction's own audit note:**
+real October `attendance_records` present-day counts (BUNG01: 31, CON01: 24) are far above the
+pre-correction snapshots' recorded `worked: 11`/`worked: 10`, confirming the underpayment was real and
+not an artifact of the correction itself. `trg_lock_items_upd` is `tgenabled='O'` (re-locked); run
+stays `finalized`; item count unchanged at **102**; run total moved **₹29,30,490.40 → ₹31,33,434.00**
+(+₹2,02,943.60 across the 14 rows, matching the per-row deltas above).
+
+**🔒 Lesson — this is the exact "orphaned record" failure mode CLAUDE.md's own 10/13 Nov
+reconciliation passes exist to catch, happening again.** A real, correct, owner-authorised DB
+correction was applied and then never written into CLAUDE.md, PENDING.md, or a `scripts/PATCH_*.sql`
+record — a different session resuming from PENDING.md's own RESUME STATE block would have re-launched
+a redundant investigation (which is exactly what happened: this file's own 21 Nov top block listed
+"check BUNG/Consultant exposure" as an open item until the investigation agent found the correction
+already live). **Whenever a DB change is applied directly (via MCP tool, SQL Editor, or any path other
+than a merged PR), record it here in the SAME session, before the session ends** — never rely on a
+later session rediscovering it from the data alone.
+
 **Also not touched today:** BUNG*/CON* populations (today's email only carried the Staff and
 Worker sheets — Pune/consultant sheets weren't sent, so whether they have the same
 attendance-truncation exposure for October is unchecked); the Sept 26-30 "balance days"

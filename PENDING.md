@@ -37,6 +37,36 @@ VFL4071's night-shift misclassification, VFL1453's missing-present day, whether 
 October payroll has the same attendance-pagination exposure PATCH_138 fixed for Staff/Worker, and an
 independent confirmation that PR #84/#85's fixes are genuinely live end-to-end (not just merged).
 
+## ✅ BUNG/Consultant exposure — ALREADY CORRECTED LIVE, 20 Nov 2026, by a session that never recorded it
+
+**Found by the Phase-1 investigation agent, not by this file.** The question above ("whether
+BUNG/Consultant has the same exposure") was already answered and already fixed — just never written
+down. `payroll-run`'s `loadFeeds()` fetches `attendance_records` **once, company-wide, unsplit by
+population**, so PATCH_138's pre-fix bug hit BUNG/CON by construction, exactly like Staff/Worker — there
+was never a separate feed path that could have exempted them.
+
+**Live evidence, independently re-checked by Claude (not just the agent's say-so):** all 14 live
+BUNG*/CON* `pay_run_items` on run `d5c1e25a-bd3e-425a-8db0-540ef2734a2e` carry a `correctionAudit` block
+timestamped **2026-11-20 12:33:12 UTC (≈18:03 IST)**, citing "owner instruction 20 Nov 2026 via Claude"
+and HR's Pune/Consultant sheets — same `CORRECTED_PER_HR_SHEET` pattern as PATCH_139 (e.g. BUNG01
+8,870.97→25,000.00; CON01 7,000.00→27,038.00; CON13 23,265.00→55,000.00; CON24 0.00→6,000.00). The agent
+cross-checked the premise against real attendance independently of the audit note: BUNG01 has 31
+present-coded October rows, CON01 has 24 — both far above the pre-correction snapshot's recorded
+`worked: 11`/`worked: 10`, consistent with (worse than proportional to) the pagination-truncation theory.
+CON16/18/21/22/23 correctly have no item (inactive per the 28 Oct decision).
+
+**Re-verified by Claude just now:** `trg_lock_items_upd` is back `tgenabled='O'` (re-locked, same
+discipline as PATCH_139); run stays **`finalized`**, still **102 pay_run_items** (count unchanged by the
+correction, only `net_pay`/`snapshot` changed on the 14 rows); run total moved **₹29,30,490.40 →
+₹31,33,434.00** (+₹2,02,943.60 across the 14 rows, consistent with the before/after figures above).
+
+**The only real gap was the paperwork — now closed:** no `scripts/PATCH_14x_*.sql` file existed for
+this, no commit mentioned it, and this file's own top block (written 09:55 IST, before this was found)
+still listed it as an open investigation. **This item is CLOSED — do not re-investigate or re-correct
+it.** If anyone still owes BUNG/CON a sanity check, it's confirming the corrected figures reconcile
+line-by-line against HR's sheets (the agent only checked net_pay direction/magnitude against real
+attendance, not a full breakdown) — optional, not urgent, the run is already finalized either way.
+
 ---
 
 # >>> (previous) RESUME STATE 19 Nov 2026, 19:05 IST — superseded by the block above <<<
@@ -73,7 +103,19 @@ live regardless of merge status.
 - **VFL4071 (2-3 Nov shown absent despite real check-in/out; 6-7 Nov shown half-day despite full day)**
   — same night-shift-checkout misclassification bug class as the 12 Nov VFL4024/VFL5458 finding. Still
   open, not yet root-caused or fixed.
-- **VFL1453 — GPS check-in/out done but 18 Nov not showing present** — reported, not yet investigated.
+- **VFL1453 — ✅ ROOT-CAUSED 21 Nov 2026: NOT a data bug, a viewing-window bug.** His 18 Nov
+  `attendance_records` row is complete and correct — check-in 18:48:52 IST, check-out 07:00:36 IST
+  (Shift 5, `hr_allocated`), status `P`, 12.20h, GPS accuracy 4.1m/11.5m, zero fraud flags. The real
+  mechanism: **every screen that answers "was this person present on date X" is hard-capped to
+  today-only or today+yesterday (IST)** — `daily_attendance_report` (the exact self-serve view
+  CLAUDE.md tells HR to use), the owner/plant-head/hr-admin dashboard "today" tiles, the plant HTML
+  dashboard's per-employee block, and `useShiftCheckinSummary.ts`. Whoever looked this up did so on or
+  after 20 Nov, 2+ days after the fact, so 18 Nov had already fallen out of every one of these windows
+  — the row was never missing. **Systemic, not isolated to VFL1453** — the same false "not present"
+  reads for ANY employee on ANY date more than 1 day old. Two independent, low-risk fixes proposed
+  (not built yet, no urgency): widen `daily_attendance_report` into a date-parameterised lookup
+  (additive, no existing behavior touched), and/or point HR at an employee's own attendance calendar
+  (via "view as") for a specific past date instead of the "today" dashboard tiles.
 - **Friday 20 Nov 2026 is a working day for some employees (per-person, supervisor's call)** — no app
   action needed or wanted, matches the 13 Nov 2026 locked "Friday working is per-person" decision. Flagged
   but not acted on: tonight's 19:00/21:00 daily-allocator reminder (VFL1560/VFL1566) will likely report
