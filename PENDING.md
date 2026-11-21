@@ -86,11 +86,14 @@ update; this commit (PATCH_141 docs) is pushed on top of it. Confirm with `git l
 2. ✅ DONE — VFL4071 historical 2–3 Nov correction
 3. ✅ DONE — VFL1453-class bug: `attendance_report_for_date`/`_range` (PATCH_141, additive, DB-only)
 4. ✅ DONE — Fraud escalation tiers now wired (team.tsx → fraud-detector's bulk_confirmation_check)
-5. ⏳ NEXT — November Extras report (OT, 8–11 Nov Diwali paid holiday) — **genuinely blocked on
-   timing, not skippable work**: due first week of December (November's own run isn't due until
-   then, same two-report principle as October's), so there is nothing to build yet — the mechanism
-   is the same one already used for October's Extras workbook. Revisit when November's pay period
-   opens, or sooner if the owner asks.
+5. ✅ DECIDED, DEFERRED — owner confirmed (a): wait for December, no partial build. His own reasoning,
+   21 Nov 2026: "we cannot build it now because the attendance for the month is not complete and
+   [so] the OT cannot be calculated so it's no point doing this calculation now even partially." This
+   is correct and stronger than Claude's own framing — the gap isn't just "not due yet," it's that
+   the November OT figures are literally uncomputable until the month's attendance is complete, so a
+   partial draft wouldn't just be early, it would be wrong. **Build it the first week of December**,
+   same mechanism as October's `Oct2026_Extras_Report.xlsx` (scratchpad-only, has names/pay, not
+   committed). Nothing to do before then.
 6. Data gaps needing the owner/HR directly, never to be fabricated — **nothing Claude can build**:
    Shakeel Sayyad's emp_code (and dept/designation/salary), VFL1527's phone, leave balances for
    VFL5463/64/65/66. Waiting on the owner/HR, not on Claude.
