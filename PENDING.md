@@ -1,4 +1,97 @@
-# >>> RESUME STATE 19 Nov 2026, 19:05 IST — READ THIS FIRST <<<
+# >>> RESUME STATE 21 Nov 2026, 09:55 IST — READ THIS FIRST <<<
+
+## Doc reconciliation + Dependabot triage done; investigation agents launching next
+
+**What this stage is:** before building anything from the 19 Nov block below, reconciled the repo's
+real GitHub state against this file (found it had drifted) and triaged every new Dependabot PR.
+No app code, no DB write, no deploy.
+
+**Found and fixed — PENDING.md was behind the actual repo.** Draft PR #82 ("Record VFL4043's passing;
+revoke credentials; defer HR exit task") had never been merged, even though its DB change was applied
+live weeks ago and its doc content already exists on this branch (`PENDING.md` "✅ VFL4043 … CLOSED"
+block, `CLAUDE.md` "PASSED AWAY" section) — the branches had simply diverged. Merged `claude/forge-os-session-start-5jxxxe` into this branch (clean, no conflicts), opened **draft PR #95** against
+`claude/forge-os-backend-setup-7woj4t` carrying that merge plus the already-present #84/#85 commits,
+and closed #82 with a comment pointing at #95 so it isn't merged twice.
+
+**Dependabot — 9 new PRs (#86–94) existed and were not in this file at all.** Read each one's actual
+`package.json` diff (never trust the group label, per the standing #67 lesson) and decided, as
+architect, per the 14 Nov "Claude decides technical questions" rule:
+- **Closed, each with a reason comment on the PR:** **#87** (mislabelled "minor-and-patch" group —
+  actually carries `react-native` 0.74.0→0.88.1 and `nativewind`→4.2.7, the same forbidden Reanimated-4
+  cascade as the already-closed #67), **#88** (i18next 23→27, 4 majors, no matching react-i18next bump
+  — risk of a silent translation break, which this project tests hard against), **#89**
+  (`react-native-safe-area-context` 4→5, SDK-51 mismatch, same pattern as #69), **#90**
+  (`expo-file-system` 17→58, targets SDK 58 — same pattern as #69, and this package is used directly
+  in the payroll export screen), **#91** (`react-dom` 18→19 with no matching `react` bump, breaks the
+  documented web-export verification step), **#92** (`lucide-react-native` 0→1, major icon-library
+  jump, untested against the existing 7-error tsc baseline).
+- **Left open on purpose:** **#86** (`action-gh-release` 2→3, build-machine only, fails loudly if
+  broken — same category as #62/63/65/66), **#93/#94** (`@typescript-eslint` 7→8, lint-only — eslint
+  has no config file and no CI step, confirmed 14 Nov, so these can never silently break anything;
+  lowest priority in the file).
+- **Still open from before, unchanged:** #62, #63, #65, #66 (GitHub Actions bumps — take one at a time,
+  each behind a verified green APK build; #64 `supabase/setup-cli` was already closed, not open).
+
+## ✅ Phase 2 (small fixes) complete — pushed, verified twice independently, no APK yet
+
+Three already-decided, no-owner-question fixes, each verified by Claude AND independently re-verified
+by the build agent itself (tsc exactly 7, i18n clean, new standalone test 6/0, payroll regression
+suites 137/0 + 77/0 unaffected): **720-minute off-by-one** (`lib/istDate.ts` + `lib/serverClock.ts`,
+changed together), **diagnostic logging for the abandoned-late-modal path** (`CheckInCard.tsx` +
+`worker/home.tsx`, plain `console.warn`, no new table, no DB write, matches this project's existing
+logging style — a durable server-side trace would need its own owner decision, deliberately not made
+here), **EOTM tie-break made explicit** (`app/(owner)/eotm.tsx`). Commits `5f9df6b`/`72e28ec`/`44923f5`/
+`53c5ef1` on `ccr-1892615a-szlynv`, all pushed. **App-code-only — no deploy, no SQL, needs a fresh APK
+build before any of this reaches a device** (not yet triggered; waiting on the open owner question
+below before batching the next build).
+
+**Phase 1 complete — all 4 investigation agents reported, each verified independently by Claude where
+possible:**
+- VFL4071 — root-caused, two unrelated symptoms (see the updated bullet above).
+- VFL1453 — root-caused, viewing-window bug not a data bug (see the updated bullet above).
+- BUNG/Consultant exposure — already corrected live 20 Nov, undocumented until now (see PATCH_140
+  above).
+- **PR #84/#85 re-verification: ALL 5 CHECKS PASS, independently re-run, not taken from commit
+  messages.** `payroll-run` v21's 15-file deployed bundle is byte-identical to the repo and genuinely
+  calls `fetchAllRows`/`fetchAllPages` for both `attendance_records` and `leave_requests`;
+  `leave-form-dates.test.ts` 23/0 run fresh; `LeaveAdvanceApprovalCards.tsx`'s real-error-message fix
+  confirmed present; tsc exactly 7 (fresh `npm ci` + run), i18n clean; VFL5449's live COFF request
+  (still pending, untouched) would now show "Comp-off balance insufficient: employee has 0 unused
+  day(s), 1 requested" instead of the old generic message.
+
+## ✅ BUNG/Consultant exposure — ALREADY CORRECTED LIVE, 20 Nov 2026, by a session that never recorded it
+
+**Found by the Phase-1 investigation agent, not by this file.** The question above ("whether
+BUNG/Consultant has the same exposure") was already answered and already fixed — just never written
+down. `payroll-run`'s `loadFeeds()` fetches `attendance_records` **once, company-wide, unsplit by
+population**, so PATCH_138's pre-fix bug hit BUNG/CON by construction, exactly like Staff/Worker — there
+was never a separate feed path that could have exempted them.
+
+**Live evidence, independently re-checked by Claude (not just the agent's say-so):** all 14 live
+BUNG*/CON* `pay_run_items` on run `d5c1e25a-bd3e-425a-8db0-540ef2734a2e` carry a `correctionAudit` block
+timestamped **2026-11-20 12:33:12 UTC (≈18:03 IST)**, citing "owner instruction 20 Nov 2026 via Claude"
+and HR's Pune/Consultant sheets — same `CORRECTED_PER_HR_SHEET` pattern as PATCH_139 (e.g. BUNG01
+8,870.97→25,000.00; CON01 7,000.00→27,038.00; CON13 23,265.00→55,000.00; CON24 0.00→6,000.00). The agent
+cross-checked the premise against real attendance independently of the audit note: BUNG01 has 31
+present-coded October rows, CON01 has 24 — both far above the pre-correction snapshot's recorded
+`worked: 11`/`worked: 10`, consistent with (worse than proportional to) the pagination-truncation theory.
+CON16/18/21/22/23 correctly have no item (inactive per the 28 Oct decision).
+
+**Re-verified by Claude just now:** `trg_lock_items_upd` is back `tgenabled='O'` (re-locked, same
+discipline as PATCH_139); run stays **`finalized`**, still **102 pay_run_items** (count unchanged by the
+correction, only `net_pay`/`snapshot` changed on the 14 rows); run total moved **₹29,30,490.40 →
+₹31,33,434.00** (+₹2,02,943.60 across the 14 rows, consistent with the before/after figures above).
+
+**The only real gap was the paperwork — now closed:** no `scripts/PATCH_14x_*.sql` file existed for
+this, no commit mentioned it, and this file's own top block (written 09:55 IST, before this was found)
+still listed it as an open investigation. **This item is CLOSED — do not re-investigate or re-correct
+it.** If anyone still owes BUNG/CON a sanity check, it's confirming the corrected figures reconcile
+line-by-line against HR's sheets (the agent only checked net_pay direction/magnitude against real
+attendance, not a full breakdown) — optional, not urgent, the run is already finalized either way.
+
+---
+
+# >>> (previous) RESUME STATE 19 Nov 2026, 19:05 IST — superseded by the block above <<<
 
 ## PATCH_138 deployed live; leave-apply date-parser bug fixed — PR #84 (draft), not yet merged
 
@@ -29,10 +122,38 @@ live regardless of merge status.
   owner's 29 Oct 2026 "comp-off shortfall: BLOCKED" rule, but the error message doesn't say why. Not a
   bug to silently approve around — flag to HR/Pallavi: why did he apply for a comp-off he hasn't earned?
   A clearer in-app error message (naming the real reason) would be a small, worthwhile follow-up fix.
-- **VFL4071 (2-3 Nov shown absent despite real check-in/out; 6-7 Nov shown half-day despite full day)**
-  — same night-shift-checkout misclassification bug class as the 12 Nov VFL4024/VFL5458 finding. Still
-  open, not yet root-caused or fixed.
-- **VFL1453 — GPS check-in/out done but 18 Nov not showing present** — reported, not yet investigated.
+- **VFL4071 — ✅ ROOT-CAUSED 21 Nov 2026, two UNRELATED symptoms, different fixes needed.**
+  - **6-7 Nov "half-day": FULLY EXPLAINED, already fixed going forward (12 Nov commit `087dfcf`).**
+    Both Fridays, a WO placeholder row existed for that date while his real Shift-3 session (started
+    the previous night) was still open; the OLD `fetchRecords()` found the WO row first and offered
+    "Check In" instead of "Check Out" — he tapped it twice ~41-59s apart, producing `hours_worked=0.01`
+    → `HL`. `087dfcf`'s open-record-first lookup already prevents this going forward. The two historical
+    HL rows stand uncorrected, per the owner's 13 Nov "never correct paid months" rule.
+  - **2-3 Nov "absent": genuinely unexplained from server data — nothing to fix yet.** Zero trace
+    anywhere (no attendance row any date, no fraud_alerts/flags, no leave_requests) — if a check-in was
+    really attempted, it never reached a DB write at all. Leading theory: the late-reason modal
+    (`CheckInCard.tsx`) blocked submission on a wrong `rawLateMinutes` value (the same deferred 720
+    off-by-one bug) and was abandoned before a reason was entered — GPS would have already succeeded by
+    then, matching "HR saw a real check-in" from the outside while nothing was ever saved. **Cannot be
+    confirmed without asking:** did a "why are you late" prompt appear on his phone those two nights?
+    **One question for HR/the owner, not a guess** — see the next brief.
+  - **Blast radius, read-only check:** 1-5 missing night-shift attendance rows per night is a small,
+    recurring, ongoing pattern across multiple employees (25 Oct-10 Nov sample, excluding the known
+    8-11 Nov holiday closure) — consistent with this being a live systemic gap, not a one-off for
+    VFL4071 specifically.
+- **VFL1453 — ✅ ROOT-CAUSED 21 Nov 2026: NOT a data bug, a viewing-window bug.** His 18 Nov
+  `attendance_records` row is complete and correct — check-in 18:48:52 IST, check-out 07:00:36 IST
+  (Shift 5, `hr_allocated`), status `P`, 12.20h, GPS accuracy 4.1m/11.5m, zero fraud flags. The real
+  mechanism: **every screen that answers "was this person present on date X" is hard-capped to
+  today-only or today+yesterday (IST)** — `daily_attendance_report` (the exact self-serve view
+  CLAUDE.md tells HR to use), the owner/plant-head/hr-admin dashboard "today" tiles, the plant HTML
+  dashboard's per-employee block, and `useShiftCheckinSummary.ts`. Whoever looked this up did so on or
+  after 20 Nov, 2+ days after the fact, so 18 Nov had already fallen out of every one of these windows
+  — the row was never missing. **Systemic, not isolated to VFL1453** — the same false "not present"
+  reads for ANY employee on ANY date more than 1 day old. Two independent, low-risk fixes proposed
+  (not built yet, no urgency): widen `daily_attendance_report` into a date-parameterised lookup
+  (additive, no existing behavior touched), and/or point HR at an employee's own attendance calendar
+  (via "view as") for a specific past date instead of the "today" dashboard tiles.
 - **Friday 20 Nov 2026 is a working day for some employees (per-person, supervisor's call)** — no app
   action needed or wanted, matches the 13 Nov 2026 locked "Friday working is per-person" decision. Flagged
   but not acted on: tonight's 19:00/21:00 daily-allocator reminder (VFL1560/VFL1566) will likely report
@@ -97,9 +218,9 @@ actual next step, not optional cleanup — without it, November repeats today's 
 
 ---
 
-# >>> (previous) RESUME STATE 15 Nov 2026, 09:30 IST — superseded by the block above <<<
+# >>> (previous) RESUME STATE 15 Nov 2026, ~14:15 IST — superseded by the block above <<<
 
-## 🔴 THE ONE THING BLOCKING OCTOBER PAY — it is the owner's/HR's move, not Claude's
+## 🔴 THE ONE THING BLOCKING OCTOBER PAY — it is the owner's/HR's move, not Claude's (historical — resolved later this same block, see below)
 
 The October run **`d5c1e25a-bd3e-425a-8db0-540ef2734a2e`** (1–31 Oct, whole company, `population=null`)
 sits at **`in_review` with 102 `pay_run_items`**. HR already pressed Calculate (14 Nov 19:52 IST) and
@@ -141,6 +262,73 @@ the month this would have bitten hard** — 31 advances start recovering then. R
 **🔒 Standing lesson: snapshot JSON keys are UPPERCASE** (`ADVANCE`, `CANTEEN`, `SOCIETY`, `OTHER`, `PF`,
 `PT`, `ESI`, `MLWF`). A lowercase read of `snapshot->'deductions'` fails silently with NULL. Claude's own
 first pre-flight query made this mistake and briefly read as "no advance deductions at all".
+
+## ✅ OCTOBER PAYROLL RUN IS FINALIZED — CLOSED, verified live
+
+Run **`d5c1e25a-bd3e-425a-8db0-540ef2734a2e`** (1–31 Oct, whole company) is **`status='finalized'`**.
+The owner pressed approve → finalize himself (More → view-as → HR Admin → Payroll Run), as planned.
+Verified live, all four checks pass:
+- **102 `pay_run_items`, total net pay ₹754,359.36** — cross-checked against the owner's own exported
+  salary-sheet xlsx the same session: byte-identical (102 rows, same total, same 4 held employees
+  absent). Nothing to reconcile.
+- **`advance_recoveries` holds exactly 2 rows** (BUNG09 ₹2,000, VFL1528 ₹5,000) — PATCH_137's fix
+  worked correctly on the real finalize, not just in the earlier rolled-back test.
+- **Outstanding balances correctly decremented once each**: BUNG09 6,000→4,000, VFL1528 12,000→7,000.
+- **102 `payslip_ready` rows** written to `app_notifications` (one per pay_run_item) — the finalize
+  notification step ran fully.
+
+**⚠ Owner reported "one row" for `advance_recoveries` — re-checked live and the correct count is 2,
+both with the right amounts and balances.** No bug found on re-verification; likely a different/filtered
+view on his end. Flagging the correction for the record, not disputing in isolation — the four checks
+above all agree with each other and with the pre-finalize rolled-back test.
+
+**The 4 held employees stayed held, as decided**: VFL1001 (owner, all-zero structure), VFL1557
+(terminated, 0 present days), VFL4072 (Batch 2, pending explanation of app non-use), VFL4043 (passed
+away — see below). None were paid in this run; none need to be.
+
+## ✅ VFL4043 Uttam Kacharu Bhadgal — CLOSED (owner: "mark complete")
+
+Passed away, confirmed by the owner 15 Nov. `employee_status_history` (`status='left'`), deactivated,
+credentials revoked — all done and verified earlier this session (see CLAUDE.md). October payroll
+needed no further action for him (already held for an unrelated reason, stays held). **Nothing further
+to do for him** — if he is one of the 8 names on HR's exit-review task (`fdc04aa8…`), that line item is
+now moot; the task itself stays open for the other 7 until HR actions it in the app (due 20 Nov).
+
+## Standing lesson from this session, kept for the record
+
+**Snapshot JSON keys are UPPERCASE** (`ADVANCE`, `CANTEEN`, `SOCIETY`, `OTHER`, `PF`, `PT`, `ESI`,
+`MLWF`). A lowercase read of `snapshot->'deductions'`/`->'earnings'` fails silently with NULL — this is
+exactly how PATCH_103's `apply_advance_recoveries()` went unnoticed-broken since 21 Oct (see CLAUDE.md's
+PATCH_137 section for the full story). Confirm against `lib/payroll/engine.ts` before trusting any such
+query.
+
+## 🟡 Next session — nothing urgent, nothing blocking; pick up when convenient
+
+1. **HR exit task** (`fdc04aa8…`, due 20 Nov) — 7 remaining named employees (VFL4043 now moot). Owner
+   said their November questions get answered when November salaries run, first week of December —
+   do not chase before then.
+2. **VFL4071's 6/7 Nov half-day rows + 2/3 Nov missing nights** — still uncorrected; needs real
+   replacement punch times from HR/Kajal, not guessed.
+3. **8–11 Nov Diwali paid holiday** (4 days, staff + worker) — queued for whoever builds November's
+   Extras report, per the 1 Nov two-report principle. No urgency; November's run isn't until December's
+   first week.
+4. **Early-arrival/06:45 rollover bug** (mis-dates a pre-shift arrival to the previous day) — root
+   cause understood, forward fix not yet written; low priority, only 29 occurrences since 1 Oct.
+5. **Historical credential-revocation gap**: the ~31 pre-PATCH_135 exits that got `is_active=false`
+   only (PATCH_60/61, VFL5337, etc.) were revoked in bulk by PATCH_136 — but their `employee_status_history`
+   was never back-dated (deliberately, per the no-fabrication rule). Flagged to the owner as a
+   record-keeping gap, not yet raised as its own item — raise it when there's a natural moment, don't
+   force it.
+6. **Dependabot**: #62/#63/#65/#66 (Actions bumps) and #70/#71 (lint-only, no CI step reads them) —
+   left open deliberately, take one at a time with a green APK each.
+7. **AI-agent roadmap** — owner wants a dedicated scoping session before any build; not started.
+8. **Leave balances gap**: VFL5463/64/65/66 have no `leave_balances` row — owner said he'll confirm
+   numbers when he has them; not blocking.
+9. **Production sync / Goal 2** — stays fully parked. No production questions, no production items in
+   any brief, until the owner opens Goal 2 himself.
+
+Branch `claude/forge-os-backend-setup-7woj4t`, latest APK `apk-133` — no new APK needed since (this
+session's changes, PATCH_135/136/137, are database-only).
 
 ## ✅ Done in the 14–15 Nov session (all verified live, nothing left half-applied)
 

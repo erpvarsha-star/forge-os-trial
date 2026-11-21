@@ -3771,6 +3771,27 @@ settled separately once HR confirms whether he left, same route as VFL4072 (Batc
 approved and finalized as it stands, with **102 pay_run_items and 4 held** (VFL1001, VFL1557, VFL4072,
 VFL4043). The owner does both transitions himself via More → view-as → HR Admin → Payroll Run.
 
+## 🔒 VFL4043 Uttam Kacharu Bhadgal — PASSED AWAY, owner confirmed 15 Nov 2026 (same day as the above)
+
+**Owner: "hes passed away."** Supersedes the "needs the owner's call" framing above — this is now a
+closed fact, not an open question. **Recorded and acted on the same turn, live:**
+`employee_status_history` gained a `status='left'` row (`effective_from` = the date Claude was told,
+2026-11-15 — the owner gave no actual date of death, so none was fabricated; the note says so
+explicitly); `employees.is_active` set `false` (active headcount 105 → **104**); credentials revoked
+via `_revoke_employee_credentials()` (the PATCH_135/136/137 pattern — PIN destroyed, 1 live refresh
+token and 1 live session both killed, verified 0/0 afterwards).
+
+**October payroll: no change.** He was already HELD (no `pay_run_item`) in the October run `d5c1e25a`
+before this, for an unrelated reason (3 present days → engine computes a negative net → `engine.ts:168`
+holds him). That stands. **The run's "4 held" set (VFL1001, VFL1557, VFL4072, VFL4043) and the 102
+pay_run_items are untouched** — the owner approves and finalizes it as-is, per the decision immediately
+above.
+
+**Not done, and not this Claude's call to do:** no final settlement, gratuity, or death-benefit
+processing — that is HR/owner territory once they decide what, if anything, is owed. HR's exit-review
+task (`fdc04aa8…`, due 20 Nov) can now be checked off for him specifically, but the task still covers
+7 other named employees and stays open until HR actions it in the app.
+
 ## 🔒 PATCH_137, 15 Nov 2026 — advance recovery had NEVER worked: wrong JSON key casing
 
 **Found by a pre-finalize check, minutes before the owner finalized October — not by any report.**
@@ -3815,6 +3836,42 @@ that casing exactly; a lowercase read fails silently, returning NULL rather than
 trusting any such query, confirm against `lib/payroll/engine.ts`** — and note Claude's own first
 pre-flight query made this same mistake and briefly read as "zero advance deductions in the run",
 which was the query's fault, not the data's.
+
+## ✅ OCTOBER 2026 PAYROLL RUN — FINALIZED, 15 Nov 2026. GOAL 1's first real in-app pay run, closed.
+
+**⚠ SUPERSEDED 17 Nov 2026 — see "PATCH_138/139" below: this run was then found to have underpaid
+most of the company and was corrected live.** Kept as the record of what was verified true at the
+15 Nov finalize itself (advance recovery, payslip notifications, held employees) — all of that
+remains accurate; only the headline total (₹7,54,359.36) was wrong, for the reason PATCH_138/139
+explains.
+
+**The owner approved and finalized it himself** (More → view-as → HR Admin → Payroll Run), exactly as
+he said he would. Run `d5c1e25a-bd3e-425a-8db0-540ef2734a2e`: `status='finalized'`, **102
+`pay_run_items`, total net pay ₹754,359.36**. Verified live, four ways, all consistent:
+1. The owner's own exported salary-sheet xlsx (shared the same session, no accompanying question) is
+   byte-identical to the live `pay_run_items` — 102 rows, same total, same 4 held employees absent.
+2. **`advance_recoveries` holds exactly 2 rows** (BUNG09 ₹2,000, VFL1528 ₹5,000) — PATCH_137's fix
+   (see above) worked correctly on the real finalize, not just the earlier rolled-back test.
+3. **Outstanding balances decremented exactly once each**: BUNG09 6,000→4,000, VFL1528 12,000→7,000.
+4. **102 `app_notifications` rows of type `payslip_ready`** — one per `pay_run_item`, confirming the
+   finalize notification step ran in full.
+
+**⚠ The owner reported seeing "one row" for `advance_recoveries` — re-checked live same turn, the
+correct count is 2, matching every other check above.** Recorded as a correction, not treated as a
+live bug: nothing here is inconsistent with itself, so this was most likely a different/filtered view
+on his side, not a second defect. Revisit only if he sees it again after a hard refresh.
+
+**The 4 held employees were not paid in this run and need nothing further for October**: VFL1001
+(owner, all-zero salary structure), VFL1557 (terminated for breach of information, 0 present days),
+VFL4072 (Batch 2, pending an explanation of why the app wasn't used), VFL4043 (passed away — see his
+own section above; already held for an unrelated reason, so his death changed nothing about this run).
+
+**This is the first payroll month run entirely in-app, start to finish, with no parallel sheet run** —
+the core milestone of Goal 1 (see the 29 Oct 2026 "Goal 1, handoff reconciliation" section). What's
+still open before Goal 1 can be called fully complete: the remaining SHEETS_RETIREMENT.md rows, the
+FY27 gap audit showing zero sheet-only gaps, and the owner's own sign-off that the parallel sheets are
+retired. None of that blocks anything — see PENDING.md's "Next session" list for what's actually
+queued.
 
 ## 🔒 PATCH_138/139, 17 Nov 2026 — October payroll underpaid ~89 of 91 staff+worker employees:
 ## unpaginated attendance read silently truncated at ~1000 rows; corrected live on HR's sheet
@@ -3865,6 +3922,47 @@ explanation of app non-use") have **no `pay_run_item` at all** in this run, so t
 (which required an existing item to correct) correctly skipped both — 87 corrected is not a
 miscount of 89, it's 89 minus these two known-held cases. Still open pending HR/owner's call on
 each.
+
+## PATCH_140 (retroactive record), 20 Nov 2026 — BUNG/Consultant October underpayment corrected,
+## never documented until a 21 Nov investigation found it
+
+**Found 21 Nov 2026 by a read-only investigation agent, not reported by anyone at the time.**
+PATCH_138/139 (17 Nov) only reconciled Staff and Worker against the two HR sheets emailed that day;
+whether BUNG (Pune) and Consultant were exposed to the same `loadFeeds()` pagination-truncation bug
+was explicitly left open in PENDING.md. It turns out **someone (owner, via a different session/tool,
+per the correction's own audit note) already answered and fixed this on 20 Nov 2026 — 15+ hours before
+this file was updated to say so.**
+
+**Why they were exposed:** `payroll-run`'s `loadFeeds()` fetches `attendance_records` **once,
+company-wide, unsplit by population**, for the whole pay period — there is no separate feed path for
+BUNG/Consultant that could have exempted them from the pre-PATCH_138 truncation. BUNG attendance
+enters via `pune_set_attendance` rather than GPS check-in, but it lands in the same table and the same
+unfiltered query.
+
+**What was corrected, live, 2026-11-20 12:33:12 UTC (≈18:03 IST) — same mechanism as PATCH_139**
+(`trg_lock_items_upd` disabled → `net_pay` + a `correctionAudit` snapshot block written → trigger
+re-enabled): all **14** live BUNG\*/Consultant `pay_run_items` on run
+`d5c1e25a-bd3e-425a-8db0-540ef2734a2e` (7 BUNG, 7 active consultants — CON16/18/21/22/23 correctly have
+no item, inactive per the 28 Oct decision), citing "owner instruction 20 Nov 2026 via Claude" and HR's
+Pune/Consultant sheets. Examples: BUNG01 ₹8,870.97→₹25,000.00; BUNG02 ₹2,580.65→₹10,300.00; CON01
+₹7,000.00→₹27,038.00; CON13 ₹23,265.00→₹55,000.00; CON24 ₹0.00→₹6,000.00.
+
+**Independently re-verified by Claude, 21 Nov 2026, not taken on the correction's own audit note:**
+real October `attendance_records` present-day counts (BUNG01: 31, CON01: 24) are far above the
+pre-correction snapshots' recorded `worked: 11`/`worked: 10`, confirming the underpayment was real and
+not an artifact of the correction itself. `trg_lock_items_upd` is `tgenabled='O'` (re-locked); run
+stays `finalized`; item count unchanged at **102**; run total moved **₹29,30,490.40 → ₹31,33,434.00**
+(+₹2,02,943.60 across the 14 rows, matching the per-row deltas above).
+
+**🔒 Lesson — this is the exact "orphaned record" failure mode CLAUDE.md's own 10/13 Nov
+reconciliation passes exist to catch, happening again.** A real, correct, owner-authorised DB
+correction was applied and then never written into CLAUDE.md, PENDING.md, or a `scripts/PATCH_*.sql`
+record — a different session resuming from PENDING.md's own RESUME STATE block would have re-launched
+a redundant investigation (which is exactly what happened: this file's own 21 Nov top block listed
+"check BUNG/Consultant exposure" as an open item until the investigation agent found the correction
+already live). **Whenever a DB change is applied directly (via MCP tool, SQL Editor, or any path other
+than a merged PR), record it here in the SAME session, before the session ends** — never rely on a
+later session rediscovering it from the data alone.
 
 **Also not touched today:** BUNG*/CON* populations (today's email only carried the Staff and
 Worker sheets — Pune/consultant sheets weren't sent, so whether they have the same
