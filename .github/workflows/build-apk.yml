@@ -177,7 +177,7 @@ jobs:
         # "latest" release + fixed filename means
         # /releases/latest/download/app-release.apk is a permanent URL that
         # always points at the most recent successful build.
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: apk-${{ github.run_number }}
           name: Forge OS APK (build ${{ github.run_number }})
