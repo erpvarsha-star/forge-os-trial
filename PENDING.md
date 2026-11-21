@@ -94,9 +94,17 @@ update; this commit (PATCH_141 docs) is pushed on top of it. Confirm with `git l
    partial draft wouldn't just be early, it would be wrong. **Build it the first week of December**,
    same mechanism as October's `Oct2026_Extras_Report.xlsx` (scratchpad-only, has names/pay, not
    committed). Nothing to do before then.
-6. Data gaps needing the owner/HR directly, never to be fabricated — **nothing Claude can build**:
-   Shakeel Sayyad's emp_code (and dept/designation/salary), VFL1527's phone, leave balances for
-   VFL5463/64/65/66. Waiting on the owner/HR, not on Claude.
+6. ✅ ALL THREE CLOSED, 21 Nov 2026. (a) **Shakeel Sayyad + Ganesh Laxmanrao Kausadkar: CONFIRMED
+   LEFT.** Owner gave the real HR October sheet link; fetched its raw HTML directly (Firecrawl),
+   confirmed real data loaded (VFL1064/VFL1389/Sayed Uzaif Ali all present), searched it: zero
+   matches for either name. Per owner's own rule ("if he is not in this he's left"), both are
+   confirmed left; neither was ever provisioned an emp_code, so there's nothing to deactivate.
+   Permanently closed — do not re-raise as "needs an emp_code." (b) **VFL1527's phone: CLOSED**,
+   confirmed real (shared company security number with VFL1520, not a data error) and NULL on
+   VFL1527 is the correct permanent state (avoids phone-login ambiguity). (c) **Leave balances for
+   VFL5463/64/65/66: CONFIRMED correct, not a gap** — checked live, all 4 joined late Sep 2026, 1-year
+   anniversary is Sep 2027, matches the standing "no leave before 1 year" rule exactly. No action on
+   any of the three; see CLAUDE.md's "Pending from Yash" section for the full record.
 7. Telegram supervisor onboarding circular (@Form_mgr_bot) — **HR's task to circulate, not a Claude
    build.** Nothing to do here.
 8. ✅ DONE — Dependabot #62/#63/#65/#66 all merged, each individually verified green (see above).
@@ -105,9 +113,10 @@ update; this commit (PATCH_141 docs) is pushed on top of it. Confirm with `git l
    any build** (this is explicitly a money/priorities call under the 14 Nov rule, not a technical
    one Claude can decide). 6 candidate agent ideas are listed near the bottom of this file, unchanged.
 
-**So of items 5-9: only #8 (the next Dependabot bump) is actually actionable by Claude right now**
-— 5, 6, 7 and 9 are correctly blocked on time/owner/HR, not being skipped. Report this plainly rather
-than inventing work for them.
+**Status of items 5-9 as of 21 Nov 2026, ~20:30 IST: 5, 6 and 8 are now CLOSED. Only 7 (HR's own
+task) and 9 (owner's prioritization call) remain, and neither needs Claude to do anything further
+right now** — 7 is purely HR circulating a Telegram link, 9 needs the owner's budget/priority
+decision before any build.
 
 **A woken/restarted session: read this block, confirm the branch state with `git log --oneline -3`
 yourself (per the standing rule — don't just trust this note), then ask the owner whether to continue

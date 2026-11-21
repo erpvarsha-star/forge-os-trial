@@ -406,7 +406,10 @@ the user operates on IST, never UTC, and never "whatever the device thinks."
 - 39 worker employees (WORKER_SEED_04Aug2026.sql)
 - 120 original + 4 (PATCH_08) + 5 (PATCH_09) = 129 total once all patches run
 - ~96 of the original 120 have phone numbers after PATCH_03 (includes VFL5337 fix, 10 Aug)
-- **VFL1527** Sharwan Singh Jodha — phone intentionally left NULL (number given was duplicate of VFL1520)
+- **VFL1527** Sharwan Singh Jodha — phone deliberately left NULL. Confirmed by owner 21 Nov 2026: he
+  and VFL1520 share the same company-issued security number for real (not a data-entry error); it's
+  stored on VFL1520 only, since storing it on both would make phone-based login ambiguous between
+  them. Both log in fine via emp_code.
 - **VFL1528** Bhupendra Kashinath Bharude — phone +918805698127 (fixed in PATCH_05)
 - **VFL5450** Sayed Uzaif Ali — full name in payroll is "Sayed Uzaif Ali Syed Altaf Ali"; confirmed same person, no DB change needed
 - **PATCH_08 (real emp_codes, confirmed against contact list + salary sheet 10 Aug 2026)**:
@@ -2739,8 +2742,23 @@ exercised on a real device** — screen behind auth. New APK build needed
 
 1. **Worker → supervisor mapping** — CLOSED 10 Aug (Yash: "that will happen in the app") — this is an in-app assignment flow, not a DB patch task
 2. **Rotating supervisor update** — CLOSED 10 Aug (Yash: rotations are decided every Friday by HR/IR, cannot be provided in advance) — the weekly `supervisor_id` UPDATE is HR/IR's own task going forward, not tracked here
-3. **VFL1527 phone** — intentionally left NULL; correct number still unknown
-4. **Shakeel Sayyad** (and **Ganesh Laxmanrao Kausadkar**, found 24 Sep in Yash's advance-balance list) — **NOT in the app at all** (re-checked live 11 Oct 2026: no `employees` row for either; no login, no attendance, no payslip). Shakeel confirmed 10 Aug by Yash as a real employee, phone to stay NULL. Both still need a real `emp_code` (and department/designation/salary from the salary sheet) before he can be inserted — not fabricated, per the VFL5463 lesson (see PATCH_09 correction above). Add once Yash provides the code.
+3. **VFL1527 phone — CLOSED, 21 Nov 2026.** Owner confirmed the duplicate wasn't a data error: VFL1527
+   and VFL1520 were issued the **same company security number** by the company itself. Staying NULL
+   on VFL1527 is a deliberate technical choice, not an unknown — storing one phone number against two
+   different employees would make `resolve_login_identifier()` ambiguous (phone is one of the two
+   accepted login identifiers; a shared number can't resolve to a single person). Both already log in
+   fine via emp_code regardless, so nothing is lost. Do not re-flag this as "correct number unknown."
+4. **Shakeel Sayyad + Ganesh Laxmanrao Kausadkar — CLOSED, both confirmed LEFT, 21 Nov 2026.**
+   Neither was ever provisioned an `emp_code` in the app (no `employees` row, no login, no
+   attendance, no payslip — confirmed again live before closing this). Owner's rule, 21 Nov 2026:
+   "if he is not in this he's left" — given the direct link to HR's real "1 to 31 Oct 2026" staff
+   sheet (`https://docs.google.com/spreadsheets/d/e/2PACX-1vSSHYtli0_g75C_3MLLIPxL9izb_tlVp-L04vG9wLnLXXzULzki8oyIiAMm83I-9_7Hoit72XyDSCC9/pubhtml?gid=1080339125`),
+   fetched the raw HTML directly (Firecrawl, `maxAge:0`), confirmed it actually loaded real data
+   (found VFL1064, VFL1389, "Shirgire", "Sayed Uzaif Ali" all present in it), then searched the
+   whole sheet: **zero matches for "Shakeel", "Sayyad", "Ganesh" or "Kausadkar", any spelling.**
+   Neither man is on HR's October sheet — both have left. Since neither was ever added to the app,
+   there is nothing to deactivate or block. **No further action; do not re-raise either name as a
+   "needs an emp_code" data gap again** — that's now permanently closed, not pending.
 5. **Nagnath Kale / Sadashiv Soddy real emp_codes** — CLOSED, stale entry found and fixed 27 Sep 2026. This used to ask Yash to provide codes; both already have real ones (CON09, CON12 — see "Employee data" above), both `is_active=true`, both have completed first login. Nothing outstanding.
 6. **Real bundle ID before Play Store submission** — **N/A as of 10 Aug**: Yash confirmed the app will NOT go on Play Store — APK will be distributed as a direct download link to all 129 employees (sideload install). `com.vfpl.forgeos` stays as-is, no further action needed on this.
 7. **EAS account for signed/production builds** — not needed given #6 (no Play Store, sideload distribution). The existing debug APK from GitHub Actions is sufficient — Android installs any signed APK (including debug-signed) directly, no Play Store signing required. Only revisit if Yash later decides to publish to Play Store.
