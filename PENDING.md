@@ -1,4 +1,61 @@
-# >>> RESUME STATE 21 Nov 2026, 09:55 IST — READ THIS FIRST <<<
+# >>> RESUME STATE 21 Nov 2026, ~15:30 IST (session pausing, resume ~19:30 IST) — READ THIS FIRST <<<
+
+## Owner's "one issue at a time" plan, items 1-2 of 9 DONE. Resume at item 3.
+
+**Branch:** `claude/forge-os-backend-setup-7woj4t` (authoritative) — HEAD `46b609b`, confirmed via
+`git log`. `ccr-1892615a-szlynv` (this session's dev branch) is fast-forwarded to the same commit and
+pushed — the two are identical right now, no divergence to reconcile on restart.
+
+**What's DONE and verified (not just agent-claimed), this session:**
+1. Doc reconciliation: merged orphaned PR #82 (VFL4043), closed it; triaged 9 new Dependabot PRs
+   (#87/88/89/90/91/92 closed with reasons, #86/93/94 left open). PR #95 squash-merged into the
+   authoritative branch.
+2. Phase 1 investigations, all root-caused: BUNG/Consultant Oct payroll exposure (already fixed live
+   20 Nov by someone else, undocumented until now — recorded as **PATCH_140**); VFL1453 (viewing-window
+   bug, not a data bug — `daily_attendance_report`/dashboards are hard-capped to today/yesterday, so a
+   2+-day-old present row always reads as "not present"; NOT fixed, just diagnosed, no urgency); PR
+   #84/#85 re-verified fully live (5/5 checks pass).
+3. Phase 2 (3 small, already-decided fixes): 720-minute `lateMinutesAgainst`/`serverLateMinutesAgainst`
+   off-by-one (+ a new standalone boundary test, 6/6 pass); diagnostic logging for the abandoned-late-
+   modal path (later superseded — see item 4); EOTM tie-break made explicit. All tsc-7/i18n-clean
+   verified by Claude independently, all pushed.
+4. **Owner's "one issue at a time" plan — item 1 of 9: DONE, verified, pushed (`46b609b`).** The
+   abandoned-late-modal data-loss bug (same mechanism as item 2) is fixed for real: `checkIn()` now
+   always saves the row immediately; the late-reason modal is a non-blocking follow-up via a new
+   `updateLateReason()`. Removed the now-dead diagnostic console.warn from Phase 2 item 3. tsc 7, i18n
+   clean, every `scripts/*.test.ts` 0 failed — re-run by Claude, not just the agent's say-so.
+5. **Item 2 of 9: DONE.** Owner confirmed ("late screen appersred ans he wa s present") the root cause
+   and that VFL4071 was genuinely present 2-3 Nov. Two manually-entered presence rows written
+   (`status='P'`, no fabricated punch times, same convention as Pune/security screens) — confirmed zero
+   pre-existing rows before insert. No patch file (a 2-row, owner-confirmed, one-off correction).
+
+**⏳ App-code changes done this session (720 fix + EOTM tie-break + the late-modal fix) have NOT yet
+had an APK built off them.** Nothing is blocking a build — just hasn't been triggered since more items
+in the 9-item plan were still coming. Trigger one once the owner is done with the plan for this session,
+or sooner if he asks.
+
+**NEXT: resume the numbered plan at item 3 of 9** (the full original list, for reference):
+1. ✅ DONE — VFL4071 abandoned-modal data-loss design fix
+2. ✅ DONE — VFL4071 historical 2–3 Nov correction
+3. ⏳ NEXT — VFL1453-class bug: the today/yesterday-only attendance lookup (affects everyone, not just
+   him). Already diagnosed above; the question to ask the owner is whether/how to widen it.
+4. Fraud escalation tiers (2nd flag→HR, 3rd+→owner/plant head) — not built, not urgent.
+5. November Extras report (OT, 8–11 Nov Diwali paid holiday) — due first week of December, no rush.
+6. Data gaps needing the owner/HR (never fabricate): Shakeel Sayyad's emp_code, VFL1527's phone, leave
+   balances for VFL5463/64/65/66.
+7. Telegram supervisor onboarding circular — HR's task to circulate, not a build.
+8. Remaining Dependabot PRs (#62/63/65/66 Actions bumps, #86/93/94 low-risk) — hold behind a green APK
+   each, not urgent.
+9. AI-agent roadmap — needs the owner's prioritization before any build; 6 candidates listed near the
+   bottom of this file.
+
+**A woken/restarted session: read this block, confirm the branch state with `git log --oneline -3`
+yourself (per the standing rule — don't just trust this note), then ask the owner whether to continue
+the numbered plan at item 3 or do something else first.**
+
+---
+
+# >>> (previous) RESUME STATE 21 Nov 2026, 09:55 IST — superseded by the block above <<<
 
 ## Doc reconciliation + Dependabot triage done; investigation agents launching next
 
@@ -129,14 +186,21 @@ live regardless of merge status.
     "Check In" instead of "Check Out" — he tapped it twice ~41-59s apart, producing `hours_worked=0.01`
     → `HL`. `087dfcf`'s open-record-first lookup already prevents this going forward. The two historical
     HL rows stand uncorrected, per the owner's 13 Nov "never correct paid months" rule.
-  - **2-3 Nov "absent": genuinely unexplained from server data — nothing to fix yet.** Zero trace
-    anywhere (no attendance row any date, no fraud_alerts/flags, no leave_requests) — if a check-in was
-    really attempted, it never reached a DB write at all. Leading theory: the late-reason modal
-    (`CheckInCard.tsx`) blocked submission on a wrong `rawLateMinutes` value (the same deferred 720
-    off-by-one bug) and was abandoned before a reason was entered — GPS would have already succeeded by
-    then, matching "HR saw a real check-in" from the outside while nothing was ever saved. **Cannot be
-    confirmed without asking:** did a "why are you late" prompt appear on his phone those two nights?
-    **One question for HR/the owner, not a guess** — see the next brief.
+  - **2-3 Nov "absent": ✅ ROOT CAUSE CONFIRMED by the owner 21 Nov 2026** ("late screen appersred ans
+    he wa s present") — the late-reason modal DID appear (confirms the leading theory below) and he WAS
+    genuinely present both nights; the modal blocked the save and was abandoned, exactly the mechanism
+    that produced zero server-side trace. **FIXED FORWARD the same day** — see "Fix 1" below, the
+    check-in flow no longer blocks the save on the late-reason modal, so this exact loss can't recur.
+    **✅ HISTORICAL DATA CORRECTED, 21 Nov 2026, owner approved ("a"):** two manually-entered presence
+    rows written (`status='P'`, no fabricated check-in/out time — same convention as the Pune/security
+    screens), confirmed zero pre-existing rows for either date before insert. `scripts/` has no patch
+    file for this (a two-row, owner-confirmed, non-repeatable data correction, same category as the
+    BUNG/CON PATCH_140 correction — recorded here, not as a numbered SQL patch).
+    Original diagnosis (now confirmed correct), kept for the record: no attendance row, no fraud_alerts/
+    flags, no leave_requests existed for either date — the late-reason modal (`CheckInCard.tsx`) blocked
+    submission on a wrong/high `rawLateMinutes` and was abandoned before a reason was entered; GPS had
+    already succeeded by that point, matching "a real check-in" from the outside while nothing was ever
+    saved server-side.
   - **Blast radius, read-only check:** 1-5 missing night-shift attendance rows per night is a small,
     recurring, ongoing pattern across multiple employees (25 Oct-10 Nov sample, excluding the known
     8-11 Nov holiday closure) — consistent with this being a live systemic gap, not a one-off for
@@ -307,8 +371,10 @@ query.
 1. **HR exit task** (`fdc04aa8…`, due 20 Nov) — 7 remaining named employees (VFL4043 now moot). Owner
    said their November questions get answered when November salaries run, first week of December —
    do not chase before then.
-2. **VFL4071's 6/7 Nov half-day rows + 2/3 Nov missing nights** — still uncorrected; needs real
-   replacement punch times from HR/Kajal, not guessed.
+2. **VFL4071's 2/3 Nov missing nights — ✅ CLOSED 21 Nov 2026** (owner confirmed present, root cause
+   confirmed, fixed forward, 2 rows written — see the VFL4071 bullet above). **6/7 Nov half-day rows
+   still uncorrected** — those still need real replacement punch times from HR/Kajal (the forward fix
+   doesn't retroactively touch them); the owner has not asked for this, no urgency.
 3. **8–11 Nov Diwali paid holiday** (4 days, staff + worker) — queued for whoever builds November's
    Extras report, per the 1 Nov two-report principle. No urgency; November's run isn't until December's
    first week.
