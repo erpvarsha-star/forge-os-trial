@@ -3771,6 +3771,27 @@ settled separately once HR confirms whether he left, same route as VFL4072 (Batc
 approved and finalized as it stands, with **102 pay_run_items and 4 held** (VFL1001, VFL1557, VFL4072,
 VFL4043). The owner does both transitions himself via More → view-as → HR Admin → Payroll Run.
 
+## 🔒 VFL4043 Uttam Kacharu Bhadgal — PASSED AWAY, owner confirmed 15 Nov 2026 (same day as the above)
+
+**Owner: "hes passed away."** Supersedes the "needs the owner's call" framing above — this is now a
+closed fact, not an open question. **Recorded and acted on the same turn, live:**
+`employee_status_history` gained a `status='left'` row (`effective_from` = the date Claude was told,
+2026-11-15 — the owner gave no actual date of death, so none was fabricated; the note says so
+explicitly); `employees.is_active` set `false` (active headcount 105 → **104**); credentials revoked
+via `_revoke_employee_credentials()` (the PATCH_135/136/137 pattern — PIN destroyed, 1 live refresh
+token and 1 live session both killed, verified 0/0 afterwards).
+
+**October payroll: no change.** He was already HELD (no `pay_run_item`) in the October run `d5c1e25a`
+before this, for an unrelated reason (3 present days → engine computes a negative net → `engine.ts:168`
+holds him). That stands. **The run's "4 held" set (VFL1001, VFL1557, VFL4072, VFL4043) and the 102
+pay_run_items are untouched** — the owner approves and finalizes it as-is, per the decision immediately
+above.
+
+**Not done, and not this Claude's call to do:** no final settlement, gratuity, or death-benefit
+processing — that is HR/owner territory once they decide what, if anything, is owed. HR's exit-review
+task (`fdc04aa8…`, due 20 Nov) can now be checked off for him specifically, but the task still covers
+7 other named employees and stays open until HR actions it in the app.
+
 ## 🔒 PATCH_137, 15 Nov 2026 — advance recovery had NEVER worked: wrong JSON key casing
 
 **Found by a pre-finalize check, minutes before the owner finalized October — not by any report.**
@@ -3815,6 +3836,42 @@ that casing exactly; a lowercase read fails silently, returning NULL rather than
 trusting any such query, confirm against `lib/payroll/engine.ts`** — and note Claude's own first
 pre-flight query made this same mistake and briefly read as "zero advance deductions in the run",
 which was the query's fault, not the data's.
+
+## ✅ OCTOBER 2026 PAYROLL RUN — FINALIZED, 15 Nov 2026. GOAL 1's first real in-app pay run, closed.
+
+**⚠ SUPERSEDED 17 Nov 2026 — see "PATCH_138/139" below: this run was then found to have underpaid
+most of the company and was corrected live.** Kept as the record of what was verified true at the
+15 Nov finalize itself (advance recovery, payslip notifications, held employees) — all of that
+remains accurate; only the headline total (₹7,54,359.36) was wrong, for the reason PATCH_138/139
+explains.
+
+**The owner approved and finalized it himself** (More → view-as → HR Admin → Payroll Run), exactly as
+he said he would. Run `d5c1e25a-bd3e-425a-8db0-540ef2734a2e`: `status='finalized'`, **102
+`pay_run_items`, total net pay ₹754,359.36**. Verified live, four ways, all consistent:
+1. The owner's own exported salary-sheet xlsx (shared the same session, no accompanying question) is
+   byte-identical to the live `pay_run_items` — 102 rows, same total, same 4 held employees absent.
+2. **`advance_recoveries` holds exactly 2 rows** (BUNG09 ₹2,000, VFL1528 ₹5,000) — PATCH_137's fix
+   (see above) worked correctly on the real finalize, not just the earlier rolled-back test.
+3. **Outstanding balances decremented exactly once each**: BUNG09 6,000→4,000, VFL1528 12,000→7,000.
+4. **102 `app_notifications` rows of type `payslip_ready`** — one per `pay_run_item`, confirming the
+   finalize notification step ran in full.
+
+**⚠ The owner reported seeing "one row" for `advance_recoveries` — re-checked live same turn, the
+correct count is 2, matching every other check above.** Recorded as a correction, not treated as a
+live bug: nothing here is inconsistent with itself, so this was most likely a different/filtered view
+on his side, not a second defect. Revisit only if he sees it again after a hard refresh.
+
+**The 4 held employees were not paid in this run and need nothing further for October**: VFL1001
+(owner, all-zero salary structure), VFL1557 (terminated for breach of information, 0 present days),
+VFL4072 (Batch 2, pending an explanation of why the app wasn't used), VFL4043 (passed away — see his
+own section above; already held for an unrelated reason, so his death changed nothing about this run).
+
+**This is the first payroll month run entirely in-app, start to finish, with no parallel sheet run** —
+the core milestone of Goal 1 (see the 29 Oct 2026 "Goal 1, handoff reconciliation" section). What's
+still open before Goal 1 can be called fully complete: the remaining SHEETS_RETIREMENT.md rows, the
+FY27 gap audit showing zero sheet-only gaps, and the owner's own sign-off that the parallel sheets are
+retired. None of that blocks anything — see PENDING.md's "Next session" list for what's actually
+queued.
 
 ## 🔒 PATCH_138/139, 17 Nov 2026 — October payroll underpaid ~89 of 91 staff+worker employees:
 ## unpaginated attendance read silently truncated at ~1000 rows; corrected live on HR's sheet
