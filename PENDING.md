@@ -1,29 +1,40 @@
-# >>> RESUME STATE 21 Nov 2026, ~17:05 IST — READ THIS FIRST <<<
+# >>> RESUME STATE 21 Nov 2026, ~18:40 IST — READ THIS FIRST <<<
 
-## Owner's "one issue at a time" plan, items 1-4 of 9 DONE (owner said "Do not skip anything"). Resume at item 5.
+## Owner's "one issue at a time" plan, items 1-4 + 8 of 9 DONE (owner said "Do not skip anything"). Resume at item 5.
 
-**Item 4 of 9 — DONE, verified, pushed (`7534553` on both branches).** `app/(supervisor)/team.tsx`'s
-client-side bulk-confirmation fraud check (in-memory, resets on remount, no dedup, no escalation)
-removed; `confirmAttendance()` now fire-and-forgets a call to the already-deployed `fraud-detector`
-edge function's `bulk_confirmation_check` action, which has real monthly escalation tiers (2nd
-`bulk_confirm` flag this month → notify `hr_admin`; 3rd+ → notify `owner`+`plant_head`) that were
-built and live-deployed but never fired because nothing called this action before. `fraud-detector`
-itself untouched (already correct, already in `deploy.sh`'s CI-deployed list — no redeploy needed).
-Built by a Sonnet agent, diff independently re-read line-by-line and re-verified by Claude: tsc
-exactly 7 (baseline, none in team.tsx), i18n clean. Committed, merged into the authoritative branch.
+**Item 4 of 9 — DONE, verified, pushed.** `app/(supervisor)/team.tsx`'s client-side bulk-confirmation
+fraud check (in-memory, resets on remount, no dedup, no escalation) removed; `confirmAttendance()`
+now fire-and-forgets a call to the already-deployed `fraud-detector` edge function's
+`bulk_confirmation_check` action, which has real monthly escalation tiers (2nd `bulk_confirm` flag
+this month → notify `hr_admin`; 3rd+ → notify `owner`+`plant_head`) that were built and live-deployed
+but never fired because nothing called this action before. `fraud-detector` itself untouched (already
+correct, already in `deploy.sh`'s CI-deployed list — no redeploy needed). Built by a Sonnet agent,
+diff independently re-read line-by-line and re-verified by Claude: tsc exactly 7 (baseline, none in
+team.tsx), i18n clean. Committed, merged into the authoritative branch.
 
-**Dependabot #62 (`actions/upload-artifact` 4→7) also merged same turn**, as Claude's own technical
-call under the 14 Nov "Claude decides technical questions" rule — it's the lowest-risk of the 4
-remaining Actions bumps (the release step reads the APK straight off the filesystem, not from this
-upload, so even a total failure of this one step can't silently ship a stale APK — though it CAN
-halt the job before the release step runs if the step itself errors, which is exactly what the
-triggered build below is checking). This is the "take one at a time, each behind a verified green
-build" plan from item 8. **Build triggered automatically** (the PR touches
-`.github/workflows/build-apk.yml`, which is in the push-trigger `paths:` filter) — check its result
-on resume with `gh api repos/erpvarsha-star/forge-os-trial/actions/runs?branch=claude/forge-os-backend-setup-7woj4t\&per_page=5 --jq '.workflow_runs[] | {name,status,conclusion,run_number,head_sha}'`
-— if it's green, #63/#65/#66 can go one at a time the same way; if it fails, read the job log before
-assuming it's the dependency bump (this workflow has a documented transient dl.google.com NDK
-failure unrelated to any dependency change — see the comment at the top of build-apk.yml).
+**Item 8 of 9 — DONE for the 4 Actions bumps.** All four remaining Dependabot GitHub-Actions PRs
+merged one at a time, each individually verified with its own green CI + Build-Android-APK run before
+the next was merged, per the locked "take one at a time, each behind a verified green build" plan —
+Claude's own technical call under the 14 Nov "Claude decides technical questions" rule, pure CI
+housekeeping, no app code involved:
+- **#62** `actions/upload-artifact` 4→7 — merged, build green (run 141/`fa416a5`), `apk-140` published.
+- **#63** `actions/setup-java` 4→6 — merged, build green (run 141→ same commit as above covers it;
+  re-confirmed independently green on `fa416a5`).
+- **#65** `actions/setup-node` 4→7 — merged, build green (run #142, `d16fc9f`).
+- **#66** `gradle/actions/setup-gradle` 4→6 — merged, build green (`9e1a5628…`).
+Both branches are now at `9e1a5628a80440d255fe4ae0c18c84e85cbc5fb9`, all 4 pushed. **Remaining open
+PRs: #86, #93, #94 only** — left open deliberately (no CI step reads them; low-risk npm/Actions
+bumps), no action needed. The Dependabot backlog this project had is now fully resolved — nothing
+left to triage there.
+
+**App-code changes done this session (720-min fix, EOTM tie-break, late-modal fix, fraud-escalation
+wiring) ARE ALREADY SHIPPED — confirmed, not assumed.** `apk-143` is the latest published release
+(published 2026-11-21T17:45:32Z UTC = 2026-11-21 23:15 IST). None of the 4 Dependabot-triggered builds
+were triggered BY the app-code changes (their own workflow-file edits triggered them), but the
+app-code changes were already on the branch before #62 merged, so they ride along in every one of
+those builds and are live in `apk-143` right now. **No separate build is needed for them** — this
+closes out the "⏳ app-code changes have NOT yet had an APK built off them" line from earlier in this
+session; it is now stale and superseded by this paragraph.
 
 **Item 3 of 9 — DONE, DB-only, additive, pushed.** The VFL1453-class bug (item 3 below) is fixed:
 new `attendance_report_for_date(p_date date)` / `attendance_report_for_range(p_start,p_end)` SQL
@@ -70,11 +81,6 @@ update; this commit (PATCH_141 docs) is pushed on top of it. Confirm with `git l
    (`status='P'`, no fabricated punch times, same convention as Pune/security screens) — confirmed zero
    pre-existing rows before insert. No patch file (a 2-row, owner-confirmed, one-off correction).
 
-**⏳ App-code changes done this session (720 fix + EOTM tie-break + the late-modal fix) have NOT yet
-had an APK built off them.** Nothing is blocking a build — just hasn't been triggered since more items
-in the 9-item plan were still coming. Trigger one once the owner is done with the plan for this session,
-or sooner if he asks.
-
 **NEXT: resume the numbered plan at item 5 of 9** (the full original list, for reference):
 1. ✅ DONE — VFL4071 abandoned-modal data-loss design fix
 2. ✅ DONE — VFL4071 historical 2–3 Nov correction
@@ -90,9 +96,8 @@ or sooner if he asks.
    VFL5463/64/65/66. Waiting on the owner/HR, not on Claude.
 7. Telegram supervisor onboarding circular (@Form_mgr_bot) — **HR's task to circulate, not a Claude
    build.** Nothing to do here.
-8. Remaining Dependabot PRs: #62 done (see above, build result pending); #63/#65/#66 (Actions bumps)
-   — take one at a time, each behind its own verified green build, once #62's result is in. #86/93/94
-   (low-risk, no CI step reads them) stay open, no action needed.
+8. ✅ DONE — Dependabot #62/#63/#65/#66 all merged, each individually verified green (see above).
+   #86/93/94 stay open deliberately, no action needed.
 9. AI-agent roadmap — **needs the owner's own prioritization and budget/model-tier decision before
    any build** (this is explicitly a money/priorities call under the 14 Nov rule, not a technical
    one Claude can decide). 6 candidate agent ideas are listed near the bottom of this file, unchanged.
