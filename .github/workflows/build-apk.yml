@@ -100,7 +100,7 @@ jobs:
         # reanimated have none).
         run: npm ci --ignore-scripts
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 17
