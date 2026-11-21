@@ -32,6 +32,19 @@ architect, per the 14 Nov "Claude decides technical questions" rule:
 - **Still open from before, unchanged:** #62, #63, #65, #66 (GitHub Actions bumps — take one at a time,
   each behind a verified green APK build; #64 `supabase/setup-cli` was already closed, not open).
 
+## ✅ Phase 2 (small fixes) complete — pushed, verified twice independently, no APK yet
+
+Three already-decided, no-owner-question fixes, each verified by Claude AND independently re-verified
+by the build agent itself (tsc exactly 7, i18n clean, new standalone test 6/0, payroll regression
+suites 137/0 + 77/0 unaffected): **720-minute off-by-one** (`lib/istDate.ts` + `lib/serverClock.ts`,
+changed together), **diagnostic logging for the abandoned-late-modal path** (`CheckInCard.tsx` +
+`worker/home.tsx`, plain `console.warn`, no new table, no DB write, matches this project's existing
+logging style — a durable server-side trace would need its own owner decision, deliberately not made
+here), **EOTM tie-break made explicit** (`app/(owner)/eotm.tsx`). Commits `5f9df6b`/`72e28ec`/`44923f5`/
+`53c5ef1` on `ccr-1892615a-szlynv`, all pushed. **App-code-only — no deploy, no SQL, needs a fresh APK
+build before any of this reaches a device** (not yet triggered; waiting on the open owner question
+below before batching the next build).
+
 **Phase 1 complete — all 4 investigation agents reported, each verified independently by Claude where
 possible:**
 - VFL4071 — root-caused, two unrelated symptoms (see the updated bullet above).
