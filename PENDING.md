@@ -32,10 +32,19 @@ architect, per the 14 Nov "Claude decides technical questions" rule:
 - **Still open from before, unchanged:** #62, #63, #65, #66 (GitHub Actions bumps — take one at a time,
   each behind a verified green APK build; #64 `supabase/setup-cli` was already closed, not open).
 
-**Next: Phase 1 investigation agents (Sonnet, parallel, read-only — no fixes until root-caused):**
-VFL4071's night-shift misclassification, VFL1453's missing-present day, whether BUNG/Consultant
-October payroll has the same attendance-pagination exposure PATCH_138 fixed for Staff/Worker, and an
-independent confirmation that PR #84/#85's fixes are genuinely live end-to-end (not just merged).
+**Phase 1 complete — all 4 investigation agents reported, each verified independently by Claude where
+possible:**
+- VFL4071 — root-caused, two unrelated symptoms (see the updated bullet above).
+- VFL1453 — root-caused, viewing-window bug not a data bug (see the updated bullet above).
+- BUNG/Consultant exposure — already corrected live 20 Nov, undocumented until now (see PATCH_140
+  above).
+- **PR #84/#85 re-verification: ALL 5 CHECKS PASS, independently re-run, not taken from commit
+  messages.** `payroll-run` v21's 15-file deployed bundle is byte-identical to the repo and genuinely
+  calls `fetchAllRows`/`fetchAllPages` for both `attendance_records` and `leave_requests`;
+  `leave-form-dates.test.ts` 23/0 run fresh; `LeaveAdvanceApprovalCards.tsx`'s real-error-message fix
+  confirmed present; tsc exactly 7 (fresh `npm ci` + run), i18n clean; VFL5449's live COFF request
+  (still pending, untouched) would now show "Comp-off balance insufficient: employee has 0 unused
+  day(s), 1 requested" instead of the old generic message.
 
 ## ✅ BUNG/Consultant exposure — ALREADY CORRECTED LIVE, 20 Nov 2026, by a session that never recorded it
 
@@ -100,9 +109,25 @@ live regardless of merge status.
   owner's 29 Oct 2026 "comp-off shortfall: BLOCKED" rule, but the error message doesn't say why. Not a
   bug to silently approve around — flag to HR/Pallavi: why did he apply for a comp-off he hasn't earned?
   A clearer in-app error message (naming the real reason) would be a small, worthwhile follow-up fix.
-- **VFL4071 (2-3 Nov shown absent despite real check-in/out; 6-7 Nov shown half-day despite full day)**
-  — same night-shift-checkout misclassification bug class as the 12 Nov VFL4024/VFL5458 finding. Still
-  open, not yet root-caused or fixed.
+- **VFL4071 — ✅ ROOT-CAUSED 21 Nov 2026, two UNRELATED symptoms, different fixes needed.**
+  - **6-7 Nov "half-day": FULLY EXPLAINED, already fixed going forward (12 Nov commit `087dfcf`).**
+    Both Fridays, a WO placeholder row existed for that date while his real Shift-3 session (started
+    the previous night) was still open; the OLD `fetchRecords()` found the WO row first and offered
+    "Check In" instead of "Check Out" — he tapped it twice ~41-59s apart, producing `hours_worked=0.01`
+    → `HL`. `087dfcf`'s open-record-first lookup already prevents this going forward. The two historical
+    HL rows stand uncorrected, per the owner's 13 Nov "never correct paid months" rule.
+  - **2-3 Nov "absent": genuinely unexplained from server data — nothing to fix yet.** Zero trace
+    anywhere (no attendance row any date, no fraud_alerts/flags, no leave_requests) — if a check-in was
+    really attempted, it never reached a DB write at all. Leading theory: the late-reason modal
+    (`CheckInCard.tsx`) blocked submission on a wrong `rawLateMinutes` value (the same deferred 720
+    off-by-one bug) and was abandoned before a reason was entered — GPS would have already succeeded by
+    then, matching "HR saw a real check-in" from the outside while nothing was ever saved. **Cannot be
+    confirmed without asking:** did a "why are you late" prompt appear on his phone those two nights?
+    **One question for HR/the owner, not a guess** — see the next brief.
+  - **Blast radius, read-only check:** 1-5 missing night-shift attendance rows per night is a small,
+    recurring, ongoing pattern across multiple employees (25 Oct-10 Nov sample, excluding the known
+    8-11 Nov holiday closure) — consistent with this being a live systemic gap, not a one-off for
+    VFL4071 specifically.
 - **VFL1453 — ✅ ROOT-CAUSED 21 Nov 2026: NOT a data bug, a viewing-window bug.** His 18 Nov
   `attendance_records` row is complete and correct — check-in 18:48:52 IST, check-out 07:00:36 IST
   (Shift 5, `hr_allocated`), status `P`, 12.20h, GPS accuracy 4.1m/11.5m, zero fraud flags. The real
