@@ -30,13 +30,17 @@ const CATEGORIES = [
  */
 function allocateWinners(candidates: Record<string, any[]>): Record<string, any> {
   const order = CATEGORIES
-    .map(cat => {
+    .map((cat, categoryIndex) => {
       const rows = candidates[cat.key] ?? []
       const top = rows[0]?.[cat.col] ?? 0
       const runnerUp = rows[1]?.[cat.col] ?? 0
-      return { key: cat.key, margin: top - runnerUp }
+      return { key: cat.key, margin: top - runnerUp, categoryIndex }
     })
-    .sort((a, b) => b.margin - a.margin)
+    // Tie-break on an identical margin: earliest category in CATEGORIES'
+    // own declared order wins first (attendance, then production, safety,
+    // 5s) — explicit so this isn't just an accident of Array.sort's
+    // stability, which a future refactor could silently change.
+    .sort((a, b) => b.margin - a.margin || a.categoryIndex - b.categoryIndex)
 
   const taken = new Set<string>()
   const results: Record<string, any> = {}
