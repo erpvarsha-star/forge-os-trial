@@ -58,7 +58,7 @@ export const serverLateMinutesAgainst = (startTime: string): number => {
   const [h, m] = startTime.split(':').map(Number)
   const now = serverIstNow()
   const diff = (now.getUTCHours() * 60 + now.getUTCMinutes() - (h * 60 + m) + 1440) % 1440
-  return diff > 720 ? 0 : diff
+  return diff >= 720 ? 0 : diff
 }
 
 const hhmm = (d: Date) =>
