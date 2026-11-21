@@ -1,4 +1,45 @@
-# >>> RESUME STATE 19 Nov 2026, 19:05 IST — READ THIS FIRST <<<
+# >>> RESUME STATE 21 Nov 2026, 09:55 IST — READ THIS FIRST <<<
+
+## Doc reconciliation + Dependabot triage done; investigation agents launching next
+
+**What this stage is:** before building anything from the 19 Nov block below, reconciled the repo's
+real GitHub state against this file (found it had drifted) and triaged every new Dependabot PR.
+No app code, no DB write, no deploy.
+
+**Found and fixed — PENDING.md was behind the actual repo.** Draft PR #82 ("Record VFL4043's passing;
+revoke credentials; defer HR exit task") had never been merged, even though its DB change was applied
+live weeks ago and its doc content already exists on this branch (`PENDING.md` "✅ VFL4043 … CLOSED"
+block, `CLAUDE.md` "PASSED AWAY" section) — the branches had simply diverged. Merged `claude/forge-os-session-start-5jxxxe` into this branch (clean, no conflicts), opened **draft PR #95** against
+`claude/forge-os-backend-setup-7woj4t` carrying that merge plus the already-present #84/#85 commits,
+and closed #82 with a comment pointing at #95 so it isn't merged twice.
+
+**Dependabot — 9 new PRs (#86–94) existed and were not in this file at all.** Read each one's actual
+`package.json` diff (never trust the group label, per the standing #67 lesson) and decided, as
+architect, per the 14 Nov "Claude decides technical questions" rule:
+- **Closed, each with a reason comment on the PR:** **#87** (mislabelled "minor-and-patch" group —
+  actually carries `react-native` 0.74.0→0.88.1 and `nativewind`→4.2.7, the same forbidden Reanimated-4
+  cascade as the already-closed #67), **#88** (i18next 23→27, 4 majors, no matching react-i18next bump
+  — risk of a silent translation break, which this project tests hard against), **#89**
+  (`react-native-safe-area-context` 4→5, SDK-51 mismatch, same pattern as #69), **#90**
+  (`expo-file-system` 17→58, targets SDK 58 — same pattern as #69, and this package is used directly
+  in the payroll export screen), **#91** (`react-dom` 18→19 with no matching `react` bump, breaks the
+  documented web-export verification step), **#92** (`lucide-react-native` 0→1, major icon-library
+  jump, untested against the existing 7-error tsc baseline).
+- **Left open on purpose:** **#86** (`action-gh-release` 2→3, build-machine only, fails loudly if
+  broken — same category as #62/63/65/66), **#93/#94** (`@typescript-eslint` 7→8, lint-only — eslint
+  has no config file and no CI step, confirmed 14 Nov, so these can never silently break anything;
+  lowest priority in the file).
+- **Still open from before, unchanged:** #62, #63, #65, #66 (GitHub Actions bumps — take one at a time,
+  each behind a verified green APK build; #64 `supabase/setup-cli` was already closed, not open).
+
+**Next: Phase 1 investigation agents (Sonnet, parallel, read-only — no fixes until root-caused):**
+VFL4071's night-shift misclassification, VFL1453's missing-present day, whether BUNG/Consultant
+October payroll has the same attendance-pagination exposure PATCH_138 fixed for Staff/Worker, and an
+independent confirmation that PR #84/#85's fixes are genuinely live end-to-end (not just merged).
+
+---
+
+# >>> (previous) RESUME STATE 19 Nov 2026, 19:05 IST — superseded by the block above <<<
 
 ## PATCH_138 deployed live; leave-apply date-parser bug fixed — PR #84 (draft), not yet merged
 
