@@ -30,12 +30,25 @@ interface AuthState {
  * employees table from anonymous callers, so this goes through the
  * SECURITY DEFINER resolver that returns only the email string.
  */
-async function resolveIdentifier(identifier: string): Promise<string | null> {
+type ResolveResult =
+  | { ok: true; email: string }
+  | { ok: false; reason: 'NOT_FOUND' | 'NETWORK_ERROR' }
+
+/**
+ * `error` (the RPC call itself failed — offline, timeout, server error) and
+ * `!data` (the RPC ran fine and genuinely found no matching employee) used to
+ * be collapsed into the same `null` return, so the login screen showed
+ * "Number not registered. Contact HR." for a real account on a bad network
+ * exactly as it would for a code that truly doesn't exist — misleading the
+ * employee into thinking their account was wrong when it was the connection.
+ */
+async function resolveIdentifier(identifier: string): Promise<ResolveResult> {
   const { data, error } = await supabase.rpc('resolve_login_identifier', {
     identifier: identifier.trim(),
   })
-  if (error || !data) return null
-  return data as string
+  if (error) return { ok: false, reason: 'NETWORK_ERROR' }
+  if (!data) return { ok: false, reason: 'NOT_FOUND' }
+  return { ok: true, email: data as string }
 }
 
 export function useAuth() {
@@ -144,12 +157,12 @@ export function useAuth() {
    * and JWT handling are all stock Supabase rather than anything hand-rolled.
    */
   const signInWithPin = async (identifier: string, pin: string) => {
-    const email = await resolveIdentifier(identifier)
-    if (!email) {
-      return { error: { message: 'NOT_FOUND' } as { message: string } }
+    const resolved = await resolveIdentifier(identifier)
+    if (!resolved.ok) {
+      return { error: { message: resolved.reason } as { message: string } }
     }
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password: pin })
+    const { error } = await supabase.auth.signInWithPassword({ email: resolved.email, password: pin })
     if (error) {
       return { error: { message: 'BAD_PIN' } as { message: string } }
     }

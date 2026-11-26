@@ -201,6 +201,7 @@
     "invalidPhone": "Please enter a valid 10-digit number",
     "invalidOtp": "Invalid OTP. Please try again.",
     "notRegistered": "Number not registered. Contact HR.",
+    "networkError": "Could not reach the server. Check your connection and try again.",
     "loginSuccess": "Login successful",
     "sessionExpired": "Session expired. Please login again.",
     "login": "Login",

@@ -59,6 +59,8 @@ export default function LoginScreen() {
       setError(
         signInError.message === 'NOT_FOUND'
           ? t('auth.notRegistered')
+          : signInError.message === 'NETWORK_ERROR'
+          ? t('auth.networkError')
           : t('auth.wrongPin')
       )
       setIsSubmitting(false)
